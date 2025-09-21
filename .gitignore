@@ -1,0 +1,70 @@
+# Build files
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Generated files
+*.g.dart
+*.freezed.dart
+*.config.dart
+*.gr.dart
+
+# Coverage
+coverage/
+lcov.info
+
+# Firebase
+firebase_app_id_file.json
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+
+# Temporary files
+*.tmp
+*.temp
+
+# Logs
+*.log
+
+# Release builds
+*.apk
+*.aab
+*.ipa
+*.app
+
+# Dependency directories
+node_modules/
+
+# Test files
+test_driver/screenshots/
+
+# Generated plugin files
+ios/Runner/GeneratedPluginRegistrant.*
+android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+
+# Key files (should never be committed)
+*.jks
+*.p12
+*.key
+*.pem
