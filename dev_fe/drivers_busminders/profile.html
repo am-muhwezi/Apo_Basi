@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Driver/Busminder Profile</title>
+</head>
+<body>
+    <h1>Your Profile</h1>
+    <nav>
+      <a href="dashboard.html">Dashboard</a> |
+      <a href="profile.html">Profile</a> |
+      <a href="login_signup.html" onclick="localStorage.clear()">Logout</a>
+    </nav>
+    <div id="profileInfo"></div>
+    <script>
+      if (!localStorage.getItem('access')) {
+        window.location.href = 'login_signup.html';
+      }
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const profileDiv = document.getElementById('profileInfo');
+      if (user && user.username) {
+        profileDiv.innerHTML = `<p>Username: ${user.username}</p><p>Email: ${user.email || ''}</p>`;
+      } else {
+        profileDiv.innerHTML = '<p>No profile info found.</p>';
+      }
+    </script>
+</body>
+</html>

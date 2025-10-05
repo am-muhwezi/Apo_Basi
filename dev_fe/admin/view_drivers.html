@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>View Drivers - Admin</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #FF9800; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        h1 { color: #FF9800; border-bottom: 3px solid #FF9800; padding-bottom: 10px; }
+        .nav-links { margin: 20px 0; }
+        .nav-links a { margin-right: 15px; padding: 8px 15px; background: #FF9800; color: white; text-decoration: none; border-radius: 4px; }
+        .nav-links a:hover { background: #F57C00; }
+        .count { background: #FF9800; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚗 All Drivers</h1>
+        <div class="nav-links">
+            <a href="dashboard.html">← Back to Dashboard</a>
+            <a href="view_busminders.html">View Bus Minders</a>
+            <a href="view_parents.html">View Parents</a>
+            <a href="view_children.html">View Children</a>
+        </div>
+
+        <p>Total Drivers: <span class="count" id="driverCount">0</span></p>
+
+        <table id="driversTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Date Joined</th>
+                    <th>Assigned Bus</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+
+        window.onload = async function() {
+            await loadDrivers();
+        };
+
+        async function loadDrivers() {
+            try {
+                const [usersRes, busesRes] = await Promise.all([
+                    fetch(`${API_BASE}/users/`),
+                    fetch(`${API_BASE}/buses/`)
+                ]);
+
+                const users = await usersRes.json();
+                const buses = await busesRes.json();
+
+                // Filter only drivers
+                const drivers = users.filter(u => u.user_type === 'driver');
+
+                document.getElementById('driverCount').textContent = drivers.length;
+
+                const tbody = document.querySelector('#driversTable tbody');
+                tbody.innerHTML = '';
+
+                drivers.forEach(driver => {
+                    // Find assigned bus
+                    const assignedBus = buses.find(b => b.driver_name &&
+                        b.driver_name.toLowerCase().includes(driver.first_name.toLowerCase()) &&
+                        b.driver_name.toLowerCase().includes(driver.last_name.toLowerCase()));
+
+                    const date = new Date(driver.date_joined).toLocaleDateString();
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${driver.id}</td>
+                            <td>${driver.first_name} ${driver.last_name}</td>
+                            <td>${driver.username}</td>
+                            <td>${driver.email || 'N/A'}</td>
+                            <td>${driver.phone_number || 'N/A'}</td>
+                            <td>${date}</td>
+                            <td>${assignedBus ? assignedBus.number_plate : 'Unassigned'}</td>
+                        </tr>
+                    `;
+                });
+            } catch(e) {
+                console.error('Error loading drivers:', e);
+                alert('Error loading drivers: ' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>

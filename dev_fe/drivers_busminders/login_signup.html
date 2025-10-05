@@ -1,0 +1,98 @@
+<!-- Placeholder: Driver/Busminder Login/Signup Page -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Driver/Busminder Login/Signup</title>
+</head>
+<body>
+    <h1>Driver/Busminder Login / Signup</h1>
+        <div id="formContainer">
+            <form id="loginForm">
+                    <input type="text" name="username" placeholder="Username" required><br>
+                    <input type="password" name="password" placeholder="Password" required><br>
+                    <button type="submit">Login</button>
+            </form>
+            <p>Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
+        </div>
+        <div id="signupContainer" style="display:none;">
+            <form id="signupForm">
+                    <input type="text" name="username" placeholder="Username" required><br>
+                    <input type="email" name="email" placeholder="Email" required><br>
+                    <input type="password" name="password" placeholder="Password" required><br>
+                    <input type="password" name="password_confirm" placeholder="Confirm Password" required><br>
+                    <input type="text" name="first_name" placeholder="First Name" required><br>
+                    <input type="text" name="last_name" placeholder="Last Name" required><br>
+                    <input type="text" name="phone_number" placeholder="Phone Number" required><br>
+                    <select name="user_type" required>
+                        <option value="busminder">Busminder</option>
+                        <option value="driver">Driver</option>
+                    </select><br>
+                    <button type="submit">Sign Up</button>
+            </form>
+            <p>Already have an account? <a href="#" id="showLogin">Login</a></p>
+        </div>
+        <script>
+        // Toggle forms
+        document.getElementById('showSignup').onclick = function() {
+            document.getElementById('formContainer').style.display = 'none';
+            document.getElementById('signupContainer').style.display = 'block';
+        };
+        document.getElementById('showLogin').onclick = function() {
+            document.getElementById('formContainer').style.display = 'block';
+            document.getElementById('signupContainer').style.display = 'none';
+        };
+
+        // Login logic
+        document.getElementById('loginForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const form = e.target;
+            const data = {
+                username: form.username.value,
+                password: form.password.value
+            };
+            const res = await fetch('http://localhost:8000/api/users/login/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (res.ok) {
+                localStorage.setItem('access', result.tokens.access);
+                localStorage.setItem('user', JSON.stringify(result.user));
+                window.location.href = 'dashboard.html';
+            } else {
+                alert(result.error || 'Login failed');
+            }
+        };
+
+        // Signup logic
+        document.getElementById('signupForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const form = e.target;
+            const data = {
+                username: form.username.value,
+                email: form.email.value,
+                password: form.password.value,
+                password_confirm: form.password_confirm.value,
+                first_name: form.first_name.value,
+                last_name: form.last_name.value,
+                phone_number: form.phone_number.value,
+                user_type: form.user_type.value
+            };
+            const res = await fetch('http://localhost:8000/api/users/register/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (res.ok) {
+                localStorage.setItem('access', result.tokens.access);
+                localStorage.setItem('user', JSON.stringify(result.user));
+                window.location.href = 'dashboard.html';
+            } else {
+                alert(result.error || 'Signup failed');
+            }
+        };
+        </script>
+</body>
+</html>

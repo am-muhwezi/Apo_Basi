@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Busminder</title>
+</head>
+<body>
+    <h1>Add Busminder</h1>
+    <form id="addBusminderForm">
+        <input type="text" name="first_name" placeholder="First Name" required><br>
+        <input type="text" name="last_name" placeholder="Last Name" required><br>
+        <input type="text" name="phone_number" placeholder="Phone Number" required><br>
+        <input type="email" name="email" placeholder="Email" required><br>
+        <input type="text" name="id_number" placeholder="ID Number" required><br>
+        <button type="submit">Add Busminder</button>
+    </form>
+    <a href="dashboard.html">Back to Dashboard</a>
+    <script>
+    document.getElementById('addBusminderForm').onsubmit = async function(e) {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        first_name: form.first_name.value,
+        last_name: form.last_name.value,
+        phone_number: form.phone_number.value,
+        email: form.email.value,
+        id_number: form.id_number.value
+      };
+      const res = await fetch('http://localhost:8000/api/admins/add-busminder/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+      });
+      const result = await res.json();
+      if (res.ok) {
+        alert('Busminder added! Username: ' + result.busminder.username + ' Password: ' + result.busminder.password);
+        form.reset();
+      } else {
+        alert(result.error || JSON.stringify(result));
+      }
+    };
+    </script>
+</body>
+</html>

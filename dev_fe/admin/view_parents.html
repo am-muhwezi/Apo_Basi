@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>View Parents - Admin</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #2196F3; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        h1 { color: #2196F3; border-bottom: 3px solid #2196F3; padding-bottom: 10px; }
+        .nav-links { margin: 20px 0; }
+        .nav-links a { margin-right: 15px; padding: 8px 15px; background: #2196F3; color: white; text-decoration: none; border-radius: 4px; }
+        .nav-links a:hover { background: #1976D2; }
+        .count { background: #2196F3; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>👨‍👩‍👧‍👦 All Parents</h1>
+        <div class="nav-links">
+            <a href="dashboard.html">← Back to Dashboard</a>
+            <a href="view_drivers.html">View Drivers</a>
+            <a href="view_busminders.html">View Bus Minders</a>
+            <a href="view_children.html">View Children</a>
+        </div>
+
+        <p>Total Parents: <span class="count" id="parentCount">0</span></p>
+
+        <table id="parentsTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Date Joined</th>
+                    <th>Children Count</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+
+        window.onload = async function() {
+            await loadParents();
+        };
+
+        async function loadParents() {
+            try {
+                const [usersRes, childrenRes] = await Promise.all([
+                    fetch(`${API_BASE}/users/`),
+                    fetch(`${API_BASE}/children/`)
+                ]);
+
+                const users = await usersRes.json();
+                const children = await childrenRes.json();
+
+                // Filter only parents
+                const parents = users.filter(u => u.user_type === 'parent');
+
+                document.getElementById('parentCount').textContent = parents.length;
+
+                const tbody = document.querySelector('#parentsTable tbody');
+                tbody.innerHTML = '';
+
+                parents.forEach(parent => {
+                    // Count children for this parent
+                    const parentName = `${parent.first_name} ${parent.last_name}`;
+                    const childCount = children.filter(c =>
+                        c.parent_name && c.parent_name.toLowerCase() === parentName.toLowerCase()
+                    ).length;
+
+                    const date = new Date(parent.date_joined).toLocaleDateString();
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${parent.id}</td>
+                            <td>${parent.first_name} ${parent.last_name}</td>
+                            <td>${parent.username}</td>
+                            <td>${parent.email || 'N/A'}</td>
+                            <td>${parent.phone_number || 'N/A'}</td>
+                            <td>${date}</td>
+                            <td>${childCount}</td>
+                        </tr>
+                    `;
+                });
+            } catch(e) {
+                console.error('Error loading parents:', e);
+                alert('Error loading parents: ' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>

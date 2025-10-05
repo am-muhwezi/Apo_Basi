@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Driver</title>
+</head>
+<body>
+    <h1>Add Driver</h1>
+    <form id="addDriverForm">
+        <input type="text" name="first_name" placeholder="First Name" required><br>
+        <input type="text" name="last_name" placeholder="Last Name" required><br>
+        <input type="text" name="license_number" placeholder="License Number" required><br>
+        <input type="text" name="phone_number" placeholder="Phone Number" required><br>
+        <button type="submit">Add Driver</button>
+    </form>
+    <a href="dashboard.html">Back to Dashboard</a>
+    <script>
+    document.getElementById('addDriverForm').onsubmit = async function(e) {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        first_name: form.first_name.value,
+        last_name: form.last_name.value,
+        license_number: form.license_number.value,
+        phone_number: form.phone_number.value
+      };
+      const res = await fetch('http://localhost:8000/api/admins/add-driver/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+      });
+      const result = await res.json();
+      if (res.ok) {
+        alert('Driver added! Username: ' + result.driver.username + ' Password: ' + result.driver.password);
+        form.reset();
+      } else {
+        alert(result.error || JSON.stringify(result));
+      }
+    };
+    </script>
+</body>
+</html>

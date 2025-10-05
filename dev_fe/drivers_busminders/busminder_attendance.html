@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bus Minder - Attendance</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        h1 { color: #333; }
+        .login-section { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .bus-card { background: white; padding: 20px; margin: 15px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .bus-card h3 { color: #9C27B0; margin-top: 0; }
+        .children-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .children-table th, .children-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        .children-table th { background-color: #9C27B0; color: white; }
+        .children-table tr:nth-child(even) { background-color: #f9f9f9; }
+        .status-select { padding: 6px; border-radius: 4px; border: 1px solid #ddd; }
+        .mark-btn { background-color: #4CAF50; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        .mark-btn:hover { background-color: #45a049; }
+        .success { color: #4CAF50; font-weight: bold; }
+        .error { color: #f44336; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>📋 Bus Minder - Attendance Management</h1>
+
+    <div class="login-section">
+        <h3>Login</h3>
+        <label>Username: <input type="text" id="username" placeholder="busminder_xxxxx"></label>
+        <label>Password: <input type="password" id="password"></label>
+        <button onclick="login()">Login</button>
+        <button onclick="logout()">Logout</button>
+        <div id="loginStatus"></div>
+    </div>
+
+    <div id="busesContainer"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        let authToken = localStorage.getItem('busminder_token');
+
+        window.onload = function() {
+            if (authToken) {
+                loadMyBuses();
+            }
+        };
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const res = await fetch(`${API_BASE}/users/login/`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (res.ok && data.access) {
+                    authToken = data.access;
+                    localStorage.setItem('busminder_token', authToken);
+                    document.getElementById('loginStatus').innerHTML = '<span class="success">Login successful!</span>';
+                    loadMyBuses();
+                } else {
+                    document.getElementById('loginStatus').innerHTML = '<span class="error">Login failed</span>';
+                }
+            } catch(e) {
+                document.getElementById('loginStatus').innerHTML = '<span class="error">Error: ' + e.message + '</span>';
+            }
+        }
+
+        function logout() {
+            authToken = null;
+            localStorage.removeItem('busminder_token');
+            document.getElementById('busesContainer').innerHTML = '';
+            document.getElementById('loginStatus').innerHTML = '';
+        }
+
+        async function loadMyBuses() {
+            if (!authToken) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/busminders/my-buses/`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!res.ok) throw new Error('Failed to load buses');
+
+                const data = await res.json();
+                const container = document.getElementById('busesContainer');
+
+                if (!data.buses || data.buses.length === 0) {
+                    container.innerHTML = '<p>No buses assigned to you</p>';
+                    return;
+                }
+
+                container.innerHTML = '';
+                for (const bus of data.buses) {
+                    await loadBusChildren(bus, container);
+                }
+            } catch(e) {
+                console.error('Error:', e);
+                document.getElementById('busesContainer').innerHTML = `<p class="error">Error: ${e.message}</p>`;
+            }
+        }
+
+        async function loadBusChildren(bus, container) {
+            try {
+                const res = await fetch(`${API_BASE}/busminders/buses/${bus.id}/children/`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!res.ok) throw new Error('Failed to load children');
+
+                const data = await res.json();
+
+                let childrenHTML = '';
+                if (data.children && data.children.length > 0) {
+                    childrenHTML = `
+                        <table class="children-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Grade</th>
+                                    <th>Parent</th>
+                                    <th>Parent Phone</th>
+                                    <th>Attendance</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.children.map(child => `
+                                    <tr>
+                                        <td>${child.first_name} ${child.last_name}</td>
+                                        <td>${child.class_grade}</td>
+                                        <td>${child.parent_name}</td>
+                                        <td>${child.parent_phone}</td>
+                                        <td>
+                                            <select class="status-select" id="status_${child.id}">
+                                                <option value="">Select...</option>
+                                                <option value="not_on_bus">Not on Bus</option>
+                                                <option value="on_bus">On Bus</option>
+                                                <option value="at_school">At School</option>
+                                                <option value="on_way_home">On Way Home</option>
+                                                <option value="dropped_off">Dropped Off</option>
+                                                <option value="absent">Absent</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <button class="mark-btn" onclick="markAttendance(${child.id})">Mark</button>
+                                            <span id="result_${child.id}"></span>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                } else {
+                    childrenHTML = '<p>No children assigned to this bus</p>';
+                }
+
+                container.innerHTML += `
+                    <div class="bus-card">
+                        <h3>🚌 Bus ${bus.number_plate}</h3>
+                        <p>Total Children: ${data.total_children || 0}</p>
+                        ${childrenHTML}
+                    </div>
+                `;
+            } catch(e) {
+                console.error('Error loading children:', e);
+            }
+        }
+
+        async function markAttendance(childId) {
+            const statusSelect = document.getElementById(`status_${childId}`);
+            const status = statusSelect.value;
+            const resultSpan = document.getElementById(`result_${childId}`);
+
+            if (!status) {
+                resultSpan.innerHTML = '<span class="error">Select status</span>';
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/busminders/mark-attendance/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        child_id: childId,
+                        status: status
+                    })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    resultSpan.innerHTML = '<span class="success">✓ Marked</span>';
+                    setTimeout(() => { resultSpan.innerHTML = ''; }, 3000);
+                } else {
+                    resultSpan.innerHTML = '<span class="error">' + (data.error || 'Failed') + '</span>';
+                }
+            } catch(e) {
+                resultSpan.innerHTML = '<span class="error">Error</span>';
+            }
+        }
+    </script>
+</body>
+</html>

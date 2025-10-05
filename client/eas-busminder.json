@@ -1,0 +1,52 @@
+{
+  "cli": {
+    "version": ">= 0.60.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "APP_VARIANT": "busminder"
+      },
+      "android": {
+        "package": "com.apobasi.busminder"
+      },
+      "ios": {
+        "bundleIdentifier": "com.apobasi.busminder"
+      }
+    },
+    "preview": {
+      "android": {
+        "buildType": "apk",
+        "package": "com.apobasi.busminder"
+      },
+      "ios": {
+        "bundleIdentifier": "com.apobasi.busminder"
+      },
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "APP_VARIANT": "busminder",
+        "APP_NAME": "ApoBasi BusMinder"
+      }
+    },
+    "production": {
+      "android": {
+        "package": "com.apobasi.busminder"
+      },
+      "ios": {
+        "bundleIdentifier": "com.apobasi.busminder"
+      },
+      "channel": "production",
+      "env": {
+        "APP_VARIANT": "busminder",
+        "APP_NAME": "ApoBasi BusMinder"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

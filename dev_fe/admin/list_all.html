@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>View All - Admin</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #4CAF50; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        .section { margin: 30px 0; }
+        h2 { color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .badge-parent { background-color: #2196F3; color: white; }
+        .badge-driver { background-color: #FF9800; color: white; }
+        .badge-busminder { background-color: #9C27B0; color: white; }
+        .badge-active { background-color: #4CAF50; color: white; }
+        .badge-inactive { background-color: #f44336; color: white; }
+    </style>
+</head>
+<body>
+    <h1>📊 View All Data</h1>
+    <a href="dashboard.html">← Back to Dashboard</a>
+
+    <div class="section" id="drivers">
+        <h2>🚗 Drivers</h2>
+        <table id="driversTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="section" id="busminders">
+        <h2>👔 Bus Minders</h2>
+        <table id="busmindersTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="section" id="parents">
+        <h2>👨‍👩‍👧‍👦 Parents</h2>
+        <table id="parentsTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="section" id="buses">
+        <h2>🚌 All Buses</h2>
+        <table id="busesTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Number Plate</th>
+                    <th>Driver</th>
+                    <th>Bus Minder</th>
+                    <th>Status</th>
+                    <th>Location</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="section" id="busChildren" style="display: none;">
+        <h2>👶 Children Assigned to <span id="selectedBusName"></span></h2>
+        <button onclick="hideBusChildren()" style="margin-bottom: 10px; padding: 8px 16px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">← Back to Buses</button>
+        <table id="busChildrenTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Grade</th>
+                    <th>Parent</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="section" id="children">
+        <h2>👶 All Children</h2>
+        <table id="childrenTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Grade</th>
+                    <th>Parent</th>
+                    <th>Assigned Bus</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+
+        window.onload = async function() {
+            await loadUsers();
+            await loadBuses();
+            await loadChildren();
+        };
+
+        async function loadUsers() {
+            try {
+                const res = await fetch(`${API_BASE}/users/`);
+                const users = await res.json();
+
+                // Separate users by type
+                const drivers = users.filter(u => u.user_type === 'driver');
+                const busminders = users.filter(u => u.user_type === 'busminder');
+                const parents = users.filter(u => u.user_type === 'parent');
+
+                // Populate drivers table
+                const driversBody = document.querySelector('#driversTable tbody');
+                driversBody.innerHTML = '';
+                drivers.forEach(user => {
+                    driversBody.innerHTML += `
+                        <tr>
+                            <td>${user.id}</td>
+                            <td>${user.first_name} ${user.last_name}</td>
+                            <td>${user.username}</td>
+                            <td>${user.email || 'N/A'}</td>
+                            <td>${user.phone_number || 'N/A'}</td>
+                        </tr>
+                    `;
+                });
+
+                // Populate bus minders table
+                const busmindersBody = document.querySelector('#busmindersTable tbody');
+                busmindersBody.innerHTML = '';
+                busminders.forEach(user => {
+                    busmindersBody.innerHTML += `
+                        <tr>
+                            <td>${user.id}</td>
+                            <td>${user.first_name} ${user.last_name}</td>
+                            <td>${user.username}</td>
+                            <td>${user.email || 'N/A'}</td>
+                            <td>${user.phone_number || 'N/A'}</td>
+                        </tr>
+                    `;
+                });
+
+                // Populate parents table
+                const parentsBody = document.querySelector('#parentsTable tbody');
+                parentsBody.innerHTML = '';
+                parents.forEach(user => {
+                    parentsBody.innerHTML += `
+                        <tr>
+                            <td>${user.id}</td>
+                            <td>${user.first_name} ${user.last_name}</td>
+                            <td>${user.username}</td>
+                            <td>${user.email || 'N/A'}</td>
+                            <td>${user.phone_number || 'N/A'}</td>
+                        </tr>
+                    `;
+                });
+            } catch(e) {
+                console.error('Error loading users:', e);
+            }
+        }
+
+        async function loadBuses() {
+            try {
+                const res = await fetch(`${API_BASE}/buses/`);
+                const buses = await res.json();
+                const tbody = document.querySelector('#busesTable tbody');
+                tbody.innerHTML = '';
+                buses.forEach(bus => {
+                    const statusClass = bus.is_active ? 'badge-active' : 'badge-inactive';
+                    const statusText = bus.is_active ? 'Active' : 'Inactive';
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${bus.id}</td>
+                            <td>${bus.number_plate}</td>
+                            <td>${bus.driver_name || 'Unassigned'}</td>
+                            <td>${bus.bus_minder_name || 'Unassigned'}</td>
+                            <td><span class="badge ${statusClass}">${statusText}</span></td>
+                            <td>${bus.current_location || 'N/A'}</td>
+                            <td>
+                                <button onclick="viewBusChildren(${bus.id}, '${bus.number_plate}')" style="padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    👶 View Children
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch(e) {
+                console.error('Error loading buses:', e);
+            }
+        }
+
+        async function viewBusChildren(busId, busNumberPlate) {
+            try {
+                const res = await fetch(`${API_BASE}/children/?bus=${busId}`);
+                const children = await res.json();
+
+                document.getElementById('selectedBusName').textContent = `Bus ${busNumberPlate}`;
+                const tbody = document.querySelector('#busChildrenTable tbody');
+                tbody.innerHTML = '';
+
+                if (children.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No children assigned to this bus</td></tr>';
+                } else {
+                    children.forEach(child => {
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>${child.id}</td>
+                                <td>${child.first_name} ${child.last_name}</td>
+                                <td>${child.class_grade}</td>
+                                <td>${child.parent_name || 'N/A'}</td>
+                            </tr>
+                        `;
+                    });
+                }
+
+                // Show bus children section and hide others
+                document.getElementById('busChildren').style.display = 'block';
+                document.getElementById('buses').style.display = 'none';
+                document.getElementById('children').style.display = 'none';
+            } catch(e) {
+                console.error('Error loading bus children:', e);
+                alert('Error loading children for this bus');
+            }
+        }
+
+        function hideBusChildren() {
+            document.getElementById('busChildren').style.display = 'none';
+            document.getElementById('buses').style.display = 'block';
+            document.getElementById('children').style.display = 'block';
+        }
+
+        async function loadChildren() {
+            try {
+                const res = await fetch(`${API_BASE}/children/`);
+                const children = await res.json();
+                const tbody = document.querySelector('#childrenTable tbody');
+                tbody.innerHTML = '';
+                children.forEach(child => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${child.id}</td>
+                            <td>${child.first_name} ${child.last_name}</td>
+                            <td>${child.class_grade}</td>
+                            <td>${child.parent_name || 'N/A'}</td>
+                            <td>${child.bus_number || 'Unassigned'}</td>
+                        </tr>
+                    `;
+                });
+            } catch(e) {
+                console.error('Error loading children:', e);
+            }
+        }
+    </script>
+</body>
+</html>
