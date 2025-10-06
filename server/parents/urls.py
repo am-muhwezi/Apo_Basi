@@ -4,6 +4,7 @@ from .views import (
     ParentDetailView,
     ParentRegistrationView,
     ParentLoginView,
+    ParentPhoneLoginView,
     MyChildrenView,
     ChildAttendanceHistoryView,
 )
@@ -16,6 +17,7 @@ urlpatterns = [
     # Parent-specific endpoints
     path("register/", ParentRegistrationView.as_view(), name="parent-register"),
     path("login/", ParentLoginView.as_view(), name="parent-login"),
+    path("phone-login/", ParentPhoneLoginView.as_view(), name="parent-phone-login"),
     path("my-children/", MyChildrenView.as_view(), name="my-children"),
     path("children/<int:child_id>/attendance/", ChildAttendanceHistoryView.as_view(), name="child-attendance-history"),
 ]

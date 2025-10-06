@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
+import '../../services/api_service.dart';
+import '../../models/child_model.dart';
 import './widgets/demo_toggle_widget.dart';
 import './widgets/phone_number_input_widget.dart';
 import './widgets/otp_input_widget.dart';
@@ -18,6 +20,7 @@ class ParentLoginScreen extends StatefulWidget {
 
 class _ParentLoginScreenState extends State<ParentLoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
+  final ApiService _apiService = ApiService();
 
   bool _isLoading = false;
   bool _isDemoMode = false;
@@ -117,11 +120,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
     HapticFeedback.lightImpact();
 
     try {
-      // Simulate OTP sending delay
-      await Future.delayed(const Duration(seconds: 2));
-
-      // In production, call your backend API to send OTP
-      // For demo, accept any valid Nigerian phone number
+      // For demo: No real OTP is sent, we just mark it as sent
       final phone = _phoneController.text.trim();
 
       if (validPhonePrefixes.any((prefix) => phone.startsWith(prefix))) {
@@ -133,10 +132,10 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
 
         _startResendCountdown();
 
-        // Show success message
+        // Show success message (demo mode - no real OTP)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('OTP sent to ${_phoneController.text}'),
+            content: const Text('Demo mode: Enter any 6-digit code'),
             backgroundColor: AppTheme.lightTheme.colorScheme.primary,
             duration: const Duration(seconds: 3),
           ),
@@ -167,24 +166,31 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
     HapticFeedback.lightImpact();
 
     try {
-      // Simulate OTP verification delay
-      await Future.delayed(const Duration(seconds: 2));
+      final phone = _phoneController.text.trim();
 
-      // For demo, accept OTP "123456" or any 6-digit code
-      if (otp.length == 6) {
-        HapticFeedback.selectionClick();
+      // Call backend API for login
+      final response = await _apiService.phoneLogin(phone, otp);
 
-        // Navigate to parent dashboard
-        Navigator.pushReplacementNamed(context, '/parent-dashboard');
-      } else {
-        HapticFeedback.heavyImpact();
-        setState(() {
-          _otpError = 'Invalid OTP. Please try again.';
-        });
-      }
+      HapticFeedback.selectionClick();
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Welcome! You have ${response['children'].length} child(ren)'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      // Navigate to parent home screen
+      Navigator.pushReplacementNamed(
+        context,
+        '/parent-home',
+      );
     } catch (e) {
+      HapticFeedback.heavyImpact();
       setState(() {
-        _otpError = 'Verification failed. Please try again.';
+        _otpError = e.toString().replaceAll('Exception: ', '');
       });
     } finally {
       setState(() {
