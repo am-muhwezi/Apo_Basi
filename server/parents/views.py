@@ -71,6 +71,59 @@ class ParentLoginView(APIView):
         return Response({"error": "Invalid credentials"}, status=400)
 
 
+class ParentPhoneLoginView(APIView):
+    """
+    Phone number-based login for parents.
+    No real OTP is sent - any 6-digit code is accepted for demo purposes.
+
+    POST /api/parents/phone-login/
+    Body: {
+        "phone_number": "0776102830",
+        "otp": "123456"  // Any 6 digits work
+    }
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        phone_number = request.data.get("phone_number")
+        otp = request.data.get("otp")
+
+        if not phone_number:
+            return Response({"error": "Phone number is required"}, status=400)
+
+        # For demo: Accept any 6-digit OTP
+        if otp and len(str(otp)) != 6:
+            return Response({"error": "OTP must be 6 digits"}, status=400)
+
+        # Find parent by contact_number
+        try:
+            parent = Parent.objects.select_related('user').get(contact_number=phone_number)
+            user = parent.user
+
+            # Generate JWT tokens
+            refresh = RefreshToken.for_user(user)
+
+            # Get children for this parent
+            children = Child.objects.filter(parent=parent)
+            children_data = ChildSerializer(children, many=True).data
+
+            return Response({
+                "user": UserSerializer(user).data,
+                "parent": ParentSerializer(parent).data,
+                "tokens": {
+                    "refresh": str(refresh),
+                    "access": str(refresh.access_token),
+                },
+                "children": children_data,
+                "message": "Login successful",
+            })
+        except Parent.DoesNotExist:
+            return Response(
+                {"error": "No parent found with this phone number"},
+                status=404
+            )
+
+
 class ParentRegistrationView(generics.CreateAPIView):
     serializer_class = ParentRegistrationSerializer
     permission_classes = [AllowAny]
