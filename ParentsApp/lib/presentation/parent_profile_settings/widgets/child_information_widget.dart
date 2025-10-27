@@ -20,6 +20,13 @@ class ChildInformationWidget extends StatelessWidget {
            status != 'no record today';
   }
 
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.isEmpty) return 'C';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     final canTrack = _canTrackChild();
@@ -52,17 +59,15 @@ class ChildInformationWidget extends StatelessWidget {
                 height: 15.w,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppTheme.lightTheme.colorScheme.primary,
-                    width: 2,
-                  ),
+                  color: AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.15),
                 ),
-                child: ClipOval(
-                  child: CustomImageWidget(
-                    imageUrl: childData['photo'] ?? '',
-                    width: 15.w,
-                    height: 15.w,
-                    fit: BoxFit.cover,
+                child: Center(
+                  child: Text(
+                    _getInitials(childData['name'] ?? 'Child Name'),
+                    style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.lightTheme.colorScheme.primary,
+                    ),
                   ),
                 ),
               ),
@@ -95,7 +100,7 @@ class ChildInformationWidget extends StatelessWidget {
           // Child Details
           _buildInfoRow('Student ID', childData['studentId'] ?? 'N/A'),
           SizedBox(height: 2.h),
-          _buildInfoRow('Grade', 'Grade ${childData['grade'] ?? 'N/A'}'),
+          _buildInfoRow('Grade', childData['grade'] ?? 'N/A'),
           SizedBox(height: 2.h),
           _buildInfoRow('School', childData['school'] ?? 'School Name'),
           SizedBox(height: 2.h),
@@ -125,7 +130,7 @@ class ChildInformationWidget extends StatelessWidget {
                   ),
                   SizedBox(width: 2.w),
                   Text(
-                    'Tap to track on map',
+                    'Tap to view details',
                     style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
                       color: AppTheme.lightTheme.colorScheme.primary,
                       fontWeight: FontWeight.w600,
@@ -150,7 +155,7 @@ class ChildInformationWidget extends StatelessWidget {
   void _navigateToLiveMap(BuildContext context) {
     Navigator.pushNamed(
       context,
-      '/live-bus-tracking-map',
+      '/child-detail',
       arguments: childData,
     );
   }

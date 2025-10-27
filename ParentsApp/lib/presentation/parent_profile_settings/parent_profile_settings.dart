@@ -261,6 +261,84 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
 
             SizedBox(height: 4.h),
 
+            // App Settings Section
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4.w),
+              child: Text(
+                'Settings',
+                style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.lightTheme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+            SizedBox(height: 2.h),
+
+            // Dark Mode Toggle
+            Container(
+              margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
+              padding: EdgeInsets.all(4.w),
+              decoration: BoxDecoration(
+                color: AppTheme.lightTheme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppTheme.lightTheme.colorScheme.outline.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(3.w),
+                    decoration: BoxDecoration(
+                      color: AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.dark_mode,
+                      color: AppTheme.lightTheme.colorScheme.primary,
+                      size: 6.w,
+                    ),
+                  ),
+                  SizedBox(width: 3.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Dark Mode',
+                          style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.lightTheme.colorScheme.onSurface,
+                          ),
+                        ),
+                        SizedBox(height: 0.5.h),
+                        Text(
+                          'Enable dark theme',
+                          style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+                            color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: false, // TODO: Connect to theme provider
+                    onChanged: (value) {
+                      // TODO: Implement theme switching
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Dark mode coming soon!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            SizedBox(height: 4.h),
+
             // Logout Button
             Container(
               width: double.infinity,
