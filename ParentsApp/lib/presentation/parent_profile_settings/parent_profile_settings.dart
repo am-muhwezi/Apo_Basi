@@ -3,6 +3,9 @@ import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
 import '../../theme/app_theme.dart';
+import '../../services/api_service.dart';
+import '../../models/child_model.dart';
+import '../../models/parent_model.dart';
 import './widgets/child_information_widget.dart';
 
 class ParentProfileSettings extends StatefulWidget {
@@ -13,50 +16,50 @@ class ParentProfileSettings extends StatefulWidget {
 }
 
 class _ParentProfileSettingsState extends State<ParentProfileSettings> {
-  // Mock data for parent and children
-  final Map<String, dynamic> _parentData = {
-    "name": "Grace Okafor",
-    "email": "grace.okafor@email.com",
-    "phone": "+234 903 456 7890",
-    "address": "15 Admiralty Way, Lekki Phase 1, Lagos",
-    "emergencyContact": "+234 803 123 4567",
-  };
+  final ApiService _apiService = ApiService();
+  bool _isLoading = true;
+  String? _error;
 
-  final List<Map<String, dynamic>> _childrenData = [
-    {
-      "id": 1,
-      "name": "Amara Okafor",
-      "grade": "7",
-      "school": "Lagos International School",
-      "photo":
-          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?fm=jpg&q=60&w=400&ixlib=rb-4.0.3",
-      "studentId": "STU789012",
-      "class": "JSS 2A",
-      "homeAddress": "15 Admiralty Way, Lekki Phase 1, Lagos",
-    },
-    {
-      "id": 2,
-      "name": "Kemi Okafor",
-      "grade": "4",
-      "school": "Lagos International School",
-      "photo":
-          "https://images.unsplash.com/photo-1547036967-23d11aacaee0?fm=jpg&q=60&w=400&ixlib=rb-4.0.3",
-      "studentId": "STU567890",
-      "class": "Primary 4B",
-      "homeAddress": "15 Admiralty Way, Lekki Phase 1, Lagos",
-    },
-    {
-      "id": 3,
-      "name": "Tunde Okafor",
-      "grade": "10",
-      "school": "Lagos International School",
-      "photo":
-          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?fm=jpg&q=60&w=400&ixlib=rb-4.0.3",
-      "studentId": "STU345678",
-      "class": "SS 1C",
-      "homeAddress": "15 Admiralty Way, Lekki Phase 1, Lagos",
+  // Parent data from API
+  User? _user;
+  Parent? _parent;
+  List<Child> _children = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      // Load profile and children data in parallel
+      final results = await Future.wait([
+        _apiService.getParentProfile(),
+        _apiService.getMyChildren(),
+      ]);
+
+      final profileData = results[0] as Map<String, dynamic>;
+      final childrenData = results[1] as List<Child>;
+
+      setState(() {
+        _user = User.fromJson(profileData['user']);
+        _parent = Parent.fromJson(profileData['parent']);
+        _children = childrenData;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
     }
-  ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,8 +76,21 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
             color: AppTheme.lightTheme.colorScheme.onSurface,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              Icons.refresh,
+              color: AppTheme.lightTheme.colorScheme.primary,
+            ),
+            onPressed: _loadProfileData,
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? _buildErrorView()
+              : SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -102,7 +118,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                     backgroundColor: AppTheme.lightTheme.colorScheme.primary
                         .withValues(alpha: 0.1),
                     child: Text(
-                      _parentData['name']?.substring(0, 1) ?? 'P',
+                      _user?.fullName.substring(0, 1).toUpperCase() ?? 'P',
                       style: AppTheme.lightTheme.textTheme.headlineMedium
                           ?.copyWith(
                         color: AppTheme.lightTheme.colorScheme.primary,
@@ -112,7 +128,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                   ),
                   SizedBox(height: 2.h),
                   Text(
-                    _parentData['name'] ?? 'Parent Name',
+                    _user?.fullName ?? 'Parent Name',
                     style:
                         AppTheme.lightTheme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w600,
@@ -121,7 +137,14 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                   ),
                   SizedBox(height: 0.5.h),
                   Text(
-                    _parentData['email'] ?? 'email@example.com',
+                    _user?.email ?? 'email@example.com',
+                    style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  SizedBox(height: 0.5.h),
+                  Text(
+                    _parent?.contactNumber ?? 'N/A',
                     style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
                       color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
                     ),
@@ -184,7 +207,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                         ),
                         SizedBox(height: 0.5.h),
                         Text(
-                          _parentData['address'] ?? 'Address not set',
+                          _parent?.address ?? 'Address not set',
                           style: AppTheme.lightTheme.textTheme.bodyMedium
                               ?.copyWith(
                             color: AppTheme.lightTheme.colorScheme.onSurface,
@@ -229,9 +252,11 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
             SizedBox(height: 2.h),
 
             // Children Cards
-            ..._childrenData
+            ..._children
                 .map(
-                    (childData) => ChildInformationWidget(childData: childData))
+                    (child) => ChildInformationWidget(
+                          childData: _childToCardData(child),
+                        ))
                 .toList(),
 
             SizedBox(height: 4.h),
@@ -275,9 +300,59 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
     );
   }
 
+  Map<String, dynamic> _childToCardData(Child child) {
+    return {
+      "id": child.id,
+      "name": child.fullName,
+      "grade": child.classGrade,
+      "school": "School Name", // TODO: Add school name to backend
+      "studentId": "STU${child.id}",
+      "class": child.classGrade,
+      "homeAddress": _parent?.address ?? 'Not set',
+      "status": child.currentStatus ?? 'no record today',
+      "busNumber": child.assignedBus?.numberPlate,
+    };
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(5.w),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline,
+                size: 64, color: AppTheme.lightTheme.colorScheme.error),
+            SizedBox(height: 2.h),
+            Text(
+              'Error Loading Profile',
+              style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 1.h),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
+                color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            SizedBox(height: 3.h),
+            ElevatedButton.icon(
+              onPressed: _loadProfileData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showUpdateAddressDialog() {
     final TextEditingController addressController =
-        TextEditingController(text: _parentData['address']);
+        TextEditingController(text: _parent?.address ?? '');
 
     showDialog(
       context: context,
@@ -319,21 +394,38 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _parentData['address'] = addressController.text;
-                  // Update children's home address too
-                  for (var child in _childrenData) {
-                    child['homeAddress'] = addressController.text;
-                  }
-                });
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Home address updated successfully'),
-                    backgroundColor: Color(0xFF34C759),
-                  ),
-                );
+              onPressed: () async {
+                try {
+                  await _apiService.updateParentProfile(
+                    address: addressController.text,
+                  );
+
+                  setState(() {
+                    _parent = Parent(
+                      userId: _parent!.userId,
+                      contactNumber: _parent!.contactNumber,
+                      address: addressController.text,
+                      emergencyContact: _parent!.emergencyContact,
+                      status: _parent!.status,
+                    );
+                  });
+
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Home address updated successfully'),
+                      backgroundColor: Color(0xFF34C759),
+                    ),
+                  );
+                } catch (e) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to update: ${e.toString().replaceAll('Exception: ', '')}'),
+                      backgroundColor: const Color(0xFFFF3B30),
+                    ),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.lightTheme.colorScheme.primary,

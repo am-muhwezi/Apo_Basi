@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
+import '../../services/api_service.dart';
+import '../../models/child_model.dart';
 import '../notifications_center/notifications_center.dart';
 import '../parent_profile_settings/parent_profile_settings.dart';
 import './widgets/child_status_card.dart';
 import './widgets/connection_status_bar.dart';
+import './widgets/telegram_background.dart';
 
 class ParentDashboard extends StatefulWidget {
   const ParentDashboard({Key? key}) : super(key: key);
@@ -19,56 +22,40 @@ class _ParentDashboardState extends State<ParentDashboard> {
   bool _isConnected = true;
   String _lastUpdated = '2 min ago';
 
-  // Mock data for multiple children - Ugandan families
-  final List<Map<String, dynamic>> _childrenData = [
-    {
-      "id": 1,
-      "name": "Muhanguzi Ampire",
-      "grade": "7",
-      "school": "Kampala Parents School",
-      "photo":
-          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?fm=jpg&q=60&w=400&ixlib=rb-4.0.3",
-      "status": "on_bus",
-      "arrivalTime": "Arriving in 12 min",
-      "progress": 0.65,
-      "busNumber": "KPS-07",
-      "driverName": "Mr. Okello",
-      "route": "Kololo Route"
-    },
-    {
-      "id": 2,
-      "name": "Nakanwagi Omanya",
-      "grade": "4",
-      "school": "Kampala Parents School",
-      "photo":
-          "https://images.unsplash.com/photo-1547036967-23d11aacaee0?fm=jpg&q=60&w=400&ixlib=rb-4.0.3",
-      "status": "at_school",
-      "arrivalTime": "Pickup at 3:30 PM",
-      "progress": 0.0,
-      "busNumber": "KPS-04",
-      "driverName": "Mrs. Namuddu",
-      "route": "Nakasero Route"
-    },
-    {
-      "id": 3,
-      "name": "Kateregga Ssemakula",
-      "grade": "10",
-      "school": "Kampala Parents School",
-      "photo":
-          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?fm=jpg&q=60&w=400&ixlib=rb-4.0.3",
-      "status": "waiting",
-      "arrivalTime": "Bus arriving in 5 min",
-      "progress": 0.0,
-      "busNumber": "KPS-10",
-      "driverName": "Mr. Mutumba",
-      "route": "Ntinda Route"
-    }
-  ];
+  final ApiService _apiService = ApiService();
+  bool _isLoading = true;
+  List<Child> _children = [];
+  String? _error;
 
   @override
   void initState() {
     super.initState();
+    _loadChildren();
     _simulateConnectionStatus();
+  }
+
+  Future<void> _loadChildren() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final children = await _apiService.getMyChildren();
+      setState(() {
+        _children = children;
+        _isLoading = false;
+        _isConnected = true;
+        _lastUpdated = 'Just now';
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+        _isConnected = false;
+        _lastUpdated = 'Failed to update';
+      });
+    }
   }
 
   void _simulateConnectionStatus() {
@@ -180,6 +167,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
         backgroundColor: AppTheme.lightTheme.appBarTheme.backgroundColor,
         elevation: 0,
         automaticallyImplyLeading: false,
+        toolbarHeight: 100,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -189,73 +177,143 @@ class _ParentDashboardState extends State<ParentDashboard> {
                 color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
               ),
             ),
+            SizedBox(height: 0.5.h),
             Text(
               'Your Children',
-              style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
+              style: AppTheme.lightTheme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w700,
                 color: AppTheme.lightTheme.colorScheme.onSurface,
               ),
             ),
           ],
         ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await Future.delayed(const Duration(seconds: 1));
-          setState(() {
-            _isConnected = true;
-            _lastUpdated = 'Just now';
-          });
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(height: 2.h),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4.w),
-                child: Text(
-                  'Children Status',
-                  style: AppTheme.lightTheme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.lightTheme.colorScheme.onSurface,
-                  ),
-                ),
-              ),
-              SizedBox(height: 2.h),
-              // Children status cards
-              ..._childrenData
-                  .map(
-                    (childData) => GestureDetector(
-                      onTap: () => _onChildStatusTap(childData),
-                      child: ChildStatusCard(childData: childData),
-                    ),
-                  )
-                  .toList(),
-              SizedBox(height: 10.h), // Space for bottom navigation
-            ],
+        actions: [
+          IconButton(
+            icon: Icon(
+              Icons.refresh,
+              color: AppTheme.lightTheme.colorScheme.primary,
+            ),
+            onPressed: _loadChildren,
           ),
+        ],
+      ),
+      body: TelegramBackground(
+        bubbleColor: AppTheme.lightTheme.colorScheme.primary,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? _buildErrorView()
+                : _children.isEmpty
+                    ? _buildEmptyView()
+                    : RefreshIndicator(
+                        onRefresh: _loadChildren,
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(height: 1.h),
+                              // Children status cards
+                              ..._children
+                                  .map(
+                                    (child) => ChildStatusCard(
+                                      childData: _childToCardData(child),
+                                      onTap: () => _onChildCardTap(_childToCardData(child)),
+                                    ),
+                                  )
+                                  .toList(),
+                              SizedBox(height: 8.h), // Space for bottom navigation
+                            ],
+                          ),
+                        ),
+                      ),
+      ),
+    );
+  }
+
+  Map<String, dynamic> _childToCardData(Child child) {
+    return {
+      "id": child.id,
+      "name": child.fullName,
+      "grade": child.classGrade,
+      "status": child.currentStatus ?? 'no record today',
+    };
+  }
+
+  void _onChildCardTap(Map<String, dynamic> childData) {
+    final String status = childData['status'] ?? '';
+
+    // Navigate to live bus tracking map for trackable statuses
+    // The card's onTap will only be called if status is trackable (not at_home, at_school, or no record)
+    Navigator.pushNamed(
+      context,
+      '/live-bus-tracking-map',
+      arguments: childData,
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(5.w),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: AppTheme.lightTheme.colorScheme.error),
+            SizedBox(height: 2.h),
+            Text(
+              'Error Loading Children',
+              style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 1.h),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
+                color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            SizedBox(height: 3.h),
+            ElevatedButton.icon(
+              onPressed: _loadChildren,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  void _onChildStatusTap(Map<String, dynamic> childData) {
-    final String status = childData['status'] ?? '';
-    final String childName = childData['name'] ?? 'Child';
-
-    if (status == 'on_bus' || status == 'waiting') {
-      // Navigate to live bus tracking map
-      Navigator.pushNamed(
-        context,
-        '/live-bus-tracking-map',
-        arguments: childData,
-      );
-    } else {
-      // Show status info for other statuses
-      _showChildStatusInfo(childData);
-    }
+  Widget _buildEmptyView() {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(5.w),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.family_restroom, size: 64, color: AppTheme.lightTheme.colorScheme.onSurfaceVariant),
+            SizedBox(height: 2.h),
+            Text(
+              'No Children Found',
+              style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 1.h),
+            Text(
+              'Contact your school admin to add children to your account',
+              textAlign: TextAlign.center,
+              style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
+                color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showChildStatusInfo(Map<String, dynamic> childData) {

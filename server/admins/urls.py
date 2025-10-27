@@ -9,12 +9,16 @@ from .views import (
     AdminAssignDriverToBusView,
     AdminAssignBusMinderToBusView,
     AdminAssignChildToBusView,
+    dashboard_stats,
 )
 from users.serializers import UserRegistrationSerializer
 
 urlpatterns = [
     # Admin registration
     path("register/", admin_register, name="admin-register"),
+
+    # Dashboard stats
+    path("dashboard/stats/", dashboard_stats, name="dashboard-stats"),
 
     # Admin CRUD endpoints
     path("", AdminListCreateView.as_view(), name="admin-list-create"),

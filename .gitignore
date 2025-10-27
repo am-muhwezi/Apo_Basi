@@ -1,107 +1,33 @@
-# -------------------------------
-# Python / Django / DRF / FastAPI
-# -------------------------------
-
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
-*.py[cod]
-*$py.class
-
-# Environment files
-.venv/
-venv/
-env/
-ENV/
-*.env
-*.env.*
-
-# Django stuff
-*.log
-*.pot
 *.pyc
+*.pyo
+.venv/
+.env
 db.sqlite3
-db.sqlite3-journal
+server/.python-version
 
-# Django migrations (optional — ignore if auto-generated on deploy)
-**/migrations/
-!**/migrations/__init__.py
+# Flutter
+**/build/
+**/.dart_tool/
+**/.plugin_symlinks/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/linux/flutter/ephemeral/
+**/macos/Flutter/ephemeral/
+**/windows/flutter/ephemeral/
+**/android/local.properties
+**/pubspec.lock
 
-# Static and media files
-staticfiles/
-media/
-static/
-build/
+# Node / React
+node_modules/
+.env*
 dist/
+npm-debug.log*
+yarn-debug.log*
 
-# FastAPI cache / build / compiled files
-*.db
-*.sqlite
-instance/
-.cache/
-.uvicorn.log
-
-# Coverage / testing
-htmlcov/
-.tox/
-.nox/
-.coverage
-coverage.xml
-*.cover
-*.py,cover
-.cache
-nosetests.xml
-pytest.xml
-
-# VSCode and IDE configs
+# Misc
 .vscode/
 .idea/
-*.swp
-*.swo
-
-# OS files
 .DS_Store
-Thumbs.db
-
-# -----------------
-# Flutter / Dart
-# -----------------
-
-# Flutter specific
-build/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-.gradle/
-android/app/debug/
-android/app/profile/
-android/app/release/
-
-# iOS
-ios/Pods/
-ios/.symlinks/
-ios/Flutter/Flutter.framework/
-ios/Flutter/Flutter.podspec
-ios/ServiceDefinitions.json
-
-# Dart tools
-.dart_tool/
-*.iml
-
-# -----------------
-# Node / React Native (if used)
-# -----------------
-node_modules/
-npm-debug.log
-yarn-error.log
-package-lock.json
-
-# -----------------
-# Logs and temporary files
-# -----------------
-*.log
-*.tmp
-*.bak
 *.swp
-*.swo

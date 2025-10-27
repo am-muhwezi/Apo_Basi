@@ -5,15 +5,28 @@ import '../../../core/app_export.dart';
 
 class ChildInformationWidget extends StatelessWidget {
   final Map<String, dynamic> childData;
+  final VoidCallback? onTap;
 
   const ChildInformationWidget({
     Key? key,
     required this.childData,
+    this.onTap,
   }) : super(key: key);
+
+  bool _canTrackChild() {
+    final status = (childData['status'] ?? 'no record today').toString().toLowerCase();
+    return status != 'at_home' &&
+           status != 'at_school' &&
+           status != 'no record today';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final canTrack = _canTrackChild();
+
+    return GestureDetector(
+      onTap: canTrack ? (onTap ?? () => _navigateToLiveMap(context)) : null,
+      child: Container(
       width: double.infinity,
       margin: EdgeInsets.only(left: 4.w, right: 4.w, bottom: 3.h),
       padding: EdgeInsets.all(4.w),
@@ -91,8 +104,54 @@ class ChildInformationWidget extends StatelessWidget {
             childData['homeAddress'] ?? 'Address not set',
             isAddress: true,
           ),
+
+          // Track button if child is on bus
+          if (_canTrackChild()) ...[
+            SizedBox(height: 2.h),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(vertical: 1.5.h, horizontal: 3.w),
+              decoration: BoxDecoration(
+                color: AppTheme.lightTheme.colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.location_on,
+                    color: AppTheme.lightTheme.colorScheme.primary,
+                    size: 5.w,
+                  ),
+                  SizedBox(width: 2.w),
+                  Text(
+                    'Tap to track on map',
+                    style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.lightTheme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(width: 2.w),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: AppTheme.lightTheme.colorScheme.primary,
+                    size: 4.w,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
+      ),
+    );
+  }
+
+  void _navigateToLiveMap(BuildContext context) {
+    Navigator.pushNamed(
+      context,
+      '/live-bus-tracking-map',
+      arguments: childData,
     );
   }
 

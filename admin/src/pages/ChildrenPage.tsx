@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, Baby, Users, Bus as BusIcon, UserCheck } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -61,6 +61,12 @@ export default function ChildrenPage() {
     const matchesGrade = gradeFilter === 'all' || child.grade === gradeFilter;
     return matchesSearch && matchesGrade;
   });
+
+  // Calculate stats (moved after filteredChildren definition)
+  const totalChildren = children.length;
+  const activeChildren = children.filter((c) => c.status === 'active').length;
+  const childrenWithBus = children.filter((c) => c.busId).length;
+  const childrenByGrade = filteredChildren.length;
 
   const handleCreate = () => {
     setSelectedChild(null);
@@ -133,6 +139,49 @@ export default function ChildrenPage() {
           <Plus size={20} className="mr-2 inline" />
           Add Child
         </Button>
+      </div>
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Baby className="w-5 h-5 text-blue-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Children</h3>
+          <p className="text-2xl font-bold text-slate-900">{totalChildren}</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <UserCheck className="w-5 h-5 text-green-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Active</h3>
+          <p className="text-2xl font-bold text-slate-900">{activeChildren}</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <BusIcon className="w-5 h-5 text-purple-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Assigned to Bus</h3>
+          <p className="text-2xl font-bold text-slate-900">{childrenWithBus}</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <Search className="w-5 h-5 text-orange-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Filtered Results</h3>
+          <p className="text-2xl font-bold text-slate-900">{childrenByGrade}</p>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">

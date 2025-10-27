@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/app_export.dart';
 import '../../services/api_service.dart';
 import '../../models/child_model.dart';
-import './widgets/demo_toggle_widget.dart';
 import './widgets/phone_number_input_widget.dart';
-import './widgets/otp_input_widget.dart';
 import './widgets/sign_in_button_widget.dart';
 import './widgets/welcome_header_widget.dart';
 
@@ -23,20 +22,8 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
   final ApiService _apiService = ApiService();
 
   bool _isLoading = false;
-  bool _isDemoMode = false;
-  bool _otpSent = false;
   String? _phoneError;
-  String? _otpError;
   bool _isPhoneValid = false;
-  int _resendCountdown = 0;
-
-  // Ugandan phone number prefixes (MTN, Airtel, Africell, Uganda Telecom)
-  final List<String> validPhonePrefixes = [
-    '075', '074', '077', '078', // MTN Uganda
-    '070', '071', '072', // Airtel Uganda
-    '079',                // Uganda Telecom
-    '073'                 // Africell Uganda
-  ];
 
   @override
   void initState() {
@@ -56,17 +43,11 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
       if (phone.isEmpty) {
         _phoneError = null;
         _isPhoneValid = false;
-      } else if (phone.length != 10) {
-        _phoneError = 'Phone number must be 10 digits';
+      } else if (phone.length < 8) {
+        _phoneError = 'Phone number must be at least 8 digits';
         _isPhoneValid = false;
-      } else if (!phone.startsWith('0')) {
-        _phoneError = 'Phone number must start with 0';
-        _isPhoneValid = false;
-      } else if (!RegExp(r'^[0-9]+$').hasMatch(phone)) {
-        _phoneError = 'Phone number can only contain digits';
-        _isPhoneValid = false;
-      } else if (!validPhonePrefixes.any((prefix) => phone.startsWith(prefix))) {
-        _phoneError = 'Invalid Ugandan phone number';
+      } else if (!RegExp(r'^[0-9+]+$').hasMatch(phone)) {
+        _phoneError = 'Phone number can only contain digits and +';
         _isPhoneValid = false;
       } else {
         _phoneError = null;
@@ -75,40 +56,8 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
     });
   }
 
-  void _startResendCountdown() {
-    setState(() {
-      _resendCountdown = 60;
-    });
-
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
-      if (mounted && _resendCountdown > 0) {
-        setState(() {
-          _resendCountdown--;
-        });
-        return true;
-      }
-      return false;
-    });
-  }
-
-  bool get _canSendOtp => _isPhoneValid && !_otpSent;
-
-  void _toggleDemoMode(bool enabled) {
-    setState(() {
-      _isDemoMode = enabled;
-      if (enabled) {
-        _phoneController.text = '0776102830'; // Default demo number
-      } else {
-        _phoneController.clear();
-        _otpSent = false;
-        _otpError = null;
-      }
-    });
-  }
-
-  Future<void> _handleSendOtp() async {
-    if (!_canSendOtp) return;
+  Future<void> _handleLogin() async {
+    if (!_isPhoneValid) return;
 
     FocusScope.of(context).unfocus();
 
@@ -120,56 +69,10 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
     HapticFeedback.lightImpact();
 
     try {
-      // For demo: No real OTP is sent, we just mark it as sent
       final phone = _phoneController.text.trim();
 
-      if (validPhonePrefixes.any((prefix) => phone.startsWith(prefix))) {
-        HapticFeedback.selectionClick();
-
-        setState(() {
-          _otpSent = true;
-        });
-
-        _startResendCountdown();
-
-        // Show success message (demo mode - no real OTP)
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Demo mode: Enter any 6-digit code'),
-            backgroundColor: AppTheme.lightTheme.colorScheme.primary,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      } else {
-        HapticFeedback.heavyImpact();
-        setState(() {
-          _phoneError = 'Invalid phone number';
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _phoneError = 'Failed to send OTP. Please try again.';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _handleVerifyOtp(String otp) async {
-    setState(() {
-      _isLoading = true;
-      _otpError = null;
-    });
-
-    HapticFeedback.lightImpact();
-
-    try {
-      final phone = _phoneController.text.trim();
-
-      // Call backend API for login
-      final response = await _apiService.phoneLogin(phone, otp);
+      // Call backend API for direct phone login
+      final response = await _apiService.directPhoneLogin(phone);
 
       HapticFeedback.selectionClick();
 
@@ -182,15 +85,15 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
         ),
       );
 
-      // Navigate to parent home screen
+      // Navigate to parent dashboard screen
       Navigator.pushReplacementNamed(
         context,
-        '/parent-home',
+        '/parent-dashboard',
       );
     } catch (e) {
       HapticFeedback.heavyImpact();
       setState(() {
-        _otpError = e.toString().replaceAll('Exception: ', '');
+        _phoneError = e.toString().replaceAll('Exception: ', '');
       });
     } finally {
       setState(() {
@@ -199,24 +102,24 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
     }
   }
 
-  Future<void> _handleResendOtp() async {
-    if (_resendCountdown > 0) return;
-
-    setState(() {
-      _otpSent = false;
-      _otpError = null;
-    });
-
-    await _handleSendOtp();
-  }
-
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
+          // Background pattern
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.15,
+              child: SvgPicture.asset(
+                'assets/images/bg_pattern.svg',
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          // Main content
           GestureDetector(
             onTap: () => FocusScope.of(context).unfocus(),
             child: SingleChildScrollView(
@@ -249,62 +152,15 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
                           isValid: _isPhoneValid,
                         ),
 
-                        SizedBox(height: 2.h),
+                        SizedBox(height: 3.h),
 
-                        // OTP Section (shown after phone is valid)
-                        if (_otpSent) ...[
-                          Text(
-                            'Enter OTP',
-                            style: AppTheme.lightTheme.textTheme.titleMedium
-                                ?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          SizedBox(height: 1.h),
-                          Text(
-                            'We sent a 6-digit code to ${_phoneController.text}',
-                            style: AppTheme.lightTheme.textTheme.bodySmall
-                                ?.copyWith(
-                              color: AppTheme
-                                  .lightTheme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          SizedBox(height: 2.h),
-                          OtpInputWidget(
-                            onCompleted: _handleVerifyOtp,
-                            errorText: _otpError,
-                          ),
-                          SizedBox(height: 3.h),
-                          // Resend OTP
-                          Center(
-                            child: TextButton(
-                              onPressed:
-                                  _resendCountdown > 0 ? null : _handleResendOtp,
-                              child: Text(
-                                _resendCountdown > 0
-                                    ? 'Resend OTP in ${_resendCountdown}s'
-                                    : 'Resend OTP',
-                                style: AppTheme.lightTheme.textTheme.bodyMedium
-                                    ?.copyWith(
-                                  color: _resendCountdown > 0
-                                      ? AppTheme.lightTheme.colorScheme
-                                          .onSurfaceVariant
-                                      : AppTheme.lightTheme.colorScheme.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ] else ...[
-                          SizedBox(height: 2.h),
-                          // Send OTP Button
-                          SignInButtonWidget(
-                            isEnabled: _canSendOtp,
-                            isLoading: _isLoading,
-                            onPressed: _handleSendOtp,
-                            buttonText: 'Send OTP',
-                          ),
-                        ],
+                        // Login Button
+                        SignInButtonWidget(
+                          isEnabled: _isPhoneValid,
+                          isLoading: _isLoading,
+                          onPressed: _handleLogin,
+                          buttonText: 'Sign In',
+                        ),
 
                         SizedBox(height: 4.h),
                       ],
@@ -313,12 +169,6 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
                 ],
               ),
             ),
-          ),
-
-          // Demo Toggle
-          DemoToggleWidget(
-            isDemoMode: _isDemoMode,
-            onToggle: _toggleDemoMode,
           ),
         ],
       ),

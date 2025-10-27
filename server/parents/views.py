@@ -71,29 +71,23 @@ class ParentLoginView(APIView):
         return Response({"error": "Invalid credentials"}, status=400)
 
 
-class ParentPhoneLoginView(APIView):
+class ParentDirectPhoneLoginView(APIView):
     """
-    Phone number-based login for parents.
-    No real OTP is sent - any 6-digit code is accepted for demo purposes.
+    Direct phone number-based login for parents.
+    No OTP required - just phone number verification.
 
-    POST /api/parents/phone-login/
+    POST /api/parents/direct-phone-login/
     Body: {
-        "phone_number": "0776102830",
-        "otp": "123456"  // Any 6 digits work
+        "phone_number": "0776102830"
     }
     """
     permission_classes = [AllowAny]
 
     def post(self, request):
         phone_number = request.data.get("phone_number")
-        otp = request.data.get("otp")
 
         if not phone_number:
             return Response({"error": "Phone number is required"}, status=400)
-
-        # For demo: Accept any 6-digit OTP
-        if otp and len(str(otp)) != 6:
-            return Response({"error": "OTP must be 6 digits"}, status=400)
 
         # Find parent by contact_number
         try:
@@ -153,6 +147,68 @@ from users.permissions import IsParent
 from rest_framework.permissions import IsAuthenticated
 from attendance.models import Attendance
 from datetime import date
+
+
+class ParentAssignChildrenView(APIView):
+    """
+    POST: Assign children to a parent
+
+    Endpoint: /api/parents/{parent_id}/assign-children/
+    Body: {"children_ids": [1, 2, 3]}
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request, user_id):
+        parent = get_object_or_404(Parent, user_id=user_id)
+        children_ids = request.data.get('children_ids', [])
+
+        if not children_ids:
+            return Response(
+                {"error": "children_ids array is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Assign children to parent
+        children = Child.objects.filter(id__in=children_ids)
+        children.update(parent=parent)
+
+        return Response({
+            "message": f"{children.count()} children assigned to {parent.user.get_full_name()}",
+            "parent": ParentSerializer(parent).data
+        }, status=status.HTTP_200_OK)
+
+
+class ParentChildrenView(APIView):
+    """
+    GET: Get all children assigned to a parent
+
+    Endpoint: /api/parents/{parent_id}/children/
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, user_id):
+        parent = get_object_or_404(Parent, user_id=user_id)
+        children = parent.parent_children.select_related('assigned_bus').all()
+
+        children_data = [
+            {
+                "id": child.id,
+                "firstName": child.first_name,
+                "lastName": child.last_name,
+                "grade": child.class_grade,
+                "age": child.age,
+                "status": child.status,
+                "busId": child.assigned_bus.id if child.assigned_bus else None,
+            }
+            for child in children
+        ]
+
+        return Response({
+            "parent_id": parent.user.id,
+            "parent_name": parent.user.get_full_name(),
+            "children_count": len(children_data),
+            "children": children_data
+        }, status=status.HTTP_200_OK)
 
 
 class MyChildrenView(APIView):

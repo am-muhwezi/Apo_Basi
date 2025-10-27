@@ -4,9 +4,13 @@ import '../models/child_model.dart';
 import '../models/parent_model.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://10.0.2.2:8000'; // Android emulator localhost
-  // Use 'http://localhost:8000' for iOS simulator
-  // Use your computer's IP for physical device (e.g., 'http://192.168.1.100:8000')
+  // DEVELOPMENT: Use WiFi IP for testing on physical device
+  static const String baseUrl = 'http://192.168.100.43:8000';
+
+  // OTHER OPTIONS:
+  // Android emulator: 'http://10.0.2.2:8000'
+  // iOS simulator: 'http://localhost:8000'
+  // Production: 'http://YOUR_VPS_IP' or 'https://yourdomain.com'
 
   late Dio _dio;
   String? _accessToken;
@@ -60,14 +64,13 @@ class ApiService {
     await prefs.remove('children_data');
   }
 
-  // Phone login
-  Future<Map<String, dynamic>> phoneLogin(String phoneNumber, String otp) async {
+  // Direct phone login (no OTP)
+  Future<Map<String, dynamic>> directPhoneLogin(String phoneNumber) async {
     try {
       final response = await _dio.post(
-        '/api/parents/phone-login/',
+        '/api/parents/direct-phone-login/',
         data: {
           'phone_number': phoneNumber,
-          'otp': otp,
         },
       );
 
@@ -78,6 +81,13 @@ class ApiService {
         await _saveToken(data['tokens']['access']);
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('refresh_token', data['tokens']['refresh']);
+
+        // Save user ID for profile access
+        if (data['user'] != null && data['user']['id'] != null) {
+          await _saveUserId(data['user']['id']);
+        } else if (data['parent'] != null && data['parent']['user'] != null) {
+          await _saveUserId(data['parent']['user']);
+        }
 
         // Save user and children data
         await prefs.setString('user_data', data['user'].toString());
@@ -122,5 +132,94 @@ class ApiService {
   Future<bool> isLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.containsKey('access_token');
+  }
+
+  // Get saved user ID from preferences
+  Future<int?> _getSavedUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('user_id');
+  }
+
+  // Save user ID to preferences
+  Future<void> _saveUserId(int userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('user_id', userId);
+  }
+
+  // Get parent profile using stored user_id
+  Future<Map<String, dynamic>> getParentProfile() async {
+    try {
+      await loadToken();
+
+      // Get saved user ID
+      final userId = await _getSavedUserId();
+      if (userId == null) {
+        throw Exception('User not logged in. Please login again.');
+      }
+
+      final response = await _dio.get('/api/parents/$userId/');
+
+      if (response.statusCode == 200) {
+        // Return in a format that matches what the app expects
+        return {
+          'user': {
+            'id': response.data['id'],
+            'username': response.data['firstName'] ?? '',
+            'email': response.data['email'] ?? '',
+            'first_name': response.data['firstName'],
+            'last_name': response.data['lastName'],
+          },
+          'parent': {
+            'user': response.data['id'],
+            'contact_number': response.data['phone'] ?? '',
+            'address': response.data['address'],
+            'emergency_contact': response.data['emergencyContact'],
+            'status': response.data['status'] ?? 'active',
+          }
+        };
+      } else {
+        throw Exception('Failed to load profile');
+      }
+    } on DioException catch (e) {
+      if (e.response != null) {
+        throw Exception(e.response?.data['error'] ?? 'Failed to load profile');
+      } else {
+        throw Exception('Network error. Please check your connection.');
+      }
+    }
+  }
+
+  // Update parent profile
+  Future<Map<String, dynamic>> updateParentProfile({
+    String? address,
+    String? emergencyContact,
+  }) async {
+    try {
+      await loadToken();
+
+      // Get saved user ID
+      final userId = await _getSavedUserId();
+      if (userId == null) {
+        throw Exception('User not logged in. Please login again.');
+      }
+
+      final data = <String, dynamic>{};
+      if (address != null) data['address'] = address;
+      if (emergencyContact != null) data['emergencyContact'] = emergencyContact;
+
+      final response = await _dio.patch('/api/parents/$userId/', data: data);
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception('Failed to update profile');
+      }
+    } on DioException catch (e) {
+      if (e.response != null) {
+        throw Exception(e.response?.data['error'] ?? 'Failed to update profile');
+      } else {
+        throw Exception('Network error. Please check your connection.');
+      }
+    }
   }
 }

@@ -14,6 +14,8 @@ class BusSerializer(serializers.ModelSerializer):
     minderId = serializers.IntegerField(source='bus_minder.id', read_only=True, allow_null=True)
     minderName = serializers.SerializerMethodField()
     assignedChildrenCount = serializers.SerializerMethodField()
+    assignedChildrenIds = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
     lastMaintenance = serializers.DateField(source='last_maintenance', allow_null=True)
     currentLocation = serializers.CharField(source='current_location', allow_blank=True)
     isActive = serializers.BooleanField(source='is_active')
@@ -23,9 +25,10 @@ class BusSerializer(serializers.ModelSerializer):
         model = Bus
         fields = [
             'id', 'busNumber', 'licensePlate', 'capacity', 'model', 'year',
-            'isActive', 'lastMaintenance', 'currentLocation',
+            'isActive', 'status', 'lastMaintenance', 'currentLocation',
             'driverId', 'driverName', 'minderId', 'minderName',
-            'assignedChildrenCount', 'latitude', 'longitude', 'lastUpdated'
+            'assignedChildrenCount', 'assignedChildrenIds',
+            'latitude', 'longitude', 'lastUpdated'
         ]
 
     def get_driverName(self, obj):
@@ -36,6 +39,20 @@ class BusSerializer(serializers.ModelSerializer):
 
     def get_assignedChildrenCount(self, obj):
         return obj.children.count() if hasattr(obj, 'children') else 0
+
+    def get_assignedChildrenIds(self, obj):
+        """Return list of child IDs assigned to this bus"""
+        if hasattr(obj, 'children'):
+            return list(obj.children.values_list('id', flat=True))
+        return []
+
+    def get_status(self, obj):
+        """Convert is_active boolean to status string for frontend"""
+        if obj.is_active:
+            return 'active'
+        # You can add more logic here based on other fields
+        # For now, return 'inactive' for non-active buses
+        return 'inactive'
 
 
 class BusCreateSerializer(serializers.ModelSerializer):
