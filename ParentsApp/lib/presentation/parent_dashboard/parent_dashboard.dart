@@ -26,23 +26,34 @@ class _ParentDashboardState extends State<ParentDashboard> {
   bool _isLoading = true;
   List<Child> _children = [];
   String? _error;
+  String _parentName = 'Parent';
 
   @override
   void initState() {
     super.initState();
-    _loadChildren();
+    _loadData();
     _simulateConnectionStatus();
   }
 
-  Future<void> _loadChildren() async {
+  Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
+      // Load both parent profile and children
+      final parentProfile = await _apiService.getParentProfile();
       final children = await _apiService.getMyChildren();
+
       setState(() {
+        // Get name from user object
+        final user = parentProfile['user'];
+        if (user != null) {
+          _parentName = user['first_name'] ?? user['username'] ?? 'Parent';
+        } else {
+          _parentName = 'Parent';
+        }
         _children = children;
         _isLoading = false;
         _isConnected = true;
@@ -56,6 +67,10 @@ class _ParentDashboardState extends State<ParentDashboard> {
         _lastUpdated = 'Failed to update';
       });
     }
+  }
+
+  Future<void> _loadChildren() async {
+    await _loadData();
   }
 
   void _simulateConnectionStatus() {
@@ -74,23 +89,12 @@ class _ParentDashboardState extends State<ParentDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
-      body: Column(
+      body: IndexedStack(
+        index: _currentIndex,
         children: [
-          if (_currentIndex == 0)
-            ConnectionStatusBar(
-              isConnected: _isConnected,
-              lastUpdated: _lastUpdated,
-            ),
-          Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: [
-                _buildHomeScreen(),
-                const NotificationsCenter(),
-                const ParentProfileSettings(),
-              ],
-            ),
-          ),
+          _buildHomeScreen(),
+          const NotificationsCenter(),
+          const ParentProfileSettings(),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -160,45 +164,35 @@ class _ParentDashboardState extends State<ParentDashboard> {
     );
   }
 
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  String _getFormattedDate() {
+    final now = DateTime.now();
+    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    final dayName = days[now.weekday - 1];
+    final monthName = months[now.month - 1];
+
+    return '$dayName, $monthName ${now.day}';
+  }
+
+  String _getFormattedTime() {
+    final now = DateTime.now();
+    final hour = now.hour.toString().padLeft(2, '0');
+    final minute = now.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
   Widget _buildHomeScreen() {
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: AppTheme.lightTheme.appBarTheme.backgroundColor,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        toolbarHeight: 100,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Good morning!',
-              style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
-                color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            SizedBox(height: 0.5.h),
-            Text(
-              'Your Children',
-              style: AppTheme.lightTheme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppTheme.lightTheme.colorScheme.onSurface,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.refresh,
-              color: AppTheme.lightTheme.colorScheme.primary,
-            ),
-            onPressed: _loadChildren,
-          ),
-        ],
-      ),
-      body: TelegramBackground(
-        bubbleColor: AppTheme.lightTheme.colorScheme.primary,
+      backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
+      body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
@@ -207,24 +201,107 @@ class _ParentDashboardState extends State<ParentDashboard> {
                     ? _buildEmptyView()
                     : RefreshIndicator(
                         onRefresh: _loadChildren,
-                        child: SingleChildScrollView(
+                        child: CustomScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(height: 1.h),
-                              // Children status cards
-                              ..._children
-                                  .map(
-                                    (child) => ChildStatusCard(
+                          slivers: [
+                            // Custom header with gradient background
+                            SliverToBoxAdapter(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      const Color(0xFF4CAF50), // Green
+                                      const Color(0xFF388E3C), // Darker green
+                                    ],
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: EdgeInsets.fromLTRB(5.w, 2.h, 5.w, 2.h),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Greeting text
+                                      Text(
+                                        'Good Morning ${_parentName.toUpperCase()}',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16.sp,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      SizedBox(height: 1.h),
+                                      // Date and time row
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.calendar_today,
+                                            color: Colors.white,
+                                            size: 4.w,
+                                          ),
+                                          SizedBox(width: 2.w),
+                                          Text(
+                                            _getFormattedDate(),
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 13.sp,
+                                              fontWeight: FontWeight.w400,
+                                            ),
+                                          ),
+                                          SizedBox(width: 4.w),
+                                          Icon(
+                                            Icons.access_time,
+                                            color: Colors.white,
+                                            size: 4.w,
+                                          ),
+                                          SizedBox(width: 2.w),
+                                          Text(
+                                            _getFormattedTime(),
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 13.sp,
+                                              fontWeight: FontWeight.w400,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Section label with padding
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(5.w, 2.h, 5.w, 1.h),
+                                child: Text(
+                                  'Your Children',
+                                  style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.lightTheme.colorScheme.onSurface,
+                                    fontSize: 18.sp,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Children cards
+                            SliverPadding(
+                              padding: EdgeInsets.only(bottom: 10.h),
+                              sliver: SliverList(
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) {
+                                    final child = _children[index];
+                                    return ChildStatusCard(
                                       childData: _childToCardData(child),
                                       onTap: () => _onChildCardTap(_childToCardData(child)),
-                                    ),
-                                  )
-                                  .toList(),
-                              SizedBox(height: 8.h), // Space for bottom navigation
-                            ],
-                          ),
+                                    );
+                                  },
+                                  childCount: _children.length,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
       ),
@@ -241,13 +318,11 @@ class _ParentDashboardState extends State<ParentDashboard> {
   }
 
   void _onChildCardTap(Map<String, dynamic> childData) {
-    final String status = childData['status'] ?? '';
-
-    // Navigate to live bus tracking map for trackable statuses
+    // Navigate to child detail screen
     // The card's onTap will only be called if status is trackable (not at_home, at_school, or no record)
     Navigator.pushNamed(
       context,
-      '/live-bus-tracking-map',
+      '/child-detail',
       arguments: childData,
     );
   }
@@ -410,7 +485,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
   }
 
   bool _hasUnreadNotifications() {
-    // Simple logic to show notification badge
-    return true; // Always show badge for demo
+    // TODO: Connect to API to check for unread notifications
+    return false; // No notifications yet
   }
 }
