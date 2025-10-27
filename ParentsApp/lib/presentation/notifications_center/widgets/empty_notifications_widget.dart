@@ -9,7 +9,7 @@ class EmptyNotificationsWidget extends StatelessWidget {
 
   const EmptyNotificationsWidget({
     Key? key,
-    this.message = 'All Caught Up!',
+    this.message = 'No new notifications',
     this.subtitle,
   }) : super(key: key);
 
@@ -47,15 +47,15 @@ class EmptyNotificationsWidget extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 2.h),
-            Text(
-              subtitle ??
-                  'You\'re all up to date with your child\'s transportation updates. We\'ll notify you when there\'s something new.',
-              style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                height: 1.5,
+            if (subtitle != null || message == 'No new notifications')
+              Text(
+                subtitle ?? 'You\'re all caught up! Check back later for updates on your child\'s transportation.',
+                style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
+                  color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
             SizedBox(height: 4.h),
             Container(
               padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 3.h),
