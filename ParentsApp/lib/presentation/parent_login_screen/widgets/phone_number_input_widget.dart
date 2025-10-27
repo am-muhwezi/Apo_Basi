@@ -49,38 +49,24 @@ class PhoneNumberInputWidget extends StatelessWidget {
             onChanged: onChanged,
             keyboardType: TextInputType.phone,
             inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(10),
+              // Allow digits and plus sign for international numbers
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
+              LengthLimitingTextInputFormatter(15),
             ],
             style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.w500,
               letterSpacing: 1.2,
             ),
             decoration: InputDecoration(
-              hintText: '0751234567',
+              hintText: 'Enter phone number',
               hintStyle: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
                 color: AppTheme.lightTheme.colorScheme.onSurfaceVariant
                     .withValues(alpha: 0.5),
               ),
-              prefixIcon: Container(
-                padding: EdgeInsets.symmetric(horizontal: 3.w),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '🇺🇬 +256',
-                      style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(width: 2.w),
-                    Container(
-                      width: 1,
-                      height: 4.h,
-                      color: AppTheme.lightTheme.colorScheme.outline,
-                    ),
-                  ],
-                ),
+              prefixIcon: Icon(
+                Icons.phone_android,
+                color: AppTheme.lightTheme.colorScheme.primary,
+                size: 5.w,
               ),
               suffixIcon: isValid
                   ? Icon(

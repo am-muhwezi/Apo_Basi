@@ -289,6 +289,100 @@ class AdminAddBusminderView(generics.CreateAPIView):
 
 from buses.models import Bus
 from rest_framework.views import APIView
+from django.db.models import Count, Q
+from datetime import datetime, timedelta
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def dashboard_stats(request):
+    """
+    Dashboard statistics endpoint for admin panel.
+
+    Returns comprehensive stats for:
+    - Buses (total, active, maintenance, inactive)
+    - Children (total, active, assigned to buses)
+    - Users (parents, drivers, minders)
+    - Recent activity
+    """
+    # Bus statistics
+    total_buses = Bus.objects.count()
+    active_buses = Bus.objects.filter(is_active=True).count()
+    maintenance_buses = Bus.objects.filter(
+        last_maintenance__isnull=False,
+        is_active=False
+    ).count()
+    inactive_buses = total_buses - active_buses - maintenance_buses
+
+    # Children statistics
+    total_children = Child.objects.count()
+    active_children = Child.objects.filter(status='active').count()
+    children_with_bus = Child.objects.filter(assigned_bus__isnull=False).count()
+
+    # User statistics
+    total_parents = Parent.objects.count()
+    total_drivers = User.objects.filter(user_type='driver').count()
+    total_minders = User.objects.filter(user_type='busminder').count()
+    total_admins = Admin.objects.count()
+
+    # Calculate total capacity
+    total_capacity = Bus.objects.aggregate(
+        total=Count('id') * 40  # Default capacity approximation
+    )['total'] or 0
+
+    # Recent activity
+    recent_activity = []
+
+    # Get recent children (last 5)
+    recent_children = Child.objects.order_by('-id')[:5]
+    for child in recent_children:
+        recent_activity.append({
+            'id': f'child-{child.id}',
+            'action': f'{child.first_name} {child.last_name} enrolled',
+            'time': 'Recently',
+            'type': 'info'
+        })
+
+    # Add active bus info
+    active_buses_list = Bus.objects.filter(is_active=True).order_by('-last_updated')[:3]
+    for bus in active_buses_list:
+        recent_activity.append({
+            'id': f'bus-{bus.id}',
+            'action': f'Bus {bus.bus_number} is active on route',
+            'time': bus.last_updated.strftime('%I:%M %p') if bus.last_updated else 'N/A',
+            'type': 'success'
+        })
+
+    return Response({
+        'buses': {
+            'total': total_buses,
+            'active': active_buses,
+            'maintenance': maintenance_buses,
+            'inactive': inactive_buses,
+        },
+        'children': {
+            'total': total_children,
+            'active': active_children,
+            'with_bus': children_with_bus,
+            'checked_in': active_children,  # Simplified for now
+        },
+        'users': {
+            'parents': total_parents,
+            'drivers': total_drivers,
+            'minders': total_minders,
+            'admins': total_admins,
+        },
+        'capacity': {
+            'total': total_capacity,
+            'students_onboard': children_with_bus,
+        },
+        'recent_activity': recent_activity[:5],
+        'fleet_status': [
+            {'status': 'Active', 'count': active_buses, 'color': 'green'},
+            {'status': 'Maintenance', 'count': maintenance_buses, 'color': 'yellow'},
+            {'status': 'Inactive', 'count': inactive_buses, 'color': 'gray'},
+        ]
+    })
 
 
 class AdminAssignDriverToBusView(APIView):

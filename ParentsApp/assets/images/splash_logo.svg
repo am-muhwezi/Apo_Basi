@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400px" height="400px" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="splashBusGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#FFB300;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#FF8F00;stop-opacity:1" />
+        </linearGradient>
+    </defs>
+
+    <!-- Bus Body -->
+    <rect x="60" y="140" width="280" height="150" rx="18" fill="url(#splashBusGradient)"/>
+
+    <!-- Bus Roof -->
+    <path d="M 70 140 L 90 110 L 310 110 L 330 140 Z" fill="#FFC107"/>
+
+    <!-- Windows -->
+    <rect x="80" y="155" width="60" height="50" rx="4" fill="#4DD0E1" opacity="0.8"/>
+    <rect x="155" y="155" width="60" height="50" rx="4" fill="#4DD0E1" opacity="0.8"/>
+    <rect x="230" y="155" width="60" height="50" rx="4" fill="#4DD0E1" opacity="0.8"/>
+
+    <!-- Window Frames -->
+    <rect x="80" y="155" width="60" height="50" rx="4" fill="none" stroke="#FF8F00" stroke-width="2.5"/>
+    <rect x="155" y="155" width="60" height="50" rx="4" fill="none" stroke="#FF8F00" stroke-width="2.5"/>
+    <rect x="230" y="155" width="60" height="50" rx="4" fill="none" stroke="#FF8F00" stroke-width="2.5"/>
+
+    <!-- Front Grill -->
+    <rect x="70" y="220" width="20" height="35" rx="3" fill="#263238"/>
+
+    <!-- Door -->
+    <rect x="95" y="230" width="45" height="58" rx="4" fill="#FF6F00"/>
+    <line x1="117" y1="240" x2="117" y2="280" stroke="#FFB300" stroke-width="2"/>
+
+    <!-- Wheels -->
+    <circle cx="125" cy="295" r="30" fill="#263238"/>
+    <circle cx="125" cy="295" r="20" fill="#424242"/>
+    <circle cx="125" cy="295" r="10" fill="#616161"/>
+
+    <circle cx="285" cy="295" r="30" fill="#263238"/>
+    <circle cx="285" cy="295" r="20" fill="#424242"/>
+    <circle cx="285" cy="295" r="10" fill="#616161"/>
+
+    <!-- Safety Light on Top -->
+    <rect x="185" y="100" width="35" height="15" rx="4" fill="#FF5722"/>
+    <circle cx="200" cy="107" r="5" fill="#FFEB3B" opacity="0.9"/>
+
+    <!-- ApoBasi Text -->
+    <text x="200" y="360" font-family="Arial, sans-serif" font-size="38" font-weight="bold" fill="#FF8F00" text-anchor="middle">ApoBasi</text>
+    <text x="200" y="385" font-family="Arial, sans-serif" font-size="16" fill="#757575" text-anchor="middle">Safe Journey Home</text>
+</svg>

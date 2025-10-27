@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/app_export.dart';
 
@@ -29,22 +30,12 @@ class WelcomeHeaderWidget extends StatelessWidget {
         child: Column(
           children: [
             SizedBox(height: 2.h),
-            Container(
-              width: 20.w,
-              height: 20.w,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: CustomIconWidget(
-                  iconName: 'family_restroom',
-                  color: Colors.white,
-                  size: 12.w,
-                ),
-              ),
+            SvgPicture.asset(
+              'assets/images/splash_logo.svg',
+              width: 45.w,
+              height: 45.w,
             ),
-            SizedBox(height: 3.h),
+            SizedBox(height: 2.h),
             Text(
               'Welcome Back',
               style: AppTheme.lightTheme.textTheme.headlineMedium?.copyWith(

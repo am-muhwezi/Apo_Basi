@@ -1,5 +1,5 @@
 import { ReactNode, useState, useEffect } from 'react';
-import { Bus, Users, Baby, CircleUser as UserCircle, MapPin, Shield, Menu, X, LogOut } from 'lucide-react';
+import { Bus, Users, Baby, CircleUser as UserCircle, MapPin, Shield, Menu, X, LogOut, LayoutDashboard } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
@@ -22,6 +22,7 @@ export default function Layout({ children, currentPage, onNavigate, onLogout }: 
   }, []);
 
   const menuItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'children', label: 'Children', icon: Baby },
     { id: 'parents', label: 'Parents', icon: Users },
     { id: 'buses', label: 'Buses', icon: Bus },

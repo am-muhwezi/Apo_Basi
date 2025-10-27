@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout from './components/Layout';
+import DashboardPage from './pages/DashboardPage';
 import ChildrenPage from './pages/ChildrenPage';
 import ParentsPage from './pages/ParentsPage';
 import BusesPage from './pages/BusesPage';
@@ -10,7 +11,7 @@ import AdminsPage from './pages/AdminsPage';
 import AuthPage from './pages/AuthPage';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('children');
+  const [currentPage, setCurrentPage] = useState('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
@@ -36,6 +37,8 @@ function App() {
 
   const renderPage = () => {
     switch (currentPage) {
+      case 'dashboard':
+        return <DashboardPage />;
       case 'children':
         return <ChildrenPage />;
       case 'parents':
@@ -51,7 +54,7 @@ function App() {
       case 'admins':
         return <AdminsPage />;
       default:
-        return <ChildrenPage />;
+        return <DashboardPage />;
     }
   };
 

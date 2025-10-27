@@ -12,16 +12,23 @@ class ParentSerializer(serializers.ModelSerializer):
     phone = serializers.CharField(source='contact_number', read_only=True)
     emergencyContact = serializers.CharField(source='emergency_contact', read_only=True)
     childrenCount = serializers.SerializerMethodField()
+    childrenIds = serializers.SerializerMethodField()
 
     class Meta:
         model = Parent
         fields = [
             'id', 'firstName', 'lastName', 'email', 'phone',
-            'address', 'emergencyContact', 'status', 'childrenCount'
+            'address', 'emergencyContact', 'status', 'childrenCount', 'childrenIds'
         ]
 
     def get_childrenCount(self, obj):
-        return obj.user.parent_children.count() if hasattr(obj.user, 'parent_children') else 0
+        return obj.parent_children.count() if hasattr(obj, 'parent_children') else 0
+
+    def get_childrenIds(self, obj):
+        """Return list of child IDs assigned to this parent"""
+        if hasattr(obj, 'parent_children'):
+            return list(obj.parent_children.values_list('id', flat=True))
+        return []
 
 
 class ParentCreateSerializer(serializers.Serializer):

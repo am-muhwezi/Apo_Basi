@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserPlus, Users } from 'lucide-react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, Users, Bus as BusIcon, AlertTriangle, CheckCircle } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
-import { getBuses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren } from '../services/busApi';
-import { getDrivers } from '../services/driverApi';
-import { getBusMinders } from '../services/busMinderApi';
-import { getChildren } from '../services/childApi';
-import type { Bus, Driver, Minder, Child } from '../types';
+import { useBuses } from '../hooks/useBuses';
+import { useDrivers } from '../hooks/useDrivers';
+import { useMinders } from '../hooks/useMinders';
+import { useChildren } from '../hooks/useChildren';
+import type { Bus } from '../types';
 
 export default function BusesPage() {
-  const [buses, setBuses] = useState<Bus[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [minders, setMinders] = useState<Minder[]>([]);
-  const [children, setChildren] = useState<Child[]>([]);
+  const { buses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren } = useBuses();
+  const { drivers } = useDrivers();
+  const { minders } = useMinders();
+  const { children } = useChildren();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -23,32 +24,10 @@ export default function BusesPage() {
   const [formData, setFormData] = useState<Partial<Bus>>({});
   const [assignData, setAssignData] = useState({ driverId: '', minderId: '', childrenIds: [] as string[] });
 
-  // Fetch all data from backend
-  React.useEffect(() => {
-    loadAllData();
-  }, []);
-
-  async function loadAllData() {
-    try {
-      const [busesRes, driversRes, mindersRes, childrenRes] = await Promise.all([
-        getBuses(),
-        getDrivers(),
-        getBusMinders(),
-        getChildren()
-      ]);
-      setBuses(busesRes.data);
-      setDrivers(driversRes.data);
-      setMinders(mindersRes.data);
-      setChildren(childrenRes.data);
-    } catch (error) {
-      console.error('Failed to load data:', error);
-    }
-  }
-
   const filteredBuses = buses.filter((bus) => {
     const matchesSearch =
-      bus.busNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bus.licensePlate.toLowerCase().includes(searchTerm.toLowerCase());
+      bus.busNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      bus.licensePlate?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
 
@@ -60,7 +39,6 @@ export default function BusesPage() {
       capacity: 40,
       model: '',
       year: new Date().getFullYear(),
-      assignedChildrenIds: [],
       status: 'active',
     });
     setShowModal(true);
@@ -80,46 +58,42 @@ export default function BusesPage() {
   const handleAssign = (bus: Bus) => {
     setSelectedBus(bus);
     setAssignData({
-      driverId: bus.driverId || '',
-      minderId: bus.minderId || '',
-      childrenIds: bus.assignedChildrenIds,
+      driverId: bus.driverId?.toString() || '',
+      minderId: bus.minderId?.toString() || '',
+      childrenIds: bus.assignedChildrenIds || [],
     });
     setShowAssignModal(true);
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this bus?')) {
-      try {
-        await deleteBus(id);
-        loadAllData();
-      } catch (error) {
-        alert('Failed to delete bus');
+      const result = await deleteBus(id);
+      if (result.success) {
+        alert('Bus deleted successfully');
+      } else {
+        alert(result.error || 'Failed to delete bus');
       }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      if (selectedBus) {
-        // Update existing bus
-        const response = await updateBus(selectedBus.id, formData);
-        if (response.status === 200 || response.status === 201) {
-          alert('Bus updated successfully');
-          loadBuses();
-          setShowModal(false);
-        }
+    if (selectedBus) {
+      const result = await updateBus(selectedBus.id, formData);
+      if (result.success) {
+        alert('Bus updated successfully');
+        setShowModal(false);
       } else {
-        // Create new bus
-        const response = await createBus(formData);
-        if (response.status === 200 || response.status === 201) {
-          alert('Bus created successfully');
-          loadBuses();
-          setShowModal(false);
-        }
+        alert(result.error || 'Failed to update bus');
       }
-    } catch (error) {
-      alert(selectedBus ? 'Failed to update bus' : 'Failed to create bus');
+    } else {
+      const result = await createBus(formData);
+      if (result.success) {
+        alert('Bus created successfully');
+        setShowModal(false);
+      } else {
+        alert(result.error || 'Failed to create bus');
+      }
     }
   };
 
@@ -143,7 +117,7 @@ export default function BusesPage() {
         await assignChildren(selectedBus.id, assignData.childrenIds);
       }
 
-      loadBuses();
+      alert('Assignments saved successfully');
       setShowAssignModal(false);
     } catch (error) {
       alert('Failed to assign staff/children');
@@ -159,17 +133,23 @@ export default function BusesPage() {
     }));
   };
 
-  const getDriverName = (driverId?: string) => {
+  const getDriverName = (driverId?: number) => {
     if (!driverId) return 'Not Assigned';
-    const driver = drivers.find((d) => d.id === driverId);
+    const driver = drivers.find((d) => d.id === driverId.toString());
     return driver ? `${driver.firstName} ${driver.lastName}` : 'Unknown';
   };
 
-  const getMinderName = (minderId?: string) => {
+  const getMinderName = (minderId?: number) => {
     if (!minderId) return 'Not Assigned';
-    const minder = minders.find((m) => m.id === minderId);
+    const minder = minders.find((m) => m.id === minderId.toString());
     return minder ? `${minder.firstName} ${minder.lastName}` : 'Unknown';
   };
+
+  // Calculate stats
+  const totalBuses = buses.length;
+  const activeBuses = buses.filter((b) => b.status === 'active').length;
+  const maintenanceBuses = buses.filter((b) => b.status === 'maintenance').length;
+  const totalCapacity = buses.reduce((sum, b) => sum + (b.capacity || 0), 0);
 
   return (
     <div>
@@ -179,6 +159,49 @@ export default function BusesPage() {
           <Plus size={20} className="mr-2 inline" />
           Add Bus
         </Button>
+      </div>
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <BusIcon className="w-5 h-5 text-blue-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Buses</h3>
+          <p className="text-2xl font-bold text-slate-900">{totalBuses}</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Active</h3>
+          <p className="text-2xl font-bold text-slate-900">{activeBuses}</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-yellow-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Maintenance</h3>
+          <p className="text-2xl font-bold text-slate-900">{maintenanceBuses}</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Users className="w-5 h-5 text-purple-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Capacity</h3>
+          <p className="text-2xl font-bold text-slate-900">{totalCapacity}</p>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">
@@ -287,6 +310,7 @@ export default function BusesPage() {
         </div>
       </div>
 
+      {/* Create/Edit Modal */}
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
@@ -356,6 +380,7 @@ export default function BusesPage() {
         </form>
       </Modal>
 
+      {/* Assignment Modal */}
       <Modal
         isOpen={showAssignModal}
         onClose={() => setShowAssignModal(false)}
@@ -392,7 +417,7 @@ export default function BusesPage() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-3">
-              Assigned Children ({assignData.childrenIds.length}/{selectedBus?.capacity})
+              Assigned Children ({assignData.childrenIds.length}/{selectedBus?.capacity || 0})
             </label>
             <div className="max-h-64 overflow-y-auto border border-slate-300 rounded-lg">
               {children.map((child) => (
@@ -428,6 +453,7 @@ export default function BusesPage() {
         </form>
       </Modal>
 
+      {/* Detail Modal */}
       <Modal isOpen={showDetailModal} onClose={() => setShowDetailModal(false)} title="Bus Details">
         {selectedBus && (
           <div className="space-y-4">
@@ -477,7 +503,7 @@ export default function BusesPage() {
                 <div className="space-y-2">
                   {selectedBus.assignedChildrenIds && selectedBus.assignedChildrenIds.length > 0 ? (
                     selectedBus.assignedChildrenIds.map((childId) => {
-                      const child = childrenService.getById(childId);
+                      const child = children.find(c => c.id === childId.toString());
                       return child ? (
                         <div key={child.id} className="p-3 bg-slate-50 rounded-lg">
                           <p className="font-medium text-slate-900">

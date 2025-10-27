@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserPlus } from 'lucide-react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserPlus, Users, Baby, UserCheck, Phone } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -142,6 +142,12 @@ export default function ParentsPage() {
       .join(', ');
   };
 
+  // Calculate stats
+  const totalParents = parents.length;
+  const activeParents = parents.filter((p) => p.status === 'active').length;
+  const totalChildren = children.length;
+  const parentsWithChildren = parents.filter((p) => p.childrenIds && p.childrenIds.length > 0).length;
+
   return (
     <div>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
@@ -150,6 +156,49 @@ export default function ParentsPage() {
           <Plus size={20} className="mr-2 inline" />
           Add Parent
         </Button>
+      </div>
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Users className="w-5 h-5 text-blue-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Parents</h3>
+          <p className="text-2xl font-bold text-slate-900">{totalParents}</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <UserCheck className="w-5 h-5 text-green-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Active Parents</h3>
+          <p className="text-2xl font-bold text-slate-900">{activeParents}</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Baby className="w-5 h-5 text-purple-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Children</h3>
+          <p className="text-2xl font-bold text-slate-900">{totalChildren}</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <UserPlus className="w-5 h-5 text-orange-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">With Children</h3>
+          <p className="text-2xl font-bold text-slate-900">{parentsWithChildren}</p>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">

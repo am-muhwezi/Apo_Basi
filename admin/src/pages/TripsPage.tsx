@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Eye, MapPin, Navigation } from 'lucide-react';
+import { Plus, Search, Eye, MapPin, Navigation, Users, Clock, TrendingUp } from 'lucide-react';
 import Button from '../components/common/Button';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
@@ -10,6 +10,70 @@ import { getBusMinders } from '../services/busMinderApi';
 import { getChildren } from '../services/childApi';
 import type { Trip, Bus, Driver, Minder, Child } from '../types';
 
+// Dummy route data
+const dummyRoutes = [
+  {
+    id: 'route-a',
+    name: 'Route A',
+    busNumber: 'Bus 101',
+    driver: 'Ethan Carter',
+    startTime: '7:00 AM',
+    students: 32,
+    stops: 12,
+    duration: 45,
+    distance: 15.2,
+    status: 'Active'
+  },
+  {
+    id: 'route-b',
+    name: 'Route B',
+    busNumber: 'Bus 102',
+    driver: 'Olivia Bennett',
+    startTime: '7:05 AM',
+    students: 28,
+    stops: 10,
+    duration: 40,
+    distance: 12.8,
+    status: 'Active'
+  },
+  {
+    id: 'route-c',
+    name: 'Route C',
+    busNumber: 'Bus 103',
+    driver: 'Noah Thompson',
+    startTime: '6:55 AM',
+    students: 35,
+    stops: 14,
+    duration: 50,
+    distance: 18.5,
+    status: 'Active'
+  },
+  {
+    id: 'route-d',
+    name: 'Route D',
+    busNumber: 'Bus 104',
+    driver: 'Ava Harper',
+    startTime: '6:50 AM',
+    students: 40,
+    stops: 16,
+    duration: 55,
+    distance: 20.1,
+    status: 'Active'
+  },
+  {
+    id: 'route-e',
+    name: 'Route E',
+    busNumber: 'Bus 105',
+    driver: 'Liam Foster',
+    startTime: '7:10 AM',
+    students: 30,
+    stops: 11,
+    duration: 42,
+    distance: 14.3,
+    status: 'Active'
+  },
+];
+
 export default function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [buses, setBuses] = useState<Bus[]>([]);
@@ -18,8 +82,12 @@ export default function TripsPage() {
   const [children, setChildren] = useState<Child[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [selectedRoute, setSelectedRoute] = useState<typeof dummyRoutes[0] | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
+
+  // Use dummy routes for now
+  const [routes] = useState(dummyRoutes);
 
   // Fetch all data from backend
   React.useEffect(() => {
@@ -91,291 +159,187 @@ export default function TripsPage() {
     });
   };
 
+  // Calculate stats from dummy routes
+  const totalRoutes = routes.length;
+  const totalStudents = routes.reduce((sum, route) => sum + route.students, 0);
+  const totalStops = routes.reduce((sum, route) => sum + route.stops, 0);
+  const avgDuration = routes.length > 0 ? Math.round(routes.reduce((sum, route) => sum + route.duration, 0) / routes.length) : 0;
+
   return (
     <div>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 mb-4 md:mb-0">Trips & Tracking</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Routes & Tracking</h1>
+          <p className="text-slate-600">Manage and optimize school bus routes for efficient transportation.</p>
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">
-        <Select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          options={[
-            { value: 'all', label: 'All Trips' },
-            { value: 'scheduled', label: 'Scheduled' },
-            { value: 'in-progress', label: 'In Progress' },
-            { value: 'completed', label: 'Completed' },
-            { value: 'cancelled', label: 'Cancelled' },
-          ]}
-        />
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <MapPin className="w-5 h-5 text-blue-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Routes</h3>
+          <p className="text-2xl font-bold text-slate-900">{totalRoutes}</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <Users className="w-5 h-5 text-green-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Students</h3>
+          <p className="text-2xl font-bold text-slate-900">{totalStudents}</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Navigation className="w-5 h-5 text-purple-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Stops</h3>
+          <p className="text-2xl font-bold text-slate-900">{totalStops}</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <Clock className="w-5 h-5 text-orange-600" />
+            </div>
+          </div>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Avg Duration</h3>
+          <p className="text-2xl font-bold text-slate-900">{avgDuration} min</p>
+        </div>
       </div>
 
-      <div className="grid gap-6">
-        {filteredTrips.map((trip) => (
+      {/* Routes Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {routes.map((route) => (
           <div
-            key={trip.id}
-            className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow"
+            key={route.id}
+            className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow"
           >
-            <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-lg font-semibold text-slate-900">{trip.route}</h3>
-                  <span
-                    className={`px-3 py-1 text-xs font-medium rounded-full ${
-                      trip.status === 'in-progress'
-                        ? 'bg-blue-100 text-blue-800'
-                        : trip.status === 'completed'
-                        ? 'bg-green-100 text-green-800'
-                        : trip.status === 'cancelled'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-slate-100 text-slate-800'
-                    }`}
-                  >
-                    {trip.status}
-                  </span>
-                  <span
-                    className={`px-3 py-1 text-xs font-medium rounded-full ${
-                      trip.type === 'pickup'
-                        ? 'bg-orange-100 text-orange-800'
-                        : 'bg-teal-100 text-teal-800'
-                    }`}
-                  >
-                    {trip.type}
-                  </span>
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-blue-100 rounded-lg">
+                  <MapPin className="w-6 h-6 text-blue-600" />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600">
-                  <div>
-                    <span className="font-medium">Bus:</span> {getBusNumber(trip.busId)}
-                  </div>
-                  <div>
-                    <span className="font-medium">Driver:</span> {getDriverName(trip.driverId)}
-                  </div>
-                  <div>
-                    <span className="font-medium">Minder:</span> {getMinderName(trip.minderId)}
-                  </div>
-                  <div>
-                    <span className="font-medium">Children:</span> {trip.childrenIds.length}
-                  </div>
-                  <div>
-                    <span className="font-medium">Scheduled:</span> {formatTime(trip.scheduledTime)}
-                  </div>
-                  {trip.startTime && (
-                    <div>
-                      <span className="font-medium">Started:</span> {formatTime(trip.startTime)}
-                    </div>
-                  )}
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">{route.name}</h3>
+                  <p className="text-sm text-slate-600">{route.busNumber}</p>
                 </div>
               </div>
-              <div className="flex gap-2 mt-4 md:mt-0">
-                {trip.status === 'in-progress' && (
-                  <Button size="sm" onClick={() => handleTrack(trip)}>
-                    <Navigation size={16} className="mr-2" />
-                    Track Live
-                  </Button>
-                )}
-                <Button size="sm" variant="secondary" onClick={() => handleView(trip)}>
+              <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                {route.status}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <Users className="w-4 h-4" />
+                <span>{route.students} students</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <Navigation className="w-4 h-4" />
+                <span>{route.stops} stops</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <Clock className="w-4 h-4" />
+                <span>{route.duration} minutes</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <MapPin className="w-4 h-4" />
+                <span>{route.distance} miles</span>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-700">Driver: {route.driver}</p>
+                  <p className="text-xs text-slate-600">Starts at {route.startTime}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setSelectedRoute(route)}
+                >
                   <Eye size={16} className="mr-2" />
                   View Details
                 </Button>
               </div>
             </div>
-
-            <div className="border-t border-slate-200 pt-4">
-              <h4 className="text-sm font-medium text-slate-700 mb-3">Stops Progress</h4>
-              <div className="space-y-2">
-                {trip.stops.map((stop, index) => (
-                  <div key={stop.id} className="flex items-center gap-3">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                        stop.status === 'completed'
-                          ? 'bg-green-100 text-green-700'
-                          : stop.status === 'skipped'
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      {index + 1}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-slate-900">{stop.address}</p>
-                      <p className="text-xs text-slate-600">
-                        {stop.childrenIds.length} children • Scheduled: {formatTime(stop.scheduledTime)}
-                        {stop.actualTime && ` • Actual: ${formatTime(stop.actualTime)}`}
-                      </p>
-                    </div>
-                    <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        stop.status === 'completed'
-                          ? 'bg-green-100 text-green-800'
-                          : stop.status === 'skipped'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-slate-100 text-slate-800'
-                      }`}
-                    >
-                      {stop.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         ))}
 
-        {filteredTrips.length === 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
+        {routes.length === 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center col-span-2">
             <MapPin className="mx-auto mb-4 text-slate-400" size={48} />
-            <h3 className="text-lg font-medium text-slate-900 mb-2">No Trips Found</h3>
-            <p className="text-slate-600">
-              {statusFilter === 'all'
-                ? 'There are no trips scheduled yet.'
-                : `There are no ${statusFilter} trips.`}
-            </p>
+            <h3 className="text-lg font-medium text-slate-900 mb-2">No Routes Found</h3>
+            <p className="text-slate-600">There are no routes configured yet.</p>
           </div>
         )}
       </div>
 
+      {/* Route Details Modal */}
       <Modal
-        isOpen={showDetailModal}
-        onClose={() => setShowDetailModal(false)}
-        title="Trip Details"
+        isOpen={selectedRoute !== null}
+        onClose={() => setSelectedRoute(null)}
+        title="Route Details"
         size="lg"
       >
-        {selectedTrip && (
+        {selectedRoute && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-medium text-slate-700">Route</p>
-                <p className="text-base text-slate-900">{selectedTrip.route}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-700">Type</p>
-                <p className="text-base text-slate-900 capitalize">{selectedTrip.type}</p>
+                <p className="text-sm font-medium text-slate-700">Route Name</p>
+                <p className="text-base text-slate-900">{selectedRoute.name}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-700">Status</p>
-                <p className="text-base text-slate-900 capitalize">{selectedTrip.status}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-700">Date</p>
-                <p className="text-base text-slate-900">{formatDate(selectedTrip.scheduledTime)}</p>
+                <p className="text-base text-slate-900">{selectedRoute.status}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-700">Bus</p>
-                <p className="text-base text-slate-900">{getBusNumber(selectedTrip.busId)}</p>
+                <p className="text-base text-slate-900">{selectedRoute.busNumber}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-700">Driver</p>
-                <p className="text-base text-slate-900">{getDriverName(selectedTrip.driverId)}</p>
+                <p className="text-base text-slate-900">{selectedRoute.driver}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-700">Bus Minder</p>
-                <p className="text-base text-slate-900">{getMinderName(selectedTrip.minderId)}</p>
+                <p className="text-sm font-medium text-slate-700">Start Time</p>
+                <p className="text-base text-slate-900">{selectedRoute.startTime}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-700">Scheduled Time</p>
-                <p className="text-base text-slate-900">{formatTime(selectedTrip.scheduledTime)}</p>
+                <p className="text-sm font-medium text-slate-700">Students</p>
+                <p className="text-base text-slate-900">{selectedRoute.students}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-700">Total Stops</p>
+                <p className="text-base text-slate-900">{selectedRoute.stops}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-700">Duration</p>
+                <p className="text-base text-slate-900">{selectedRoute.duration} minutes</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-700">Distance</p>
+                <p className="text-base text-slate-900">{selectedRoute.distance} miles</p>
               </div>
             </div>
 
-            <div>
-              <p className="text-sm font-medium text-slate-700 mb-3">Children on Trip</p>
-              <div className="grid grid-cols-2 gap-2">
-                {selectedTrip.childrenIds.map((childId) => {
-                  const child = children.find(c => c.id === childId);
-                  return child ? (
-                    <div key={child.id} className="p-3 bg-slate-50 rounded-lg">
-                      <p className="font-medium text-slate-900">
-                        {child.firstName} {child.lastName}
-                      </p>
-                      <p className="text-sm text-slate-600">{child.grade}</p>
-                    </div>
-                  ) : null;
-                })}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-sm font-medium text-slate-700 mb-3">Stops</p>
-              <div className="space-y-3">
-                {selectedTrip.stops.map((stop, index) => (
-                  <div key={stop.id} className="p-4 bg-slate-50 rounded-lg">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-medium">
-                          {index + 1}
-                        </span>
-                        <h4 className="font-medium text-slate-900">{stop.address}</h4>
-                      </div>
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          stop.status === 'completed'
-                            ? 'bg-green-100 text-green-800'
-                            : stop.status === 'skipped'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-slate-100 text-slate-800'
-                        }`}
-                      >
-                        {stop.status}
-                      </span>
-                    </div>
-                    <div className="text-sm text-slate-600 space-y-1">
-                      <p>Scheduled: {formatTime(stop.scheduledTime)}</p>
-                      {stop.actualTime && <p>Actual: {formatTime(stop.actualTime)}</p>}
-                      <p>Children: {stop.childrenIds.length}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      <Modal
-        isOpen={showMapModal}
-        onClose={() => setShowMapModal(false)}
-        title="Live Location Tracking"
-        size="xl"
-      >
-        {selectedTrip && (
-          <div className="space-y-4">
-            <div className="bg-slate-100 rounded-lg p-8 flex items-center justify-center" style={{ height: '400px' }}>
-              <div className="text-center">
-                <MapPin className="mx-auto mb-4 text-blue-600" size={64} />
-                <h3 className="text-xl font-semibold text-slate-900 mb-2">
-                  Live Tracking: {selectedTrip.route}
-                </h3>
-                {selectedTrip.currentLocation ? (
-                  <div className="space-y-2 text-slate-700">
-                    <p className="font-medium">Current Location</p>
-                    <p className="text-sm">Lat: {selectedTrip.currentLocation.latitude.toFixed(4)}</p>
-                    <p className="text-sm">Lng: {selectedTrip.currentLocation.longitude.toFixed(4)}</p>
-                    <p className="text-xs text-slate-600">
-                      Last updated: {formatTime(selectedTrip.currentLocation.timestamp)}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-slate-600">Waiting for location data...</p>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-700 font-medium mb-1">Bus</p>
-                <p className="text-lg font-semibold text-slate-900">{getBusNumber(selectedTrip.busId)}</p>
-              </div>
-              <div className="p-4 bg-green-50 rounded-lg">
-                <p className="text-sm text-green-700 font-medium mb-1">Completed Stops</p>
-                <p className="text-lg font-semibold text-slate-900">
-                  {selectedTrip.stops.filter((s) => s.status === 'completed').length} / {selectedTrip.stops.length}
-                </p>
-              </div>
-              <div className="p-4 bg-orange-50 rounded-lg">
-                <p className="text-sm text-orange-700 font-medium mb-1">Children</p>
-                <p className="text-lg font-semibold text-slate-900">{selectedTrip.childrenIds.length}</p>
-              </div>
+            <div className="bg-blue-50 rounded-lg p-4">
+              <h4 className="font-medium text-slate-900 mb-2">Route Information</h4>
+              <p className="text-sm text-slate-600">
+                This route covers {selectedRoute.stops} pickup/drop-off points with an estimated duration of {selectedRoute.duration} minutes.
+                The bus travels approximately {selectedRoute.distance} miles to transport {selectedRoute.students} students.
+              </p>
             </div>
           </div>
         )}
