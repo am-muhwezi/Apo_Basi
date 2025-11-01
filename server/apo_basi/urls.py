@@ -13,5 +13,6 @@ urlpatterns = [
     path("api/busminders/", include("busminders.urls")),
     path("api/admins/", include("admins.urls")),
     path("api/trips/", include("trips.urls")),
+    path("api/assignments/", include("assignments.urls")),
     path("api/health/", health_check, name="health_check"),  # Health check endpoint
 ]

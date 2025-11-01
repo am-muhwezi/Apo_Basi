@@ -6,16 +6,19 @@ import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
 import { busMinderService } from '../services/busMinderService';
 import { busService } from '../services/busService';
-import type { BusMinder, Bus } from '../types';
+import { assignmentService } from '../services/assignmentService';
+import type { BusMinder, Bus, Assignment } from '../types';
 
 export default function MindersPage() {
   const [minders, setMinders] = useState<BusMinder[]>([]);
   const [buses, setBuses] = useState<Bus[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
 
-  // Fetch bus minders and buses from backend on mount
+  // Fetch bus minders, buses, and assignments from backend on mount
   React.useEffect(() => {
     loadMinders();
     loadBuses();
+    loadAssignments();
   }, []);
 
   async function loadMinders() {
@@ -33,6 +36,15 @@ export default function MindersPage() {
       setBuses(data);
     } catch (error) {
       console.error('Failed to load buses:', error);
+    }
+  }
+
+  async function loadAssignments() {
+    try {
+      const data = await assignmentService.loadAssignments({ assignmentType: 'minder_to_bus' });
+      setAssignments(data);
+    } catch (error) {
+      console.error('Failed to load assignments:', error);
     }
   }
 
@@ -100,16 +112,27 @@ export default function MindersPage() {
     }
   };
 
-  const getBusNumber = (busId: string | undefined) => {
-    if (!busId) return 'Not assigned';
-    const bus = buses.find((b) => b.id === busId);
-    return bus ? bus.busNumber : 'Not assigned';
+  const getAssignedBus = (minderId: string): string => {
+    // Find active assignment for this minder
+    const assignment = assignments.find(
+      (a) => a.assigneeId === Number(minderId) && a.status === 'active'
+    );
+
+    if (!assignment) return 'Not assigned';
+
+    // Return the assigned bus name from assignment (backend provides this)
+    return assignment.assignedToName || 'Unknown';
   };
 
   // Calculate stats
   const totalMinders = minders.length;
   const activeMinders = minders.filter((m) => m.status === 'active').length;
-  const assignedMinders = minders.filter((m) => m.assignedBusId).length;
+  const assignedMinders = minders.filter((m) => {
+    const assignment = assignments.find(
+      (a) => a.assigneeId === Number(m.id) && a.status === 'active'
+    );
+    return assignment !== undefined;
+  }).length;
 
   return (
     <div>
@@ -219,7 +242,7 @@ export default function MindersPage() {
                     {minder.certifications?.join(', ') || 'None'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                    {getBusNumber(minder.assignedBusId)}
+                    {getAssignedBus(minder.id)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
@@ -356,7 +379,7 @@ export default function MindersPage() {
               <div>
                 <p className="text-sm font-medium text-slate-700">Assigned Bus</p>
                 <p className="text-base text-slate-900">
-                  {getBusNumber(selectedMinder.assignedBusId)}
+                  {getAssignedBus(selectedMinder.id)}
                 </p>
               </div>
               <div className="col-span-2">

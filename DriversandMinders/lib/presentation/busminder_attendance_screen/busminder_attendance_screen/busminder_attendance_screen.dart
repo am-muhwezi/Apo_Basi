@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
+import '../../../services/api_service.dart';
 import '../../../widgets/custom_app_bar.dart';
 import '../../../widgets/custom_tab_bar.dart';
+import '../../../widgets/busminder_drawer_widget.dart';
 import './widgets/attendance_summary_widget.dart';
 import './widgets/route_header_widget.dart';
 import './widgets/search_bar_widget.dart';
@@ -25,152 +28,156 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
   late TabController _tabController;
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey =
       GlobalKey<RefreshIndicatorState>();
+  final ApiService _apiService = ApiService();
 
   // Search functionality
   String _searchQuery = '';
   List<Map<String, dynamic>> _filteredStudents = [];
 
-  // Mock route information
-  final Map<String, dynamic> _routeInfo = {
+  // Loading states
+  bool _isLoadingData = true;
+  String? _errorMessage;
+
+  // Trip information
+  String? _tripType;
+  int? _busId;
+  Map<String, dynamic>? _busInfo;
+
+  // Route information
+  Map<String, dynamic> _routeInfo = {
     "routeId": "RT001",
-    "routeName": "Greenwood Elementary Route A",
+    "routeName": "Loading...",
     "status": "active",
     "startTime": "07:30 AM",
-    "tripType": "Morning Pickup",
+    "tripType": "Loading...",
     "driverId": "DRV001",
-    "driverName": "Michael Johnson",
+    "driverName": "Busminder",
     "busNumber": "BUS-042",
   };
 
-  // Mock student data with comprehensive information
-  final List<Map<String, dynamic>> _allStudents = [
-    {
-      "id": 1,
-      "name": "Emma Thompson",
-      "grade": "3rd",
-      "photo":
-          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face",
-      "status": "pending",
-      "hasSpecialNeeds": false,
-      "parentContact": "+1 (555) 123-4567",
-      "emergencyContact": "+1 (555) 987-6543",
-      "address": "123 Oak Street, Greenwood",
-      "notes": "",
-      "pickupTime": "07:45 AM",
-      "dropoffTime": "03:15 PM",
-    },
-    {
-      "id": 2,
-      "name": "Liam Rodriguez",
-      "grade": "4th",
-      "photo":
-          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
-      "status": "picked_up",
-      "hasSpecialNeeds": true,
-      "parentContact": "+1 (555) 234-5678",
-      "emergencyContact": "+1 (555) 876-5432",
-      "address": "456 Pine Avenue, Greenwood",
-      "notes": "Requires wheelchair assistance",
-      "pickupTime": "07:50 AM",
-      "dropoffTime": "03:20 PM",
-    },
-    {
-      "id": 3,
-      "name": "Sophia Chen",
-      "grade": "2nd",
-      "photo":
-          "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
-      "status": "dropped_off",
-      "hasSpecialNeeds": false,
-      "parentContact": "+1 (555) 345-6789",
-      "emergencyContact": "+1 (555) 765-4321",
-      "address": "789 Maple Drive, Greenwood",
-      "notes": "",
-      "pickupTime": "07:55 AM",
-      "dropoffTime": "03:25 PM",
-    },
-    {
-      "id": 4,
-      "name": "Noah Williams",
-      "grade": "5th",
-      "photo":
-          "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
-      "status": "pending",
-      "hasSpecialNeeds": false,
-      "parentContact": "+1 (555) 456-7890",
-      "emergencyContact": "+1 (555) 654-3210",
-      "address": "321 Elm Street, Greenwood",
-      "notes": "",
-      "pickupTime": "08:00 AM",
-      "dropoffTime": "03:30 PM",
-    },
-    {
-      "id": 5,
-      "name": "Ava Johnson",
-      "grade": "1st",
-      "photo":
-          "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
-      "status": "picked_up",
-      "hasSpecialNeeds": true,
-      "parentContact": "+1 (555) 567-8901",
-      "emergencyContact": "+1 (555) 543-2109",
-      "address": "654 Birch Lane, Greenwood",
-      "notes": "Food allergies - peanuts",
-      "pickupTime": "08:05 AM",
-      "dropoffTime": "03:35 PM",
-    },
-    {
-      "id": 6,
-      "name": "Ethan Davis",
-      "grade": "3rd",
-      "photo":
-          "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
-      "status": "pending",
-      "hasSpecialNeeds": false,
-      "parentContact": "+1 (555) 678-9012",
-      "emergencyContact": "+1 (555) 432-1098",
-      "address": "987 Cedar Court, Greenwood",
-      "notes": "",
-      "pickupTime": "08:10 AM",
-      "dropoffTime": "03:40 PM",
-    },
-    {
-      "id": 7,
-      "name": "Isabella Martinez",
-      "grade": "4th",
-      "photo":
-          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face",
-      "status": "dropped_off",
-      "hasSpecialNeeds": false,
-      "parentContact": "+1 (555) 789-0123",
-      "emergencyContact": "+1 (555) 321-0987",
-      "address": "147 Willow Way, Greenwood",
-      "notes": "",
-      "pickupTime": "08:15 AM",
-      "dropoffTime": "03:45 PM",
-    },
-    {
-      "id": 8,
-      "name": "Mason Brown",
-      "grade": "2nd",
-      "photo":
-          "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face",
-      "status": "picked_up",
-      "hasSpecialNeeds": false,
-      "parentContact": "+1 (555) 890-1234",
-      "emergencyContact": "+1 (555) 210-9876",
-      "address": "258 Spruce Street, Greenwood",
-      "notes": "",
-      "pickupTime": "08:20 AM",
-      "dropoffTime": "03:50 PM",
-    },
-  ];
+  // Student data loaded from API
+  List<Map<String, dynamic>> _allStudents = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _filteredStudents = List.from(_allStudents);
+    _loadShiftData();
+  }
+
+  Future<void> _loadShiftData() async {
+    setState(() {
+      _isLoadingData = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Get shift info from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      _tripType = prefs.getString('current_trip_type');
+      _busId = prefs.getInt('current_bus_id');
+      final userName = prefs.getString('user_name') ?? 'Busminder';
+
+      if (_busId == null) {
+        throw Exception('No bus selected. Please start shift again.');
+      }
+
+      // Fetch children for this bus
+      final childrenData = await _apiService.getBusChildren(_busId!);
+
+      // Transform API data to match UI format
+      _allStudents = childrenData.map((child) {
+        return {
+          'id': child['id'],
+          'name': '${child['first_name']} ${child['last_name']}',
+          'grade': child['grade']?.toString() ?? 'N/A',
+          'photo': child['photo_url'],
+          'status': 'pending',
+          'hasSpecialNeeds': child['has_special_needs'] ?? false,
+          'parentContact': child['parent_phone'] ?? 'N/A',
+          'emergencyContact': child['emergency_contact'] ?? 'N/A',
+          'address': child['address'] ?? 'N/A',
+          'notes': child['notes'] ?? '',
+          'pickupTime': child['pickup_time'] ?? 'N/A',
+          'dropoffTime': child['dropoff_time'] ?? 'N/A',
+        };
+      }).toList();
+
+      _filteredStudents = List.from(_allStudents);
+
+      // Update route info
+      setState(() {
+        _routeInfo = {
+          'routeId': _busId.toString(),
+          'routeName': 'Bus $_busId - ${_tripType?.toUpperCase()}',
+          'status': 'active',
+          'startTime': DateTime.now().toString().substring(11, 16),
+          'tripType': _tripType == 'pickup' ? 'Morning Pickup' : 'Afternoon Dropoff',
+          'busminderName': userName,
+          'busNumber': 'BUS-${_busId.toString().padLeft(3, '0')}',
+        };
+        _isLoadingData = false;
+      });
+    } catch (e) {
+      print('Error loading shift data: $e');
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoadingData = false;
+        // Use mock data as fallback
+        _allStudents = _getMockStudents();
+        _filteredStudents = List.from(_allStudents);
+      });
+    }
+  }
+
+  List<Map<String, dynamic>> _getMockStudents() {
+    return [
+      {
+        "id": 1,
+        "name": "Emma Thompson",
+        "grade": "3rd",
+        "photo":
+            "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face",
+        "status": "pending",
+        "hasSpecialNeeds": false,
+        "parentContact": "+1 (555) 123-4567",
+        "emergencyContact": "+1 (555) 987-6543",
+        "address": "123 Oak Street, Greenwood",
+        "notes": "",
+        "pickupTime": "07:45 AM",
+        "dropoffTime": "03:15 PM",
+      },
+      {
+        "id": 2,
+        "name": "Liam Rodriguez",
+        "grade": "4th",
+        "photo":
+            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "status": "pending",
+        "hasSpecialNeeds": true,
+        "parentContact": "+1 (555) 234-5678",
+        "emergencyContact": "+1 (555) 876-5432",
+        "address": "456 Pine Avenue, Greenwood",
+        "notes": "Requires wheelchair assistance",
+        "pickupTime": "07:50 AM",
+        "dropoffTime": "03:20 PM",
+      },
+      {
+        "id": 3,
+        "name": "Sophia Chen",
+        "grade": "2nd",
+        "photo":
+            "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
+        "status": "pending",
+        "hasSpecialNeeds": false,
+        "parentContact": "+1 (555) 345-6789",
+        "emergencyContact": "+1 (555) 765-4321",
+        "address": "789 Maple Drive, Greenwood",
+        "notes": "",
+        "pickupTime": "07:55 AM",
+        "dropoffTime": "03:25 PM",
+      },
+    ];
   }
 
   @override
@@ -196,7 +203,8 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
   }
 
   // Handle student status changes
-  void _handleStatusChange(String studentId, String newStatus) {
+  Future<void> _handleStatusChange(String studentId, String newStatus) async {
+    // Update local state immediately for responsiveness
     setState(() {
       final studentIndex = _allStudents.indexWhere(
         (student) => student['id'].toString() == studentId,
@@ -213,15 +221,38 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
       }
     });
 
-    // Show confirmation toast
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content:
-            Text('Student status updated to ${newStatus.replaceAll('_', ' ')}'),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    // Send update to API
+    try {
+      await _apiService.markAttendance(
+        childId: int.parse(studentId),
+        status: newStatus,
+      );
+
+      // Show success toast
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Status updated to ${newStatus.replaceAll('_', ' ')}'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppTheme.successAction,
+        ),
+      );
+    } catch (e) {
+      // Show error toast but keep local state
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to sync: ${e.toString()}'),
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppTheme.criticalAlert,
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Colors.white,
+            onPressed: () => _handleStatusChange(studentId, newStatus),
+          ),
+        ),
+      );
+    }
   }
 
   // Handle swipe right - add note
@@ -485,31 +516,48 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingData) {
+      return Theme(
+        data: AppTheme.lightBusminderTheme,
+        child: Scaffold(
+          backgroundColor: AppTheme.backgroundPrimary,
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(
+                  color: AppTheme.primaryBusminder,
+                ),
+                SizedBox(height: 2.h),
+                Text('Loading student roster...'),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Theme(
       data: AppTheme.lightBusminderTheme,
       child: Scaffold(
+        drawer: BusminderDrawerWidget(
+          currentRoute: '/busminder-attendance-screen',
+        ),
         appBar: CustomAppBar(
           title: 'Attendance Tracking',
           subtitle: 'Manage student pickup & drop-off',
           actions: [
             IconButton(
-              onPressed: () {
-                // Navigate to settings or help
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Settings feature coming soon'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
+              onPressed: _handleRefresh,
               icon: CustomIconWidget(
-                iconName: 'settings',
+                iconName: 'refresh',
                 color: AppTheme.textOnPrimary,
                 size: 24,
               ),
             ),
           ],
           bottom: CustomTabBar(
+            controller: _tabController,
             tabs: const [
               CustomTab(
                 text: 'Attendance',
@@ -523,8 +571,8 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
             currentIndex: 0, // Attendance tab is active
             onTap: (index) {
               if (index == 1) {
-                // Navigate to Trip Progress screen
-                Navigator.pushNamed(context, '/busminder-trip-progress-screen');
+                // Navigate to Trip Progress screen - use pushReplacementNamed to avoid stack buildup
+                Navigator.pushReplacementNamed(context, '/busminder-trip-progress-screen');
               }
             },
           ),
@@ -562,6 +610,7 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
                         final student = _filteredStudents[index];
                         return StudentAttendanceCard(
                           student: student,
+                          tripType: _tripType,
                           onStatusChanged: _handleStatusChange,
                           onSwipeRight: _handleSwipeRight,
                           onSwipeLeft: _handleSwipeLeft,
@@ -572,19 +621,9 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
                     ),
                   ),
 
-                  // Attendance Summary
-                  SliverToBoxAdapter(
-                    child: AttendanceSummaryWidget(
-                      totalStudents: _totalStudents,
-                      pickedUpCount: _pickedUpCount,
-                      droppedOffCount: _droppedOffCount,
-                      pendingCount: _pendingCount,
-                    ),
-                  ),
-
                   // Bottom spacing
                   SliverToBoxAdapter(
-                    child: SizedBox(height: 10.h),
+                    child: SizedBox(height: 3.h),
                   ),
                 ],
               ),
@@ -597,17 +636,16 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
             ),
           ],
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _showAddStudentModal,
-          backgroundColor: AppTheme.primaryBusminder,
-          foregroundColor: AppTheme.textOnPrimary,
-          icon: CustomIconWidget(
-            iconName: 'person_add',
-            color: AppTheme.textOnPrimary,
-            size: 24,
-          ),
-          label: const Text('Add Student'),
-        ),
+        floatingActionButton: _filteredStudents.isNotEmpty
+            ? null // Hide FAB when there are students to avoid clutter
+            : FloatingActionButton(
+                onPressed: _showAddStudentModal,
+                backgroundColor: AppTheme.primaryBusminder,
+                foregroundColor: AppTheme.textOnPrimary,
+                elevation: 4,
+                child: Icon(Icons.person_add, size: 24),
+              ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       ),
     );
   }

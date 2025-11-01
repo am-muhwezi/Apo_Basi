@@ -8,13 +8,30 @@ import { useBuses } from '../hooks/useBuses';
 import { useDrivers } from '../hooks/useDrivers';
 import { useMinders } from '../hooks/useMinders';
 import { useChildren } from '../hooks/useChildren';
-import type { Bus } from '../types';
+import { assignmentService } from '../services/assignmentService';
+import type { Bus, Assignment } from '../types';
 
 export default function BusesPage() {
   const { buses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren } = useBuses();
   const { drivers } = useDrivers();
   const { minders } = useMinders();
   const { children } = useChildren();
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+
+  // Load assignments
+  React.useEffect(() => {
+    loadAssignments();
+  }, []);
+
+  async function loadAssignments() {
+    try {
+      const driverAssignments = await assignmentService.loadAssignments({ assignmentType: 'driver_to_bus' });
+      const minderAssignments = await assignmentService.loadAssignments({ assignmentType: 'minder_to_bus' });
+      setAssignments([...driverAssignments, ...minderAssignments]);
+    } catch (error) {
+      console.error('Failed to load assignments:', error);
+    }
+  }
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
@@ -133,16 +150,20 @@ export default function BusesPage() {
     }));
   };
 
-  const getDriverName = (driverId?: number) => {
-    if (!driverId) return 'Not Assigned';
-    const driver = drivers.find((d) => d.id === driverId.toString());
-    return driver ? `${driver.firstName} ${driver.lastName}` : 'Unknown';
+  const getDriverName = (busId: string): string => {
+    // Find active driver assignment for this bus
+    const assignment = assignments.find(
+      (a) => a.assignmentType === 'driver_to_bus' && a.assignedToId === Number(busId) && a.status === 'active'
+    );
+    return assignment?.assigneeName || 'Not Assigned';
   };
 
-  const getMinderName = (minderId?: number) => {
-    if (!minderId) return 'Not Assigned';
-    const minder = minders.find((m) => m.id === minderId.toString());
-    return minder ? `${minder.firstName} ${minder.lastName}` : 'Unknown';
+  const getMinderName = (busId: string): string => {
+    // Find active minder assignment for this bus
+    const assignment = assignments.find(
+      (a) => a.assignmentType === 'minder_to_bus' && a.assignedToId === Number(busId) && a.status === 'active'
+    );
+    return assignment?.assigneeName || 'Not Assigned';
   };
 
   // Calculate stats
@@ -253,10 +274,10 @@ export default function BusesPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">{bus.licensePlate}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                    {getDriverName(bus.driverId)}
+                    {getDriverName(bus.id)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                    {getMinderName(bus.minderId)}
+                    {getMinderName(bus.id)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
                     {bus.assignedChildrenCount || 0}/{bus.capacity}
@@ -484,11 +505,11 @@ export default function BusesPage() {
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-700">Driver</p>
-                <p className="text-base text-slate-900">{getDriverName(selectedBus.driverId)}</p>
+                <p className="text-base text-slate-900">{getDriverName(selectedBus.id)}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-700">Bus Minder</p>
-                <p className="text-base text-slate-900">{getMinderName(selectedBus.minderId)}</p>
+                <p className="text-base text-slate-900">{getMinderName(selectedBus.id)}</p>
               </div>
               {selectedBus.lastMaintenance && (
                 <div>

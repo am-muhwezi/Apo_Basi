@@ -1,5 +1,5 @@
 import { ReactNode, useState, useEffect } from 'react';
-import { Bus, Users, Baby, CircleUser as UserCircle, MapPin, Shield, Menu, X, LogOut, LayoutDashboard } from 'lucide-react';
+import { Bus, Users, Baby, CircleUser as UserCircle, MapPin, Shield, Menu, X, LogOut, LayoutDashboard, Layers } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
@@ -29,6 +29,7 @@ export default function Layout({ children, currentPage, onNavigate, onLogout }: 
     { id: 'drivers', label: 'Drivers', icon: UserCircle },
     { id: 'minders', label: 'Bus Minders', icon: UserCircle },
     { id: 'trips', label: 'Trips & Tracking', icon: MapPin },
+    { id: 'assignments', label: 'Assignments', icon: Layers },
     { id: 'admins', label: 'Admins', icon: Shield },
   ];
 

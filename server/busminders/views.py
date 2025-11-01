@@ -2,6 +2,7 @@ from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
 from users.serializers import BusMinderRegistrationSerializer, UserSerializer
 from .models import BusMinder
@@ -263,3 +264,48 @@ class MarkAttendanceView(APIView):
                 "notes": attendance.notes,
             }
         }, status=status.HTTP_200_OK if not created else status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def busminder_phone_login(request):
+    """
+    Simple phone-based login for bus minders (passwordless).
+    Bus minder must be created by admin first.
+
+    POST /api/busminders/phone-login/
+    Body: {"phone_number": "0773882123"}
+
+    Returns:
+    {
+        "user_id": 5,
+        "name": "John Doe",
+        "phone": "0773882123",
+        "tokens": {"access": "...", "refresh": "..."}
+    }
+    """
+    phone_number = request.data.get("phone_number")
+
+    if not phone_number:
+        return Response({"error": "Phone number required"}, status=400)
+
+    # Find bus minder by phone number
+    try:
+        busminder = BusMinder.objects.select_related('user').get(phone_number=phone_number.strip())
+        user = busminder.user
+
+        # Generate tokens
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            "user_id": user.id,
+            "name": user.get_full_name() or "Bus Minder",
+            "phone": phone_number,
+            "tokens": {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+            }
+        })
+
+    except BusMinder.DoesNotExist:
+        return Response({"error": "Phone number not registered"}, status=404)

@@ -6,12 +6,16 @@ from .views import (
     MyBusesView,
     BusChildrenView,
     MarkAttendanceView,
+    busminder_phone_login,
 )
 
 urlpatterns = [
     # RESTful CRUD endpoints
     path("", BusMinderListCreateView.as_view(), name="busminder-list-create"),
     path("<int:user_id>/", BusMinderDetailView.as_view(), name="busminder-detail"),
+
+    # Authentication
+    path("phone-login/", busminder_phone_login, name="busminder-phone-login"),
 
     # BusMinder-specific endpoints
     path("register/", BusMinderRegistrationView.as_view(), name="bus-minder-register"),

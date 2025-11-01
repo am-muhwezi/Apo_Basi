@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
+import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import './widgets/begin_route_button_widget.dart';
 import './widgets/driver_header_widget.dart';
@@ -28,48 +30,19 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
   bool _isLocationEnabled = false;
   bool _isChecklistComplete = false;
   bool _isLoading = false;
+  bool _isLoadingData = true;
   String _currentTime = '';
   String _accuracyText = 'Searching...';
   Timer? _timeTimer;
   StreamSubscription<Position>? _positionStream;
+  final ApiService _apiService = ApiService();
 
-  // Mock data
-  final Map<String, dynamic> _driverData = {
-    "driverId": "DRV001",
-    "driverName": "Michael Rodriguez",
-    "routeAssignment": "Route A - Downtown Elementary",
-    "estimatedDuration": "45 minutes",
-    "studentCount": 28,
-  };
-
-  final Map<String, dynamic> _routeDetails = {
-    "routeName": "Route A - Downtown Elementary",
-    "totalDistance": "12.5 miles",
-    "estimatedTime": "45 minutes",
-    "totalStops": 8,
-    "totalStudents": 28,
-    "morningPickup": 28,
-    "afternoonDrop": 28,
-    "mapPreview":
-        "https://images.unsplash.com/photo-1524661135-423995f22d0b?fm=jpg&q=60&w=3000&ixlib=rb-4.0.3",
-    "keyStops": [
-      {
-        "name": "Maple Street & 5th Avenue",
-        "studentCount": 4,
-        "estimatedTime": "7:15 AM"
-      },
-      {
-        "name": "Downtown Elementary School",
-        "studentCount": 28,
-        "estimatedTime": "7:45 AM"
-      },
-      {
-        "name": "Pine Ridge Community Center",
-        "studentCount": 6,
-        "estimatedTime": "8:00 AM"
-      },
-    ]
-  };
+  // Driver data fetched from API
+  Map<String, dynamic>? _driverData;
+  Map<String, dynamic>? _busData;
+  Map<String, dynamic>? _routeDetails;
+  List<Map<String, dynamic>> _assignedChildren = [];
+  String? _errorMessage;
 
   final List<Map<String, dynamic>> _checklistItems = [
     {
@@ -100,6 +73,113 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
     super.initState();
     _startTimeUpdates();
     _checkLocationPermission();
+    _loadDriverData();
+  }
+
+  Future<void> _loadDriverData() async {
+    setState(() {
+      _isLoadingData = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Get user info from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final userName = prefs.getString('user_name') ?? 'Driver';
+      final userId = prefs.getInt('user_id')?.toString() ?? 'N/A';
+
+      // Try to get driver's bus information from API
+      try {
+        final busResponse = await _apiService.getDriverBus();
+        print('Bus Response: $busResponse');
+
+        // Get driver's route information from API
+        final routeResponse = await _apiService.getDriverRoute();
+        print('Route Response: $routeResponse');
+
+        // Extract bus data
+        _busData = busResponse['buses'] is Map
+            ? busResponse['buses'] as Map<String, dynamic>
+            : (busResponse['buses'] is List &&
+                    (busResponse['buses'] as List).isNotEmpty
+                ? busResponse['buses'][0] as Map<String, dynamic>
+                : null);
+
+        // Extract route data
+        _routeDetails = routeResponse;
+
+        // Extract assigned children list
+        if (routeResponse['children'] != null && routeResponse['children'] is List) {
+          _assignedChildren = [];
+          for (var child in routeResponse['children']) {
+            _assignedChildren.add({
+              'id': child['id']?.toString() ?? '',
+              'name': '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}',
+              'grade': child['grade']?.toString() ?? child['class_grade']?.toString() ?? 'N/A',
+              'address': child['address']?.toString() ?? 'No address',
+              'phone': child['emergency_contact']?.toString() ?? child['parent_contact']?.toString() ?? '',
+            });
+          }
+        }
+
+        // Build driver data object
+        _driverData = {
+          "driverId": userId,
+          "driverName": userName,
+          "busNumber": _busData?['bus_number'] ?? 'No Bus',
+          "busPlate": _busData?['number_plate'] ?? 'N/A',
+          "routeName": routeResponse['route_name'] ?? 'No Route',
+          "routeAssignment": '${_busData?['bus_number'] ?? 'No Bus'}${routeResponse['route_name'] != null ? ' - ${routeResponse['route_name']}' : ''}',
+          "estimatedDuration": routeResponse['estimated_duration'] ?? "N/A",
+          "studentCount": routeResponse['total_children'] ?? 0,
+        };
+      } catch (apiError) {
+        // API call failed, use fallback data
+        print('API Error: $apiError');
+        await _initializeFallbackData();
+        setState(() {
+          _errorMessage =
+              'Could not connect to server. Using offline mode.\n${apiError.toString()}';
+        });
+      }
+
+      setState(() {
+        _isLoadingData = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load driver data: ${e.toString()}';
+        _isLoadingData = false;
+
+        // Fallback to minimal data from SharedPreferences
+        _initializeFallbackData();
+      });
+    }
+  }
+
+  Future<void> _initializeFallbackData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userName = prefs.getString('user_name') ?? 'Driver';
+    final userId = prefs.getInt('user_id')?.toString() ?? 'N/A';
+
+    setState(() {
+      _driverData = {
+        "driverId": userId,
+        "driverName": userName,
+        "routeAssignment": "No Assignment",
+        "estimatedDuration": "N/A",
+        "studentCount": 0,
+      };
+
+      _routeDetails = {
+        "routeName": "No Route Assigned",
+        "totalDistance": "N/A",
+        "estimatedTime": "N/A",
+        "totalStops": 0,
+        "totalStudents": 0,
+        "keyStops": [],
+      };
+    });
   }
 
   @override
@@ -254,12 +334,14 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
   }
 
   void _showRouteDetailsModal() {
+    if (_routeDetails == null) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => RouteDetailsModalWidget(
-        routeData: _routeDetails,
+        routeData: _routeDetails!,
         onClose: () => Navigator.pop(context),
       ),
     );
@@ -317,70 +399,356 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
   bool get _canBeginRoute =>
       _isLocationEnabled && _isGpsConnected && _isChecklistComplete;
 
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppTheme.primaryDriver.withValues(alpha: 0.05),
+              AppTheme.backgroundPrimary,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Profile Header
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(5.w),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppTheme.primaryDriver,
+                      AppTheme.primaryDriver.withValues(alpha: 0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryDriver.withValues(alpha: 0.3),
+                      offset: Offset(0, 4),
+                      blurRadius: 12,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        border: Border.all(color: Colors.white, width: 3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            offset: Offset(0, 4),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          (_driverData?['driverName'] as String? ?? 'D')
+                              .substring(0, 1)
+                              .toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryDriver,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 2.h),
+                    Text(
+                      _driverData?['driverName'] as String? ?? 'Driver',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 0.5.h),
+                    Text(
+                      'ID: ${_driverData?['driverId'] as String? ?? 'N/A'}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 3.h),
+
+              // Menu Items
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.symmetric(horizontal: 2.w),
+                  children: [
+                    _buildDrawerItem(
+                      context,
+                      icon: 'home',
+                      title: 'Start Shift',
+                      onTap: () {
+                        Navigator.pop(context);
+                      },
+                    ),
+                    _buildDrawerItem(
+                      context,
+                      icon: 'directions_bus',
+                      title: 'Active Trip',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.pushNamed(context, '/driver-active-trip-screen');
+                      },
+                    ),
+                    _buildDrawerItem(
+                      context,
+                      icon: 'history',
+                      title: 'Trip History',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.pushNamed(context, '/driver-trip-history-screen');
+                      },
+                    ),
+                    Divider(height: 3.h),
+                    _buildDrawerItem(
+                      context,
+                      icon: 'person',
+                      title: 'Profile',
+                      onTap: () {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Profile page coming soon')),
+                        );
+                      },
+                    ),
+                    _buildDrawerItem(
+                      context,
+                      icon: 'settings',
+                      title: 'Settings',
+                      onTap: () {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Settings page coming soon')),
+                        );
+                      },
+                    ),
+                    _buildDrawerItem(
+                      context,
+                      icon: 'help',
+                      title: 'Help & Support',
+                      onTap: () {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Help page coming soon')),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              // Logout button at bottom
+              Container(
+                padding: EdgeInsets.all(4.w),
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _showLogoutConfirmation();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.criticalAlert,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 2.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CustomIconWidget(
+                        iconName: 'logout',
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      SizedBox(width: 2.w),
+                      Text(
+                        'Logout',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem(
+    BuildContext context, {
+    required String icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Container(
+        padding: EdgeInsets.all(2.w),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryDriver.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: CustomIconWidget(
+          iconName: icon,
+          color: AppTheme.primaryDriver,
+          size: 22,
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.textPrimary,
+        ),
+      ),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: AppTheme.textSecondary,
+      ),
+      onTap: onTap,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Theme(
       data: AppTheme.lightDriverTheme,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundPrimary,
+        drawer: _buildDrawer(context),
         body: SafeArea(
-          child: Column(
-            children: [
-              // GPS Status Bar
-              GpsStatusWidget(
-                isGpsConnected: _isGpsConnected,
-                currentTime: _currentTime,
-              ),
-
-              Expanded(
-                child: SingleChildScrollView(
+          child: _isLoadingData
+              ? Center(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Driver Header
-                      DriverHeaderWidget(
-                        driverName: _driverData['driverName'] as String,
-                        driverId: _driverData['driverId'] as String,
-                        onLogout: _showLogoutConfirmation,
-                      ),
-
-                      // Route Assignment Card
-                      RouteAssignmentCardWidget(
-                        routeName: _driverData['routeAssignment'] as String,
-                        estimatedDuration:
-                            _driverData['estimatedDuration'] as String,
-                        studentCount: _driverData['studentCount'] as int,
-                        onTap: _showRouteDetailsModal,
-                      ),
-
-                      // Location Services Toggle
-                      LocationServicesWidget(
-                        isLocationEnabled: _isLocationEnabled,
-                        accuracyText: _accuracyText,
-                        onToggle: _toggleLocationServices,
-                      ),
-
-                      // Pre-Trip Checklist
-                      PreTripChecklistWidget(
-                        checklistItems: _checklistItems,
-                        onChecklistComplete: _onChecklistComplete,
-                      ),
-
+                      CircularProgressIndicator(),
                       SizedBox(height: 2.h),
+                      Text('Loading driver information...'),
                     ],
                   ),
-                ),
-              ),
+                )
+              : _errorMessage != null
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error_outline, size: 48, color: Colors.red),
+                          SizedBox(height: 2.h),
+                          Text(
+                            _errorMessage!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.red),
+                          ),
+                          SizedBox(height: 2.h),
+                          ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                _errorMessage = null;
+                              });
+                            },
+                            child: Text('Continue Anyway'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        // GPS Status Bar
+                        GpsStatusWidget(
+                          isGpsConnected: _isGpsConnected,
+                          currentTime: _currentTime,
+                        ),
 
-              // Begin Route Button
-              BeginRouteButtonWidget(
-                isEnabled: _canBeginRoute,
-                isLoading: _isLoading,
-                onPressed: _beginRoute,
-                onLongPress: _showRouteDetailsModal,
-              ),
-            ],
-          ),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Driver Header
+                                Builder(
+                                  builder: (context) => DriverHeaderWidget(
+                                    driverName: _driverData?['driverName'] as String? ?? 'Driver',
+                                    driverId: _driverData?['driverId'] as String? ?? 'N/A',
+                                    onLogout: _showLogoutConfirmation,
+                                    onMenuTap: () => Scaffold.of(context).openDrawer(),
+                                  ),
+                                ),
+
+                                // Route Assignment Card
+                                RouteAssignmentCardWidget(
+                                  routeName: _driverData?['routeAssignment'] as String? ?? 'No Assignment',
+                                  estimatedDuration:
+                                      _driverData?['estimatedDuration'] as String? ?? 'N/A',
+                                  studentCount: _driverData?['studentCount'] as int? ?? 0,
+                                  assignedChildren: _assignedChildren,
+                                  busNumber: _driverData?['busNumber'] as String?,
+                                  routeNameOnly: _driverData?['routeName'] as String?,
+                                  onTap: _showRouteDetailsModal,
+                                ),
+
+                                // Location Services Toggle
+                                LocationServicesWidget(
+                                  isLocationEnabled: _isLocationEnabled,
+                                  accuracyText: _accuracyText,
+                                  onToggle: _toggleLocationServices,
+                                ),
+
+                                // Pre-Trip Checklist
+                                PreTripChecklistWidget(
+                                  checklistItems: _checklistItems,
+                                  onChecklistComplete: _onChecklistComplete,
+                                ),
+
+                                SizedBox(height: 2.h),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Begin Route Button
+                        BeginRouteButtonWidget(
+                          isEnabled: _canBeginRoute,
+                          isLoading: _isLoading,
+                          onPressed: _beginRoute,
+                          onLongPress: _showRouteDetailsModal,
+                        ),
+                      ],
+                    ),
         ),
       ),
     );

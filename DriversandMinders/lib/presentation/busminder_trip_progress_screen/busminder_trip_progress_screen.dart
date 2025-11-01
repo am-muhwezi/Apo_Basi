@@ -5,8 +5,8 @@ import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
 import '../../widgets/custom_app_bar.dart';
-import '../../widgets/custom_bottom_bar.dart';
 import '../../widgets/custom_tab_bar.dart';
+import '../../widgets/busminder_drawer_widget.dart';
 import './widgets/current_stop_card_widget.dart';
 import './widgets/progress_bar_widget.dart';
 import './widgets/quick_actions_widget.dart';
@@ -25,7 +25,6 @@ class BusminderTripProgressScreen extends StatefulWidget {
 class _BusminderTripProgressScreenState
     extends State<BusminderTripProgressScreen> with TickerProviderStateMixin {
   late TabController _tabController;
-  int _currentBottomIndex = 1;
   bool _isRefreshing = false;
 
   // Mock data for trip progress
@@ -320,6 +319,9 @@ class _BusminderTripProgressScreenState
       data: AppTheme.lightBusminderTheme,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundPrimary,
+        drawer: BusminderDrawerWidget(
+          currentRoute: '/busminder-trip-progress-screen',
+        ),
         appBar: CustomAppBar(
           title: 'Trip Progress',
           subtitle: _tripData['routeName'] as String,
@@ -345,6 +347,7 @@ class _BusminderTripProgressScreenState
             ),
           ],
           bottom: CustomTabBar(
+            controller: _tabController,
             tabs: const [
               CustomTab(
                 text: 'Attendance',
@@ -358,7 +361,8 @@ class _BusminderTripProgressScreenState
             currentIndex: 1, // Progress tab is active
             onTap: (index) {
               if (index == 0) {
-                Navigator.pushNamed(context, '/busminder-attendance-screen');
+                // Use pushReplacementNamed to avoid stack buildup
+                Navigator.pushReplacementNamed(context, '/busminder-attendance-screen');
               }
             },
           ),
@@ -430,23 +434,6 @@ class _BusminderTripProgressScreenState
               ],
             ),
           ),
-        ),
-        bottomNavigationBar: CustomBottomBar(
-          currentIndex: _currentBottomIndex,
-          onTap: (index) {
-            setState(() {
-              _currentBottomIndex = index;
-            });
-
-            switch (index) {
-              case 0:
-                Navigator.pushNamed(context, '/busminder-attendance-screen');
-                break;
-              case 1:
-                // Current screen - do nothing
-                break;
-            }
-          },
         ),
       ),
     );

@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "attendance",
     "admins",
     "trips",
+    "assignments",
 ]
 
 MIDDLEWARE = [

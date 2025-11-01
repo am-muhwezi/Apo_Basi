@@ -3,7 +3,7 @@ import 'package:sizer/sizer.dart';
 
 import '../../../../core/app_export.dart';
 
-/// Bottom attendance summary widget with progress indicators
+/// Modern floating attendance summary widget with compact stats
 class AttendanceSummaryWidget extends StatelessWidget {
   final int totalStudents;
   final int pickedUpCount;
@@ -21,124 +21,178 @@ class AttendanceSummaryWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = AppTheme.lightBusminderTheme;
-    final pickupProgress =
-        totalStudents > 0 ? pickedUpCount / totalStudents : 0.0;
-    final dropoffProgress =
-        totalStudents > 0 ? droppedOffCount / totalStudents : 0.0;
+    final completedCount = pickedUpCount + droppedOffCount;
+    final completionProgress = totalStudents > 0 ? completedCount / totalStudents : 0.0;
 
     return Container(
-      margin: EdgeInsets.all(4.w),
-      padding: EdgeInsets.all(4.w),
+      margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
+      padding: EdgeInsets.all(4.5.w),
       decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12.0),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            AppTheme.primaryBusminder.withValues(alpha: 0.02),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20.0),
+        border: Border.all(
+          color: AppTheme.primaryBusminder.withValues(alpha: 0.15),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.shadowLight,
-            offset: const Offset(0, -2),
-            blurRadius: 8,
+            color: AppTheme.primaryBusminder.withValues(alpha: 0.08),
+            offset: const Offset(0, 4),
+            blurRadius: 16,
             spreadRadius: 0,
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Header
+          // Progress Ring with Stats
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Attendance Summary',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
+              // Circular Progress Indicator
+              SizedBox(
+                width: 20.w,
+                height: 20.w,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Background Circle
+                    SizedBox(
+                      width: 20.w,
+                      height: 20.w,
+                      child: CircularProgressIndicator(
+                        value: 1.0,
+                        strokeWidth: 8,
+                        backgroundColor: Colors.transparent,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppTheme.backgroundSecondary.withValues(alpha: 0.3),
+                        ),
+                      ),
+                    ),
+                    // Progress Circle
+                    SizedBox(
+                      width: 20.w,
+                      height: 20.w,
+                      child: CircularProgressIndicator(
+                        value: completionProgress,
+                        strokeWidth: 8,
+                        backgroundColor: Colors.transparent,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppTheme.successAction,
+                        ),
+                      ),
+                    ),
+                    // Center Text
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${(completionProgress * 100).toInt()}%',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.primaryBusminder,
+                          ),
+                        ),
+                        Text(
+                          'Complete',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 3.w,
-                  vertical: 1.h,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryBusminder.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20.0),
-                ),
-                child: Text(
-                  '$totalStudents Total',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: AppTheme.primaryBusminder,
-                    fontWeight: FontWeight.w600,
-                  ),
+
+              SizedBox(width: 5.w),
+
+              // Stats Grid
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildCompactStat(
+                            context,
+                            completedCount.toString(),
+                            'Marked',
+                            AppTheme.successAction,
+                            Icons.check_circle,
+                          ),
+                        ),
+                        SizedBox(width: 2.w),
+                        Expanded(
+                          child: _buildCompactStat(
+                            context,
+                            pendingCount.toString(),
+                            'Pending',
+                            AppTheme.warningState,
+                            Icons.pending,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 2.h),
+                    _buildTotalBar(context, totalStudents, completedCount),
+                  ],
                 ),
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
 
-          SizedBox(height: 3.h),
-
-          // Progress Indicators
-          Row(
-            children: [
-              // Pickup Progress
-              Expanded(
-                child: _buildProgressIndicator(
-                  context,
-                  'Picked Up',
-                  pickedUpCount,
-                  pickupProgress,
-                  AppTheme.successAction,
-                  Icons.check_circle,
-                ),
-              ),
-
-              SizedBox(width: 4.w),
-
-              // Dropoff Progress
-              Expanded(
-                child: _buildProgressIndicator(
-                  context,
-                  'Dropped Off',
-                  droppedOffCount,
-                  dropoffProgress,
-                  AppTheme.warningState,
-                  Icons.home_filled,
-                ),
-              ),
-            ],
-          ),
-
-          SizedBox(height: 3.h),
-
-          // Pending Count
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(3.w),
-            decoration: BoxDecoration(
-              color: AppTheme.textSecondary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8.0),
-              border: Border.all(
-                color: AppTheme.textSecondary.withValues(alpha: 0.3),
-                width: 1.0,
-              ),
+  Widget _buildCompactStat(
+    BuildContext context,
+    String count,
+    String label,
+    Color color,
+    IconData icon,
+  ) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.5.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 20),
+          SizedBox(height: 0.5.h),
+          Text(
+            count,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: color,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CustomIconWidget(
-                  iconName: 'pending',
-                  color: AppTheme.textSecondary,
-                  size: 20,
-                ),
-                SizedBox(width: 2.w),
-                Text(
-                  '$pendingCount Pending',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: color.withValues(alpha: 0.8),
             ),
           ),
         ],
@@ -146,82 +200,51 @@ class AttendanceSummaryWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildProgressIndicator(
-    BuildContext context,
-    String label,
-    int count,
-    double progress,
-    Color color,
-    IconData icon,
-  ) {
-    final theme = AppTheme.lightBusminderTheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Label and Count
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
+  Widget _buildTotalBar(BuildContext context, int total, int completed) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryBusminder.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(10.0),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.people,
+            color: AppTheme.primaryBusminder,
+            size: 16,
+          ),
+          SizedBox(width: 2.w),
+          RichText(
+            text: TextSpan(
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textPrimary,
+              ),
               children: [
-                CustomIconWidget(
-                  iconName: icon.codePoint.toString(),
-                  color: color,
-                  size: 16,
-                ),
-                SizedBox(width: 2.w),
-                Text(
-                  label,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: AppTheme.textPrimary,
-                    fontWeight: FontWeight.w500,
+                TextSpan(
+                  text: '$completed',
+                  style: TextStyle(
+                    color: AppTheme.successAction,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
+                TextSpan(text: ' of '),
+                TextSpan(
+                  text: '$total',
+                  style: TextStyle(
+                    color: AppTheme.primaryBusminder,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                TextSpan(text: ' students marked'),
               ],
             ),
-            Text(
-              count.toString(),
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-
-        SizedBox(height: 1.h),
-
-        // Progress Bar
-        Container(
-          height: 1.h,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(4.0),
           ),
-          child: FractionallySizedBox(
-            alignment: Alignment.centerLeft,
-            widthFactor: progress,
-            child: Container(
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(4.0),
-              ),
-            ),
-          ),
-        ),
-
-        SizedBox(height: 0.5.h),
-
-        // Percentage
-        Text(
-          '${(progress * 100).toInt()}%',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

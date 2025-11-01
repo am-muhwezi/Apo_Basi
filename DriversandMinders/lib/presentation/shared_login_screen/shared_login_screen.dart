@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
+import '../../services/api_service.dart';
 import '../../widgets/custom_icon_widget.dart';
 import './widgets/app_logo_widget.dart';
 import './widgets/login_form_widget.dart';
@@ -23,30 +24,7 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-
-  // Mock credentials for demo
-  final Map<String, Map<String, dynamic>> _mockCredentials = {
-    'D1234': {
-      'role': 'driver',
-      'name': 'John Smith',
-      'route': '/driver-start-shift-screen',
-    },
-    'D5678': {
-      'role': 'driver',
-      'name': 'Mike Johnson',
-      'route': '/driver-start-shift-screen',
-    },
-    'S1234': {
-      'role': 'busminder',
-      'name': 'Sarah Wilson',
-      'route': '/busminder-attendance-screen',
-    },
-    'S5678': {
-      'role': 'busminder',
-      'name': 'Emily Davis',
-      'route': '/busminder-attendance-screen',
-    },
-  };
+  final ApiService _apiService = ApiService();
 
   @override
   void initState() {
@@ -113,7 +91,7 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
     }
   }
 
-  Future<void> _handleLogin(String id) async {
+  Future<void> _handleLogin(String phoneNumber) async {
     if (_isLoading) return;
 
     setState(() {
@@ -125,46 +103,55 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
     HapticFeedback.lightImpact();
 
     try {
-      // Simulate network delay
-      await Future.delayed(const Duration(milliseconds: 1500));
+      Map<String, dynamic>? response;
+      String role;
+      String route;
 
-      // Check mock credentials
-      final userCredentials = _mockCredentials[id];
-
-      if (userCredentials == null) {
-        setState(() {
-          _errorMessage =
-              'Invalid credentials. Please check your ID and try again.';
-          _isLoading = false;
-        });
-        HapticFeedback.heavyImpact();
-        return;
+      // Try driver login first, then bus minder if it fails
+      try {
+        response = await _apiService.driverPhoneLogin(phoneNumber);
+        role = 'driver';
+        route = '/driver-start-shift-screen';
+      } catch (driverError) {
+        // Not a driver, try bus minder
+        try {
+          response = await _apiService.busMinderPhoneLogin(phoneNumber);
+          role = 'busminder';
+          route = '/busminder-start-shift-screen';
+        } catch (busMinderError) {
+          // Neither worked
+          throw Exception(
+              'Phone number not registered. Please contact admin.');
+        }
       }
 
       // Save successful login
-      await _saveLastUsedId(id);
+      await _saveLastUsedId(phoneNumber);
 
-      // Store user session
+      // Store user session (already saved in API service)
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_role', userCredentials['role']);
-      await prefs.setString('user_name', userCredentials['name']);
-      await prefs.setString('user_id', id);
-      await prefs.setBool('is_logged_in', true);
+      await prefs.setString('user_phone', phoneNumber);
 
       // Success haptic feedback
       HapticFeedback.mediumImpact();
 
       if (mounted) {
-        // Navigate based on role
-        Navigator.pushReplacementNamed(
-          context,
-          userCredentials['route'],
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Welcome back!'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
         );
+
+        // Navigate based on role
+        Navigator.pushReplacementNamed(context, route);
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Login failed. Please try again.';
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
           _isLoading = false;
         });
         HapticFeedback.heavyImpact();
@@ -245,54 +232,6 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
                         padding: EdgeInsets.all(4.w),
                         child: Column(
                           children: [
-                            // Demo Credentials Info
-                            Container(
-                              padding: EdgeInsets.all(3.w),
-                              decoration: BoxDecoration(
-                                color:
-                                    colorScheme.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: colorScheme.primary
-                                      .withValues(alpha: 0.2),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    children: [
-                                      CustomIconWidget(
-                                        iconName: 'info_outline',
-                                        color: colorScheme.primary,
-                                        size: 18,
-                                      ),
-                                      SizedBox(width: 2.w),
-                                      Text(
-                                        'Demo Credentials',
-                                        style: theme.textTheme.labelLarge
-                                            ?.copyWith(
-                                          color: colorScheme.primary,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: 1.h),
-                                  Text(
-                                    'Drivers: D1234, D5678\nStaff: S1234, S5678',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: colorScheme.onSurface
-                                          .withValues(alpha: 0.8),
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            SizedBox(height: 3.h),
-
                             // Copyright
                             Text(
                               '© 2024 BusTracker Pro. All rights reserved.',

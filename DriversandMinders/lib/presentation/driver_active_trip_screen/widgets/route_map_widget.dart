@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -29,6 +31,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
   Set<Polyline> _polylines = {};
   bool _isLoading = true;
   bool _hasLocationPermission = false;
+  StreamSubscription<Position>? _positionStream;
 
   @override
   void initState() {
@@ -38,6 +41,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
 
   @override
   void dispose() {
+    _positionStream?.cancel();
     _mapController?.dispose();
     super.dispose();
   }
@@ -50,6 +54,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
       // Get current location
       if (_hasLocationPermission) {
         await _getCurrentLocation();
+        _startLocationUpdates(); // Start real-time tracking
       }
 
       // Setup markers and route
@@ -91,23 +96,52 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     }
   }
 
+  /// Start real-time location updates
+  void _startLocationUpdates() {
+    _positionStream = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10, // Update every 10 meters
+      ),
+    ).listen((Position position) {
+      setState(() {
+        _currentPosition = position;
+      });
+      _setupMarkersAndRoute(); // Update markers with new position
+      _updateCamera(position);
+    });
+  }
+
+  /// Update camera to follow bus
+  void _updateCamera(Position position) {
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLng(
+        LatLng(position.latitude, position.longitude),
+      ),
+    );
+  }
+
   void _setupMarkersAndRoute() {
     final stops = (widget.tripData["stops"] as List? ?? []);
     final Set<Marker> markers = {};
     final Set<Polyline> polylines = {};
 
-    // Add current location marker
+    // Add current bus location marker (YELLOW)
     if (_currentPosition != null) {
+      final busNumber = widget.tripData["busNumber"]?.toString() ?? 'Bus';
       markers.add(
         Marker(
-          markerId: MarkerId('current_location'),
+          markerId: MarkerId('bus_location'),
           position:
               LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-          infoWindow: InfoWindow(
-            title: 'Current Location',
-            snippet: 'Bus Location',
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueYellow, // Yellow marker for bus
           ),
+          infoWindow: InfoWindow(
+            title: 'Bus $busNumber',
+            snippet: 'Your current location',
+          ),
+          rotation: _currentPosition!.heading,
         ),
       );
     }
@@ -286,9 +320,84 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
                 ),
               ),
             ),
+
+            // Bus info overlay at bottom
+            if (_currentPosition != null)
+              Positioned(
+                bottom: 2.h,
+                left: 3.w,
+                right: 3.w,
+                child: Container(
+                  padding: EdgeInsets.all(3.w),
+                  decoration: BoxDecoration(
+                    color: AppTheme.backgroundPrimary.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.shadowLight,
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildInfoItem(
+                        icon: 'directions_bus',
+                        label: 'Bus',
+                        value: widget.tripData["busNumber"]?.toString() ?? 'N/A',
+                      ),
+                      _buildInfoItem(
+                        icon: 'speed',
+                        label: 'Speed',
+                        value: '${_currentPosition!.speed.toStringAsFixed(1)} m/s',
+                      ),
+                      _buildInfoItem(
+                        icon: 'my_location',
+                        label: 'Accuracy',
+                        value: '±${_currentPosition!.accuracy.toInt()}m',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildInfoItem({
+    required String icon,
+    required String label,
+    required String value,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CustomIconWidget(
+          iconName: icon,
+          color: AppTheme.primaryDriver,
+          size: 20,
+        ),
+        SizedBox(height: 0.5.h),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppTheme.textSecondary,
+            fontSize: 9.sp,
+          ),
+        ),
+        Text(
+          value,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.w600,
+            fontSize: 10.sp,
+          ),
+        ),
+      ],
     );
   }
 
