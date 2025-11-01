@@ -33,38 +33,38 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
     super.dispose();
   }
 
-  bool _isValidId(String id) {
-    if (id.isEmpty) return false;
-    // Driver ID: starts with 'D' followed by 4-6 digits
-    // Staff ID: starts with 'S' followed by 4-6 digits
-    final driverPattern = RegExp(r'^D\d{4,6}$');
-    final staffPattern = RegExp(r'^S\d{4,6}$');
-    return driverPattern.hasMatch(id) || staffPattern.hasMatch(id);
+  bool _isValidPhone(String phone) {
+    if (phone.isEmpty) return false;
+
+    // Accept phone numbers with or without country code
+    // Minimum 9 digits, maximum 15 digits
+    final phonePattern = RegExp(r'^\+?[0-9]{9,15}$');
+    return phonePattern.hasMatch(phone);
   }
 
   void _validateAndSubmit() {
-    final id = _idController.text.trim().toUpperCase();
+    final phone = _idController.text.trim();
 
     setState(() {
       _validationError = null;
     });
 
-    if (id.isEmpty) {
+    if (phone.isEmpty) {
       setState(() {
-        _validationError = 'Please enter your ID';
+        _validationError = 'Please enter your phone number';
       });
       return;
     }
 
-    if (!_isValidId(id)) {
+    if (!_isValidPhone(phone)) {
       setState(() {
-        _validationError =
-            'Invalid ID format. Use D1234 for drivers or S1234 for staff';
+        _validationError = 'Please enter a valid phone number';
       });
       return;
     }
 
-    widget.onLogin(id);
+    // Send to API
+    widget.onLogin(phone);
   }
 
   @override
@@ -104,7 +104,7 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
           SizedBox(height: 1.h),
 
           Text(
-            'Enter your ID to continue',
+            'Enter your phone number to continue',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurface.withValues(alpha: 0.7),
             ),
@@ -113,12 +113,12 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
 
           SizedBox(height: 3.h),
 
-          // ID Input Field
+          // Phone Number Input Field
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Driver ID / Staff ID',
+                'Phone Number',
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: colorScheme.onSurface,
                   fontWeight: FontWeight.w500,
@@ -128,8 +128,7 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
               TextFormField(
                 controller: _idController,
                 focusNode: _idFocusNode,
-                keyboardType: TextInputType.text,
-                textCapitalization: TextCapitalization.characters,
+                keyboardType: TextInputType.phone,
                 textInputAction: TextInputAction.done,
                 enabled: !widget.isLoading,
                 onChanged: (value) {
@@ -141,15 +140,15 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
                 },
                 onFieldSubmitted: (_) => _validateAndSubmit(),
                 inputFormatters: [
-                  LengthLimitingTextInputFormatter(7),
-                  FilteringTextInputFormatter.allow(RegExp(r'[DSds0-9]')),
+                  LengthLimitingTextInputFormatter(15),
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
                 ],
                 decoration: InputDecoration(
-                  hintText: 'e.g., D1234 or S5678',
+                  hintText: 'e.g., 0773882123 or +256773882123',
                   prefixIcon: Padding(
                     padding: EdgeInsets.all(3.w),
                     child: CustomIconWidget(
-                      iconName: 'badge',
+                      iconName: 'phone',
                       color: colorScheme.onSurface.withValues(alpha: 0.6),
                       size: 20,
                     ),

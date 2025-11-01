@@ -8,6 +8,7 @@ import DriversPage from './pages/DriversPage';
 import MindersPage from './pages/MindersPage';
 import TripsPage from './pages/TripsPage';
 import AdminsPage from './pages/AdminsPage';
+import AssignmentsPage from './pages/AssignmentsPage';
 import AuthPage from './pages/AuthPage';
 
 function App() {
@@ -51,6 +52,8 @@ function App() {
         return <MindersPage />;
       case 'trips':
         return <TripsPage />;
+      case 'assignments':
+        return <AssignmentsPage />;
       case 'admins':
         return <AdminsPage />;
       default:

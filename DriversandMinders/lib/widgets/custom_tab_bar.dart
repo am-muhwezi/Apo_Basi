@@ -40,6 +40,9 @@ class CustomTabBar extends StatelessWidget implements PreferredSizeWidget {
   /// Whether to show divider
   final bool showDivider;
 
+  /// Optional tab controller
+  final TabController? controller;
+
   const CustomTabBar({
     super.key,
     required this.tabs,
@@ -53,6 +56,7 @@ class CustomTabBar extends StatelessWidget implements PreferredSizeWidget {
     this.indicatorColor,
     this.tabAlignment,
     this.showDivider = true,
+    this.controller,
   });
 
   @override
@@ -87,7 +91,7 @@ class CustomTabBar extends StatelessWidget implements PreferredSizeWidget {
             height: 48.0,
             child: TabBar(
               tabs: tabs.map((tab) => _buildTab(context, tab)).toList(),
-              controller: null, // Let parent handle controller
+              controller: controller,
               isScrollable: isScrollable,
               tabAlignment: tabAlignment,
               labelColor: effectiveSelectedColor,

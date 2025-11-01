@@ -16,11 +16,9 @@ class RouteHeaderWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = AppTheme.lightBusminderTheme;
-
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
-      padding: EdgeInsets.all(4.w),
+      margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 0.8.h),
+      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.8.h),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -30,76 +28,104 @@ class RouteHeaderWidget extends StatelessWidget {
             AppTheme.primaryBusminderLight,
           ],
         ),
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: BorderRadius.circular(12.0),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryBusminder.withValues(alpha: 0.3),
-            offset: const Offset(0, 4),
-            blurRadius: 12,
+            color: AppTheme.primaryBusminder.withValues(alpha: 0.15),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
             spreadRadius: 0,
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Route Name and Status
+          // Left side - Trip info
+          Expanded(
+            child: Row(
+              children: [
+                // Trip Type
+                Text(
+                  routeInfo['tripType'] as String? ?? 'Trip',
+                  style: TextStyle(
+                    color: AppTheme.textOnPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    letterSpacing: -0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+
+          // Right side - Compact stats
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Good ${_getTimeOfDay()}!',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textOnPrimary.withValues(alpha: 0.9),
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    SizedBox(height: 0.5.h),
-                    Text(
-                      routeInfo['routeName'] as String? ?? 'Route Unknown',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        color: AppTheme.textOnPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+              // Student count
+              Icon(
+                Icons.people,
+                color: AppTheme.textOnPrimary,
+                size: 14,
+              ),
+              SizedBox(width: 1.w),
+              Text(
+                '$totalStudents',
+                style: TextStyle(
+                  color: AppTheme.textOnPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
                 ),
               ),
-
-              // Trip Status Badge
+              SizedBox(width: 3.w),
+              // Time
+              Icon(
+                Icons.access_time,
+                color: AppTheme.textOnPrimary,
+                size: 14,
+              ),
+              SizedBox(width: 1.w),
+              Text(
+                routeInfo['startTime'] as String? ?? '--:--',
+                style: TextStyle(
+                  color: AppTheme.textOnPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+              SizedBox(width: 3.w),
+              // Status indicator
               Container(
                 padding: EdgeInsets.symmetric(
-                  horizontal: 3.w,
-                  vertical: 1.h,
+                  horizontal: 2.w,
+                  vertical: 0.4.h,
                 ),
                 decoration: BoxDecoration(
-                  color: _getTripStatusColor().withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20.0),
-                  border: Border.all(
-                    color: _getTripStatusColor(),
-                    width: 1.5,
-                  ),
+                  color: AppTheme.successAction,
+                  borderRadius: BorderRadius.circular(6.0),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CustomIconWidget(
-                      iconName: _getTripStatusIcon(),
-                      color: _getTripStatusColor(),
-                      size: 16,
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                    SizedBox(width: 2.w),
+                    SizedBox(width: 1.w),
                     Text(
-                      _getTripStatusText(),
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: _getTripStatusColor(),
-                        fontWeight: FontWeight.w600,
+                      'ACTIVE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 9,
+                        letterSpacing: 0.2,
                       ),
                     ),
                   ],
@@ -107,150 +133,9 @@ class RouteHeaderWidget extends StatelessWidget {
               ),
             ],
           ),
-
-          SizedBox(height: 3.h),
-
-          // Route Details
-          Row(
-            children: [
-              // Student Count
-              Expanded(
-                child: _buildInfoCard(
-                  context,
-                  'Students',
-                  totalStudents.toString(),
-                  'people',
-                  AppTheme.textOnPrimary,
-                ),
-              ),
-
-              SizedBox(width: 3.w),
-
-              // Trip Time
-              Expanded(
-                child: _buildInfoCard(
-                  context,
-                  'Started',
-                  routeInfo['startTime'] as String? ?? '--:--',
-                  'schedule',
-                  AppTheme.textOnPrimary,
-                ),
-              ),
-
-              SizedBox(width: 3.w),
-
-              // Route Type
-              Expanded(
-                child: _buildInfoCard(
-                  context,
-                  'Type',
-                  routeInfo['tripType'] as String? ?? 'Regular',
-                  'directions_bus',
-                  AppTheme.textOnPrimary,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoCard(
-    BuildContext context,
-    String label,
-    String value,
-    String iconName,
-    Color color,
-  ) {
-    final theme = AppTheme.lightBusminderTheme;
-
-    return Container(
-      padding: EdgeInsets.all(3.w),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8.0),
-        border: Border.all(
-          color: color.withValues(alpha: 0.3),
-          width: 1.0,
-        ),
-      ),
-      child: Column(
-        children: [
-          CustomIconWidget(
-            iconName: iconName,
-            color: color,
-            size: 20,
-          ),
-          SizedBox(height: 1.h),
-          Text(
-            value,
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          SizedBox(height: 0.5.h),
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: color.withValues(alpha: 0.8),
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getTimeOfDay() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Morning';
-    if (hour < 17) return 'Afternoon';
-    return 'Evening';
-  }
-
-  Color _getTripStatusColor() {
-    final status = routeInfo['status'] as String? ?? 'active';
-    switch (status) {
-      case 'active':
-        return AppTheme.successAction;
-      case 'completed':
-        return AppTheme.primaryBusminder;
-      case 'paused':
-        return AppTheme.warningState;
-      default:
-        return AppTheme.textOnPrimary;
-    }
-  }
-
-  String _getTripStatusIcon() {
-    final status = routeInfo['status'] as String? ?? 'active';
-    switch (status) {
-      case 'active':
-        return 'play_circle';
-      case 'completed':
-        return 'check_circle';
-      case 'paused':
-        return 'pause_circle';
-      default:
-        return 'radio_button_unchecked';
-    }
-  }
-
-  String _getTripStatusText() {
-    final status = routeInfo['status'] as String? ?? 'active';
-    switch (status) {
-      case 'active':
-        return 'Active';
-      case 'completed':
-        return 'Completed';
-      case 'paused':
-        return 'Paused';
-      default:
-        return 'Unknown';
-    }
-  }
 }
