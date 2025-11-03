@@ -219,48 +219,32 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                 ),
                                 child: Padding(
                                   padding: EdgeInsets.fromLTRB(5.w, 2.h, 5.w, 2.h),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       // Greeting text
                                       Text(
-                                        'Good Morning ${_parentName.toUpperCase()}',
+                                        '${_getGreeting()}, $_parentName',
                                         style: TextStyle(
                                           color: Colors.white,
-                                          fontSize: 16.sp,
-                                          fontWeight: FontWeight.w500,
+                                          fontSize: 18.sp,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
-                                      SizedBox(height: 1.h),
-                                      // Date and time row
+                                      // Date and time
                                       Row(
                                         children: [
                                           Icon(
                                             Icons.calendar_today,
-                                            color: Colors.white,
+                                            color: Colors.white.withValues(alpha: 0.85),
                                             size: 4.w,
                                           ),
-                                          SizedBox(width: 2.w),
+                                          SizedBox(width: 1.5.w),
                                           Text(
                                             _getFormattedDate(),
                                             style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 13.sp,
-                                              fontWeight: FontWeight.w400,
-                                            ),
-                                          ),
-                                          SizedBox(width: 4.w),
-                                          Icon(
-                                            Icons.access_time,
-                                            color: Colors.white,
-                                            size: 4.w,
-                                          ),
-                                          SizedBox(width: 2.w),
-                                          Text(
-                                            _getFormattedTime(),
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 13.sp,
+                                              color: Colors.white.withValues(alpha: 0.85),
+                                              fontSize: 12.sp,
                                               fontWeight: FontWeight.w400,
                                             ),
                                           ),
