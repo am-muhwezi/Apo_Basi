@@ -1,37 +1,50 @@
-import { ReactNode, useState, useEffect } from 'react';
-import { Bus, Users, Baby, CircleUser as UserCircle, MapPin, Shield, Menu, X, LogOut, LayoutDashboard, Layers } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Bus, Users, Baby, CircleUser as UserCircle, MapPin, Shield, Menu, X, LogOut, LayoutDashboard, Layers, ChevronDown, ChevronRight, BarChart3, Database, CheckSquare } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
-interface LayoutProps {
-  children: ReactNode;
-  currentPage: string;
-  onNavigate: (page: string) => void;
-  onLogout: () => void;
-}
-
-export default function Layout({ children, currentPage, onNavigate, onLogout }: LayoutProps) {
+export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminName, setAdminName] = useState('');
+  const [managementOpen, setManagementOpen] = useState(false);
+  const location = useLocation();
+  const { logout } = useAuth();
 
   useEffect(() => {
     // Get admin name from localStorage
     const userStr = localStorage.getItem('adminUser');
     if (userStr) {
       const user = JSON.parse(userStr);
-      setAdminName(`${user.first_name} ${user.last_name}`);
+      setAdminName(`${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'Admin');
     }
   }, []);
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'children', label: 'Children', icon: Baby },
-    { id: 'parents', label: 'Parents', icon: Users },
-    { id: 'buses', label: 'Buses', icon: Bus },
-    { id: 'drivers', label: 'Drivers', icon: UserCircle },
-    { id: 'minders', label: 'Bus Minders', icon: UserCircle },
-    { id: 'trips', label: 'Trips & Tracking', icon: MapPin },
-    { id: 'assignments', label: 'Assignments', icon: Layers },
-    { id: 'admins', label: 'Admins', icon: Shield },
+    { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'analytics', path: '/analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'attendance', path: '/attendance', label: 'Attendance', icon: CheckSquare },
+    { id: 'trips', path: '/trips', label: 'Trips & Tracking', icon: MapPin },
+    { id: 'assignments', path: '/assignments', label: 'Assignments', icon: Layers },
+    { id: 'admins', path: '/admins', label: 'Admins', icon: Shield },
   ];
+
+  const managementItems = [
+    { id: 'children', path: '/children', label: 'Children', icon: Baby },
+    { id: 'parents', path: '/parents', label: 'Parents', icon: Users },
+    { id: 'buses', path: '/buses', label: 'Buses', icon: Bus },
+    { id: 'drivers', path: '/drivers', label: 'Drivers', icon: UserCircle },
+    { id: 'minders', path: '/minders', label: 'Bus Minders', icon: UserCircle },
+  ];
+
+  // Check if any management item is active
+  const isManagementActive = managementItems.some(item => location.pathname === item.path);
+
+  // Auto-open management menu if a management route is active
+  useEffect(() => {
+    if (isManagementActive) {
+      setManagementOpen(true);
+    }
+  }, [isManagementActive]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -54,7 +67,7 @@ export default function Layout({ children, currentPage, onNavigate, onLogout }: 
             </div>
           )}
           <button
-            onClick={onLogout}
+            onClick={logout}
             className="flex items-center gap-2 px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
           >
             <LogOut size={20} />
@@ -72,14 +85,12 @@ export default function Layout({ children, currentPage, onNavigate, onLogout }: 
           <nav className="p-4 space-y-1">
             {menuItems.map((item) => {
               const Icon = item.icon;
-              const isActive = currentPage === item.id;
+              const isActive = location.pathname === item.path;
               return (
-                <button
+                <Link
                   key={item.id}
-                  onClick={() => {
-                    onNavigate(item.id);
-                    setSidebarOpen(false);
-                  }}
+                  to={item.path}
+                  onClick={() => setSidebarOpen(false)}
                   className={`w-full flex items-center px-4 py-3 rounded-lg text-left transition-colors ${
                     isActive
                       ? 'bg-blue-50 text-blue-700 font-medium'
@@ -88,14 +99,63 @@ export default function Layout({ children, currentPage, onNavigate, onLogout }: 
                 >
                   <Icon size={20} className="mr-3" />
                   {item.label}
-                </button>
+                </Link>
               );
             })}
+
+            {/* Management Collapsible Menu */}
+            <div className="mt-1">
+              <button
+                onClick={() => setManagementOpen(!managementOpen)}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
+                  isManagementActive
+                    ? 'bg-blue-50 text-blue-700 font-medium'
+                    : 'text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-center">
+                  <Database size={20} className="mr-3" />
+                  Management
+                </div>
+                {managementOpen ? (
+                  <ChevronDown size={16} />
+                ) : (
+                  <ChevronRight size={16} />
+                )}
+              </button>
+
+              {/* Nested Management Items */}
+              {managementOpen && (
+                <div className="ml-4 mt-1 space-y-1 border-l-2 border-slate-200 pl-2">
+                  {managementItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = location.pathname === item.path;
+                    return (
+                      <Link
+                        key={item.id}
+                        to={item.path}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`w-full flex items-center px-4 py-2.5 rounded-lg text-left transition-colors text-sm ${
+                          isActive
+                            ? 'bg-blue-50 text-blue-700 font-medium'
+                            : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Icon size={18} className="mr-3" />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </nav>
         </aside>
 
         <main className="flex-1 md:ml-64 p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">{children}</div>
+          <div className="max-w-7xl mx-auto">
+            <Outlet />
+          </div>
         </main>
       </div>
 

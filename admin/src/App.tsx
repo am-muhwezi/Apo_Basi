@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
 import DashboardPage from './pages/DashboardPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import AttendancePage from './pages/AttendancePage';
 import ChildrenPage from './pages/ChildrenPage';
 import ParentsPage from './pages/ParentsPage';
 import BusesPage from './pages/BusesPage';
@@ -9,62 +12,62 @@ import MindersPage from './pages/MindersPage';
 import TripsPage from './pages/TripsPage';
 import AdminsPage from './pages/AdminsPage';
 import AssignmentsPage from './pages/AssignmentsPage';
-import AuthPage from './pages/AuthPage';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import { useAuth } from './contexts/AuthContext';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('dashboard');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { isAuthenticated, loading } = useAuth();
 
-  useEffect(() => {
-    // Check authentication on mount
-    const token = localStorage.getItem('adminToken');
-    setIsAuthenticated(!!token);
-  }, []);
-
-  const handleLogin = () => {
-    setIsAuthenticated(true);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('adminToken');
-    localStorage.removeItem('adminUser');
-    setIsAuthenticated(false);
-  };
-
-  // Show auth page if not authenticated
-  if (!isAuthenticated) {
-    return <AuthPage onLogin={handleLogin} />;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
   }
 
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return <DashboardPage />;
-      case 'children':
-        return <ChildrenPage />;
-      case 'parents':
-        return <ParentsPage />;
-      case 'buses':
-        return <BusesPage />;
-      case 'drivers':
-        return <DriversPage />;
-      case 'minders':
-        return <MindersPage />;
-      case 'trips':
-        return <TripsPage />;
-      case 'assignments':
-        return <AssignmentsPage />;
-      case 'admins':
-        return <AdminsPage />;
-      default:
-        return <DashboardPage />;
-    }
-  };
-
   return (
-    <Layout currentPage={currentPage} onNavigate={setCurrentPage} onLogout={handleLogout}>
-      {renderPage()}
-    </Layout>
+    <Routes>
+      {/* Public routes */}
+      <Route
+        path="/login"
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />}
+      />
+      <Route
+        path="/signup"
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <SignupPage />}
+      />
+
+      {/* Protected routes */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="analytics" element={<AnalyticsPage />} />
+        <Route path="attendance" element={<AttendancePage />} />
+        <Route path="children" element={<ChildrenPage />} />
+        <Route path="parents" element={<ParentsPage />} />
+        <Route path="buses" element={<BusesPage />} />
+        <Route path="drivers" element={<DriversPage />} />
+        <Route path="minders" element={<MindersPage />} />
+        <Route path="trips" element={<TripsPage />} />
+        <Route path="assignments" element={<AssignmentsPage />} />
+        <Route path="admins" element={<AdminsPage />} />
+      </Route>
+
+      {/* Catch all - redirect to dashboard or login */}
+      <Route
+        path="*"
+        element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />}
+      />
+    </Routes>
   );
 }
 
