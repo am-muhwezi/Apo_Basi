@@ -2,9 +2,9 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000/api/parents/';
 
-// List all parents
-export async function getParents() {
-  return axios.get(`${API_BASE_URL}`);
+// List all parents with pagination support
+export async function getParents(params?: { limit?: number; offset?: number }) {
+  return axios.get(`${API_BASE_URL}`, { params });
 }
 
 // Get single parent

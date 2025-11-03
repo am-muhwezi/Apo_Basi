@@ -3,11 +3,12 @@ import type { BusMinder } from '../types';
 
 class BusMinderService {
   /**
-   * Load all bus minders from DRF API
+   * Load all bus minders from DRF API with pagination
    */
-  async loadBusMinders(): Promise<BusMinder[]> {
-    const response = await busMinderApi.getBusMinders();
-    return response.data;
+  async loadBusMinders(params?: { limit?: number; offset?: number }): Promise<BusMinder[]> {
+    const response = await busMinderApi.getBusMinders(params);
+    // Handle paginated response from DRF: {results: [], count, next, previous}
+    return response.data.results || [];
   }
 
   /**

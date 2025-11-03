@@ -3,11 +3,12 @@ import type { Bus } from '../types';
 
 class BusService {
   /**
-   * Load all buses from DRF API
+   * Load all buses from DRF API with pagination
    */
-  async loadBuses(): Promise<Bus[]> {
-    const response = await busApi.getBuses();
-    return response.data;
+  async loadBuses(params?: { limit?: number; offset?: number }): Promise<Bus[]> {
+    const response = await busApi.getBuses(params);
+    // Handle paginated response from DRF: {results: [], count, next, previous}
+    return response.data.results || [];
   }
 
   /**

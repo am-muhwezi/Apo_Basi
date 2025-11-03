@@ -13,6 +13,8 @@ export default function MindersPage() {
   const [minders, setMinders] = useState<BusMinder[]>([]);
   const [buses, setBuses] = useState<Bus[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   // Fetch bus minders, buses, and assignments from backend on mount
   React.useEffect(() => {
@@ -21,18 +23,23 @@ export default function MindersPage() {
     loadAssignments();
   }, []);
 
-  async function loadMinders() {
+  async function loadMinders(append = false) {
     try {
-      const data = await busMinderService.loadBusMinders();
-      setMinders(data);
+      setLoading(true);
+      const offset = append ? minders.length : 0;
+      const data = await busMinderService.loadBusMinders({ limit: 20, offset });
+      setMinders(append ? [...minders, ...data] : data);
+      setHasMore(data.length === 20);
     } catch (error) {
       console.error('Failed to load bus minders:', error);
+    } finally {
+      setLoading(false);
     }
   }
 
   async function loadBuses() {
     try {
-      const data = await busService.loadBuses();
+      const data = await busService.loadBuses({ limit: 100 });
       setBuses(data);
     } catch (error) {
       console.error('Failed to load buses:', error);
@@ -42,9 +49,16 @@ export default function MindersPage() {
   async function loadAssignments() {
     try {
       const data = await assignmentService.loadAssignments({ assignmentType: 'minder_to_bus' });
-      setAssignments(data);
+      setAssignments(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to load assignments:', error);
+      setAssignments([]);
+    }
+  }
+
+  function loadMoreMinders() {
+    if (!loading && hasMore) {
+      loadMinders(true);
     }
   }
 
@@ -281,6 +295,23 @@ export default function MindersPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="p-4 border-t border-slate-200">
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-sm text-slate-600">
+              Loaded {filteredMinders.length} of {filteredMinders.length}{hasMore ? '+' : ''} minders
+            </span>
+            {hasMore && (
+              <Button
+                onClick={loadMoreMinders}
+                disabled={loading}
+                variant="secondary"
+                size="sm"
+              >
+                {loading ? 'Loading...' : 'Load More'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

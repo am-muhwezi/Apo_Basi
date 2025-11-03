@@ -11,6 +11,8 @@ import type { Parent, Child } from '../types';
 export default function ParentsPage() {
   const [parents, setParents] = useState<Parent[]>([]);
   const [children, setChildren] = useState<Child[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   // Fetch parents and children from backend on mount
   React.useEffect(() => {
@@ -18,21 +20,32 @@ export default function ParentsPage() {
     loadChildren();
   }, []);
 
-  async function loadParents() {
+  async function loadParents(append = false) {
     try {
-      const data = await parentService.loadParents();
-      setParents(data);
+      setLoading(true);
+      const offset = append ? parents.length : 0;
+      const data = await parentService.loadParents({ limit: 20, offset });
+      setParents(append ? [...parents, ...data] : data);
+      setHasMore(data.length === 20);
     } catch (error) {
       console.error('Failed to load parents:', error);
+    } finally {
+      setLoading(false);
     }
   }
 
   async function loadChildren() {
     try {
-      const data = await childService.loadChildren();
+      const data = await childService.loadChildren({ limit: 100 });
       setChildren(data);
     } catch (error) {
       console.error('Failed to load children:', error);
+    }
+  }
+
+  function loadMoreParents() {
+    if (!loading && hasMore) {
+      loadParents(true);
     }
   }
 
@@ -296,6 +309,23 @@ export default function ParentsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="p-4 border-t border-slate-200">
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-sm text-slate-600">
+              Loaded {filteredParents.length} of {filteredParents.length}{hasMore ? '+' : ''} parents
+            </span>
+            {hasMore && (
+              <Button
+                onClick={loadMoreParents}
+                disabled={loading}
+                variant="secondary"
+                size="sm"
+              >
+                {loading ? 'Loading...' : 'Load More'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

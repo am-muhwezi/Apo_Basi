@@ -7,12 +7,14 @@ const API_BASE_URL = 'http://localhost:8000/api/trips/';
  * Backend uses camelCase, frontend uses camelCase
  */
 
-// List all trips
+// List all trips with pagination support
 export async function getTrips(params?: {
   status?: string;
   bus_id?: number;
   driver_id?: number;
   type?: 'pickup' | 'dropoff';
+  limit?: number;
+  offset?: number;
 }) {
   return axios.get(`${API_BASE_URL}`, { params });
 }

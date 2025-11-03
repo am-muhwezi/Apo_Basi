@@ -17,6 +17,8 @@ export default function ChildrenPage() {
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [formData, setFormData] = useState<Partial<Child>>({});
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   const grades = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6'];
 
@@ -27,18 +29,24 @@ export default function ChildrenPage() {
     loadBuses();
   }, []);
 
-  async function loadChildren() {
+  async function loadChildren(append = false) {
     try {
-      const data = await childService.loadChildren();
-      setChildren(data);
+      setLoading(true);
+      const offset = append ? children.length : 0;
+      const response = await childService.loadChildren({ limit: 20, offset });
+      setChildren(append ? [...children, ...response] : response);
+      // Check if there's more data (if we got a full page, there might be more)
+      setHasMore(response.length === 20);
     } catch (error) {
       console.error('Failed to load children:', error);
+    } finally {
+      setLoading(false);
     }
   }
 
   async function loadParents() {
     try {
-      const data = await childService.loadParents();
+      const data = await childService.loadParents({ limit: 100 }); // Load enough for dropdown
       setParents(data);
     } catch (error) {
       console.error('Failed to load parents:', error);
@@ -47,10 +55,16 @@ export default function ChildrenPage() {
 
   async function loadBuses() {
     try {
-      const data = await childService.loadBuses();
+      const data = await childService.loadBuses({ limit: 100 }); // Load enough for dropdown
       setBuses(data);
     } catch (error) {
       console.error('Failed to load buses:', error);
+    }
+  }
+
+  function loadMoreChildren() {
+    if (!loading && hasMore) {
+      loadChildren(true);
     }
   }
 
@@ -288,6 +302,23 @@ export default function ChildrenPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="p-4 border-t border-slate-200">
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-sm text-slate-600">
+              Loaded {filteredChildren.length} of {filteredChildren.length}{hasMore ? '+' : ''} children
+            </span>
+            {hasMore && (
+              <Button
+                onClick={loadMoreChildren}
+                disabled={loading}
+                variant="secondary"
+                size="sm"
+              >
+                {loading ? 'Loading...' : 'Load More'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

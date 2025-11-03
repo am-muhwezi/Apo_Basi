@@ -12,6 +12,8 @@ export default function DriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [buses, setBuses] = useState<Bus[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   // Fetch drivers, buses, and assignments from backend on mount
   React.useEffect(() => {
@@ -20,18 +22,23 @@ export default function DriversPage() {
     loadAssignments();
   }, []);
 
-  async function loadDrivers() {
+  async function loadDrivers(append = false) {
     try {
-      const data = await driverService.loadDrivers();
-      setDrivers(data);
+      setLoading(true);
+      const offset = append ? drivers.length : 0;
+      const data = await driverService.loadDrivers({ limit: 20, offset });
+      setDrivers(append ? [...drivers, ...data] : data);
+      setHasMore(data.length === 20);
     } catch (error) {
       console.error('Failed to load drivers:', error);
+    } finally {
+      setLoading(false);
     }
   }
 
   async function loadBuses() {
     try {
-      const data = await driverService.loadBuses();
+      const data = await driverService.loadBuses({ limit: 100 });
       setBuses(data);
     } catch (error) {
       console.error('Failed to load buses:', error);
@@ -41,9 +48,16 @@ export default function DriversPage() {
   async function loadAssignments() {
     try {
       const data = await assignmentService.loadAssignments({ assignmentType: 'driver_to_bus' });
-      setAssignments(data);
+      setAssignments(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to load assignments:', error);
+      setAssignments([]);
+    }
+  }
+
+  function loadMoreDrivers() {
+    if (!loading && hasMore) {
+      loadDrivers(true);
     }
   }
   const [searchTerm, setSearchTerm] = useState('');
@@ -280,6 +294,23 @@ export default function DriversPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="p-4 border-t border-slate-200">
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-sm text-slate-600">
+              Loaded {filteredDrivers.length} of {filteredDrivers.length}{hasMore ? '+' : ''} drivers
+            </span>
+            {hasMore && (
+              <Button
+                onClick={loadMoreDrivers}
+                disabled={loading}
+                variant="secondary"
+                size="sm"
+              >
+                {loading ? 'Loading...' : 'Load More'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

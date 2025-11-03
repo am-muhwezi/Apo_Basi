@@ -2,9 +2,9 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000/api/busminders/';
 
-// List all bus minders
-export async function getBusMinders() {
-  return axios.get(`${API_BASE_URL}`);
+// List all bus minders with pagination support
+export async function getBusMinders(params?: { limit?: number; offset?: number }) {
+  return axios.get(`${API_BASE_URL}`, { params });
 }
 
 // Get single bus minder

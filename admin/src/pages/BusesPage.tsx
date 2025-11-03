@@ -12,10 +12,10 @@ import { assignmentService } from '../services/assignmentService';
 import type { Bus, Assignment } from '../types';
 
 export default function BusesPage() {
-  const { buses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren } = useBuses();
-  const { drivers } = useDrivers();
-  const { minders } = useMinders();
-  const { children } = useChildren();
+  const { buses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren, hasMore: busesHasMore, loadMore: loadMoreBuses, loading: busesLoading } = useBuses();
+  const { drivers, hasMore: driversHasMore, loadMore: loadMoreDrivers } = useDrivers();
+  const { minders, hasMore: mindersHasMore, loadMore: loadMoreMinders } = useMinders();
+  const { children, hasMore: childrenHasMore, loadMore: loadMoreChildren } = useChildren();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
 
   // Load assignments
@@ -27,9 +27,12 @@ export default function BusesPage() {
     try {
       const driverAssignments = await assignmentService.loadAssignments({ assignmentType: 'driver_to_bus' });
       const minderAssignments = await assignmentService.loadAssignments({ assignmentType: 'minder_to_bus' });
-      setAssignments([...driverAssignments, ...minderAssignments]);
+      const drivers = Array.isArray(driverAssignments) ? driverAssignments : [];
+      const minders = Array.isArray(minderAssignments) ? minderAssignments : [];
+      setAssignments([...drivers, ...minders]);
     } catch (error) {
       console.error('Failed to load assignments:', error);
+      setAssignments([]);
     }
   }
 
@@ -329,6 +332,23 @@ export default function BusesPage() {
             </tbody>
           </table>
         </div>
+        <div className="p-4 border-t border-slate-200">
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-sm text-slate-600">
+              Loaded {filteredBuses.length} of {filteredBuses.length}{busesHasMore ? '+' : ''} buses
+            </span>
+            {busesHasMore && (
+              <Button
+                onClick={loadMoreBuses}
+                disabled={busesLoading}
+                variant="secondary"
+                size="sm"
+              >
+                {busesLoading ? 'Loading...' : 'Load More'}
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Create/Edit Modal */}
@@ -462,6 +482,17 @@ export default function BusesPage() {
                   </div>
                 </label>
               ))}
+              {childrenHasMore && (
+                <div className="p-2 text-center border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={loadMoreChildren}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    Load More Children
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
