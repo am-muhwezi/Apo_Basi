@@ -100,6 +100,7 @@ export default function AssignmentsPage() {
 
   // Loading state
   const [isLoading, setIsLoading] = useState(false);
+  const [hasMoreAssignments, setHasMoreAssignments] = useState(false);
 
   // Load data on mount
   useEffect(() => {
@@ -134,27 +135,36 @@ export default function AssignmentsPage() {
     }
   }
 
-  async function loadAssignments() {
+  async function loadAssignments(append = false) {
     try {
-      const data = await assignmentService.loadAssignments();
-      setAssignments(data);
+      const offset = append ? assignments.length : 0;
+      const data = await assignmentService.loadAssignments({ limit: 20, offset });
+      setAssignments(append ? [...assignments, ...data] : data);
+      setHasMoreAssignments(data.length === 20);
     } catch (error) {
       console.error('Failed to load assignments:', error);
+    }
+  }
+
+  function loadMoreAssignments() {
+    if (!isLoading && hasMoreAssignments) {
+      loadAssignments(true);
     }
   }
 
   async function loadRoutes() {
     try {
       const data = await assignmentService.loadRoutes();
-      setRoutes(data);
+      setRoutes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to load routes:', error);
+      setRoutes([]);
     }
   }
 
   async function loadBuses() {
     try {
-      const data = await busService.loadBuses();
+      const data = await busService.loadBuses({ limit: 100 });
       setBuses(data);
     } catch (error) {
       console.error('Failed to load buses:', error);
@@ -163,7 +173,7 @@ export default function AssignmentsPage() {
 
   async function loadDrivers() {
     try {
-      const data = await driverService.loadDrivers();
+      const data = await driverService.loadDrivers({ limit: 100 });
       setDrivers(data);
     } catch (error) {
       console.error('Failed to load drivers:', error);
@@ -172,7 +182,7 @@ export default function AssignmentsPage() {
 
   async function loadMinders() {
     try {
-      const data = await busMinderService.loadBusMinders();
+      const data = await busMinderService.loadBusMinders({ limit: 100 });
       setMinders(data);
     } catch (error) {
       console.error('Failed to load minders:', error);
@@ -181,7 +191,7 @@ export default function AssignmentsPage() {
 
   async function loadChildren() {
     try {
-      const data = await childService.loadChildren();
+      const data = await childService.loadChildren({ limit: 100 });
       setChildren(data);
     } catch (error) {
       console.error('Failed to load children:', error);
@@ -689,6 +699,23 @@ export default function AssignmentsPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+            <div className="p-4 border-t border-slate-200">
+              <div className="flex flex-col items-center gap-3">
+                <span className="text-sm text-slate-600">
+                  Loaded {filteredAssignments.length} of {filteredAssignments.length}{hasMoreAssignments ? '+' : ''} assignments
+                </span>
+                {hasMoreAssignments && (
+                  <Button
+                    onClick={loadMoreAssignments}
+                    disabled={isLoading}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    {isLoading ? 'Loading...' : 'Load More'}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </>

@@ -6,19 +6,31 @@ export function useBuses() {
   const [buses, setBuses] = useState<Bus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
 
-  const loadBuses = async () => {
+  const loadBuses = async (append = false) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await getBuses();
-      setBuses(response.data || []);
+      const offset = append ? buses.length : 0;
+      const response = await getBuses({ limit: 20, offset });
+
+      // Handle paginated response from DRF: {results: [], count, next, previous}
+      const data = response.data.results || [];
+      setHasMore(!!response.data.next);
+      setBuses(append ? [...buses, ...data] : data);
     } catch (err) {
       setError('Failed to load buses');
       console.error('Failed to load buses:', err);
-      setBuses([]);
+      if (!append) setBuses([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMore = () => {
+    if (!loading && hasMore) {
+      loadBuses(true);
     }
   };
 
@@ -102,7 +114,9 @@ export function useBuses() {
     buses,
     loading,
     error,
+    hasMore,
     loadBuses,
+    loadMore,
     createBus: handleCreateBus,
     updateBus: handleUpdateBus,
     deleteBus: handleDeleteBus,

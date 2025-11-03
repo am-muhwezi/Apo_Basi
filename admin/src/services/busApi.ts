@@ -7,9 +7,9 @@ const API_BASE_URL = 'http://localhost:8000/api/buses/';
  * Backend uses camelCase, frontend uses camelCase
  */
 
-// List all buses
-export async function getBuses() {
-  return axios.get(`${API_BASE_URL}`);
+// List all buses with pagination support
+export async function getBuses(params?: { limit?: number; offset?: number }) {
+  return axios.get(`${API_BASE_URL}`, { params });
 }
 
 // Get single bus

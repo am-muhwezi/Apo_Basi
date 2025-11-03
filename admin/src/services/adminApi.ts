@@ -2,9 +2,9 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000/api/admins/';
 
-// List all admins
-export async function getAdmins() {
-  return axios.get(`${API_BASE_URL}`);
+// List all admins with pagination support
+export async function getAdmins(params?: { limit?: number; offset?: number }) {
+  return axios.get(`${API_BASE_URL}`, { params });
 }
 
 // Get single admin

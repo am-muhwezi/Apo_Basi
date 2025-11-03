@@ -5,27 +5,30 @@ import type { Child, Parent, Bus } from '../types';
 
 class ChildService {
   /**
-   * Load all children from DRF API
+   * Load all children from DRF API with pagination
    */
-  async loadChildren(): Promise<Child[]> {
-    const response = await childApi.getChildren();
-    return response.data;
+  async loadChildren(params?: { limit?: number; offset?: number }): Promise<Child[]> {
+    const response = await childApi.getChildren(params);
+    // Handle paginated response from DRF: {results: [], count, next, previous}
+    return response.data.results || [];
   }
 
   /**
-   * Load all parents (for parent dropdown)
+   * Load all parents (for parent dropdown) with pagination
    */
-  async loadParents(): Promise<Parent[]> {
-    const response = await parentApi.getParents();
-    return response.data;
+  async loadParents(params?: { limit?: number; offset?: number }): Promise<Parent[]> {
+    const response = await parentApi.getParents(params);
+    // Handle paginated response from DRF: {results: [], count, next, previous}
+    return response.data.results || [];
   }
 
   /**
-   * Load all buses (for bus assignment dropdown)
+   * Load all buses (for bus assignment dropdown) with pagination
    */
-  async loadBuses(): Promise<Bus[]> {
-    const response = await busApi.getBuses();
-    return response.data;
+  async loadBuses(params?: { limit?: number; offset?: number }): Promise<Bus[]> {
+    const response = await busApi.getBuses(params);
+    // Handle paginated response from DRF: {results: [], count, next, previous}
+    return response.data.results || [];
   }
 
   /**

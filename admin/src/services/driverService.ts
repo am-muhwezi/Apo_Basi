@@ -4,19 +4,21 @@ import type { Driver, Bus } from '../types';
 
 class DriverService {
   /**
-   * Load all drivers from DRF API
+   * Load all drivers from DRF API with pagination
    */
-  async loadDrivers(): Promise<Driver[]> {
-    const response = await driverApi.getDrivers();
-    return response.data;
+  async loadDrivers(params?: { limit?: number; offset?: number }): Promise<Driver[]> {
+    const response = await driverApi.getDrivers(params);
+    // Handle paginated response from DRF: {results: [], count, next, previous}
+    return response.data.results || [];
   }
 
   /**
-   * Load all buses (for assignment dropdown)
+   * Load all buses (for assignment dropdown) with pagination
    */
-  async loadBuses(): Promise<Bus[]> {
-    const response = await busApi.getBuses();
-    return response.data;
+  async loadBuses(params?: { limit?: number; offset?: number }): Promise<Bus[]> {
+    const response = await busApi.getBuses(params);
+    // Handle paginated response from DRF: {results: [], count, next, previous}
+    return response.data.results || [];
   }
 
   /**

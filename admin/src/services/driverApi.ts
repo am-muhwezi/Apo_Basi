@@ -2,9 +2,9 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000/api/drivers/';
 
-// List all drivers
-export async function getDrivers() {
-  return axios.get(`${API_BASE_URL}`);
+// List all drivers with pagination support
+export async function getDrivers(params?: { limit?: number; offset?: number }) {
+  return axios.get(`${API_BASE_URL}`, { params });
 }
 
 // Get single driver

@@ -6,23 +6,35 @@ export function useChildren() {
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
     loadChildren();
   }, []);
 
-  const loadChildren = async () => {
+  const loadChildren = async (append = false) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await getChildren();
-      setChildren(response.data || []);
+      const offset = append ? children.length : 0;
+      const response = await getChildren({ limit: 20, offset });
+
+      // Handle paginated response from DRF: {results: [], count, next, previous}
+      const data = response.data.results || [];
+      setHasMore(!!response.data.next);
+      setChildren(append ? [...children, ...data] : data);
     } catch (err) {
       setError('Failed to load children');
       console.error('Failed to load children:', err);
-      setChildren([]);
+      if (!append) setChildren([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMore = () => {
+    if (!loading && hasMore) {
+      loadChildren(true);
     }
   };
 
@@ -30,6 +42,8 @@ export function useChildren() {
     children,
     loading,
     error,
+    hasMore,
     loadChildren,
+    loadMore,
   };
 }

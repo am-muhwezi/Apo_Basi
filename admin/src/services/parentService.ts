@@ -3,11 +3,12 @@ import type { Parent } from '../types';
 
 class ParentService {
   /**
-   * Load all parents from DRF API
+   * Load all parents from DRF API with pagination
    */
-  async loadParents(): Promise<Parent[]> {
-    const response = await parentApi.getParents();
-    return response.data;
+  async loadParents(params?: { limit?: number; offset?: number }): Promise<Parent[]> {
+    const response = await parentApi.getParents(params);
+    // Handle paginated response from DRF: {results: [], count, next, previous}
+    return response.data.results || [];
   }
 
   /**

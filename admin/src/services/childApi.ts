@@ -2,9 +2,9 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000/api/children/';
 
-// List all children
-export async function getChildren() {
-  return axios.get(`${API_BASE_URL}`);
+// List all children with pagination support
+export async function getChildren(params?: { limit?: number; offset?: number }) {
+  return axios.get(`${API_BASE_URL}`, { params });
 }
 
 // Get single child
