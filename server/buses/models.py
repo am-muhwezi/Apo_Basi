@@ -76,3 +76,4 @@ class Bus(models.Model):
 
     class Meta:
         verbose_name_plural = "Buses"
+        ordering = ['bus_number', 'id']

@@ -49,5 +49,8 @@ class Child(models.Model):
         related_name="children",
     )
 
+    class Meta:
+        ordering = ['first_name', 'last_name', 'id']
+
     def __str__(self):
         return f"{self.first_name} {self.last_name}"

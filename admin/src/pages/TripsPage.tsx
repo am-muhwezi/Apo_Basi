@@ -89,9 +89,17 @@ export default function TripsPage() {
   const [hasMore, setHasMore] = useState(false);
 
   // Use dummy routes for now
+  // TODO: Replace with real route data from backend when routes API is ready
   const [routes] = useState(dummyRoutes);
 
-  // Fetch all data from backend
+  // NOTE: Currently using dummy data for routes display
+  // Backend data loading is disabled until routes API is fully implemented
+  // When implementing real routes:
+  // 1. Backend should return route data with all necessary info (driver names, bus numbers, etc.)
+  // 2. Load only routes data, not buses/drivers/minders/children separately
+  // 3. Follow the pattern used in other optimized pages (BusesPage, DriversPage, etc.)
+
+  /* DISABLED: Loading all data unnecessarily
   React.useEffect(() => {
     loadAllData();
   }, []);
@@ -141,6 +149,7 @@ export default function TripsPage() {
       loadAllData(true);
     }
   }
+  */
 
   const filteredTrips = trips.filter((trip) => {
     const matchesStatus = statusFilter === 'all' || trip.status === statusFilter;
