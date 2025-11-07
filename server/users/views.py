@@ -171,7 +171,7 @@ def user_profile(request):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])  # For testing - change to IsAuthenticated in production
+@permission_classes([IsAuthenticated])  # Secured: requires authentication
 def list_users(request):
     """
     List all users - for admin/testing purposes
@@ -181,7 +181,7 @@ def list_users(request):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def health_check(request):
     """
     Simple health check endpoint

@@ -19,5 +19,8 @@ class Admin(models.Model):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='admin')
     status = models.CharField(max_length=20, default='active')
 
+    class Meta:
+        ordering = ['user__first_name', 'user__last_name', 'user_id']
+
     def __str__(self):
         return f"Admin: {self.user.get_full_name() or self.user.username}"

@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import ProtectedRoute from './components/ProtectedRoute';
+import PrivateRoute from './components/PrivateRoute';
 import DashboardPage from './pages/DashboardPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import AttendancePage from './pages/AttendancePage';
@@ -22,7 +22,7 @@ function App() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
@@ -43,9 +43,9 @@ function App() {
       <Route
         path="/"
         element={
-          <ProtectedRoute>
+          <PrivateRoute>
             <Layout />
-          </ProtectedRoute>
+          </PrivateRoute>
         }
       >
         <Route index element={<Navigate to="/dashboard" replace />} />

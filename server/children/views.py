@@ -1,5 +1,5 @@
 from rest_framework import generics
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from .models import Child
 from .serializers import ChildSerializer, ChildCreateSerializer
 
@@ -9,7 +9,7 @@ class ChildListCreateView(generics.ListCreateAPIView):
     GET /api/children/ - List all children
     POST /api/children/ - Create new child
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     queryset = Child.objects.select_related('parent__user', 'assigned_bus').all()
 
     def get_serializer_class(self):
@@ -25,7 +25,7 @@ class ChildDetailView(generics.RetrieveUpdateDestroyAPIView):
     PATCH /api/children/{id}/ - Partial update child
     DELETE /api/children/{id}/ - Delete child
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     queryset = Child.objects.select_related('parent__user', 'assigned_bus').all()
 
     def get_serializer_class(self):
