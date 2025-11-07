@@ -21,11 +21,11 @@ import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
 import SearchableSelect from '../components/common/SearchableSelect';
+import { useBuses } from '../hooks/useBuses';
+import { useDrivers } from '../hooks/useDrivers';
+import { useMinders } from '../hooks/useMinders';
+import { useChildren } from '../hooks/useChildren';
 import { assignmentService } from '../services/assignmentService';
-import { busService } from '../services/busService';
-import { driverService } from '../services/driverService';
-import { busMinderService } from '../services/busMinderService';
-import { childService } from '../services/childService';
 import type {
   Assignment,
   BusRoute,
@@ -41,6 +41,20 @@ import type {
 type TabType = 'assignments' | 'routes';
 
 export default function AssignmentsPage() {
+  // Use hooks for data
+  const { buses, loadBuses } = useBuses();
+  const { drivers, loadDrivers } = useDrivers();
+  const { minders, loadMinders } = useMinders();
+  const { children, loadChildren } = useChildren();
+
+  // Load all data on mount
+  useEffect(() => {
+    loadBuses();
+    loadDrivers();
+    loadMinders();
+    loadChildren();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('assignments');
 
@@ -91,11 +105,7 @@ export default function AssignmentsPage() {
     childrenIds: [] as number[],
   });
 
-  // Supporting data
-  const [buses, setBuses] = useState<Bus[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [minders, setMinders] = useState<Minder[]>([]);
-  const [children, setChildren] = useState<Child[]>([]);
+  // Supporting data (buses, drivers, minders, children come from hooks)
   const [busUtilization, setBusUtilization] = useState<any[]>([]);
 
   // Loading state
@@ -123,10 +133,6 @@ export default function AssignmentsPage() {
       await Promise.all([
         loadAssignments(),
         loadRoutes(),
-        loadBuses(),
-        loadDrivers(),
-        loadMinders(),
-        loadChildren(),
       ]);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -162,41 +168,7 @@ export default function AssignmentsPage() {
     }
   }
 
-  async function loadBuses() {
-    try {
-      const data = await busService.loadBuses({ limit: 100 });
-      setBuses(data);
-    } catch (error) {
-      console.error('Failed to load buses:', error);
-    }
-  }
-
-  async function loadDrivers() {
-    try {
-      const data = await driverService.loadDrivers({ limit: 100 });
-      setDrivers(data);
-    } catch (error) {
-      console.error('Failed to load drivers:', error);
-    }
-  }
-
-  async function loadMinders() {
-    try {
-      const data = await busMinderService.loadBusMinders({ limit: 100 });
-      setMinders(data);
-    } catch (error) {
-      console.error('Failed to load minders:', error);
-    }
-  }
-
-  async function loadChildren() {
-    try {
-      const data = await childService.loadChildren({ limit: 100 });
-      setChildren(data);
-    } catch (error) {
-      console.error('Failed to load children:', error);
-    }
-  }
+  // buses, drivers, minders, children are loaded via hooks
 
   async function loadBusUtilization() {
     try {

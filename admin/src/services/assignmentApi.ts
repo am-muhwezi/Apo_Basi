@@ -1,38 +1,36 @@
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8000/api/assignments/';
+import axiosInstance from './axiosConfig';
 
 // Assignment endpoints
 export async function getAssignments(params?: Record<string, any>) {
-  return axios.get(`${API_BASE_URL}list/`, { params });
+  return axiosInstance.get('/assignments/list/', { params });
 }
 
 export async function getAssignment(id: string) {
-  return axios.get(`${API_BASE_URL}list/${id}/`);
+  return axiosInstance.get(`/assignments/list/${id}/`);
 }
 
 export async function createAssignment(data: any) {
-  return axios.post(`${API_BASE_URL}list/`, data);
+  return axiosInstance.post('/assignments/list/', data);
 }
 
 export async function updateAssignment(id: string, data: any) {
-  return axios.put(`${API_BASE_URL}list/${id}/`, data);
+  return axiosInstance.put(`/assignments/list/${id}/`, data);
 }
 
 export async function deleteAssignment(id: string) {
-  return axios.delete(`${API_BASE_URL}list/${id}/`);
+  return axiosInstance.delete(`/assignments/list/${id}/`);
 }
 
 export async function cancelAssignment(id: string, reason: string) {
-  return axios.post(`${API_BASE_URL}list/${id}/cancel/`, { reason });
+  return axiosInstance.post(`/assignments/list/${id}/cancel/`, { reason });
 }
 
 export async function getAssignmentHistory(id: string) {
-  return axios.get(`${API_BASE_URL}list/${id}/history/`);
+  return axiosInstance.get(`/assignments/list/${id}/history/`);
 }
 
 export async function bulkAssignChildrenToBus(busId: number, childrenIds: number[], effectiveDate?: string) {
-  return axios.post(`${API_BASE_URL}list/bulk-assign-children-to-bus/`, {
+  return axiosInstance.post('/assignments/list/bulk-assign-children-to-bus/', {
     busId,
     childrenIds,
     effectiveDate
@@ -40,7 +38,7 @@ export async function bulkAssignChildrenToBus(busId: number, childrenIds: number
 }
 
 export async function bulkAssignChildrenToRoute(routeId: number, childrenIds: number[], effectiveDate?: string) {
-  return axios.post(`${API_BASE_URL}list/bulk-assign-children-to-route/`, {
+  return axiosInstance.post('/assignments/list/bulk-assign-children-to-route/', {
     routeId,
     childrenIds,
     effectiveDate
@@ -48,11 +46,11 @@ export async function bulkAssignChildrenToRoute(routeId: number, childrenIds: nu
 }
 
 export async function getBusUtilization() {
-  return axios.get(`${API_BASE_URL}list/bus-utilization/`);
+  return axiosInstance.get('/assignments/list/bus-utilization/');
 }
 
 export async function transferAssignment(assignmentId: number, newAssignedToId: number, newAssignedToType: string, reason?: string) {
-  return axios.post(`${API_BASE_URL}list/transfer/`, {
+  return axiosInstance.post('/assignments/list/transfer/', {
     assignmentId,
     newAssignedToId,
     newAssignedToType,
@@ -62,38 +60,38 @@ export async function transferAssignment(assignmentId: number, newAssignedToId: 
 
 // Route endpoints
 export async function getRoutes() {
-  return axios.get(`${API_BASE_URL}routes/`);
+  return axiosInstance.get('/assignments/routes/');
 }
 
 export async function getRoute(id: string) {
-  return axios.get(`${API_BASE_URL}routes/${id}/`);
+  return axiosInstance.get(`/assignments/routes/${id}/`);
 }
 
 export async function createRoute(data: any) {
-  return axios.post(`${API_BASE_URL}routes/`, data);
+  return axiosInstance.post('/assignments/routes/', data);
 }
 
 export async function updateRoute(id: string, data: any) {
-  return axios.put(`${API_BASE_URL}routes/${id}/`, data);
+  return axiosInstance.put(`/assignments/routes/${id}/`, data);
 }
 
 export async function deleteRoute(id: string) {
-  return axios.delete(`${API_BASE_URL}routes/${id}/`);
+  return axiosInstance.delete(`/assignments/routes/${id}/`);
 }
 
 export async function getRouteAssignments(id: string) {
-  return axios.get(`${API_BASE_URL}routes/${id}/assignments/`);
+  return axiosInstance.get(`/assignments/routes/${id}/assignments/`);
 }
 
 export async function getRouteStatistics(id: string) {
-  return axios.get(`${API_BASE_URL}routes/${id}/statistics/`);
+  return axiosInstance.get(`/assignments/routes/${id}/statistics/`);
 }
 
 // History endpoints
 export async function getAllHistory(params?: Record<string, any>) {
-  return axios.get(`${API_BASE_URL}history/`, { params });
+  return axiosInstance.get('/assignments/history/', { params });
 }
 
 export async function getHistoryEntry(id: string) {
-  return axios.get(`${API_BASE_URL}history/${id}/`);
+  return axiosInstance.get(`/assignments/history/${id}/`);
 }

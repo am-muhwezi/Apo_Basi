@@ -1,11 +1,13 @@
 import axios from 'axios';
 import { refreshToken } from './authApi';
+import { config } from '../config/environment';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = `${config.apiBaseUrl}/api`;
 
-// Create axios instance
+// Create axios instance with centralized configuration
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
+  timeout: config.apiTimeout,
 });
 
 // Request interceptor to add auth token

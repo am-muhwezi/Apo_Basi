@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { UserPlus, Bus } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
@@ -15,6 +16,7 @@ export default function SignupPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { signup } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,22 +48,24 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // For now, simulate signup
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Create username from email
+      const username = formData.email.split('@')[0];
 
-      // Store auth token (replace with actual token from API)
-      localStorage.setItem('adminToken', 'demo-token');
-      localStorage.setItem('adminUser', JSON.stringify({
+      await signup({
+        username,
         email: formData.email,
-        name: `${formData.firstName} ${formData.lastName}`,
-        role: 'admin',
-        schoolName: formData.schoolName
-      }));
-
-      navigate('/');
-    } catch (err) {
-      setError('Failed to create account. Please try again.');
+        password: formData.password,
+        password_confirm: formData.confirmPassword,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        user_type: 'admin',
+      });
+      // Navigation handled by AuthContext
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.error
+        || err.response?.data?.detail
+        || 'Failed to create account. Please try again.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

@@ -4,62 +4,17 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
-import { driverService } from '../services/driverService';
-import { assignmentService } from '../services/assignmentService';
-import type { Driver, Bus, Assignment } from '../types';
+import { useDrivers } from '../hooks/useDrivers';
+import type { Driver } from '../types';
 
 export default function DriversPage() {
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [buses, setBuses] = useState<Bus[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
+  // Use hooks for drivers
+  const { drivers, loading, hasMore, loadDrivers, loadMore: loadMoreDrivers } = useDrivers();
 
-  // Fetch drivers, buses, and assignments from backend on mount
+  // Load drivers on mount (assignedBusNumber is included in drivers response)
   React.useEffect(() => {
     loadDrivers();
-    loadBuses();
-    loadAssignments();
-  }, []);
-
-  async function loadDrivers(append = false) {
-    try {
-      setLoading(true);
-      const offset = append ? drivers.length : 0;
-      const data = await driverService.loadDrivers({ limit: 20, offset });
-      setDrivers(append ? [...drivers, ...data] : data);
-      setHasMore(data.length === 20);
-    } catch (error) {
-      console.error('Failed to load drivers:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadBuses() {
-    try {
-      const data = await driverService.loadBuses({ limit: 100 });
-      setBuses(data);
-    } catch (error) {
-      console.error('Failed to load buses:', error);
-    }
-  }
-
-  async function loadAssignments() {
-    try {
-      const data = await assignmentService.loadAssignments({ assignmentType: 'driver_to_bus' });
-      setAssignments(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Failed to load assignments:', error);
-      setAssignments([]);
-    }
-  }
-
-  function loadMoreDrivers() {
-    if (!loading && hasMore) {
-      loadDrivers(true);
-    }
-  }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -125,27 +80,10 @@ export default function DriversPage() {
     }
   };
 
-  const getAssignedBus = (driverId: string): string => {
-    // Find active assignment for this driver
-    const assignment = assignments.find(
-      (a) => a.assigneeId === Number(driverId) && a.status === 'active'
-    );
-
-    if (!assignment) return 'Not Assigned';
-
-    // Return the assigned bus name from assignment (backend provides this)
-    return assignment.assignedToName || 'Unknown';
-  };
-
   // Calculate stats
   const totalDrivers = drivers.length;
   const activeDrivers = drivers.filter((d) => d.status === 'active').length;
-  const assignedDrivers = drivers.filter((d) => {
-    const assignment = assignments.find(
-      (a) => a.assigneeId === Number(d.id) && a.status === 'active'
-    );
-    return assignment !== undefined;
-  }).length;
+  const assignedDrivers = drivers.filter((d) => d.assignedBusNumber).length;
 
   return (
     <div>
@@ -255,7 +193,7 @@ export default function DriversPage() {
                     {driver.licenseNumber}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                    {getAssignedBus(driver.id)}
+                    {driver.assignedBusNumber || 'Not Assigned'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
@@ -417,7 +355,7 @@ export default function DriversPage() {
               <div>
                 <p className="text-sm font-medium text-slate-700">Assigned Bus</p>
                 <p className="text-base text-slate-900">
-                  {getAssignedBus(selectedDriver.id)}
+                  {selectedDriver.assignedBusNumber || 'Not Assigned'}
                 </p>
               </div>
             </div>
