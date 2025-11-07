@@ -1,15 +1,13 @@
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8000/api/parents/';
+import axiosInstance from './axiosConfig';
 
 // List all parents with pagination support
 export async function getParents(params?: { limit?: number; offset?: number }) {
-  return axios.get(`${API_BASE_URL}`, { params });
+  return axiosInstance.get('/parents/', { params });
 }
 
 // Get single parent
 export async function getParent(id: string) {
-  return axios.get(`${API_BASE_URL}${id}/`);
+  return axiosInstance.get(`/parents/${id}/`);
 }
 
 // Create new parent
@@ -22,7 +20,7 @@ export async function createParent(data: {
   emergencyContact?: string;
   status?: string;
 }) {
-  return axios.post(`${API_BASE_URL}`, data);
+  return axiosInstance.post('/parents/', data);
 }
 
 // Update parent
@@ -35,10 +33,10 @@ export async function updateParent(id: string, data: {
   emergencyContact?: string;
   status?: string;
 }) {
-  return axios.put(`${API_BASE_URL}${id}/`, data);
+  return axiosInstance.put(`/parents/${id}/`, data);
 }
 
 // Delete parent
 export async function deleteParent(id: string) {
-  return axios.delete(`${API_BASE_URL}${id}/`);
+  return axiosInstance.delete(`/parents/${id}/`);
 }

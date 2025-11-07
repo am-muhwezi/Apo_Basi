@@ -4,42 +4,39 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
+import { useChildren } from '../hooks/useChildren';
 import { parentService } from '../services/parentService';
-import { childService } from '../services/childService';
 import type { Parent, Child } from '../types';
 
 export default function ParentsPage() {
+  // Use useChildren hook for children data
+  const { children, loadChildren } = useChildren();
+
   const [parents, setParents] = useState<Parent[]>([]);
-  const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
 
-  // Fetch parents and children from backend on mount
+  // Fetch parents from backend on mount
+  // Children are loaded on-demand when needed (e.g., when viewing parent details)
   React.useEffect(() => {
     loadParents();
-    loadChildren();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadParents(append = false) {
     try {
       setLoading(true);
       const offset = append ? parents.length : 0;
-      const data = await parentService.loadParents({ limit: 20, offset });
-      setParents(append ? [...parents, ...data] : data);
-      setHasMore(data.length === 20);
+      const result = await parentService.loadParents({ limit: 20, offset });
+
+      if (result.success && result.data) {
+        const newParents = result.data.parents || [];
+        setParents(append ? [...parents, ...newParents] : newParents);
+        setHasMore(result.data.hasNext || false);
+      }
     } catch (error) {
       console.error('Failed to load parents:', error);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function loadChildren() {
-    try {
-      const data = await childService.loadChildren({ limit: 100 });
-      setChildren(data);
-    } catch (error) {
-      console.error('Failed to load children:', error);
     }
   }
 
@@ -87,6 +84,10 @@ export default function ParentsPage() {
 
   const handleView = (parent: Parent) => {
     setSelectedParent(parent);
+    // Load children data only when viewing parent details (if not already loaded)
+    if (children.length === 0) {
+      loadChildren();
+    }
     setShowDetailModal(true);
   };
 

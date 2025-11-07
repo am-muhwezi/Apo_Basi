@@ -1,6 +1,6 @@
 import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8000/api';
+import axiosInstance from './axiosConfig';
+import { config } from '../config/environment';
 
 export interface LoginCredentials {
   username: string;
@@ -36,17 +36,19 @@ export interface AuthResponse {
 
 /**
  * Login user
+ * Note: Uses raw axios (not axiosInstance) to avoid auth interceptor during login
  */
 export async function login(credentials: LoginCredentials): Promise<AuthResponse> {
-  const response = await axios.post(`${API_BASE_URL}/users/login/`, credentials);
+  const response = await axios.post(`${config.apiBaseUrl}/api/users/login/`, credentials);
   return response.data;
 }
 
 /**
  * Register new admin
+ * Note: Uses raw axios (not axiosInstance) to avoid auth interceptor during signup
  */
 export async function signup(data: SignupData): Promise<AuthResponse> {
-  const response = await axios.post(`${API_BASE_URL}/admins/register/`, data);
+  const response = await axios.post(`${config.apiBaseUrl}/api/admins/register/`, data);
   return response.data;
 }
 
@@ -54,36 +56,23 @@ export async function signup(data: SignupData): Promise<AuthResponse> {
  * Logout user
  */
 export async function logout(refreshToken: string): Promise<void> {
-  const token = localStorage.getItem('adminToken');
-  await axios.post(
-    `${API_BASE_URL}/users/logout/`,
-    { refresh_token: refreshToken },
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+  await axiosInstance.post('/users/logout/', { refresh_token: refreshToken });
 }
 
 /**
  * Get user profile
  */
 export async function getUserProfile() {
-  const token = localStorage.getItem('adminToken');
-  const response = await axios.get(`${API_BASE_URL}/users/profile/detail/`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const response = await axiosInstance.get('/users/profile/detail/');
   return response.data;
 }
 
 /**
  * Refresh access token
+ * Note: Uses raw axios to avoid infinite loop in token refresh interceptor
  */
 export async function refreshToken(refreshToken: string) {
-  const response = await axios.post(`${API_BASE_URL}/users/token/refresh/`, {
+  const response = await axios.post(`${config.apiBaseUrl}/api/users/token/refresh/`, {
     refresh: refreshToken,
   });
   return response.data;

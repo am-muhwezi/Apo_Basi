@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8000/api/trips/';
+import axiosInstance from './axiosConfig';
 
 /**
  * Trip API Service - Manages trips and stops
@@ -16,12 +14,12 @@ export async function getTrips(params?: {
   limit?: number;
   offset?: number;
 }) {
-  return axios.get(`${API_BASE_URL}`, { params });
+  return axiosInstance.get('/trips/', { params });
 }
 
 // Get single trip
 export async function getTrip(id: string | number) {
-  return axios.get(`${API_BASE_URL}${id}/`);
+  return axiosInstance.get(`/trips/${id}/`);
 }
 
 // Create trip
@@ -46,7 +44,7 @@ export async function createTrip(data: {
     order: number;
   }>;
 }) {
-  return axios.post(`${API_BASE_URL}`, data);
+  return axiosInstance.post('/trips/', data);
 }
 
 // Update trip
@@ -71,27 +69,27 @@ export async function updateTrip(id: string | number, data: {
     order: number;
   }>;
 }) {
-  return axios.put(`${API_BASE_URL}${id}/`, data);
+  return axiosInstance.put(`/trips/${id}/`, data);
 }
 
 // Delete trip
 export async function deleteTrip(id: string | number) {
-  return axios.delete(`${API_BASE_URL}${id}/`);
+  return axiosInstance.delete(`/trips/${id}/`);
 }
 
 // Start a trip
 export async function startTrip(id: string | number) {
-  return axios.post(`${API_BASE_URL}${id}/start/`);
+  return axiosInstance.post(`/trips/${id}/start/`);
 }
 
 // Complete a trip
 export async function completeTrip(id: string | number) {
-  return axios.post(`${API_BASE_URL}${id}/complete/`);
+  return axiosInstance.post(`/trips/${id}/complete/`);
 }
 
 // Cancel a trip
 export async function cancelTrip(id: string | number) {
-  return axios.post(`${API_BASE_URL}${id}/cancel/`);
+  return axiosInstance.post(`/trips/${id}/cancel/`);
 }
 
 // Update trip location
@@ -99,12 +97,12 @@ export async function updateTripLocation(id: string | number, data: {
   latitude: number;
   longitude: number;
 }) {
-  return axios.post(`${API_BASE_URL}${id}/update-location/`, data);
+  return axiosInstance.post(`/trips/${id}/update-location/`, data);
 }
 
 // Get stops for a trip
 export async function getTripStops(tripId: string | number) {
-  return axios.get(`${API_BASE_URL}${tripId}/stops/`);
+  return axiosInstance.get(`/trips/${tripId}/stops/`);
 }
 
 // Create stop for a trip
@@ -117,7 +115,7 @@ export async function createStop(tripId: string | number, data: {
   status?: 'pending' | 'completed' | 'skipped';
   order: number;
 }) {
-  return axios.post(`${API_BASE_URL}${tripId}/stops/`, data);
+  return axiosInstance.post(`/trips/${tripId}/stops/`, data);
 }
 
 // Update stop
@@ -131,20 +129,20 @@ export async function updateStop(stopId: string | number, data: {
   status?: 'pending' | 'completed' | 'skipped';
   order?: number;
 }) {
-  return axios.put(`${API_BASE_URL}stops/${stopId}/`, data);
+  return axiosInstance.put(`/trips/stops/${stopId}/`, data);
 }
 
 // Delete stop
 export async function deleteStop(stopId: string | number) {
-  return axios.delete(`${API_BASE_URL}stops/${stopId}/`);
+  return axiosInstance.delete(`/trips/stops/${stopId}/`);
 }
 
 // Complete a stop
 export async function completeStop(stopId: string | number) {
-  return axios.post(`${API_BASE_URL}stops/${stopId}/complete/`);
+  return axiosInstance.post(`/trips/stops/${stopId}/complete/`);
 }
 
 // Skip a stop
 export async function skipStop(stopId: string | number) {
-  return axios.post(`${API_BASE_URL}stops/${stopId}/skip/`);
+  return axiosInstance.post(`/trips/stops/${stopId}/skip/`);
 }

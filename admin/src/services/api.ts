@@ -1,12 +1,11 @@
-
 // API service for DRF backend integration
+import axiosInstance from './axiosConfig';
+import { config } from '../config/environment';
 import axios from 'axios';
-
-// Base URL for DRF backend (adjust as needed for your environment)
-const API_BASE_URL = 'http://localhost:8000/';
 
 /**
  * Registers a new parent via DRF backend.
+ * Note: Uses raw axios (not axiosInstance) to avoid auth interceptor during registration
  * @param data - Parent registration fields matching backend requirements
  * @returns Axios response promise
  *
@@ -23,11 +22,8 @@ export async function registerParent(data: {
 	last_name: string;
 	phone_number: string;
 }) {
-	return axios.post(`${API_BASE_URL}/register/`, data);
+	return axios.post(`${config.apiBaseUrl}/register/`, data);
 }
-
-
-
 
 /**
  * Creates a new bus via DRF backend.
@@ -63,5 +59,5 @@ export async function createBus(data: {
 	capacity: number;
 	status: boolean; // UI boolean, maps to is_active
 }) {
-	return axios.post(`${API_BASE_URL}api/admins/create-bus/`, data);
+	return axiosInstance.post('/admins/create-bus/', data);
 }

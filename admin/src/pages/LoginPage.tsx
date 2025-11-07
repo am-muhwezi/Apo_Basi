@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LogIn, Bus } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
+import { useAuth } from '../contexts/AuthContext';
 
-interface LoginPageProps {
-  onLogin: () => void;
-  onNavigateToSignup: () => void;
-}
-
-export default function LoginPage({ onLogin, onNavigateToSignup }: LoginPageProps) {
+export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,21 +24,11 @@ export default function LoginPage({ onLogin, onNavigateToSignup }: LoginPageProp
 
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // For now, simulate login
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Store auth token (replace with actual token from API)
-      localStorage.setItem('adminToken', 'demo-token');
-      localStorage.setItem('adminUser', JSON.stringify({
-        email,
-        name: 'Admin User',
-        role: 'admin'
-      }));
-
-      onLogin();
-    } catch (err) {
-      setError('Invalid email or password');
+      await login(email, password);
+      // Navigation handled by AuthContext
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.error || 'Invalid email or password';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -110,7 +99,7 @@ export default function LoginPage({ onLogin, onNavigateToSignup }: LoginPageProp
             <p className="text-slate-600">
               Don't have an account?{' '}
               <button
-                onClick={onNavigateToSignup}
+                onClick={() => navigate('/signup')}
                 className="text-blue-600 font-medium hover:text-blue-700"
               >
                 Sign up

@@ -1,44 +1,66 @@
-import axios from 'axios';
+/**
+ * Child API Layer
+ *
+ * Handles all HTTP requests related to children.
+ * Uses configured axios instance with auth interceptors.
+ *
+ * Architecture:
+ * - Uses axiosInstance (no hardcoded URLs)
+ * - Strongly typed with API types
+ * - Returns raw axios responses (error handling in service layer)
+ */
 
-const API_BASE_URL = 'http://localhost:8000/api/children/';
+import axiosInstance from './axiosConfig';
+import type { AxiosResponse } from 'axios';
+import type {
+  PaginatedResponse,
+  PaginationParams,
+  ChildCreateData,
+  ChildUpdateData,
+} from '../types/api';
+import type { Child } from '../types';
 
-// List all children with pagination support
-export async function getChildren(params?: { limit?: number; offset?: number }) {
-  return axios.get(`${API_BASE_URL}`, { params });
+/**
+ * Fetch all children with pagination support
+ * GET /api/children/
+ */
+export async function getChildren(
+  params?: PaginationParams
+): Promise<AxiosResponse<PaginatedResponse<Child>>> {
+  return axiosInstance.get('/children/', { params });
 }
 
-// Get single child
-export async function getChild(id: string) {
-  return axios.get(`${API_BASE_URL}${id}/`);
+/**
+ * Fetch a single child by ID
+ * GET /api/children/:id/
+ */
+export async function getChild(id: string): Promise<AxiosResponse<Child>> {
+  return axiosInstance.get(`/children/${id}/`);
 }
 
-// Create new child
-export async function createChild(data: {
-  firstName: string;
-  lastName: string;
-  grade: string;
-  age?: number;
-  status?: string;
-  parentId: string;
-  assignedBusId?: string;
-}) {
-  return axios.post(`${API_BASE_URL}`, data);
+/**
+ * Create a new child
+ * POST /api/children/
+ */
+export async function createChild(data: ChildCreateData): Promise<AxiosResponse<Child>> {
+  return axiosInstance.post('/children/', data);
 }
 
-// Update child
-export async function updateChild(id: string, data: {
-  firstName?: string;
-  lastName?: string;
-  grade?: string;
-  age?: number;
-  status?: string;
-  parentId?: string;
-  assignedBusId?: string;
-}) {
-  return axios.put(`${API_BASE_URL}${id}/`, data);
+/**
+ * Update an existing child
+ * PUT /api/children/:id/
+ */
+export async function updateChild(
+  id: string,
+  data: ChildUpdateData
+): Promise<AxiosResponse<Child>> {
+  return axiosInstance.put(`/children/${id}/`, data);
 }
 
-// Delete child
-export async function deleteChild(id: string) {
-  return axios.delete(`${API_BASE_URL}${id}/`);
+/**
+ * Delete a child
+ * DELETE /api/children/:id/
+ */
+export async function deleteChild(id: string): Promise<AxiosResponse<void>> {
+  return axiosInstance.delete(`/children/${id}/`);
 }

@@ -15,7 +15,7 @@ class BusMinderListCreateView(generics.ListCreateAPIView):
     POST /api/busminders/ - Create new bus minder
     """
     permission_classes = [AllowAny]
-    queryset = BusMinder.objects.select_related('user').all()
+    queryset = BusMinder.objects.select_related('user').prefetch_related('user__managed_buses').all()
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -31,7 +31,7 @@ class BusMinderDetailView(generics.RetrieveUpdateDestroyAPIView):
     DELETE /api/busminders/{id}/ - Delete bus minder
     """
     permission_classes = [AllowAny]
-    queryset = BusMinder.objects.select_related('user').all()
+    queryset = BusMinder.objects.select_related('user').prefetch_related('user__managed_buses').all()
     lookup_field = 'user_id'
 
     def get_serializer_class(self):
