@@ -41,19 +41,27 @@ import type {
 type TabType = 'assignments' | 'routes';
 
 export default function AssignmentsPage() {
-  // Use hooks for data
+  // Use hooks for data (loaded lazily when needed)
   const { buses, loadBuses } = useBuses();
   const { drivers, loadDrivers } = useDrivers();
   const { minders, loadMinders } = useMinders();
   const { children, loadChildren } = useChildren();
 
-  // Load all data on mount
-  useEffect(() => {
-    loadBuses();
-    loadDrivers();
-    loadMinders();
-    loadChildren();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Track if resources have been loaded (for lazy loading)
+  const [resourcesLoaded, setResourcesLoaded] = useState(false);
+
+  // Load resources only when opening create/edit modal
+  const loadResourcesForModal = async () => {
+    if (!resourcesLoaded) {
+      await Promise.all([
+        loadBuses(),
+        loadDrivers(),
+        loadMinders(),
+        loadChildren(),
+      ]);
+      setResourcesLoaded(true);
+    }
+  };
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('assignments');
@@ -220,7 +228,10 @@ export default function AssignmentsPage() {
   }
 
   // Assignment CRUD
-  function handleCreateAssignment() {
+  async function handleCreateAssignment() {
+    // Load resources needed for dropdowns
+    await loadResourcesForModal();
+
     setCurrentAssignment(null);
     setIsEditMode(false);
     setAssignmentFormData({
@@ -233,7 +244,10 @@ export default function AssignmentsPage() {
     setShowAssignmentModal(true);
   }
 
-  function handleEditAssignment(assignment: Assignment) {
+  async function handleEditAssignment(assignment: Assignment) {
+    // Load resources needed for dropdowns
+    await loadResourcesForModal();
+
     setCurrentAssignment(assignment);
     setIsEditMode(true);
     setAssignmentFormData({
@@ -292,7 +306,10 @@ export default function AssignmentsPage() {
   }
 
   // Route CRUD
-  function handleCreateRoute() {
+  async function handleCreateRoute() {
+    // Load resources needed for route assignment dropdowns
+    await loadResourcesForModal();
+
     setCurrentRoute(null);
     setIsEditMode(false);
     setRouteFormData({
@@ -304,7 +321,10 @@ export default function AssignmentsPage() {
     setShowRouteModal(true);
   }
 
-  function handleEditRoute(route: BusRoute) {
+  async function handleEditRoute(route: BusRoute) {
+    // Load resources needed for route assignment dropdowns
+    await loadResourcesForModal();
+
     setCurrentRoute(route);
     setIsEditMode(true);
     setRouteFormData({
