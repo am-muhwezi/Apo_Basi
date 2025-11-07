@@ -1,7 +1,7 @@
 from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from .models import Trip, Stop
@@ -13,7 +13,7 @@ class TripListCreateView(generics.ListCreateAPIView):
     GET /api/trips/ - List all trips
     POST /api/trips/ - Create new trip
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     queryset = Trip.objects.select_related('bus', 'driver', 'bus_minder').prefetch_related('children', 'stops').all()
 
     def get_serializer_class(self):
@@ -54,7 +54,7 @@ class TripDetailView(generics.RetrieveUpdateDestroyAPIView):
     PATCH /api/trips/{id}/ - Partial update trip
     DELETE /api/trips/{id}/ - Delete trip
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     queryset = Trip.objects.select_related('bus', 'driver', 'bus_minder').prefetch_related('children', 'stops').all()
 
     def get_serializer_class(self):
@@ -67,7 +67,7 @@ class TripStartView(APIView):
     """
     POST /api/trips/{id}/start/ - Start a trip
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
         trip = get_object_or_404(Trip, pk=pk)
@@ -90,7 +90,7 @@ class TripCompleteView(APIView):
     """
     POST /api/trips/{id}/complete/ - Complete a trip
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
         trip = get_object_or_404(Trip, pk=pk)
@@ -113,7 +113,7 @@ class TripCancelView(APIView):
     """
     POST /api/trips/{id}/cancel/ - Cancel a trip
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
         trip = get_object_or_404(Trip, pk=pk)
@@ -136,7 +136,7 @@ class TripUpdateLocationView(APIView):
     POST /api/trips/{id}/update-location/ - Update trip location
     Body: { "latitude": 40.7128, "longitude": -74.0060 }
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
         trip = get_object_or_404(Trip, pk=pk)
@@ -164,7 +164,7 @@ class StopListCreateView(generics.ListCreateAPIView):
     GET /api/trips/{trip_id}/stops/ - List stops for a trip
     POST /api/trips/{trip_id}/stops/ - Create a stop for a trip
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -188,7 +188,7 @@ class StopDetailView(generics.RetrieveUpdateDestroyAPIView):
     PATCH /api/stops/{id}/ - Partial update stop
     DELETE /api/stops/{id}/ - Delete stop
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     queryset = Stop.objects.prefetch_related('children').all()
 
     def get_serializer_class(self):
@@ -201,7 +201,7 @@ class StopCompleteView(APIView):
     """
     POST /api/stops/{id}/complete/ - Mark stop as completed
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
         stop = get_object_or_404(Stop, pk=pk)
@@ -224,7 +224,7 @@ class StopSkipView(APIView):
     """
     POST /api/stops/{id}/skip/ - Mark stop as skipped
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
         stop = get_object_or_404(Stop, pk=pk)

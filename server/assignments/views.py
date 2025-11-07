@@ -37,7 +37,7 @@ class BusRouteViewSet(viewsets.ModelViewSet):
     """
 
     queryset = BusRoute.objects.all()
-    permission_classes = [AllowAny]  # Change to IsAuthenticated in production
+    permission_classes = [IsAuthenticated]  # Secured: requires authentication
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -78,7 +78,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     """
 
     queryset = Assignment.objects.all()
-    permission_classes = [AllowAny]  # Change to IsAuthenticated in production
+    permission_classes = [IsAuthenticated]  # Secured: requires authentication
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -384,7 +384,7 @@ class AssignmentHistoryViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = AssignmentHistory.objects.all()
     serializer_class = AssignmentHistorySerializer
-    permission_classes = [AllowAny]  # Change to IsAuthenticated in production
+    permission_classes = [IsAuthenticated]  # Secured: requires authentication
 
     def get_queryset(self):
         """Filter history based on query parameters"""

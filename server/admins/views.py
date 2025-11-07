@@ -1,6 +1,6 @@
 from rest_framework import status, generics, permissions
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from users.models import User
@@ -41,7 +41,7 @@ class AdminListCreateView(generics.ListCreateAPIView):
     GET /api/admins/ - List all admins
     POST /api/admins/ - Create new admin
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     queryset = Admin.objects.select_related('user').all()
 
     def get_serializer_class(self):
@@ -57,7 +57,7 @@ class AdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     PATCH /api/admins/{id}/ - Partial update admin
     DELETE /api/admins/{id}/ - Delete admin
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     queryset = Admin.objects.select_related('user').all()
     lookup_field = 'user_id'
 
@@ -72,7 +72,7 @@ class AdminDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class AdminAddParentView(generics.CreateAPIView):
-    permission_classes = [permissions.AllowAny]  # Changed for testing
+    permission_classes = [permissions.IsAuthenticated]  # Secured: requires authentication
     queryset = User.objects.all()
 
     def post(self, request, *args, **kwargs):
@@ -161,7 +161,7 @@ from drivers.models import Driver
 
 
 class AdminAddDriverView(generics.CreateAPIView):
-    permission_classes = [permissions.AllowAny]  # Changed for testing
+    permission_classes = [permissions.IsAuthenticated]  # Secured: requires authentication
     queryset = User.objects.all()
 
     def post(self, request, *args, **kwargs):
@@ -222,7 +222,7 @@ class AdminAddDriverView(generics.CreateAPIView):
 
 
 class AdminAddBusminderView(generics.CreateAPIView):
-    permission_classes = [permissions.AllowAny]  # Changed for testing
+    permission_classes = [permissions.IsAuthenticated]  # Secured: requires authentication
     queryset = User.objects.all()
 
     def post(self, request, *args, **kwargs):
@@ -294,7 +294,7 @@ from datetime import datetime, timedelta
 
 
 @api_view(['GET'])
-@permission_classes([permissions.AllowAny])
+@permission_classes([permissions.IsAuthenticated])
 def dashboard_stats(request):
     """
     Dashboard statistics endpoint for admin panel.
@@ -395,7 +395,7 @@ class AdminAssignDriverToBusView(APIView):
     This is essential for managing which driver operates which bus.
     """
 
-    permission_classes = [permissions.AllowAny]  # Changed for testing
+    permission_classes = [permissions.IsAuthenticated]  # Secured: requires authentication
 
     def post(self, request):
         """
@@ -463,7 +463,7 @@ class AdminAssignBusMinderToBusView(APIView):
     Bus minders are responsible for marking attendance for children on their assigned bus.
     """
 
-    permission_classes = [permissions.AllowAny]  # Changed for testing
+    permission_classes = [permissions.IsAuthenticated]  # Secured: requires authentication
 
     def post(self, request):
         """
@@ -532,7 +532,7 @@ class AdminAssignChildToBusView(APIView):
     for that child on the assigned bus.
     """
 
-    permission_classes = [permissions.AllowAny]  # Changed for testing
+    permission_classes = [permissions.IsAuthenticated]  # Secured: requires authentication
 
     def post(self, request):
         """

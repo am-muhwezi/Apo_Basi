@@ -1,7 +1,7 @@
 from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.shortcuts import get_object_or_404
@@ -19,7 +19,7 @@ class ParentListCreateView(generics.ListCreateAPIView):
     GET /api/parents/ - List all parents
     POST /api/parents/ - Create new parent
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     queryset = Parent.objects.select_related('user').all()
 
     def get_serializer_class(self):
@@ -35,7 +35,7 @@ class ParentDetailView(generics.RetrieveUpdateDestroyAPIView):
     PATCH /api/parents/{id}/ - Partial update parent
     DELETE /api/parents/{id}/ - Delete parent
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     queryset = Parent.objects.select_related('user').all()
     lookup_field = 'user_id'
 
@@ -81,7 +81,7 @@ class ParentDirectPhoneLoginView(APIView):
         "phone_number": "0776102830"
     }
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         phone_number = request.data.get("phone_number")
@@ -156,7 +156,7 @@ class ParentAssignChildrenView(APIView):
     Endpoint: /api/parents/{parent_id}/assign-children/
     Body: {"children_ids": [1, 2, 3]}
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, user_id):
         parent = get_object_or_404(Parent, user_id=user_id)
@@ -184,7 +184,7 @@ class ParentChildrenView(APIView):
 
     Endpoint: /api/parents/{parent_id}/children/
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, user_id):
         parent = get_object_or_404(Parent, user_id=user_id)
