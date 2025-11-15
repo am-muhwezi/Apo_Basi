@@ -8,30 +8,22 @@ import { useBuses } from '../hooks/useBuses';
 import { useDrivers } from '../hooks/useDrivers';
 import { useMinders } from '../hooks/useMinders';
 import { useChildren } from '../hooks/useChildren';
-import { assignmentService } from '../services/assignmentService';
-import type { Bus, Assignment } from '../types';
+import type { Bus } from '../types';
 
 export default function BusesPage() {
-  const { buses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren } = useBuses();
-  const { drivers } = useDrivers();
-  const { minders } = useMinders();
-  const { children } = useChildren();
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const { buses, loadBuses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren, hasMore: busesHasMore, loadMore: loadMoreBuses, loading: busesLoading } = useBuses();
 
-  // Load assignments
+  // Lazy load drivers, minders, children only when needed
+  const { drivers, loadDrivers, hasMore: driversHasMore, loadMore: loadMoreDrivers } = useDrivers();
+  const { minders, loadMinders, hasMore: mindersHasMore, loadMore: loadMoreMinders } = useMinders();
+  const { children, loadChildren, hasMore: childrenHasMore, loadMore: loadMoreChildren } = useChildren();
+
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  // Load buses on mount (driver/minder names are included in buses response)
   React.useEffect(() => {
-    loadAssignments();
+    loadBuses();
   }, []);
-
-  async function loadAssignments() {
-    try {
-      const driverAssignments = await assignmentService.loadAssignments({ assignmentType: 'driver_to_bus' });
-      const minderAssignments = await assignmentService.loadAssignments({ assignmentType: 'minder_to_bus' });
-      setAssignments([...driverAssignments, ...minderAssignments]);
-    } catch (error) {
-      console.error('Failed to load assignments:', error);
-    }
-  }
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
@@ -72,13 +64,24 @@ export default function BusesPage() {
     setShowDetailModal(true);
   };
 
-  const handleAssign = (bus: Bus) => {
+  const handleAssign = async (bus: Bus) => {
     setSelectedBus(bus);
     setAssignData({
       driverId: bus.driverId?.toString() || '',
       minderId: bus.minderId?.toString() || '',
       childrenIds: bus.assignedChildrenIds || [],
     });
+
+    // Load drivers, minders, children only once when first opening assignment modal
+    if (!dataLoaded) {
+      await Promise.all([
+        loadDrivers(),
+        loadMinders(),
+        loadChildren(),
+      ]);
+      setDataLoaded(true);
+    }
+
     setShowAssignModal(true);
   };
 
@@ -88,7 +91,7 @@ export default function BusesPage() {
       if (result.success) {
         alert('Bus deleted successfully');
       } else {
-        alert(result.error || 'Failed to delete bus');
+        alert(result.error?.message || 'Failed to delete bus');
       }
     }
   };
@@ -101,7 +104,7 @@ export default function BusesPage() {
         alert('Bus updated successfully');
         setShowModal(false);
       } else {
-        alert(result.error || 'Failed to update bus');
+        alert(result.error?.message || 'Failed to update bus');
       }
     } else {
       const result = await createBus(formData);
@@ -109,7 +112,7 @@ export default function BusesPage() {
         alert('Bus created successfully');
         setShowModal(false);
       } else {
-        alert(result.error || 'Failed to create bus');
+        alert(result.error?.message || 'Failed to create bus');
       }
     }
   };
@@ -118,26 +121,18 @@ export default function BusesPage() {
     e.preventDefault();
     if (!selectedBus) return;
 
-    try {
-      // Assign driver if selected
-      if (assignData.driverId) {
-        await assignDriver(selectedBus.id, assignData.driverId);
-      }
+    const results = await Promise.all([
+      assignData.driverId ? assignDriver(selectedBus.id, assignData.driverId) : null,
+      assignData.minderId ? assignMinder(selectedBus.id, assignData.minderId) : null,
+      assignData.childrenIds.length > 0 ? assignChildren(selectedBus.id, assignData.childrenIds) : null,
+    ]);
 
-      // Assign minder if selected
-      if (assignData.minderId) {
-        await assignMinder(selectedBus.id, assignData.minderId);
-      }
-
-      // Assign children if selected
-      if (assignData.childrenIds.length > 0) {
-        await assignChildren(selectedBus.id, assignData.childrenIds);
-      }
-
+    const failedResult = results.find(r => r && !r.success);
+    if (!failedResult) {
       alert('Assignments saved successfully');
       setShowAssignModal(false);
-    } catch (error) {
-      alert('Failed to assign staff/children');
+    } else {
+      alert(failedResult.error?.message || 'Failed to save some assignments');
     }
   };
 
@@ -150,21 +145,6 @@ export default function BusesPage() {
     }));
   };
 
-  const getDriverName = (busId: string): string => {
-    // Find active driver assignment for this bus
-    const assignment = assignments.find(
-      (a) => a.assignmentType === 'driver_to_bus' && a.assignedToId === Number(busId) && a.status === 'active'
-    );
-    return assignment?.assigneeName || 'Not Assigned';
-  };
-
-  const getMinderName = (busId: string): string => {
-    // Find active minder assignment for this bus
-    const assignment = assignments.find(
-      (a) => a.assignmentType === 'minder_to_bus' && a.assignedToId === Number(busId) && a.status === 'active'
-    );
-    return assignment?.assigneeName || 'Not Assigned';
-  };
 
   // Calculate stats
   const totalBuses = buses.length;
@@ -274,10 +254,10 @@ export default function BusesPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">{bus.licensePlate}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                    {getDriverName(bus.id)}
+                    {bus.driverName || 'Not Assigned'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                    {getMinderName(bus.id)}
+                    {bus.minderName || 'Not Assigned'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
                     {bus.assignedChildrenCount || 0}/{bus.capacity}
@@ -328,6 +308,23 @@ export default function BusesPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="p-4 border-t border-slate-200">
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-sm text-slate-600">
+              Loaded {filteredBuses.length} of {filteredBuses.length}{busesHasMore ? '+' : ''} buses
+            </span>
+            {busesHasMore && (
+              <Button
+                onClick={loadMoreBuses}
+                disabled={busesLoading}
+                variant="secondary"
+                size="sm"
+              >
+                {busesLoading ? 'Loading...' : 'Load More'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -462,6 +459,17 @@ export default function BusesPage() {
                   </div>
                 </label>
               ))}
+              {childrenHasMore && (
+                <div className="p-2 text-center border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={loadMoreChildren}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    Load More Children
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -505,11 +513,11 @@ export default function BusesPage() {
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-700">Driver</p>
-                <p className="text-base text-slate-900">{getDriverName(selectedBus.id)}</p>
+                <p className="text-base text-slate-900">{selectedBus.driverName || 'Not Assigned'}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-700">Bus Minder</p>
-                <p className="text-base text-slate-900">{getMinderName(selectedBus.id)}</p>
+                <p className="text-base text-slate-900">{selectedBus.minderName || 'Not Assigned'}</p>
               </div>
               {selectedBus.lastMaintenance && (
                 <div>

@@ -85,33 +85,71 @@ export default function TripsPage() {
   const [selectedRoute, setSelectedRoute] = useState<typeof dummyRoutes[0] | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   // Use dummy routes for now
+  // TODO: Replace with real route data from backend when routes API is ready
   const [routes] = useState(dummyRoutes);
 
-  // Fetch all data from backend
+  // NOTE: Currently using dummy data for routes display
+  // Backend data loading is disabled until routes API is fully implemented
+  // When implementing real routes:
+  // 1. Backend should return route data with all necessary info (driver names, bus numbers, etc.)
+  // 2. Load only routes data, not buses/drivers/minders/children separately
+  // 3. Follow the pattern used in other optimized pages (BusesPage, DriversPage, etc.)
+
+  /* DISABLED: Loading all data unnecessarily
   React.useEffect(() => {
     loadAllData();
   }, []);
 
-  async function loadAllData() {
+  async function loadAllData(append = false) {
     try {
+      setLoading(true);
+      const offset = append ? trips.length : 0;
       const [tripsRes, busesRes, driversRes, mindersRes, childrenRes] = await Promise.all([
-        getTrips(),
-        getBuses(),
-        getDrivers(),
-        getBusMinders(),
-        getChildren()
+        getTrips({ limit: 20, offset }),
+        getBuses({ limit: 100 }),
+        getDrivers({ limit: 100 }),
+        getBusMinders({ limit: 100 }),
+        getChildren({ limit: 100 })
       ]);
-      setTrips(tripsRes.data);
-      setBuses(busesRes.data);
-      setDrivers(driversRes.data);
-      setMinders(mindersRes.data);
-      setChildren(childrenRes.data);
+
+      // Handle paginated responses
+      const tripsData = tripsRes.data.results || tripsRes.data || [];
+      const busesData = busesRes.data.results || busesRes.data || [];
+      const driversData = driversRes.data.results || driversRes.data || [];
+      const mindersData = mindersRes.data.results || mindersRes.data || [];
+      const childrenData = childrenRes.data.results || childrenRes.data || [];
+
+      setTrips(append ? [...trips, ...Array.isArray(tripsData) ? tripsData : []] : (Array.isArray(tripsData) ? tripsData : []));
+      setBuses(Array.isArray(busesData) ? busesData : []);
+      setDrivers(Array.isArray(driversData) ? driversData : []);
+      setMinders(Array.isArray(mindersData) ? mindersData : []);
+      setChildren(Array.isArray(childrenData) ? childrenData : []);
+
+      setHasMore(Array.isArray(tripsData) && tripsData.length === 20);
     } catch (error) {
       console.error('Failed to load data:', error);
+      if (!append) {
+        setTrips([]);
+        setBuses([]);
+        setDrivers([]);
+        setMinders([]);
+        setChildren([]);
+      }
+    } finally {
+      setLoading(false);
     }
   }
+
+  function loadMoreTrips() {
+    if (!loading && hasMore) {
+      loadAllData(true);
+    }
+  }
+  */
 
   const filteredTrips = trips.filter((trip) => {
     const matchesStatus = statusFilter === 'all' || trip.status === statusFilter;
@@ -284,6 +322,25 @@ export default function TripsPage() {
             <p className="text-slate-600">There are no routes configured yet.</p>
           </div>
         )}
+      </div>
+
+      {/* Loaded Indicator */}
+      <div className="mt-6 p-4 bg-white rounded-xl border border-slate-200">
+        <div className="flex flex-col items-center gap-3">
+          <span className="text-sm text-slate-600">
+            Loaded {filteredTrips.length} of {filteredTrips.length}{hasMore ? '+' : ''} trips
+          </span>
+          {hasMore && (
+            <Button
+              onClick={loadMoreTrips}
+              disabled={loading}
+              variant="secondary"
+              size="sm"
+            >
+              {loading ? 'Loading...' : 'Load More'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Route Details Modal */}

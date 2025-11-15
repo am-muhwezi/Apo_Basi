@@ -20,5 +20,8 @@ class Driver(models.Model):
         Bus, on_delete=models.SET_NULL, null=True, blank=True, related_name='driver_profile'
     )
 
+    class Meta:
+        ordering = ['user__first_name', 'user__last_name', 'user_id']
+
     def __str__(self):
         return f"Driver: {self.user.get_full_name() or self.user.username}"

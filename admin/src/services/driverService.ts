@@ -1,84 +1,166 @@
+/**
+ * Driver Service Layer
+ *
+ * Business logic and error handling for driver operations.
+ *
+ * Architecture:
+ * - Calls driverApi functions
+ * - Handles errors and transforms them into user-friendly messages
+ * - Returns consistent ApiResponse objects
+ */
+
 import * as driverApi from './driverApi';
-import * as busApi from './busApi';
-import type { Driver, Bus } from '../types';
+import type { Driver } from '../types';
+import type { ApiResponse, PaginationParams } from '../types/api';
+import { AxiosError } from 'axios';
+
+/**
+ * Helper function to extract error message from axios error
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof AxiosError) {
+    if (error.response?.data) {
+      const data = error.response.data;
+      if (data.detail) return data.detail;
+      if (typeof data === 'object') {
+        const firstError = Object.values(data)[0];
+        if (Array.isArray(firstError) && firstError.length > 0) {
+          return firstError[0];
+        }
+      }
+      if (data.error) return data.error;
+      if (data.message) return data.message;
+    }
+    if (error.response?.status === 404) return 'Resource not found';
+    if (error.response?.status === 403) return 'Permission denied';
+    if (error.response?.status === 401) return 'Authentication required';
+    if (error.response?.status >= 500) return 'Server error. Please try again later.';
+    return error.message || 'Network error';
+  }
+  if (error instanceof Error) return error.message;
+  return 'An unexpected error occurred';
+}
 
 class DriverService {
   /**
-   * Load all drivers from DRF API
+   * Load all drivers with pagination
    */
-  async loadDrivers(): Promise<Driver[]> {
-    const response = await driverApi.getDrivers();
-    return response.data;
+  async loadDrivers(params?: PaginationParams): Promise<
+    ApiResponse<{
+      drivers: Driver[];
+      count: number;
+      hasNext: boolean;
+      hasPrevious: boolean;
+    }>
+  > {
+    try {
+      const response = await driverApi.getDrivers(params);
+      const { results, count, next, previous } = response.data;
+
+      return {
+        success: true,
+        data: {
+          drivers: results || [],
+          count: count || 0,
+          hasNext: !!next,
+          hasPrevious: !!previous,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: getErrorMessage(error),
+        },
+      };
+    }
   }
 
   /**
-   * Load all buses (for assignment dropdown)
+   * Get a single driver by ID
    */
-  async loadBuses(): Promise<Bus[]> {
-    const response = await busApi.getBuses();
-    return response.data;
-  }
-
-  /**
-   * Get single driver by ID
-   */
-  async getDriver(id: string): Promise<Driver> {
-    const response = await driverApi.getDriver(id);
-    return response.data;
+  async getDriver(id: string): Promise<ApiResponse<Driver>> {
+    try {
+      const response = await driverApi.getDriver(id);
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: getErrorMessage(error),
+        },
+      };
+    }
   }
 
   /**
    * Create new driver
    */
-  async createDriver(formData: Partial<Driver>): Promise<Driver> {
-    const driverData = {
-      firstName: formData.firstName!,
-      lastName: formData.lastName!,
-      email: formData.email,
-      phone: formData.phone!,
-      licenseNumber: formData.licenseNumber!,
-      licenseExpiry: formData.licenseExpiry,
-      status: formData.status || 'active',
-      assignedBusId: formData.assignedBusId,
-    };
-
-    const response = await driverApi.createDriver(driverData);
-    return response.data;
+  async createDriver(formData: Partial<Driver>): Promise<ApiResponse<Driver>> {
+    try {
+      const response = await driverApi.createDriver({
+        firstName: formData.firstName!,
+        lastName: formData.lastName!,
+        email: formData.email,
+        phone: formData.phone!,
+        licenseNumber: formData.licenseNumber!,
+        licenseExpiry: formData.licenseExpiry,
+        status: formData.status || 'active',
+      });
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: getErrorMessage(error),
+        },
+      };
+    }
   }
 
   /**
    * Update existing driver
    */
-  async updateDriver(id: string, formData: Partial<Driver>): Promise<Driver> {
-    const driverData = {
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email,
-      phone: formData.phone,
-      licenseNumber: formData.licenseNumber,
-      licenseExpiry: formData.licenseExpiry,
-      status: formData.status,
-      assignedBusId: formData.assignedBusId,
-    };
-
-    const response = await driverApi.updateDriver(id, driverData);
-    return response.data;
+  async updateDriver(id: string, formData: Partial<Driver>): Promise<ApiResponse<Driver>> {
+    try {
+      const response = await driverApi.updateDriver(id, formData);
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: getErrorMessage(error),
+        },
+      };
+    }
   }
 
   /**
    * Delete driver
    */
-  async deleteDriver(id: string): Promise<void> {
-    await driverApi.deleteDriver(id);
-  }
-
-  /**
-   * Get bus number for display
-   */
-  getBusNumber(buses: Bus[], busId?: string): string {
-    if (!busId) return 'Not Assigned';
-    const bus = buses.find((b) => b.id === busId);
-    return bus ? bus.busNumber : 'Unknown';
+  async deleteDriver(id: string): Promise<ApiResponse<void>> {
+    try {
+      await driverApi.deleteDriver(id);
+      return {
+        success: true,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: getErrorMessage(error),
+        },
+      };
+    }
   }
 }
 

@@ -9,18 +9,34 @@ import type { Admin, Permission } from '../types';
 
 export default function AdminsPage() {
   const [admins, setAdmins] = useState<Admin[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   // Fetch admins from backend
   React.useEffect(() => {
     loadAdmins();
   }, []);
 
-  async function loadAdmins() {
+  async function loadAdmins(append = false) {
     try {
-      const response = await getAdmins();
-      setAdmins(response.data);
+      setLoading(true);
+      const offset = append ? admins.length : 0;
+      const response = await getAdmins({ limit: 20, offset });
+      // Handle paginated response from DRF: {results: [], count, next, previous}
+      const data = response.data.results || response.data || [];
+      setAdmins(append ? [...admins, ...Array.isArray(data) ? data : []] : (Array.isArray(data) ? data : []));
+      setHasMore(Array.isArray(data) && data.length === 20);
     } catch (error) {
       console.error('Failed to load admins:', error);
+      if (!append) setAdmins([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function loadMoreAdmins() {
+    if (!loading && hasMore) {
+      loadAdmins(true);
     }
   }
   const [searchTerm, setSearchTerm] = useState('');
@@ -246,6 +262,23 @@ export default function AdminsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="p-4 border-t border-slate-200">
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-sm text-slate-600">
+              Loaded {filteredAdmins.length} of {filteredAdmins.length}{hasMore ? '+' : ''} admins
+            </span>
+            {hasMore && (
+              <Button
+                onClick={loadMoreAdmins}
+                disabled={loading}
+                variant="secondary"
+                size="sm"
+              >
+                {loading ? 'Loading...' : 'Load More'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

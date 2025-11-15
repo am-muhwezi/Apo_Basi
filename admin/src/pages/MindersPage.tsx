@@ -4,49 +4,19 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
-import { busMinderService } from '../services/busMinderService';
-import { busService } from '../services/busService';
-import { assignmentService } from '../services/assignmentService';
-import type { BusMinder, Bus, Assignment } from '../types';
+import { useMinders } from '../hooks/useMinders';
+import type { BusMinder } from '../types';
 
 export default function MindersPage() {
-  const [minders, setMinders] = useState<BusMinder[]>([]);
-  const [buses, setBuses] = useState<Bus[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  // Use hooks for minders
+  const { minders, loading, hasMore, loadMinders, loadMore: loadMoreMinders } = useMinders();
 
-  // Fetch bus minders, buses, and assignments from backend on mount
+  // Load minders on mount (assignedBusNumber is included in minders response)
   React.useEffect(() => {
     loadMinders();
-    loadBuses();
-    loadAssignments();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function loadMinders() {
-    try {
-      const data = await busMinderService.loadBusMinders();
-      setMinders(data);
-    } catch (error) {
-      console.error('Failed to load bus minders:', error);
-    }
-  }
-
-  async function loadBuses() {
-    try {
-      const data = await busService.loadBuses();
-      setBuses(data);
-    } catch (error) {
-      console.error('Failed to load buses:', error);
-    }
-  }
-
-  async function loadAssignments() {
-    try {
-      const data = await assignmentService.loadAssignments({ assignmentType: 'minder_to_bus' });
-      setAssignments(data);
-    } catch (error) {
-      console.error('Failed to load assignments:', error);
-    }
-  }
+  // loadMoreMinders is already available from the hook
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMinder, setSelectedMinder] = useState<BusMinder | null>(null);
@@ -112,27 +82,10 @@ export default function MindersPage() {
     }
   };
 
-  const getAssignedBus = (minderId: string): string => {
-    // Find active assignment for this minder
-    const assignment = assignments.find(
-      (a) => a.assigneeId === Number(minderId) && a.status === 'active'
-    );
-
-    if (!assignment) return 'Not assigned';
-
-    // Return the assigned bus name from assignment (backend provides this)
-    return assignment.assignedToName || 'Unknown';
-  };
-
   // Calculate stats
   const totalMinders = minders.length;
   const activeMinders = minders.filter((m) => m.status === 'active').length;
-  const assignedMinders = minders.filter((m) => {
-    const assignment = assignments.find(
-      (a) => a.assigneeId === Number(m.id) && a.status === 'active'
-    );
-    return assignment !== undefined;
-  }).length;
+  const assignedMinders = minders.filter((m) => m.assignedBusNumber).length;
 
   return (
     <div>
@@ -242,7 +195,7 @@ export default function MindersPage() {
                     {minder.certifications?.join(', ') || 'None'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                    {getAssignedBus(minder.id)}
+                    {minder.assignedBusNumber || 'Not Assigned'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
@@ -281,6 +234,23 @@ export default function MindersPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="p-4 border-t border-slate-200">
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-sm text-slate-600">
+              Loaded {filteredMinders.length} of {filteredMinders.length}{hasMore ? '+' : ''} minders
+            </span>
+            {hasMore && (
+              <Button
+                onClick={loadMoreMinders}
+                disabled={loading}
+                variant="secondary"
+                size="sm"
+              >
+                {loading ? 'Loading...' : 'Load More'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -379,7 +349,7 @@ export default function MindersPage() {
               <div>
                 <p className="text-sm font-medium text-slate-700">Assigned Bus</p>
                 <p className="text-base text-slate-900">
-                  {getAssignedBus(selectedMinder.id)}
+                  {selectedMinder.assignedBusNumber || 'Not Assigned'}
                 </p>
               </div>
               <div className="col-span-2">

@@ -1,40 +1,66 @@
-import axios from 'axios';
+/**
+ * Bus Minder API Layer
+ *
+ * Handles all HTTP requests related to bus minders.
+ * Uses configured axios instance with auth interceptors.
+ *
+ * Architecture:
+ * - Uses axiosInstance (no hardcoded URLs)
+ * - Strongly typed with API types
+ * - Returns raw axios responses (error handling in service layer)
+ */
 
-const API_BASE_URL = 'http://localhost:8000/api/busminders/';
+import axiosInstance from './axiosConfig';
+import type { AxiosResponse } from 'axios';
+import type {
+  PaginatedResponse,
+  PaginationParams,
+  MinderCreateData,
+  MinderUpdateData,
+} from '../types/api';
+import type { Minder } from '../types';
 
-// List all bus minders
-export async function getBusMinders() {
-  return axios.get(`${API_BASE_URL}`);
+/**
+ * Fetch all bus minders with pagination support
+ * GET /api/busminders/
+ */
+export async function getBusMinders(
+  params?: PaginationParams
+): Promise<AxiosResponse<PaginatedResponse<Minder>>> {
+  return axiosInstance.get('/busminders/', { params });
 }
 
-// Get single bus minder
-export async function getBusMinder(id: string) {
-  return axios.get(`${API_BASE_URL}${id}/`);
+/**
+ * Fetch a single bus minder by ID
+ * GET /api/busminders/:id/
+ */
+export async function getBusMinder(id: string): Promise<AxiosResponse<Minder>> {
+  return axiosInstance.get(`/busminders/${id}/`);
 }
 
-// Create new bus minder
-export async function createBusMinder(data: {
-  firstName: string;
-  lastName: string;
-  email?: string;
-  phone: string;
-  status?: string;
-}) {
-  return axios.post(`${API_BASE_URL}`, data);
+/**
+ * Create a new bus minder
+ * POST /api/busminders/
+ */
+export async function createBusMinder(data: MinderCreateData): Promise<AxiosResponse<Minder>> {
+  return axiosInstance.post('/busminders/', data);
 }
 
-// Update bus minder
-export async function updateBusMinder(id: string, data: {
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  phone?: string;
-  status?: string;
-}) {
-  return axios.put(`${API_BASE_URL}${id}/`, data);
+/**
+ * Update an existing bus minder
+ * PUT /api/busminders/:id/
+ */
+export async function updateBusMinder(
+  id: string,
+  data: MinderUpdateData
+): Promise<AxiosResponse<Minder>> {
+  return axiosInstance.put(`/busminders/${id}/`, data);
 }
 
-// Delete bus minder
-export async function deleteBusMinder(id: string) {
-  return axios.delete(`${API_BASE_URL}${id}/`);
+/**
+ * Delete a bus minder
+ * DELETE /api/busminders/:id/
+ */
+export async function deleteBusMinder(id: string): Promise<AxiosResponse<void>> {
+  return axiosInstance.delete(`/busminders/${id}/`);
 }

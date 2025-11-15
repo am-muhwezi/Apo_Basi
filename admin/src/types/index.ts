@@ -5,7 +5,10 @@ export interface Child {
   grade: string;
   age: number;
   parentId: string;
+  parentName?: string;
   busId?: string;
+  assignedBusId?: string;
+  assignedBusNumber?: string;
   photoUrl?: string;
   address: string;
   emergencyContact: string;
@@ -58,6 +61,7 @@ export interface Driver {
   licenseNumber: string;
   licenseExpiry: string;
   assignedBusId?: string;
+  assignedBusNumber?: string;
   photoUrl?: string;
   status: 'active' | 'inactive';
   createdAt: string;
@@ -70,6 +74,7 @@ export interface Minder {
   email: string;
   phone: string;
   assignedBusId?: string;
+  assignedBusNumber?: string;
   photoUrl?: string;
   certifications?: string[];
   status: 'active' | 'inactive';

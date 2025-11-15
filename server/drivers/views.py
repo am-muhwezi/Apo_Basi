@@ -21,7 +21,7 @@ class DriverListCreateView(generics.ListCreateAPIView):
     GET /api/drivers/ - List all drivers
     POST /api/drivers/ - Create new driver
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     queryset = Driver.objects.select_related('user', 'assigned_bus').all()
 
     def get_serializer_class(self):
@@ -37,7 +37,7 @@ class DriverDetailView(generics.RetrieveUpdateDestroyAPIView):
     PATCH /api/drivers/{id}/ - Partial update driver
     DELETE /api/drivers/{id}/ - Delete driver
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     queryset = Driver.objects.select_related('user', 'assigned_bus').all()
     lookup_field = 'user_id'
 
@@ -245,7 +245,7 @@ class MyRouteView(APIView):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def driver_phone_login(request):
     """
     Simple phone-based login for drivers (passwordless).

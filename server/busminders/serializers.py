@@ -10,14 +10,26 @@ class BusMinderSerializer(serializers.ModelSerializer):
     lastName = serializers.CharField(source='user.last_name', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
     phone = serializers.CharField(source='phone_number', read_only=True)
+    assignedBusId = serializers.SerializerMethodField()
+    assignedBusNumber = serializers.SerializerMethodField()
     assignedBusesCount = serializers.SerializerMethodField()
 
     class Meta:
         model = BusMinder
         fields = [
             'id', 'firstName', 'lastName', 'email', 'phone',
-            'status', 'assignedBusesCount'
+            'status', 'assignedBusId', 'assignedBusNumber', 'assignedBusesCount'
         ]
+
+    def get_assignedBusId(self, obj):
+        # Get the first assigned bus (minders typically manage one bus at a time)
+        bus = obj.user.managed_buses.first() if hasattr(obj.user, 'managed_buses') else None
+        return bus.id if bus else None
+
+    def get_assignedBusNumber(self, obj):
+        # Get the first assigned bus number
+        bus = obj.user.managed_buses.first() if hasattr(obj.user, 'managed_buses') else None
+        return bus.bus_number if bus else None
 
     def get_assignedBusesCount(self, obj):
         return obj.user.managed_buses.count() if hasattr(obj.user, 'managed_buses') else 0

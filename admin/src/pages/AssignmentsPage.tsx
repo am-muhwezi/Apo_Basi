@@ -21,11 +21,11 @@ import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
 import SearchableSelect from '../components/common/SearchableSelect';
+import { useBuses } from '../hooks/useBuses';
+import { useDrivers } from '../hooks/useDrivers';
+import { useMinders } from '../hooks/useMinders';
+import { useChildren } from '../hooks/useChildren';
 import { assignmentService } from '../services/assignmentService';
-import { busService } from '../services/busService';
-import { driverService } from '../services/driverService';
-import { busMinderService } from '../services/busMinderService';
-import { childService } from '../services/childService';
 import type {
   Assignment,
   BusRoute,
@@ -41,6 +41,28 @@ import type {
 type TabType = 'assignments' | 'routes';
 
 export default function AssignmentsPage() {
+  // Use hooks for data (loaded lazily when needed)
+  const { buses, loadBuses } = useBuses();
+  const { drivers, loadDrivers } = useDrivers();
+  const { minders, loadMinders } = useMinders();
+  const { children, loadChildren } = useChildren();
+
+  // Track if resources have been loaded (for lazy loading)
+  const [resourcesLoaded, setResourcesLoaded] = useState(false);
+
+  // Load resources only when opening create/edit modal
+  const loadResourcesForModal = async () => {
+    if (!resourcesLoaded) {
+      await Promise.all([
+        loadBuses(),
+        loadDrivers(),
+        loadMinders(),
+        loadChildren(),
+      ]);
+      setResourcesLoaded(true);
+    }
+  };
+
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('assignments');
 
@@ -91,15 +113,12 @@ export default function AssignmentsPage() {
     childrenIds: [] as number[],
   });
 
-  // Supporting data
-  const [buses, setBuses] = useState<Bus[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [minders, setMinders] = useState<Minder[]>([]);
-  const [children, setChildren] = useState<Child[]>([]);
+  // Supporting data (buses, drivers, minders, children come from hooks)
   const [busUtilization, setBusUtilization] = useState<any[]>([]);
 
   // Loading state
   const [isLoading, setIsLoading] = useState(false);
+  const [hasMoreAssignments, setHasMoreAssignments] = useState(false);
 
   // Load data on mount
   useEffect(() => {
@@ -122,10 +141,6 @@ export default function AssignmentsPage() {
       await Promise.all([
         loadAssignments(),
         loadRoutes(),
-        loadBuses(),
-        loadDrivers(),
-        loadMinders(),
-        loadChildren(),
       ]);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -134,59 +149,34 @@ export default function AssignmentsPage() {
     }
   }
 
-  async function loadAssignments() {
+  async function loadAssignments(append = false) {
     try {
-      const data = await assignmentService.loadAssignments();
-      setAssignments(data);
+      const offset = append ? assignments.length : 0;
+      const data = await assignmentService.loadAssignments({ limit: 20, offset });
+      setAssignments(append ? [...assignments, ...data] : data);
+      setHasMoreAssignments(data.length === 20);
     } catch (error) {
       console.error('Failed to load assignments:', error);
+    }
+  }
+
+  function loadMoreAssignments() {
+    if (!isLoading && hasMoreAssignments) {
+      loadAssignments(true);
     }
   }
 
   async function loadRoutes() {
     try {
       const data = await assignmentService.loadRoutes();
-      setRoutes(data);
+      setRoutes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to load routes:', error);
+      setRoutes([]);
     }
   }
 
-  async function loadBuses() {
-    try {
-      const data = await busService.loadBuses();
-      setBuses(data);
-    } catch (error) {
-      console.error('Failed to load buses:', error);
-    }
-  }
-
-  async function loadDrivers() {
-    try {
-      const data = await driverService.loadDrivers();
-      setDrivers(data);
-    } catch (error) {
-      console.error('Failed to load drivers:', error);
-    }
-  }
-
-  async function loadMinders() {
-    try {
-      const data = await busMinderService.loadBusMinders();
-      setMinders(data);
-    } catch (error) {
-      console.error('Failed to load minders:', error);
-    }
-  }
-
-  async function loadChildren() {
-    try {
-      const data = await childService.loadChildren();
-      setChildren(data);
-    } catch (error) {
-      console.error('Failed to load children:', error);
-    }
-  }
+  // buses, drivers, minders, children are loaded via hooks
 
   async function loadBusUtilization() {
     try {
@@ -238,7 +228,10 @@ export default function AssignmentsPage() {
   }
 
   // Assignment CRUD
-  function handleCreateAssignment() {
+  async function handleCreateAssignment() {
+    // Load resources needed for dropdowns
+    await loadResourcesForModal();
+
     setCurrentAssignment(null);
     setIsEditMode(false);
     setAssignmentFormData({
@@ -251,7 +244,10 @@ export default function AssignmentsPage() {
     setShowAssignmentModal(true);
   }
 
-  function handleEditAssignment(assignment: Assignment) {
+  async function handleEditAssignment(assignment: Assignment) {
+    // Load resources needed for dropdowns
+    await loadResourcesForModal();
+
     setCurrentAssignment(assignment);
     setIsEditMode(true);
     setAssignmentFormData({
@@ -310,7 +306,10 @@ export default function AssignmentsPage() {
   }
 
   // Route CRUD
-  function handleCreateRoute() {
+  async function handleCreateRoute() {
+    // Load resources needed for route assignment dropdowns
+    await loadResourcesForModal();
+
     setCurrentRoute(null);
     setIsEditMode(false);
     setRouteFormData({
@@ -322,7 +321,10 @@ export default function AssignmentsPage() {
     setShowRouteModal(true);
   }
 
-  function handleEditRoute(route: BusRoute) {
+  async function handleEditRoute(route: BusRoute) {
+    // Load resources needed for route assignment dropdowns
+    await loadResourcesForModal();
+
     setCurrentRoute(route);
     setIsEditMode(true);
     setRouteFormData({
@@ -689,6 +691,23 @@ export default function AssignmentsPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+            <div className="p-4 border-t border-slate-200">
+              <div className="flex flex-col items-center gap-3">
+                <span className="text-sm text-slate-600">
+                  Loaded {filteredAssignments.length} of {filteredAssignments.length}{hasMoreAssignments ? '+' : ''} assignments
+                </span>
+                {hasMoreAssignments && (
+                  <Button
+                    onClick={loadMoreAssignments}
+                    disabled={isLoading}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    {isLoading ? 'Loading...' : 'Load More'}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </>

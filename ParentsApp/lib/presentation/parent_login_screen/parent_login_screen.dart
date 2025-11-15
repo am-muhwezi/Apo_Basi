@@ -76,10 +76,16 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
 
       HapticFeedback.selectionClick();
 
+      // Get parent name from response
+      String parentName = 'Parent';
+      if (response['user'] != null) {
+        parentName = response['user']['first_name'] ?? response['user']['username'] ?? 'Parent';
+      }
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Welcome! You have ${response['children'].length} child(ren)'),
+          content: Text('Welcome, $parentName'),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 2),
         ),

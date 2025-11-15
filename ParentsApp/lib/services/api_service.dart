@@ -5,7 +5,7 @@ import '../models/parent_model.dart';
 
 class ApiService {
   // DEVELOPMENT: Use WiFi IP for testing on physical device
-  static const String baseUrl = 'http://192.168.100.43:8000';
+  static const String baseUrl = 'http://192.168.100.36:8000';
 
   // OTHER OPTIONS:
   // Android emulator: 'http://10.0.2.2:8000'
@@ -216,7 +216,8 @@ class ApiService {
       }
     } on DioException catch (e) {
       if (e.response != null) {
-        throw Exception(e.response?.data['error'] ?? 'Failed to update profile');
+        throw Exception(
+            e.response?.data['error'] ?? 'Failed to update profile');
       } else {
         throw Exception('Network error. Please check your connection.');
       }

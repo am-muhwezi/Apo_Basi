@@ -6,7 +6,8 @@ class AssignmentService {
   async loadAssignments(filters?: Record<string, any>): Promise<Assignment[]> {
     try {
       const response = await assignmentApi.getAssignments(filters);
-      return response.data;
+      // Handle paginated response from DRF: {results: [], count, next, previous}
+      return response.data.results || response.data || [];
     } catch (error) {
       console.error('Error loading assignments:', error);
       throw error;
@@ -64,7 +65,8 @@ class AssignmentService {
   async getAssignmentHistory(id: string): Promise<AssignmentHistory[]> {
     try {
       const response = await assignmentApi.getAssignmentHistory(id);
-      return response.data;
+      // Handle paginated response from DRF: {results: [], count, next, previous}
+      return response.data.results || response.data || [];
     } catch (error) {
       console.error(`Error loading assignment history for ${id}:`, error);
       throw error;
@@ -94,7 +96,8 @@ class AssignmentService {
   async getBusUtilization(): Promise<any[]> {
     try {
       const response = await assignmentApi.getBusUtilization();
-      return response.data;
+      // Handle paginated response from DRF: {results: [], count, next, previous}
+      return response.data.results || response.data || [];
     } catch (error) {
       console.error('Error loading bus utilization:', error);
       throw error;
@@ -115,7 +118,8 @@ class AssignmentService {
   async loadRoutes(): Promise<BusRoute[]> {
     try {
       const response = await assignmentApi.getRoutes();
-      return response.data;
+      // Handle paginated response from DRF: {results: [], count, next, previous}
+      return response.data.results || response.data || [];
     } catch (error) {
       console.error('Error loading routes:', error);
       throw error;
@@ -164,7 +168,8 @@ class AssignmentService {
   async getRouteAssignments(id: string): Promise<Assignment[]> {
     try {
       const response = await assignmentApi.getRouteAssignments(id);
-      return response.data;
+      // Handle paginated response from DRF: {results: [], count, next, previous}
+      return response.data.results || response.data || [];
     } catch (error) {
       console.error(`Error loading route assignments for ${id}:`, error);
       throw error;
@@ -185,7 +190,8 @@ class AssignmentService {
   async loadAllHistory(filters?: Record<string, any>): Promise<AssignmentHistory[]> {
     try {
       const response = await assignmentApi.getAllHistory(filters);
-      return response.data;
+      // Handle paginated response from DRF: {results: [], count, next, previous}
+      return response.data.results || response.data || [];
     } catch (error) {
       console.error('Error loading assignment history:', error);
       throw error;

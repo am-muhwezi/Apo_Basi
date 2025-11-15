@@ -4,35 +4,45 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
+import { useChildren } from '../hooks/useChildren';
 import { parentService } from '../services/parentService';
-import { childService } from '../services/childService';
 import type { Parent, Child } from '../types';
 
 export default function ParentsPage() {
-  const [parents, setParents] = useState<Parent[]>([]);
-  const [children, setChildren] = useState<Child[]>([]);
+  // Use useChildren hook for children data
+  const { children, loadChildren } = useChildren();
 
-  // Fetch parents and children from backend on mount
+  const [parents, setParents] = useState<Parent[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+
+  // Fetch parents from backend on mount
+  // Children are loaded on-demand when needed (e.g., when viewing parent details)
   React.useEffect(() => {
     loadParents();
-    loadChildren();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function loadParents() {
+  async function loadParents(append = false) {
     try {
-      const data = await parentService.loadParents();
-      setParents(data);
+      setLoading(true);
+      const offset = append ? parents.length : 0;
+      const result = await parentService.loadParents({ limit: 20, offset });
+
+      if (result.success && result.data) {
+        const newParents = result.data.parents || [];
+        setParents(append ? [...parents, ...newParents] : newParents);
+        setHasMore(result.data.hasNext || false);
+      }
     } catch (error) {
       console.error('Failed to load parents:', error);
+    } finally {
+      setLoading(false);
     }
   }
 
-  async function loadChildren() {
-    try {
-      const data = await childService.loadChildren();
-      setChildren(data);
-    } catch (error) {
-      console.error('Failed to load children:', error);
+  function loadMoreParents() {
+    if (!loading && hasMore) {
+      loadParents(true);
     }
   }
 
@@ -74,6 +84,10 @@ export default function ParentsPage() {
 
   const handleView = (parent: Parent) => {
     setSelectedParent(parent);
+    // Load children data only when viewing parent details (if not already loaded)
+    if (children.length === 0) {
+      loadChildren();
+    }
     setShowDetailModal(true);
   };
 
@@ -296,6 +310,23 @@ export default function ParentsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="p-4 border-t border-slate-200">
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-sm text-slate-600">
+              Loaded {filteredParents.length} of {filteredParents.length}{hasMore ? '+' : ''} parents
+            </span>
+            {hasMore && (
+              <Button
+                onClick={loadMoreParents}
+                disabled={loading}
+                variant="secondary"
+                size="sm"
+              >
+                {loading ? 'Loading...' : 'Load More'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

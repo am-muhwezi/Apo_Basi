@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../core/app_export.dart';
 import '../../theme/app_theme.dart';
@@ -94,59 +95,123 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Profile Header
+            // Profile Header - Sleeker Design
             Container(
               width: double.infinity,
-              padding: EdgeInsets.all(4.w),
+              padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 3.h),
               margin: EdgeInsets.all(4.w),
               decoration: BoxDecoration(
-                color: AppTheme.lightTheme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.05),
+                    AppTheme.lightTheme.colorScheme.surface,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.lightTheme.colorScheme.shadow
-                        .withValues(alpha: 0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    color: AppTheme.lightTheme.colorScheme.primary
+                        .withValues(alpha: 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
                   ),
                 ],
+                border: Border.all(
+                  color: AppTheme.lightTheme.colorScheme.primary
+                      .withValues(alpha: 0.1),
+                  width: 1,
+                ),
               ),
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 12.w,
-                    backgroundColor: AppTheme.lightTheme.colorScheme.primary
-                        .withValues(alpha: 0.1),
-                    child: Text(
-                      _user?.fullName.substring(0, 1).toUpperCase() ?? 'P',
-                      style: AppTheme.lightTheme.textTheme.headlineMedium
-                          ?.copyWith(
-                        color: AppTheme.lightTheme.colorScheme.primary,
-                        fontWeight: FontWeight.w600,
+                  Container(
+                    padding: EdgeInsets.all(1.w),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.2),
+                          AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: CircleAvatar(
+                      radius: 11.w,
+                      backgroundColor: AppTheme.lightTheme.colorScheme.surface,
+                      child: Text(
+                        _user?.fullName.substring(0, 1).toUpperCase() ?? 'P',
+                        style: AppTheme.lightTheme.textTheme.headlineMedium
+                            ?.copyWith(
+                          color: AppTheme.lightTheme.colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
-                  SizedBox(height: 2.h),
+                  SizedBox(height: 1.8.h),
                   Text(
                     _user?.fullName ?? 'Parent Name',
                     style:
                         AppTheme.lightTheme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: AppTheme.lightTheme.colorScheme.onSurface,
+                      letterSpacing: -0.5,
                     ),
                   ),
-                  SizedBox(height: 0.5.h),
-                  Text(
-                    _user?.email ?? 'email@example.com',
-                    style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                  SizedBox(height: 0.8.h),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 0.5.h),
+                    decoration: BoxDecoration(
+                      color: AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.email_outlined,
+                          size: 14,
+                          color: AppTheme.lightTheme.colorScheme.primary,
+                        ),
+                        SizedBox(width: 1.5.w),
+                        Text(
+                          _user?.email ?? 'email@example.com',
+                          style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+                            color: AppTheme.lightTheme.colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  SizedBox(height: 0.5.h),
-                  Text(
-                    _parent?.contactNumber ?? 'N/A',
-                    style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                  SizedBox(height: 1.h),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 0.5.h),
+                    decoration: BoxDecoration(
+                      color: AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.phone_outlined,
+                          size: 14,
+                          color: AppTheme.lightTheme.colorScheme.primary,
+                        ),
+                        SizedBox(width: 1.5.w),
+                        Text(
+                          _parent?.contactNumber ?? 'N/A',
+                          style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+                            color: AppTheme.lightTheme.colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -159,37 +224,59 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
               child: Text(
                 'Home Location',
                 style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: AppTheme.lightTheme.colorScheme.onSurface,
+                  letterSpacing: -0.3,
                 ),
               ),
             ),
-            SizedBox(height: 2.h),
+            SizedBox(height: 1.5.h),
             Container(
               width: double.infinity,
-              padding: EdgeInsets.all(4.w),
+              padding: EdgeInsets.all(3.5.w),
               margin: EdgeInsets.symmetric(horizontal: 4.w),
               decoration: BoxDecoration(
-                color: AppTheme.lightTheme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.lightTheme.colorScheme.surface,
+                    AppTheme.lightTheme.colorScheme.surface.withValues(alpha: 0.95),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.lightTheme.colorScheme.shadow
+                        .withValues(alpha: 0.06),
+                    blurRadius: 12,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
                 border: Border.all(
                   color: AppTheme.lightTheme.colorScheme.outline
-                      .withValues(alpha: 0.2),
+                      .withValues(alpha: 0.08),
                 ),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(3.w),
+                    padding: EdgeInsets.all(2.8.w),
                     decoration: BoxDecoration(
-                      color: AppTheme.lightTheme.colorScheme.primary
-                          .withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.15),
+                          AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.08),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(
-                      Icons.location_on,
+                      Icons.location_on_rounded,
                       color: AppTheme.lightTheme.colorScheme.primary,
-                      size: 6.w,
+                      size: 5.5.w,
                     ),
                   ),
                   SizedBox(width: 3.w),
@@ -203,32 +290,37 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                               AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
                             color: AppTheme
                                 .lightTheme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 10.sp,
                           ),
                         ),
-                        SizedBox(height: 0.5.h),
+                        SizedBox(height: 0.4.h),
                         Text(
                           _parent?.address ?? 'Address not set',
                           style: AppTheme.lightTheme.textTheme.bodyMedium
                               ?.copyWith(
                             color: AppTheme.lightTheme.colorScheme.onSurface,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w600,
+                            height: 1.3,
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                  TextButton(
-                    onPressed: () => _showUpdateAddressDialog(),
-                    style: TextButton.styleFrom(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
+                  SizedBox(width: 2.w),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      'Update',
-                      style:
-                          AppTheme.lightTheme.textTheme.labelMedium?.copyWith(
+                    child: IconButton(
+                      onPressed: () => _showUpdateAddressDialog(),
+                      icon: Icon(
+                        Icons.edit_rounded,
                         color: AppTheme.lightTheme.colorScheme.primary,
-                        fontWeight: FontWeight.w600,
+                        size: 5.w,
                       ),
                     ),
                   ),
@@ -244,12 +336,13 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
               child: Text(
                 'Children Information',
                 style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: AppTheme.lightTheme.colorScheme.onSurface,
+                  letterSpacing: -0.3,
                 ),
               ),
             ),
-            SizedBox(height: 2.h),
+            SizedBox(height: 1.5.h),
 
             // Children Cards
             ..._children
@@ -267,36 +360,59 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
               child: Text(
                 'Settings',
                 style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: AppTheme.lightTheme.colorScheme.onSurface,
+                  letterSpacing: -0.3,
                 ),
               ),
             ),
-            SizedBox(height: 2.h),
+            SizedBox(height: 1.5.h),
 
             // Dark Mode Toggle
             Container(
               margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
-              padding: EdgeInsets.all(4.w),
+              padding: EdgeInsets.all(3.5.w),
               decoration: BoxDecoration(
-                color: AppTheme.lightTheme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.lightTheme.colorScheme.surface,
+                    AppTheme.lightTheme.colorScheme.surface.withValues(alpha: 0.95),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.lightTheme.colorScheme.shadow
+                        .withValues(alpha: 0.06),
+                    blurRadius: 12,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
                 border: Border.all(
-                  color: AppTheme.lightTheme.colorScheme.outline.withValues(alpha: 0.2),
+                  color: AppTheme.lightTheme.colorScheme.outline.withValues(alpha: 0.08),
                 ),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(3.w),
+                    padding: EdgeInsets.all(2.8.w),
                     decoration: BoxDecoration(
-                      color: AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.15),
+                          AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.08),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(
-                      Icons.dark_mode,
+                      Icons.dark_mode_rounded,
                       color: AppTheme.lightTheme.colorScheme.primary,
-                      size: 6.w,
+                      size: 5.5.w,
                     ),
                   ),
                   SizedBox(width: 3.w),
@@ -307,15 +423,16 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                         Text(
                           'Dark Mode',
                           style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                             color: AppTheme.lightTheme.colorScheme.onSurface,
                           ),
                         ),
-                        SizedBox(height: 0.5.h),
+                        SizedBox(height: 0.3.h),
                         Text(
                           'Enable dark theme',
                           style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
                             color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                            fontSize: 10.sp,
                           ),
                         ),
                       ],
@@ -428,6 +545,75 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
     );
   }
 
+  Future<void> _useCurrentLocation() async {
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      // Check and request location permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location permissions are permanently denied'),
+            backgroundColor: Color(0xFFFF3B30),
+          ),
+        );
+        return;
+      }
+
+      // Get current position
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // Use coordinates as address (in real app, use reverse geocoding)
+      String locationAddress = '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+
+      // Update on server
+      await _apiService.updateParentProfile(
+        address: locationAddress,
+      );
+
+      setState(() {
+        _parent = Parent(
+          userId: _parent!.userId,
+          contactNumber: _parent!.contactNumber,
+          address: locationAddress,
+          emergencyContact: _parent!.emergencyContact,
+          status: _parent!.status,
+        );
+      });
+
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location updated successfully'),
+          backgroundColor: Color(0xFF34C759),
+        ),
+      );
+    } catch (e) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to get location: ${e.toString()}'),
+          backgroundColor: const Color(0xFFFF3B30),
+        ),
+      );
+    }
+  }
+
   void _showUpdateAddressDialog() {
     final TextEditingController addressController =
         TextEditingController(text: _parent?.address ?? '');
@@ -436,6 +622,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Text(
             'Update Home Address',
             style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
@@ -462,6 +651,31 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   contentPadding: EdgeInsets.all(3.w),
+                ),
+              ),
+              SizedBox(height: 2.h),
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _useCurrentLocation();
+                  },
+                  icon: Icon(
+                    Icons.my_location,
+                    color: AppTheme.lightTheme.colorScheme.primary,
+                  ),
+                  label: Text(
+                    'Use Current Location',
+                    style: TextStyle(
+                      color: AppTheme.lightTheme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -508,6 +722,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.lightTheme.colorScheme.primary,
                 foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: const Text('Update'),
             ),

@@ -4,13 +4,31 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
+import { useChildren } from '../hooks/useChildren';
 import { childService } from '../services/childService';
-import type { Child, Parent, Bus } from '../types';
+import type { Child, Parent } from '../types';
 
 export default function ChildrenPage() {
-  const [children, setChildren] = useState<Child[]>([]);
+  // Use hooks for data management
+  const {
+    children,
+    loading: childrenLoading,
+    error: childrenError,
+    hasMore: childrenHasMore,
+    loadChildren,
+    loadMore: loadMoreChildren,
+    refreshChildren
+  } = useChildren();
+
+  // Load children on mount (assignedBusNumber is included in children response)
+  React.useEffect(() => {
+    loadChildren();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Local state for parents (loaded on demand)
   const [parents, setParents] = useState<Parent[]>([]);
-  const [buses, setBuses] = useState<Bus[]>([]);
+  const [parentsLoaded, setParentsLoaded] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [gradeFilter, setGradeFilter] = useState('all');
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
@@ -20,55 +38,43 @@ export default function ChildrenPage() {
 
   const grades = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6'];
 
-  // Fetch data from backend on mount
-  React.useEffect(() => {
-    loadChildren();
-    loadParents();
-    loadBuses();
-  }, []);
+  // Load parents when modal opens
+  const loadParentsForModal = async () => {
+    if (parentsLoaded) return;
 
-  async function loadChildren() {
     try {
-      const data = await childService.loadChildren();
-      setChildren(data);
-    } catch (error) {
-      console.error('Failed to load children:', error);
-    }
-  }
-
-  async function loadParents() {
-    try {
-      const data = await childService.loadParents();
-      setParents(data);
+      // For now, we'll need to create a parent API/service
+      // This is a temporary workaround - parents should have their own hook
+      const response = await fetch('http://localhost:8000/api/parents/?limit=100', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        }
+      });
+      const data = await response.json();
+      setParents(data.results || []);
+      setParentsLoaded(true);
     } catch (error) {
       console.error('Failed to load parents:', error);
+      setParents([]);
     }
-  }
-
-  async function loadBuses() {
-    try {
-      const data = await childService.loadBuses();
-      setBuses(data);
-    } catch (error) {
-      console.error('Failed to load buses:', error);
-    }
-  }
+  };
 
   const filteredChildren = children.filter((child) => {
     const matchesSearch =
-      child.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      child.lastName.toLowerCase().includes(searchTerm.toLowerCase());
+      child.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      child.lastName?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesGrade = gradeFilter === 'all' || child.grade === gradeFilter;
     return matchesSearch && matchesGrade;
   });
 
-  // Calculate stats (moved after filteredChildren definition)
+  // Calculate stats
   const totalChildren = children.length;
   const activeChildren = children.filter((c) => c.status === 'active').length;
   const childrenWithBus = children.filter((c) => c.busId).length;
   const childrenByGrade = filteredChildren.length;
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
+    await loadParentsForModal();
     setSelectedChild(null);
     setFormData({
       firstName: '',
@@ -83,7 +89,8 @@ export default function ChildrenPage() {
     setShowModal(true);
   };
 
-  const handleEdit = (child: Child) => {
+  const handleEdit = async (child: Child) => {
+    await loadParentsForModal();
     setSelectedChild(child);
     setFormData(child);
     setShowModal(true);
@@ -96,27 +103,37 @@ export default function ChildrenPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this child?')) {
-      try {
-        await childService.deleteChild(id);
-        loadChildren();
-      } catch (error) {
-        alert('Failed to delete child');
+      const result = await childService.deleteChild(id);
+      if (result.success) {
+        alert('Child deleted successfully');
+        await refreshChildren();
+      } else {
+        alert(result.error?.message || 'Failed to delete child');
       }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      if (selectedChild) {
-        await childService.updateChild(selectedChild.id, formData);
+
+    if (selectedChild) {
+      const result = await childService.updateChild(selectedChild.id, formData);
+      if (result.success) {
+        alert('Child updated successfully');
+        setShowModal(false);
+        await refreshChildren();
       } else {
-        await childService.createChild(formData);
+        alert(result.error?.message || 'Failed to update child');
       }
-      loadChildren();
-      setShowModal(false);
-    } catch (error) {
-      alert(`Failed to ${selectedChild ? 'update' : 'create'} child`);
+    } else {
+      const result = await childService.createChild(formData);
+      if (result.success) {
+        alert('Child created successfully');
+        setShowModal(false);
+        await refreshChildren();
+      } else {
+        alert(result.error?.message || 'Failed to create child');
+      }
     }
   };
 
@@ -125,11 +142,15 @@ export default function ChildrenPage() {
     return parent ? `${parent.firstName} ${parent.lastName}` : 'Unknown';
   };
 
-  const getBusNumber = (busId?: string) => {
-    if (!busId) return 'Not Assigned';
-    const bus = buses.find((b) => b.id === busId);
-    return bus ? bus.busNumber : 'Unknown';
-  };
+
+  if (childrenError) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-red-600 mb-4">Error: {childrenError}</p>
+        <Button onClick={() => refreshChildren()}>Retry</Button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -184,6 +205,7 @@ export default function ChildrenPage() {
         </div>
       </div>
 
+      {/* Search and Filter */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
@@ -207,6 +229,7 @@ export default function ChildrenPage() {
         </div>
       </div>
 
+      {/* Children Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -249,7 +272,7 @@ export default function ChildrenPage() {
                     {getParentName(child.parentId)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                    {getBusNumber(child.busId)}
+                    {child.assignedBusNumber || 'Not Assigned'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
@@ -289,8 +312,28 @@ export default function ChildrenPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        <div className="p-4 border-t border-slate-200">
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-sm text-slate-600">
+              Loaded {filteredChildren.length} of {filteredChildren.length}{childrenHasMore ? '+' : ''} children
+            </span>
+            {childrenHasMore && (
+              <Button
+                onClick={loadMoreChildren}
+                disabled={childrenLoading}
+                variant="secondary"
+                size="sm"
+              >
+                {childrenLoading ? 'Loading...' : 'Load More'}
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
 
+      {/* Create/Edit Modal */}
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
@@ -330,28 +373,20 @@ export default function ChildrenPage() {
             label="Parent"
             value={formData.parentId || ''}
             onChange={(e) => setFormData({ ...formData, parentId: e.target.value })}
-            options={parents.map((p) => ({ value: p.id, label: `${p.firstName} ${p.lastName}` }))}
-          />
-          <Select
-            label="Assigned Bus"
-            value={formData.busId || ''}
-            onChange={(e) => setFormData({ ...formData, busId: e.target.value || undefined })}
-            options={[
-              { value: '', label: 'Not Assigned' },
-              ...buses.map((b) => ({ value: b.id, label: b.busNumber })),
-            ]}
+            options={parents.map((p) => ({
+              value: p.id,
+              label: `${p.firstName} ${p.lastName}`,
+            }))}
           />
           <Input
             label="Address"
             value={formData.address || ''}
             onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-            required
           />
           <Input
             label="Emergency Contact"
             value={formData.emergencyContact || ''}
             onChange={(e) => setFormData({ ...formData, emergencyContact: e.target.value })}
-            required
           />
           <Input
             label="Medical Info"
@@ -376,19 +411,18 @@ export default function ChildrenPage() {
         </form>
       </Modal>
 
-      <Modal
-        isOpen={showDetailModal}
-        onClose={() => setShowDetailModal(false)}
-        title="Child Details"
-      >
+      {/* Detail Modal */}
+      <Modal isOpen={showDetailModal} onClose={() => setShowDetailModal(false)} title="Child Details">
         {selectedChild && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-medium text-slate-700">Name</p>
-                <p className="text-base text-slate-900">
-                  {selectedChild.firstName} {selectedChild.lastName}
-                </p>
+                <p className="text-sm font-medium text-slate-700">First Name</p>
+                <p className="text-base text-slate-900">{selectedChild.firstName}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-700">Last Name</p>
+                <p className="text-base text-slate-900">{selectedChild.lastName}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-700">Grade</p>
@@ -399,16 +433,12 @@ export default function ChildrenPage() {
                 <p className="text-base text-slate-900">{selectedChild.age}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-700">Status</p>
-                <p className="text-base text-slate-900">{selectedChild.status}</p>
-              </div>
-              <div>
                 <p className="text-sm font-medium text-slate-700">Parent</p>
                 <p className="text-base text-slate-900">{getParentName(selectedChild.parentId)}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-700">Assigned Bus</p>
-                <p className="text-base text-slate-900">{getBusNumber(selectedChild.busId)}</p>
+                <p className="text-sm font-medium text-slate-700">Bus</p>
+                <p className="text-base text-slate-900">{selectedChild.assignedBusNumber || 'Not Assigned'}</p>
               </div>
               <div className="col-span-2">
                 <p className="text-sm font-medium text-slate-700">Address</p>
@@ -424,6 +454,10 @@ export default function ChildrenPage() {
                   <p className="text-base text-slate-900">{selectedChild.medicalInfo}</p>
                 </div>
               )}
+              <div>
+                <p className="text-sm font-medium text-slate-700">Status</p>
+                <p className="text-base text-slate-900">{selectedChild.status}</p>
+              </div>
             </div>
           </div>
         )}

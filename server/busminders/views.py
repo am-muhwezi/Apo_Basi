@@ -1,7 +1,7 @@
 from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
 from users.serializers import BusMinderRegistrationSerializer, UserSerializer
@@ -14,8 +14,8 @@ class BusMinderListCreateView(generics.ListCreateAPIView):
     GET /api/busminders/ - List all bus minders
     POST /api/busminders/ - Create new bus minder
     """
-    permission_classes = [AllowAny]
-    queryset = BusMinder.objects.select_related('user').all()
+    permission_classes = [IsAuthenticated]
+    queryset = BusMinder.objects.select_related('user').prefetch_related('user__managed_buses').all()
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -30,8 +30,8 @@ class BusMinderDetailView(generics.RetrieveUpdateDestroyAPIView):
     PATCH /api/busminders/{id}/ - Partial update bus minder
     DELETE /api/busminders/{id}/ - Delete bus minder
     """
-    permission_classes = [AllowAny]
-    queryset = BusMinder.objects.select_related('user').all()
+    permission_classes = [IsAuthenticated]
+    queryset = BusMinder.objects.select_related('user').prefetch_related('user__managed_buses').all()
     lookup_field = 'user_id'
 
     def get_serializer_class(self):
@@ -267,7 +267,7 @@ class MarkAttendanceView(APIView):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def busminder_phone_login(request):
     """
     Simple phone-based login for bus minders (passwordless).

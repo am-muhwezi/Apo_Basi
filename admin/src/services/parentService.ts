@@ -1,64 +1,167 @@
 import * as parentApi from './parentApi';
 import type { Parent } from '../types';
+import type { ApiResponse, PaginationParams } from '../types/api';
+import { AxiosError } from 'axios';
+
+/**
+ * Helper function to extract error message from axios error
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof AxiosError) {
+    if (error.response?.data) {
+      const data = error.response.data;
+      if (data.detail) return data.detail;
+      if (typeof data === 'object') {
+        const firstError = Object.values(data)[0];
+        if (Array.isArray(firstError) && firstError.length > 0) {
+          return firstError[0];
+        }
+      }
+      if (data.error) return data.error;
+      if (data.message) return data.message;
+    }
+    if (error.response?.status === 404) return 'Resource not found';
+    if (error.response?.status === 403) return 'Permission denied';
+    if (error.response?.status === 401) return 'Authentication required';
+    if (error.response?.status >= 500) return 'Server error. Please try again later.';
+    return error.message || 'Network error';
+  }
+  if (error instanceof Error) return error.message;
+  return 'An unexpected error occurred';
+}
 
 class ParentService {
   /**
-   * Load all parents from DRF API
+   * Load all parents from DRF API with pagination
    */
-  async loadParents(): Promise<Parent[]> {
-    const response = await parentApi.getParents();
-    return response.data;
+  async loadParents(params?: PaginationParams): Promise<
+    ApiResponse<{
+      parents: Parent[];
+      count: number;
+      hasNext: boolean;
+      hasPrevious: boolean;
+    }>
+  > {
+    try {
+      const response = await parentApi.getParents(params);
+      const { results, count, next, previous } = response.data;
+
+      return {
+        success: true,
+        data: {
+          parents: results || [],
+          count: count || 0,
+          hasNext: !!next,
+          hasPrevious: !!previous,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: getErrorMessage(error),
+        },
+      };
+    }
   }
 
   /**
    * Get single parent by ID
    */
-  async getParent(id: string): Promise<Parent> {
-    const response = await parentApi.getParent(id);
-    return response.data;
+  async getParent(id: string): Promise<ApiResponse<Parent>> {
+    try {
+      const response = await parentApi.getParent(id);
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: getErrorMessage(error),
+        },
+      };
+    }
   }
 
   /**
    * Create new parent
    */
-  async createParent(formData: Partial<Parent>): Promise<Parent> {
-    const parentData = {
-      firstName: formData.firstName!,
-      lastName: formData.lastName!,
-      email: formData.email,
-      phone: formData.phone!,
-      address: formData.address,
-      emergencyContact: formData.emergencyContact,
-      status: formData.status || 'active',
-    };
+  async createParent(formData: Partial<Parent>): Promise<ApiResponse<Parent>> {
+    try {
+      const parentData = {
+        firstName: formData.firstName!,
+        lastName: formData.lastName!,
+        email: formData.email,
+        phone: formData.phone!,
+        address: formData.address,
+        emergencyContact: formData.emergencyContact,
+        status: formData.status || 'active',
+      };
 
-    const response = await parentApi.createParent(parentData);
-    return response.data;
+      const response = await parentApi.createParent(parentData);
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: getErrorMessage(error),
+        },
+      };
+    }
   }
 
   /**
    * Update existing parent
    */
-  async updateParent(id: string, formData: Partial<Parent>): Promise<Parent> {
-    const parentData = {
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email,
-      phone: formData.phone,
-      address: formData.address,
-      emergencyContact: formData.emergencyContact,
-      status: formData.status,
-    };
+  async updateParent(id: string, formData: Partial<Parent>): Promise<ApiResponse<Parent>> {
+    try {
+      const parentData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        emergencyContact: formData.emergencyContact,
+        status: formData.status,
+      };
 
-    const response = await parentApi.updateParent(id, parentData);
-    return response.data;
+      const response = await parentApi.updateParent(id, parentData);
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: getErrorMessage(error),
+        },
+      };
+    }
   }
 
   /**
    * Delete parent
    */
-  async deleteParent(id: string): Promise<void> {
-    await parentApi.deleteParent(id);
+  async deleteParent(id: string): Promise<ApiResponse<void>> {
+    try {
+      await parentApi.deleteParent(id);
+      return {
+        success: true,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: getErrorMessage(error),
+        },
+      };
+    }
   }
 }
 

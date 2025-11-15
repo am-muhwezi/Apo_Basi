@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiService {
   // DEVELOPMENT: Use WiFi IP for testing on physical device
   // TODO: Update this to match your backend server IP/domain
-  static const String baseUrl = 'http://192.168.100.36:8000';
+  static const String baseUrl = 'http://localhost:8000';
 
   // OTHER OPTIONS:
   // Android emulator: 'http://10.0.2.2:8000'
