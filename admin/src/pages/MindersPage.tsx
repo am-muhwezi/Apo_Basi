@@ -5,6 +5,7 @@ import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
 import { useMinders } from '../hooks/useMinders';
+import { busMinderService } from '../services/busMinderService';
 import type { BusMinder } from '../types';
 
 export default function MindersPage() {
@@ -39,7 +40,6 @@ export default function MindersPage() {
       lastName: '',
       email: '',
       phone: '',
-      certifications: [],
       status: 'active',
     });
     setShowModal(true);
@@ -58,27 +58,29 @@ export default function MindersPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this bus minder?')) {
-      try {
-        await busMinderService.deleteBusMinder(id);
+      const result = await busMinderService.deleteBusMinder(id);
+      if (result.success) {
         loadMinders();
-      } catch (error) {
-        alert('Failed to delete bus minder');
+      } else {
+        alert(result.error?.message || 'Failed to delete bus minder');
       }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      if (selectedMinder) {
-        await busMinderService.updateBusMinder(selectedMinder.id, formData);
-      } else {
-        await busMinderService.createBusMinder(formData);
-      }
+    let result;
+    if (selectedMinder) {
+      result = await busMinderService.updateBusMinder(selectedMinder.id, formData);
+    } else {
+      result = await busMinderService.createBusMinder(formData);
+    }
+
+    if (result.success) {
       loadMinders();
       setShowModal(false);
-    } catch (error) {
-      alert(`Failed to ${selectedMinder ? 'update' : 'create'} bus minder`);
+    } else {
+      alert(result.error?.message || `Failed to ${selectedMinder ? 'update' : 'create'} bus minder`);
     }
   };
 
@@ -168,9 +170,6 @@ export default function MindersPage() {
                   Phone
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
-                  Certifications
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
                   Assigned Bus
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
@@ -191,9 +190,6 @@ export default function MindersPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">{minder.email}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">{minder.phone}</td>
-                  <td className="px-6 py-4 text-slate-700">
-                    {minder.certifications?.join(', ') || 'None'}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
                     {minder.assignedBusNumber || 'Not Assigned'}
                   </td>
@@ -287,21 +283,6 @@ export default function MindersPage() {
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             required
           />
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Certifications (comma-separated)
-            </label>
-            <Input
-              value={formData.certifications?.join(', ') || ''}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  certifications: e.target.value.split(',').map((c) => c.trim()).filter(Boolean),
-                })
-              }
-              placeholder="e.g., First Aid, CPR, Child Safety"
-            />
-          </div>
           <Select
             label="Status"
             value={formData.status || ''}
@@ -351,23 +332,6 @@ export default function MindersPage() {
                 <p className="text-base text-slate-900">
                   {selectedMinder.assignedBusNumber || 'Not Assigned'}
                 </p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-sm font-medium text-slate-700">Certifications</p>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {selectedMinder.certifications && selectedMinder.certifications.length > 0 ? (
-                    selectedMinder.certifications.map((cert, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
-                      >
-                        {cert}
-                      </span>
-                    ))
-                  ) : (
-                    <p className="text-slate-600">No certifications</p>
-                  )}
-                </div>
               </div>
             </div>
           </div>

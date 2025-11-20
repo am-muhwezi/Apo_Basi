@@ -1,291 +1,235 @@
-from rest_framework import status, generics
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
+"""
+Parent ViewSet for managing parent CRUD operations.
 
+This ViewSet consolidates all parent operations:
+- CRUD operations (list, create, retrieve, update, delete)
+- Child relationship queries
+
+Architecture Benefits:
+- Single ViewSet instead of multiple views
+- Automatic URL routing via DRF router
+- Built-in pagination (configured globally)
+- Built-in authentication (JWT)
+"""
+
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.shortcuts import get_object_or_404
-from django.contrib.auth import authenticate
-from users.serializers import ParentRegistrationSerializer, UserSerializer
-from users.models import User
-from children.models import Child
-from children.serializers import ChildSerializer
+from django.contrib.auth import get_user_model
+from django.db import transaction
+
 from .models import Parent
-from .serializers import ParentSerializer, ParentCreateSerializer
-
-
-class ParentListCreateView(generics.ListCreateAPIView):
-    """
-    GET /api/parents/ - List all parents
-    POST /api/parents/ - Create new parent
-    """
-    permission_classes = [IsAuthenticated]
-    queryset = Parent.objects.select_related('user').all()
-
-    def get_serializer_class(self):
-        if self.request.method == 'POST':
-            return ParentCreateSerializer
-        return ParentSerializer
-
-
-class ParentDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    GET /api/parents/{id}/ - Get parent details
-    PUT /api/parents/{id}/ - Update parent
-    PATCH /api/parents/{id}/ - Partial update parent
-    DELETE /api/parents/{id}/ - Delete parent
-    """
-    permission_classes = [IsAuthenticated]
-    queryset = Parent.objects.select_related('user').all()
-    lookup_field = 'user_id'
-
-    def get_serializer_class(self):
-        if self.request.method in ['PUT', 'PATCH']:
-            return ParentCreateSerializer
-        return ParentSerializer
-
-
-class ParentLoginView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        username = request.data.get("username")
-        password = request.data.get("password")
-        user = authenticate(username=username, password=password)
-        if user and hasattr(user, "parent"):
-            refresh = RefreshToken.for_user(user)
-            # Get children for this parent
-            children = Child.objects.filter(parent=user.parent)
-            children_data = ChildSerializer(children, many=True).data
-            return Response(
-                {
-                    "user": UserSerializer(user).data,
-                    "tokens": {
-                        "refresh": str(refresh),
-                        "access": str(refresh.access_token),
-                    },
-                    "children": children_data,
-                    "message": "Login successful",
-                }
-            )
-        return Response({"error": "Invalid credentials"}, status=400)
-
-
-class ParentDirectPhoneLoginView(APIView):
-    """
-    Direct phone number-based login for parents.
-    No OTP required - just phone number verification.
-
-    POST /api/parents/direct-phone-login/
-    Body: {
-        "phone_number": "0776102830"
-    }
-    """
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        phone_number = request.data.get("phone_number")
-
-        if not phone_number:
-            return Response({"error": "Phone number is required"}, status=400)
-
-        # Find parent by contact_number
-        try:
-            parent = Parent.objects.select_related('user').get(contact_number=phone_number)
-            user = parent.user
-
-            # Generate JWT tokens
-            refresh = RefreshToken.for_user(user)
-
-            # Get children for this parent
-            children = Child.objects.filter(parent=parent)
-            children_data = ChildSerializer(children, many=True).data
-
-            return Response({
-                "user": UserSerializer(user).data,
-                "parent": ParentSerializer(parent).data,
-                "tokens": {
-                    "refresh": str(refresh),
-                    "access": str(refresh.access_token),
-                },
-                "children": children_data,
-                "message": "Login successful",
-            })
-        except Parent.DoesNotExist:
-            return Response(
-                {"error": "No parent found with this phone number"},
-                status=404
-            )
-
-
-class ParentRegistrationView(generics.CreateAPIView):
-    serializer_class = ParentRegistrationSerializer
-    permission_classes = [AllowAny]
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-
-        # Generate JWT tokens for the user
-        refresh = RefreshToken.for_user(user)
-
-        return Response(
-            {
-                "user": UserSerializer(user).data,
-                "tokens": {
-                    "refresh": str(refresh),
-                    "access": str(refresh.access_token),
-                },
-                "message": "Parent registered successfully",
-            },
-            status=status.HTTP_201_CREATED,
-        )
-
-
-from users.permissions import IsParent
-from rest_framework.permissions import IsAuthenticated
+from .serializers import ParentLoginSerializer, ParentSerializer, ParentCreateSerializer
+from children.models import Child
 from attendance.models import Attendance
+from users.permissions import IsParent
+from assignments.models import Assignment
 from datetime import date
 
+User = get_user_model()
 
-class ParentAssignChildrenView(APIView):
-    """
-    POST: Assign children to a parent
 
-    Endpoint: /api/parents/{parent_id}/assign-children/
-    Body: {"children_ids": [1, 2, 3]}
+class ParentViewSet(viewsets.ModelViewSet):
     """
+    ViewSet for Parent operations.
+
+    Endpoints:
+        GET    /api/parents/                    → list all parents (paginated)
+        POST   /api/parents/                    → create new parent
+        GET    /api/parents/:id/                → retrieve single parent
+        PUT    /api/parents/:id/                → full update
+        PATCH  /api/parents/:id/                → partial update
+        DELETE /api/parents/:id/                → delete parent
+        GET    /api/parents/:id/children/       → get parent's children
+
+    Permissions:
+        - List/Retrieve: Authenticated users
+        - Create/Update/Delete: Admin users only
+
+    Pagination:
+        - Automatically paginated (PAGE_SIZE=20 from settings)
+        - Returns: {count, next, previous, results}
+    """
+
+    queryset = Parent.objects.select_related('user').all()
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, user_id):
-        parent = get_object_or_404(Parent, user_id=user_id)
-        children_ids = request.data.get('children_ids', [])
+    def get_serializer_class(self):
+        """
+        Use different serializers for read vs write operations.
 
-        if not children_ids:
-            return Response(
-                {"error": "children_ids array is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        - Read (GET): ParentSerializer (full details with camelCase)
+        - Write (POST/PUT/PATCH): ParentCreateSerializer (validation + field mapping)
+        """
+        if self.action in ['create', 'update', 'partial_update']:
+            return ParentCreateSerializer
+        return ParentSerializer
 
-        # Assign children to parent
-        children = Child.objects.filter(id__in=children_ids)
-        children.update(parent=parent)
+    @action(
+        detail=True,
+        methods=['get'],
+        permission_classes=[IsAuthenticated],
+        url_path='children'
+    )
+    def children(self, request, pk=None):
+        """
+        Get all children for a specific parent.
 
-        return Response({
-            "message": f"{children.count()} children assigned to {parent.user.get_full_name()}",
-            "parent": ParentSerializer(parent).data
-        }, status=status.HTTP_200_OK)
+        GET /api/parents/:id/children/
 
+        Returns detailed information about parent's children including:
+        - Child details
+        - Bus assignment information
+        - Status
 
-class ParentChildrenView(APIView):
-    """
-    GET: Get all children assigned to a parent
+        Returns:
+            200: Children data
+            404: Parent not found
+        """
+        parent = self.get_object()
 
-    Endpoint: /api/parents/{parent_id}/children/
-    """
-    permission_classes = [IsAuthenticated]
+        # Get all children for this parent
+        children = Child.objects.filter(parent=parent)
 
-    def get(self, request, user_id):
-        parent = get_object_or_404(Parent, user_id=user_id)
-        children = parent.parent_children.select_related('assigned_bus').all()
+        # Build children data with bus assignments
+        children_data = []
+        for child in children:
+            # Get child's bus assignment using Assignment API
+            bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
 
-        children_data = [
-            {
+            child_data = {
                 "id": child.id,
                 "firstName": child.first_name,
                 "lastName": child.last_name,
                 "grade": child.class_grade,
-                "age": child.age,
+                "age": getattr(child, 'age', None),
                 "status": child.status,
-                "busId": child.assigned_bus.id if child.assigned_bus else None,
+                "assignedBus": None
             }
-            for child in children
-        ]
 
-        return Response({
-            "parent_id": parent.user.id,
-            "parent_name": parent.user.get_full_name(),
-            "children_count": len(children_data),
-            "children": children_data
-        }, status=status.HTTP_200_OK)
+            if bus_assignment:
+                bus = bus_assignment.assigned_to
+                child_data["assignedBus"] = {
+                    "id": bus.id,
+                    "busNumber": bus.bus_number,
+                    "licensePlate": bus.number_plate,
+                }
+
+            children_data.append(child_data)
+
+        return Response(
+            {
+                "success": True,
+                "parent": {
+                    "id": parent.user.id,
+                    "firstName": parent.user.first_name,
+                    "lastName": parent.user.last_name,
+                },
+                "children": children_data,
+                "totalChildren": len(children_data)
+            },
+            status=status.HTTP_200_OK
+        )
 
 
-class MyChildrenView(APIView):
+class ParentLoginView(APIView):
     """
-    Allows a parent to view all their children with current status.
-
-    Endpoint: GET /api/parents/my-children/
-    Returns: List of children with their current attendance status
-
-    For junior devs:
-    - This view is protected by IsAuthenticated and IsParent permissions
-    - It automatically filters children by the logged-in parent's profile
-    - Includes today's attendance status for each child
+    POST /api/parents/login/
+    Authenticate parent using phone number only.
+    School creates parent accounts, so parents just login.
     """
-    permission_classes = [IsAuthenticated, IsParent]
+    permission_classes = [AllowAny]
 
-    def get(self, request):
-        # Get the parent profile for the logged-in user
+    def post(self, request):
+        serializer = ParentLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        phone_number = serializer.validated_data['phone_number']
+
         try:
-            parent = Parent.objects.get(user=request.user)
+            parent = Parent.objects.select_related('user').get(
+                contact_number=phone_number,
+                status='active'
+            )
         except Parent.DoesNotExist:
             return Response(
-                {"error": "Parent profile not found"},
+                {"error": "No active parent account found with this phone number"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Get all children for this parent
-        children = Child.objects.filter(parent=parent).select_related('assigned_bus')
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(parent.user)
 
-        # Get today's attendance for each child
-        today = date.today()
+        # Get parent's children
+        children = Child.objects.filter(parent=parent)
+
+        # Build children data with bus assignments from Assignment API
         children_data = []
-
         for child in children:
-            # Get today's attendance record if it exists
-            try:
-                attendance = Attendance.objects.get(child=child, date=today)
-                attendance_status = attendance.get_status_display()
-                attendance_time = attendance.timestamp
-            except Attendance.DoesNotExist:
-                attendance_status = "No record today"
-                attendance_time = None
+            # Get child's bus assignment using Assignment API
+            bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
 
-            children_data.append({
+            child_data = {
                 "id": child.id,
                 "first_name": child.first_name,
                 "last_name": child.last_name,
                 "class_grade": child.class_grade,
-                "assigned_bus": {
-                    "id": child.assigned_bus.id,
-                    "number_plate": child.assigned_bus.number_plate,
-                } if child.assigned_bus else None,
-                "current_status": attendance_status,
-                "last_updated": attendance_time,
-            })
+                "status": child.status,
+                "assigned_bus": None
+            }
+
+            if bus_assignment:
+                bus = bus_assignment.assigned_to
+                # Get driver and minder for the bus
+                driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+                minder_assignment = Assignment.get_assignments_to(bus, 'minder_to_bus').first()
+
+                child_data["assigned_bus"] = {
+                    "id": bus.id,
+                    "bus_number": bus.bus_number,
+                    "number_plate": bus.number_plate,
+                    "driver": {
+                        "name": f"{driver_assignment.assignee.user.first_name} {driver_assignment.assignee.user.last_name}",
+                        "phone": driver_assignment.assignee.user.phone_number
+                    } if driver_assignment else None,
+                    "minder": {
+                        "name": f"{minder_assignment.assignee.user.first_name} {minder_assignment.assignee.user.last_name}",
+                        "phone": minder_assignment.assignee.phone_number
+                    } if minder_assignment else None
+                }
+
+            children_data.append(child_data)
 
         return Response({
-            "children": children_data,
-            "count": len(children_data)
-        })
+            "message": "Login successful",
+            "tokens": {
+                "refresh": str(refresh),
+                "access": str(refresh.access_token)
+            },
+            "parent": {
+                "id": parent.user.id,
+                "first_name": parent.user.first_name,
+                "last_name": parent.user.last_name,
+                "email": parent.user.email,
+                "phone": parent.contact_number,
+            },
+            "children": children_data
+        }, status=status.HTTP_200_OK)
 
 
 class ChildAttendanceHistoryView(APIView):
     """
-    Allows a parent to view attendance history for a specific child.
-
-    Endpoint: GET /api/parents/children/{child_id}/attendance/
-    Returns: List of attendance records for the child
-
-    Security:
-    - Parents can only view attendance for their own children
-    - Returns 403 if trying to access another parent's child
+    GET /api/parents/children/<child_id>/attendance/
+    Returns attendance history for a specific child.
+    Parents can only view their own children's attendance.
     """
     permission_classes = [IsAuthenticated, IsParent]
 
     def get(self, request, child_id):
-        # Get the parent profile for the logged-in user
         try:
             parent = Parent.objects.get(user=request.user)
         except Parent.DoesNotExist:
@@ -294,17 +238,18 @@ class ChildAttendanceHistoryView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Get the child and verify it belongs to this parent
+        # Verify child belongs to this parent
         child = get_object_or_404(Child, id=child_id)
-
         if child.parent != parent:
             return Response(
                 {"error": "You can only view attendance for your own children"},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Get attendance records for this child, ordered by date (most recent first)
-        attendance_records = Attendance.objects.filter(child=child).select_related('bus', 'marked_by').order_by('-date')
+        # Get attendance records
+        attendance_records = Attendance.objects.filter(
+            child=child
+        ).select_related('bus', 'marked_by').order_by('-date')
 
         attendance_data = [{
             "id": record.id,
@@ -312,19 +257,19 @@ class ChildAttendanceHistoryView(APIView):
             "status": record.get_status_display(),
             "bus": {
                 "id": record.bus.id,
-                "number_plate": record.bus.number_plate,
+                "number_plate": record.bus.number_plate
             } if record.bus else None,
             "marked_by": record.marked_by.get_full_name() if record.marked_by else None,
             "timestamp": record.timestamp,
-            "notes": record.notes,
+            "notes": record.notes
         } for record in attendance_records]
 
         return Response({
             "child": {
                 "id": child.id,
                 "name": f"{child.first_name} {child.last_name}",
-                "class_grade": child.class_grade,
+                "class_grade": child.class_grade
             },
             "attendance_history": attendance_data,
             "total_records": len(attendance_data)
-        })
+        }, status=status.HTTP_200_OK)

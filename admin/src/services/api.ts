@@ -61,3 +61,47 @@ export async function createBus(data: {
 }) {
 	return axiosInstance.post('/admins/create-bus/', data);
 }
+
+/**
+ * Fetches attendance statistics for a specific date
+ * @param date - Date in YYYY-MM-DD format (optional, defaults to today)
+ * @param busId - Filter by specific bus (optional)
+ * @returns Attendance statistics
+ */
+export async function getAttendanceStats(date?: string, busId?: number) {
+	const params = new URLSearchParams();
+	if (date) params.append('date', date);
+	if (busId) params.append('bus_id', busId.toString());
+
+	return axiosInstance.get(`/attendance/stats/?${params.toString()}`);
+}
+
+/**
+ * Fetches daily attendance report with detailed breakdown by bus
+ * @param date - Date in YYYY-MM-DD format (optional, defaults to today)
+ * @returns Daily attendance report grouped by bus
+ */
+export async function getDailyAttendanceReport(date?: string) {
+	const params = date ? `?date=${date}` : '';
+	return axiosInstance.get(`/attendance/daily-report/${params}`);
+}
+
+/**
+ * Fetches attendance records with filtering
+ * @param filters - Optional filters (date, child_id, bus_id, status)
+ * @returns List of attendance records
+ */
+export async function getAttendanceRecords(filters?: {
+	date?: string;
+	child_id?: number;
+	bus_id?: number;
+	status?: string;
+}) {
+	const params = new URLSearchParams();
+	if (filters?.date) params.append('date', filters.date);
+	if (filters?.child_id) params.append('child_id', filters.child_id.toString());
+	if (filters?.bus_id) params.append('bus_id', filters.bus_id.toString());
+	if (filters?.status) params.append('status', filters.status);
+
+	return axiosInstance.get(`/attendance/?${params.toString()}`);
+}

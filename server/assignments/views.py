@@ -2,9 +2,11 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError
+from django.contrib.contenttypes.models import ContentType
 
 from .models import Assignment, BusRoute, AssignmentHistory
 from .serializers import (
@@ -17,9 +19,12 @@ from .serializers import (
 from .services import AssignmentService
 from .validators import AssignmentValidator
 from buses.models import Bus
+from buses.serializers import BusSerializer
 from drivers.models import Driver
 from busminders.models import BusMinder
 from children.models import Child
+from children.serializers import ChildSerializer
+from parents.models import Parent
 
 
 class BusRouteViewSet(viewsets.ModelViewSet):
@@ -406,3 +411,490 @@ class AssignmentHistoryViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(performed_by_id=performed_by_id)
 
         return queryset
+
+
+# ============================================================================
+# CONVENIENCE API VIEWS - Single source of truth for assignment queries
+# ============================================================================
+
+
+class DriverAssignmentsView(APIView):
+    """
+    Get driver's current assignments.
+
+    Endpoints:
+    - GET /api/assignments/driver/<driver_id>/bus/ - Get driver's assigned bus
+    - GET /api/assignments/driver/<driver_id>/children/ - Get children on driver's bus
+    - GET /api/assignments/driver/<driver_id>/route/ - Get driver's assigned route
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, driver_id, query_type='bus'):
+        """Get driver's assignments based on query type"""
+        try:
+            driver = Driver.objects.get(pk=driver_id)
+        except Driver.DoesNotExist:
+            return Response(
+                {'error': f'Driver with id {driver_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if query_type == 'bus':
+            # Get driver's assigned bus
+            assignment = Assignment.get_active_assignments_for(driver, 'driver_to_bus').first()
+
+            if not assignment:
+                return Response({
+                    'message': 'Driver has no active bus assignment',
+                    'bus': None
+                })
+
+            bus = assignment.assigned_to
+            return Response({
+                'bus': BusSerializer(bus).data,
+                'assignment': AssignmentSerializer(assignment).data
+            })
+
+        elif query_type == 'children':
+            # Get children on driver's bus
+            assignment = Assignment.get_active_assignments_for(driver, 'driver_to_bus').first()
+
+            if not assignment:
+                return Response({
+                    'message': 'Driver has no active bus assignment',
+                    'children': []
+                })
+
+            bus = assignment.assigned_to
+            child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
+
+            children = [ca.assignee for ca in child_assignments]
+
+            return Response({
+                'bus': BusSerializer(bus).data,
+                'children': ChildSerializer(children, many=True).data,
+                'count': len(children)
+            })
+
+        elif query_type == 'route':
+            # Get driver's assigned route
+            assignment = Assignment.get_active_assignments_for(driver, 'driver_to_route').first()
+
+            if not assignment:
+                return Response({
+                    'message': 'Driver has no active route assignment',
+                    'route': None
+                })
+
+            route = assignment.assigned_to
+            return Response({
+                'route': BusRouteSerializer(route).data,
+                'assignment': AssignmentSerializer(assignment).data
+            })
+
+        else:
+            return Response(
+                {'error': f'Invalid query type: {query_type}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class BusAssignmentsView(APIView):
+    """
+    Get bus's current assignments.
+
+    Endpoints:
+    - GET /api/assignments/bus/<bus_id>/children/ - Get children on the bus
+    - GET /api/assignments/bus/<bus_id>/driver/ - Get bus's driver
+    - GET /api/assignments/bus/<bus_id>/minder/ - Get bus's minder
+    - GET /api/assignments/bus/<bus_id>/all/ - Get all assignments for the bus
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, bus_id, query_type='all'):
+        """Get bus's assignments based on query type"""
+        try:
+            bus = Bus.objects.get(pk=bus_id)
+        except Bus.DoesNotExist:
+            return Response(
+                {'error': f'Bus with id {bus_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if query_type == 'children':
+            # Get children on this bus
+            child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
+            children = [ca.assignee for ca in child_assignments]
+
+            return Response({
+                'bus': BusSerializer(bus).data,
+                'children': ChildSerializer(children, many=True).data,
+                'count': len(children),
+                'capacity': bus.capacity,
+                'availableSeats': bus.capacity - len(children)
+            })
+
+        elif query_type == 'driver':
+            # Get bus's driver
+            assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+
+            if not assignment:
+                return Response({
+                    'message': 'Bus has no active driver assignment',
+                    'driver': None
+                })
+
+            driver = assignment.assignee
+            return Response({
+                'driver': {
+                    'id': driver.user.id,
+                    'firstName': driver.user.first_name,
+                    'lastName': driver.user.last_name,
+                    'email': driver.user.email,
+                    'licenseNumber': driver.license_number,
+                    'status': driver.status
+                },
+                'assignment': AssignmentSerializer(assignment).data
+            })
+
+        elif query_type == 'minder':
+            # Get bus's minder
+            assignment = Assignment.get_assignments_to(bus, 'minder_to_bus').first()
+
+            if not assignment:
+                return Response({
+                    'message': 'Bus has no active minder assignment',
+                    'minder': None
+                })
+
+            minder = assignment.assignee
+            return Response({
+                'minder': {
+                    'id': minder.user.id,
+                    'firstName': minder.user.first_name,
+                    'lastName': minder.user.last_name,
+                    'email': minder.user.email,
+                    'phoneNumber': minder.phone_number,
+                    'status': minder.status
+                },
+                'assignment': AssignmentSerializer(assignment).data
+            })
+
+        elif query_type == 'all':
+            # Get all assignments for this bus
+            assignments = Assignment.get_assignments_to(bus)
+
+            # Organize by type
+            driver_assignment = assignments.filter(assignment_type='driver_to_bus').first()
+            minder_assignment = assignments.filter(assignment_type='minder_to_bus').first()
+            child_assignments = assignments.filter(assignment_type='child_to_bus')
+
+            driver = driver_assignment.assignee if driver_assignment else None
+            minder = minder_assignment.assignee if minder_assignment else None
+            children = [ca.assignee for ca in child_assignments]
+
+            return Response({
+                'bus': BusSerializer(bus).data,
+                'driver': {
+                    'id': driver.user.id,
+                    'firstName': driver.user.first_name,
+                    'lastName': driver.user.last_name,
+                    'licenseNumber': driver.license_number,
+                    'status': driver.status
+                } if driver else None,
+                'minder': {
+                    'id': minder.user.id,
+                    'firstName': minder.user.first_name,
+                    'lastName': minder.user.last_name,
+                    'phoneNumber': minder.phone_number,
+                    'status': minder.status
+                } if minder else None,
+                'children': ChildSerializer(children, many=True).data,
+                'counts': {
+                    'children': len(children),
+                    'capacity': bus.capacity,
+                    'availableSeats': bus.capacity - len(children)
+                }
+            })
+
+        else:
+            return Response(
+                {'error': f'Invalid query type: {query_type}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class ChildAssignmentsView(APIView):
+    """
+    Get child's current assignments.
+
+    Endpoints:
+    - GET /api/assignments/child/<child_id>/bus/ - Get child's assigned bus
+    - GET /api/assignments/child/<child_id>/route/ - Get child's assigned route
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, child_id, query_type='bus'):
+        """Get child's assignments based on query type"""
+        try:
+            child = Child.objects.get(pk=child_id)
+        except Child.DoesNotExist:
+            return Response(
+                {'error': f'Child with id {child_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if query_type == 'bus':
+            # Get child's assigned bus
+            assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
+
+            if not assignment:
+                return Response({
+                    'message': 'Child has no active bus assignment',
+                    'bus': None
+                })
+
+            bus = assignment.assigned_to
+
+            # Get driver and minder for the bus
+            driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+            minder_assignment = Assignment.get_assignments_to(bus, 'minder_to_bus').first()
+
+            return Response({
+                'child': ChildSerializer(child).data,
+                'bus': BusSerializer(bus).data,
+                'driver': {
+                    'id': driver_assignment.assignee.user.id,
+                    'firstName': driver_assignment.assignee.user.first_name,
+                    'lastName': driver_assignment.assignee.user.last_name,
+                } if driver_assignment else None,
+                'minder': {
+                    'id': minder_assignment.assignee.user.id,
+                    'firstName': minder_assignment.assignee.user.first_name,
+                    'lastName': minder_assignment.assignee.user.last_name,
+                } if minder_assignment else None,
+                'assignment': AssignmentSerializer(assignment).data
+            })
+
+        elif query_type == 'route':
+            # Get child's assigned route
+            assignment = Assignment.get_active_assignments_for(child, 'child_to_route').first()
+
+            if not assignment:
+                return Response({
+                    'message': 'Child has no active route assignment',
+                    'route': None
+                })
+
+            route = assignment.assigned_to
+            return Response({
+                'child': ChildSerializer(child).data,
+                'route': BusRouteSerializer(route).data,
+                'assignment': AssignmentSerializer(assignment).data
+            })
+
+        else:
+            return Response(
+                {'error': f'Invalid query type: {query_type}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class ParentChildrenAssignmentsView(APIView):
+    """
+    Get parent's children and their bus assignments.
+
+    Endpoints:
+    - GET /api/assignments/parent/<parent_id>/children-buses/ - Get all children with their bus assignments
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, parent_id):
+        """Get parent's children and their bus assignments"""
+        try:
+            parent = Parent.objects.get(pk=parent_id)
+        except Parent.DoesNotExist:
+            return Response(
+                {'error': f'Parent with id {parent_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get all children for this parent
+        children = Child.objects.filter(parent=parent)
+
+        children_data = []
+        for child in children:
+            # Get child's bus assignment
+            bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
+
+            child_info = ChildSerializer(child).data
+
+            if bus_assignment:
+                bus = bus_assignment.assigned_to
+
+                # Get driver and minder
+                driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+                minder_assignment = Assignment.get_assignments_to(bus, 'minder_to_bus').first()
+
+                child_info['bus'] = BusSerializer(bus).data
+                child_info['driver'] = {
+                    'firstName': driver_assignment.assignee.user.first_name,
+                    'lastName': driver_assignment.assignee.user.last_name,
+                    'phone': driver_assignment.assignee.user.email
+                } if driver_assignment else None
+                child_info['minder'] = {
+                    'firstName': minder_assignment.assignee.user.first_name,
+                    'lastName': minder_assignment.assignee.user.last_name,
+                    'phone': minder_assignment.assignee.phone_number
+                } if minder_assignment else None
+                child_info['assignment'] = AssignmentSerializer(bus_assignment).data
+            else:
+                child_info['bus'] = None
+                child_info['driver'] = None
+                child_info['minder'] = None
+                child_info['assignment'] = None
+
+            children_data.append(child_info)
+
+        return Response({
+            'parent': {
+                'id': parent.id,
+                'firstName': parent.first_name,
+                'lastName': parent.last_name,
+                'email': parent.email
+            },
+            'children': children_data,
+            'count': len(children_data)
+        })
+
+
+class MinderAssignmentsView(APIView):
+    """
+    Get minder's current assignments.
+
+    Endpoints:
+    - GET /api/assignments/minder/<minder_id>/buses/ - Get minder's assigned buses
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, minder_id):
+        """Get minder's assigned buses"""
+        try:
+            minder = BusMinder.objects.get(pk=minder_id)
+        except BusMinder.DoesNotExist:
+            return Response(
+                {'error': f'BusMinder with id {minder_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get all bus assignments for this minder
+        assignments = Assignment.get_active_assignments_for(minder, 'minder_to_bus')
+
+        buses_data = []
+        for assignment in assignments:
+            bus = assignment.assigned_to
+
+            # Get children on this bus
+            child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
+            children_count = child_assignments.count()
+
+            buses_data.append({
+                'bus': BusSerializer(bus).data,
+                'childrenCount': children_count,
+                'availableSeats': bus.capacity - children_count,
+                'assignment': AssignmentSerializer(assignment).data
+            })
+
+        return Response({
+            'minder': {
+                'id': minder.user.id,
+                'firstName': minder.user.first_name,
+                'lastName': minder.user.last_name,
+                'phoneNumber': minder.phone_number,
+                'status': minder.status
+            },
+            'buses': buses_data,
+            'count': len(buses_data)
+        })
+
+
+class QuickAssignView(APIView):
+    """
+    Quick assignment endpoints for common operations.
+
+    Endpoints:
+    - POST /api/assignments/quick/assign-driver-to-bus/
+    - POST /api/assignments/quick/assign-minder-to-bus/
+    - POST /api/assignments/quick/assign-child-to-bus/
+    - POST /api/assignments/quick/assign-bus-to-route/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, assignment_type):
+        """Quick assignment based on type"""
+
+        type_mapping = {
+            'assign-driver-to-bus': ('driver_to_bus', 'driverId', 'busId', Driver, Bus),
+            'assign-minder-to-bus': ('minder_to_bus', 'minderId', 'busId', BusMinder, Bus),
+            'assign-child-to-bus': ('child_to_bus', 'childId', 'busId', Child, Bus),
+            'assign-bus-to-route': ('bus_to_route', 'busId', 'routeId', Bus, BusRoute),
+        }
+
+        if assignment_type not in type_mapping:
+            return Response(
+                {'error': f'Invalid assignment type: {assignment_type}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        assignment_type_code, assignee_key, assigned_to_key, assignee_model, assigned_to_model = type_mapping[assignment_type]
+
+        assignee_id = request.data.get(assignee_key)
+        assigned_to_id = request.data.get(assigned_to_key)
+        effective_date = request.data.get('effectiveDate')
+        expiry_date = request.data.get('expiryDate')
+        reason = request.data.get('reason', '')
+
+        if not assignee_id or not assigned_to_id:
+            return Response(
+                {'error': f'{assignee_key} and {assigned_to_key} are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            assignee = assignee_model.objects.get(pk=assignee_id)
+        except assignee_model.DoesNotExist:
+            return Response(
+                {'error': f'{assignee_model.__name__} with id {assignee_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        try:
+            assigned_to = assigned_to_model.objects.get(pk=assigned_to_id)
+        except assigned_to_model.DoesNotExist:
+            return Response(
+                {'error': f'{assigned_to_model.__name__} with id {assigned_to_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        try:
+            assignment = AssignmentService.create_assignment(
+                assignment_type=assignment_type_code,
+                assignee=assignee,
+                assigned_to=assigned_to,
+                assigned_by=request.user if request.user.is_authenticated else None,
+                effective_date=effective_date,
+                expiry_date=expiry_date,
+                reason=reason,
+                auto_cancel_conflicting=True
+            )
+
+            return Response({
+                'message': f'Successfully assigned {assignee} to {assigned_to}',
+                'assignment': AssignmentSerializer(assignment).data
+            }, status=status.HTTP_201_CREATED)
+
+        except DjangoValidationError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )

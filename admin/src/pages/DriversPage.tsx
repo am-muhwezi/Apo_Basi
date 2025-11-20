@@ -5,6 +5,7 @@ import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
 import { useDrivers } from '../hooks/useDrivers';
+import { driverService } from '../services/driverService';
 import type { Driver } from '../types';
 
 export default function DriversPage() {
@@ -56,27 +57,29 @@ export default function DriversPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this driver?')) {
-      try {
-        await driverService.deleteDriver(id);
+      const result = await driverService.deleteDriver(id);
+      if (result.success) {
         loadDrivers();
-      } catch (error) {
-        alert('Failed to delete driver');
+      } else {
+        alert(result.error?.message || 'Failed to delete driver');
       }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      if (selectedDriver) {
-        await driverService.updateDriver(selectedDriver.id, formData);
-      } else {
-        await driverService.createDriver(formData);
-      }
+    let result;
+    if (selectedDriver) {
+      result = await driverService.updateDriver(selectedDriver.id, formData);
+    } else {
+      result = await driverService.createDriver(formData);
+    }
+
+    if (result.success) {
       loadDrivers();
       setShowModal(false);
-    } catch (error) {
-      alert(`Failed to ${selectedDriver ? 'update' : 'create'} driver`);
+    } else {
+      alert(result.error?.message || `Failed to ${selectedDriver ? 'update' : 'create'} driver`);
     }
   };
 

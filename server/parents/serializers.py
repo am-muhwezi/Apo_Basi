@@ -1,10 +1,30 @@
 from rest_framework import serializers
 from .models import Parent
-from users.models import User
+
+
+class ParentLoginSerializer(serializers.Serializer):
+    """Validates phone number for login"""
+    phone_number = serializers.CharField(
+        required=True,
+        max_length=15,
+        error_messages={
+            'required': 'Phone number is required',
+            'blank': 'Phone number cannot be blank'
+        }
+    )
+
+    def validate_phone_number(self, value):
+        """Add custom phone validation if needed"""
+        if not value.strip():
+            raise serializers.ValidationError("Phone number cannot be empty")
+        return value.strip()
 
 
 class ParentSerializer(serializers.ModelSerializer):
-    """For GET requests - includes all data with relationships"""
+    """
+    For GET requests - includes all parent data with relationships.
+    Uses camelCase for frontend consistency.
+    """
     id = serializers.IntegerField(source='user.id', read_only=True)
     firstName = serializers.CharField(source='user.first_name', read_only=True)
     lastName = serializers.CharField(source='user.last_name', read_only=True)
@@ -32,16 +52,30 @@ class ParentSerializer(serializers.ModelSerializer):
 
 
 class ParentCreateSerializer(serializers.Serializer):
-    """For POST/PUT requests - validates input and creates User + Parent"""
+    """
+    For POST/PUT requests - validates input and creates User + Parent.
+
+    Email is optional - if not provided, auto-generates: firstname.lastname@parent.com
+    Phone number is mandatory.
+    Address and emergency contact are optional.
+    """
     firstName = serializers.CharField(write_only=True)
     lastName = serializers.CharField(write_only=True)
-    email = serializers.EmailField(required=False, write_only=True)
-    phone = serializers.CharField(write_only=True)
+    email = serializers.EmailField(
+        required=False,
+        allow_blank=True,
+        write_only=True,
+        help_text="Optional - auto-generates if not provided"
+    )
+    phone = serializers.CharField(write_only=True, help_text="Mandatory - primary contact number")
     address = serializers.CharField(required=False, allow_blank=True, write_only=True)
     emergencyContact = serializers.CharField(required=False, allow_blank=True, write_only=True)
     status = serializers.ChoiceField(choices=['active', 'inactive'], default='active', write_only=True)
 
     def create(self, validated_data):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
         # Extract user data
         first_name = validated_data.pop('firstName')
         last_name = validated_data.pop('lastName')
@@ -71,7 +105,7 @@ class ParentCreateSerializer(serializers.Serializer):
         # Create Parent
         parent = Parent.objects.create(
             user=user,
-            contact_number=validated_data.get('phone', ''),
+            contact_number=validated_data.get('phone'),
             address=validated_data.get('address', ''),
             emergency_contact=validated_data.get('emergencyContact', ''),
             status=validated_data.get('status', 'active'),

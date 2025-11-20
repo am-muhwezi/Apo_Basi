@@ -43,12 +43,20 @@ class Attendance(models.Model):
     """
 
     STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('picked_up', 'Picked Up'),
+        ('dropped_off', 'Dropped Off'),
+        ('absent', 'Absent'),
+        # Legacy statuses for backward compatibility
         ('not_on_bus', 'Not on Bus'),
         ('on_bus', 'On the way to school'),
         ('at_school', 'At School'),
         ('on_way_home', 'On the way home'),
-        ('dropped_off', 'Dropped Off'),
-        ('absent', 'Absent'),
+    ]
+
+    TRIP_TYPE_CHOICES = [
+        ('pickup', 'Pickup'),
+        ('dropoff', 'Dropoff'),
     ]
 
     child = models.ForeignKey(
@@ -67,7 +75,14 @@ class Attendance(models.Model):
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default='not_on_bus'
+        default='pending'
+    )
+    trip_type = models.CharField(
+        max_length=10,
+        choices=TRIP_TYPE_CHOICES,
+        null=True,
+        blank=True,
+        help_text="Which trip type this attendance record is for (pickup or dropoff)"
     )
     date = models.DateField(auto_now_add=True)
     marked_by = models.ForeignKey(

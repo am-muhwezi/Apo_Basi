@@ -22,7 +22,7 @@ class DriverListCreateView(generics.ListCreateAPIView):
     POST /api/drivers/ - Create new driver
     """
     permission_classes = [IsAuthenticated]
-    queryset = Driver.objects.select_related('user', 'assigned_bus').all()
+    queryset = Driver.objects.select_related('user').all()
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -38,7 +38,7 @@ class DriverDetailView(generics.RetrieveUpdateDestroyAPIView):
     DELETE /api/drivers/{id}/ - Delete driver
     """
     permission_classes = [IsAuthenticated]
-    queryset = Driver.objects.select_related('user', 'assigned_bus').all()
+    queryset = Driver.objects.select_related('user').all()
     lookup_field = 'user_id'
 
     def get_serializer_class(self):
@@ -71,16 +71,8 @@ class MyBusView(APIView):
                 "bus": None
             }, status=status.HTTP_404_NOT_FOUND)
 
-        # Find active driver-to-bus assignment using the new assignments system
-        bus_content_type = ContentType.objects.get_for_model(Bus)
-        driver_content_type = ContentType.objects.get_for_model(Driver)
-
-        assignment = Assignment.objects.filter(
-            assignee_content_type=driver_content_type,
-            assignee_object_id=driver.user_id,
-            assigned_to_content_type=bus_content_type,
-            status='active'
-        ).first()
+        # Find active driver-to-bus assignment using Assignment API
+        assignment = Assignment.get_active_assignments_for(driver, 'driver_to_bus').first()
 
         if not assignment:
             return Response({
@@ -89,23 +81,17 @@ class MyBusView(APIView):
             })
 
         # Get the assigned bus
-        bus = Bus.objects.get(id=assignment.assigned_to_object_id)
+        bus = assignment.assigned_to
 
-        # Get children assigned to this bus using assignments
-        child_content_type = ContentType.objects.get_for_model(Child)
-        child_assignments = Assignment.objects.filter(
-            assigned_to_content_type=bus_content_type,
-            assigned_to_object_id=bus.id,
-            assignee_content_type=child_content_type,
-            status='active'
-        )
+        # Get children assigned to this bus using Assignment API
+        child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
 
         # Get today's date for attendance
         today = date.today()
 
         children_data = []
         for child_assignment in child_assignments:
-            child = Child.objects.get(id=child_assignment.assignee_object_id)
+            child = child_assignment.assignee  # Use the assignee from Assignment
 
             # Get today's attendance status
             try:
@@ -167,16 +153,8 @@ class MyRouteView(APIView):
                 "error": "Driver profile not found",
             }, status=status.HTTP_404_NOT_FOUND)
 
-        # Find active driver-to-bus assignment
-        bus_content_type = ContentType.objects.get_for_model(Bus)
-        driver_content_type = ContentType.objects.get_for_model(Driver)
-
-        driver_assignment = Assignment.objects.filter(
-            assignee_content_type=driver_content_type,
-            assignee_object_id=driver.user_id,
-            assigned_to_content_type=bus_content_type,
-            status='active'
-        ).first()
+        # Find active driver-to-bus assignment using Assignment API
+        driver_assignment = Assignment.get_active_assignments_for(driver, 'driver_to_bus').first()
 
         if not driver_assignment:
             return Response({
@@ -184,25 +162,17 @@ class MyRouteView(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
 
         # Get the assigned bus
-        bus = Bus.objects.get(id=driver_assignment.assigned_to_object_id)
+        bus = driver_assignment.assigned_to
 
-        # Get all children assigned to this bus
-        child_content_type = ContentType.objects.get_for_model(Child)
-        child_assignments = Assignment.objects.filter(
-            assigned_to_content_type=bus_content_type,
-            assigned_to_object_id=bus.id,
-            assignee_content_type=child_content_type,
-            status='active'
-        ).select_related('assignee_content_type')
+        # Get all children assigned to this bus using Assignment API
+        child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
 
         # Get today's date
         today = date.today()
 
         route_data = []
         for child_assignment in child_assignments:
-            child = Child.objects.select_related('parent', 'parent__user').get(
-                id=child_assignment.assignee_object_id
-            )
+            child = child_assignment.assignee  # Use the assignee from Assignment
 
             # Get today's attendance
             try:
@@ -245,7 +215,7 @@ class MyRouteView(APIView):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def driver_phone_login(request):
     """
     Simple phone-based login for drivers (passwordless).

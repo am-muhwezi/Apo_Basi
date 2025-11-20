@@ -13,6 +13,7 @@ import {
   TrendingUp,
   AlertTriangle,
 } from 'lucide-react';
+import { getAttendanceStats, getDailyAttendanceReport } from '../services/api';
 
 interface AttendanceRecord {
   id: string;
@@ -22,16 +23,20 @@ interface AttendanceRecord {
   route: string;
   pickupTime: string;
   dropoffTime: string;
-  status: 'present' | 'absent' | 'late' | 'early_dismissal';
+  status: 'picked_up' | 'dropped_off' | 'absent' | 'pending';
   parentNotified: boolean;
 }
 
 interface DailyStats {
   total: number;
-  present: number;
+  picked_up: number;
+  dropped_off: number;
   absent: number;
-  late: number;
-  attendanceRate: number;
+  pending: number;
+  picked_up_percentage?: number;
+  dropped_off_percentage?: number;
+  absent_percentage?: number;
+  pending_percentage?: number;
 }
 
 export default function AttendancePage() {
@@ -40,17 +45,58 @@ export default function AttendancePage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [tripType, setTripType] = useState<'pickup' | 'dropoff'>('pickup');
   const [loading, setLoading] = useState(false);
+  const [dailyStats, setDailyStats] = useState<DailyStats>({
+    total: 0,
+    picked_up: 0,
+    dropped_off: 0,
+    absent: 0,
+    pending: 0,
+  });
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
 
-  // Mock data - replace with actual API calls
-  const dailyStats: DailyStats = {
-    total: 856,
-    present: 742,
-    absent: 28,
-    late: 86,
-    attendanceRate: 96.4,
+  // Fetch attendance data when date changes
+  useEffect(() => {
+    fetchAttendanceData();
+  }, [selectedDate]);
+
+  const fetchAttendanceData = async () => {
+    setLoading(true);
+    try {
+      const dateStr = selectedDate.toISOString().split('T')[0];
+
+      // Fetch stats
+      const statsResponse = await getAttendanceStats(dateStr);
+      setDailyStats(statsResponse.data);
+
+      // Fetch daily report
+      const reportResponse = await getDailyAttendanceReport(dateStr);
+
+      // Transform report data to match AttendanceRecord interface
+      const records: AttendanceRecord[] = [];
+      reportResponse.data.buses.forEach((bus: any) => {
+        bus.children.forEach((child: any) => {
+          records.push({
+            id: child.id.toString(),
+            childName: child.name,
+            class: child.grade || 'N/A',
+            busNumber: bus.bus_number,
+            route: bus.bus_number,
+            pickupTime: '-',
+            dropoffTime: '-',
+            status: child.status,
+            parentNotified: true,
+          });
+        });
+      });
+      setAttendanceRecords(records);
+    } catch (error) {
+      console.error('Error fetching attendance data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const attendanceRecords: AttendanceRecord[] = [
+  const mockAttendanceRecords: AttendanceRecord[] = [
     {
       id: '1',
       childName: 'Sarah Johnson',
@@ -110,25 +156,25 @@ export default function AttendancePage() {
 
   const getStatusBadge = (status: AttendanceRecord['status']) => {
     const badges = {
-      present: {
+      picked_up: {
         icon: <CheckCircle size={16} />,
-        text: 'Present',
+        text: 'Picked Up',
         className: 'bg-green-100 text-green-700 border-green-200',
+      },
+      dropped_off: {
+        icon: <CheckCircle size={16} />,
+        text: 'Dropped Off',
+        className: 'bg-blue-100 text-blue-700 border-blue-200',
       },
       absent: {
         icon: <XCircle size={16} />,
         text: 'Absent',
         className: 'bg-red-100 text-red-700 border-red-200',
       },
-      late: {
+      pending: {
         icon: <Clock size={16} />,
-        text: 'Late',
+        text: 'Pending',
         className: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-      },
-      early_dismissal: {
-        icon: <AlertTriangle size={16} />,
-        text: 'Early Dismissal',
-        className: 'bg-orange-100 text-orange-700 border-orange-200',
       },
     };
 
@@ -164,7 +210,14 @@ export default function AttendancePage() {
 
     const matchesStatus = statusFilter === 'all' || record.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
+    // Filter by trip type - use trip_type field if available, otherwise infer from status
+    const recordTripType = (record as any).trip_type ||
+      (record.status === 'picked_up' ? 'pickup' :
+       record.status === 'dropped_off' ? 'dropoff' : null);
+
+    const matchesTripType = !recordTripType || recordTripType === tripType;
+
+    return matchesSearch && matchesStatus && matchesTripType;
   });
 
   return (
@@ -235,54 +288,67 @@ export default function AttendancePage() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
+      <div className="grid grid-cols-5 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
             <div className="p-2 bg-blue-100 rounded-lg">
-              <Users className="w-6 h-6 text-blue-600" />
+              <Users className="w-5 h-5 text-blue-600" />
             </div>
           </div>
-          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Students</h3>
-          <p className="text-3xl font-bold text-slate-900">{dailyStats.total}</p>
+          <h3 className="text-xs font-medium text-slate-600 mb-1">Total Students</h3>
+          <p className="text-2xl font-bold text-slate-900">{filteredRecords.length}</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
+        <div className={`bg-white p-4 rounded-xl border shadow-sm ${tripType === 'pickup' ? 'border-green-300 ring-2 ring-green-100' : 'border-slate-200'}`}>
+          <div className="flex items-center justify-between mb-2">
             <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-green-600" />
+              <CheckCircle className="w-5 h-5 text-green-600" />
             </div>
-            <span className="text-sm text-green-600 font-medium">
-              {((dailyStats.present / dailyStats.total) * 100).toFixed(1)}%
+            <span className="text-xs text-green-600 font-medium">
+              {dailyStats.picked_up_percentage?.toFixed(1) || '0.0'}%
             </span>
           </div>
-          <h3 className="text-sm font-medium text-slate-600 mb-1">Present</h3>
-          <p className="text-3xl font-bold text-slate-900">{dailyStats.present}</p>
+          <h3 className="text-xs font-medium text-slate-600 mb-1">Picked Up</h3>
+          <p className="text-2xl font-bold text-slate-900">{dailyStats.picked_up}</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
+        <div className={`bg-white p-4 rounded-xl border shadow-sm ${tripType === 'dropoff' ? 'border-blue-300 ring-2 ring-blue-100' : 'border-slate-200'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <CheckCircle className="w-5 h-5 text-blue-600" />
+            </div>
+            <span className="text-xs text-blue-600 font-medium">
+              {dailyStats.dropped_off_percentage?.toFixed(1) || '0.0'}%
+            </span>
+          </div>
+          <h3 className="text-xs font-medium text-slate-600 mb-1">Dropped Off</h3>
+          <p className="text-2xl font-bold text-slate-900">{dailyStats.dropped_off}</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
             <div className="p-2 bg-red-100 rounded-lg">
-              <XCircle className="w-6 h-6 text-red-600" />
+              <XCircle className="w-5 h-5 text-red-600" />
             </div>
-            <span className="text-sm text-red-600 font-medium">
-              {((dailyStats.absent / dailyStats.total) * 100).toFixed(1)}%
+            <span className="text-xs text-red-600 font-medium">
+              {dailyStats.absent_percentage?.toFixed(1) || '0.0'}%
             </span>
           </div>
-          <h3 className="text-sm font-medium text-slate-600 mb-1">Absent</h3>
-          <p className="text-3xl font-bold text-slate-900">{dailyStats.absent}</p>
+          <h3 className="text-xs font-medium text-slate-600 mb-1">Absent</h3>
+          <p className="text-2xl font-bold text-slate-900">{dailyStats.absent}</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
             <div className="p-2 bg-yellow-100 rounded-lg">
-              <Clock className="w-6 h-6 text-yellow-600" />
+              <Clock className="w-5 h-5 text-yellow-600" />
             </div>
-            <span className="text-sm text-yellow-600 font-medium">
-              {((dailyStats.late / dailyStats.total) * 100).toFixed(1)}%
+            <span className="text-xs text-yellow-600 font-medium">
+              {dailyStats.pending_percentage?.toFixed(1) || '0.0'}%
             </span>
           </div>
-          <h3 className="text-sm font-medium text-slate-600 mb-1">Late Arrivals</h3>
-          <p className="text-3xl font-bold text-slate-900">{dailyStats.late}</p>
+          <h3 className="text-xs font-medium text-slate-600 mb-1">Pending</h3>
+          <p className="text-2xl font-bold text-slate-900">{dailyStats.pending}</p>
         </div>
       </div>
 

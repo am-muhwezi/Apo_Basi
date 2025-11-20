@@ -29,8 +29,13 @@ class IsAdminOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:  # GET, HEAD, OPTIONS
             return True
 
-        # Write permissions only for admins
-        return hasattr(request.user, 'user_type') and request.user.user_type == 'admin'
+        # Write permissions for admins, staff users, or superusers
+        # Check Django built-in admin flags OR custom user_type
+        return (
+            request.user.is_staff or
+            request.user.is_superuser or
+            (hasattr(request.user, 'user_type') and request.user.user_type == 'admin')
+        )
 
 
 class IsAdminUser(permissions.BasePermission):
@@ -46,8 +51,11 @@ class IsAdminUser(permissions.BasePermission):
         return (
             request.user and
             request.user.is_authenticated and
-            hasattr(request.user, 'user_type') and
-            request.user.user_type == 'admin'
+            (
+                request.user.is_staff or
+                request.user.is_superuser or
+                (hasattr(request.user, 'user_type') and request.user.user_type == 'admin')
+            )
         )
 
 
@@ -61,8 +69,11 @@ class CanManageBusAssignments(permissions.BasePermission):
         return (
             request.user and
             request.user.is_authenticated and
-            hasattr(request.user, 'user_type') and
-            request.user.user_type == 'admin'
+            (
+                request.user.is_staff or
+                request.user.is_superuser or
+                (hasattr(request.user, 'user_type') and request.user.user_type == 'admin')
+            )
         )
 
 
@@ -77,7 +88,8 @@ class IsOwnerOrAdmin(permissions.BasePermission):
         # Read permissions for authenticated users
         if request.method in permissions.SAFE_METHODS:
             # Admins can view all
-            if hasattr(request.user, 'user_type') and request.user.user_type == 'admin':
+            if (request.user.is_staff or request.user.is_superuser or
+                (hasattr(request.user, 'user_type') and request.user.user_type == 'admin')):
                 return True
 
             # Drivers can view their assigned bus
@@ -91,4 +103,8 @@ class IsOwnerOrAdmin(permissions.BasePermission):
             return False
 
         # Write permissions only for admins
-        return hasattr(request.user, 'user_type') and request.user.user_type == 'admin'
+        return (
+            request.user.is_staff or
+            request.user.is_superuser or
+            (hasattr(request.user, 'user_type') and request.user.user_type == 'admin')
+        )

@@ -4,20 +4,20 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
-import { useChildren } from '../hooks/useChildren';
 import { parentService } from '../services/parentService';
+import { childService } from '../services/childService';
 import type { Parent, Child } from '../types';
 
 export default function ParentsPage() {
-  // Use useChildren hook for children data
-  const { children, loadChildren } = useChildren();
-
   const [parents, setParents] = useState<Parent[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
 
+  // State for parent-specific children (loaded on-demand)
+  const [parentChildren, setParentChildren] = useState<Child[]>([]);
+  const [loadingChildren, setLoadingChildren] = useState(false);
+
   // Fetch parents from backend on mount
-  // Children are loaded on-demand when needed (e.g., when viewing parent details)
   React.useEffect(() => {
     loadParents();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -82,13 +82,35 @@ export default function ParentsPage() {
     setShowModal(true);
   };
 
-  const handleView = (parent: Parent) => {
+  const handleView = async (parent: Parent) => {
     setSelectedParent(parent);
-    // Load children data only when viewing parent details (if not already loaded)
-    if (children.length === 0) {
-      loadChildren();
-    }
     setShowDetailModal(true);
+
+    // Load children for this specific parent
+    if (parent.childrenIds && parent.childrenIds.length > 0) {
+      await loadParentChildren(parent.childrenIds);
+    } else {
+      setParentChildren([]);
+    }
+  };
+
+  const loadParentChildren = async (childrenIds: string[]) => {
+    try {
+      setLoadingChildren(true);
+      const childPromises = childrenIds.map(id => childService.getChild(id));
+      const results = await Promise.all(childPromises);
+
+      const loadedChildren = results
+        .filter(result => result.success && result.data)
+        .map(result => result.data!);
+
+      setParentChildren(loadedChildren);
+    } catch (error) {
+      console.error('Failed to load children:', error);
+      setParentChildren([]);
+    } finally {
+      setLoadingChildren(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -136,30 +158,17 @@ export default function ParentsPage() {
     e.preventDefault();
     try {
       await childService.createChild(childFormData);
-      loadParents();
-      loadChildren();
+      loadParents(); // Reload parents to get updated childrenCount and childrenIds
       setShowAddChildModal(false);
     } catch (error) {
       alert('Failed to create child');
     }
   };
 
-  const getChildrenNames = (childrenIds: string[] | undefined) => {
-    if (!childrenIds || childrenIds.length === 0) return '';
-
-    return childrenIds
-      .map((id) => {
-        const child = children.find((c) => c.id === id);
-        return child ? `${child.firstName} ${child.lastName}` : null;
-      })
-      .filter(Boolean)
-      .join(', ');
-  };
-
-  // Calculate stats
+  // Calculate stats from parent data (no need to load all children)
   const totalParents = parents.length;
   const activeParents = parents.filter((p) => p.status === 'active').length;
-  const totalChildren = children.length;
+  const totalChildren = parents.reduce((sum, p) => sum + (p.childrenCount || 0), 0);
   const parentsWithChildren = parents.filter((p) => p.childrenIds && p.childrenIds.length > 0).length;
 
   return (
@@ -264,7 +273,9 @@ export default function ParentsPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">{parent.email}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">{parent.phone}</td>
                   <td className="px-6 py-4 text-slate-700">
-                    <div className="max-w-xs truncate">{getChildrenNames(parent.childrenIds) || 'No children'}</div>
+                    <div className="max-w-xs truncate">
+                      {parent.childrenCount ? `${parent.childrenCount} ${parent.childrenCount === 1 ? 'child' : 'children'}` : 'No children'}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
@@ -418,24 +429,37 @@ export default function ParentsPage() {
                 <p className="text-base text-slate-900">{selectedParent.address}</p>
               </div>
               <div className="col-span-2">
-                <p className="text-sm font-medium text-slate-700 mb-2">Children</p>
-                <div className="space-y-2">
-                  {selectedParent.childrenIds && selectedParent.childrenIds.length > 0 ? (
-                    selectedParent.childrenIds.map((childId) => {
-                      const child = children.find((c) => c.id === childId);
-                      return child ? (
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-slate-700">Children</p>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setShowDetailModal(false);
+                      handleAddChild(selectedParent);
+                    }}
+                  >
+                    <UserPlus size={16} className="mr-1 inline" />
+                    Add Child
+                  </Button>
+                </div>
+                {loadingChildren ? (
+                  <p className="text-slate-600">Loading children...</p>
+                ) : (
+                  <div className="space-y-2">
+                    {parentChildren.length > 0 ? (
+                      parentChildren.map((child) => (
                         <div key={child.id} className="p-3 bg-slate-50 rounded-lg">
                           <p className="font-medium text-slate-900">
                             {child.firstName} {child.lastName}
                           </p>
                           <p className="text-sm text-slate-600">{child.grade} - Age {child.age}</p>
                         </div>
-                      ) : null;
-                    })
-                  ) : (
-                    <p className="text-slate-600">No children assigned</p>
-                  )}
-                </div>
+                      ))
+                    ) : (
+                      <p className="text-slate-600">No children assigned</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

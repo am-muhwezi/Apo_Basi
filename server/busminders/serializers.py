@@ -1,10 +1,14 @@
 from rest_framework import serializers
 from .models import BusMinder
 from users.models import User
+from assignments.models import Assignment
 
 
 class BusMinderSerializer(serializers.ModelSerializer):
-    """For GET requests - includes all data with relationships"""
+    """For GET requests - includes all data with relationships
+
+    NOTE: Uses Assignment API for assignedBusId, assignedBusNumber, and assignedBusesCount
+    """
     id = serializers.IntegerField(source='user.id', read_only=True)
     firstName = serializers.CharField(source='user.first_name', read_only=True)
     lastName = serializers.CharField(source='user.last_name', read_only=True)
@@ -22,17 +26,19 @@ class BusMinderSerializer(serializers.ModelSerializer):
         ]
 
     def get_assignedBusId(self, obj):
-        # Get the first assigned bus (minders typically manage one bus at a time)
-        bus = obj.user.managed_buses.first() if hasattr(obj.user, 'managed_buses') else None
-        return bus.id if bus else None
+        """Get the first assigned bus ID from Assignment API"""
+        assignment = Assignment.get_active_assignments_for(obj, 'minder_to_bus').first()
+        return assignment.assigned_to.id if assignment else None
 
     def get_assignedBusNumber(self, obj):
-        # Get the first assigned bus number
-        bus = obj.user.managed_buses.first() if hasattr(obj.user, 'managed_buses') else None
-        return bus.bus_number if bus else None
+        """Get the first assigned bus number from Assignment API"""
+        assignment = Assignment.get_active_assignments_for(obj, 'minder_to_bus').first()
+        return assignment.assigned_to.bus_number if assignment else None
 
     def get_assignedBusesCount(self, obj):
-        return obj.user.managed_buses.count() if hasattr(obj.user, 'managed_buses') else 0
+        """Get count of assigned buses from Assignment API"""
+        assignments = Assignment.get_active_assignments_for(obj, 'minder_to_bus')
+        return assignments.count()
 
 
 class BusMinderCreateSerializer(serializers.Serializer):

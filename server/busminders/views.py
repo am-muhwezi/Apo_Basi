@@ -70,6 +70,7 @@ from rest_framework.permissions import IsAuthenticated
 from buses.models import Bus
 from children.models import Child
 from attendance.models import Attendance
+from assignments.models import Assignment
 from datetime import date
 from django.shortcuts import get_object_or_404
 
@@ -89,27 +90,39 @@ class MyBusesView(APIView):
     permission_classes = [IsAuthenticated, IsBusMinder]
 
     def get(self, request):
-        # Get all buses assigned to this bus minder
-        buses = Bus.objects.filter(bus_minder=request.user).prefetch_related('children')
+        # Get bus minder object
+        try:
+            busminder = BusMinder.objects.get(user=request.user)
+        except BusMinder.DoesNotExist:
+            return Response({
+                "message": "Bus minder profile not found",
+                "buses": []
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # Get all buses assigned to this bus minder using Assignment API
+        bus_assignments = Assignment.get_active_assignments_for(busminder, 'minder_to_bus')
 
         buses_data = []
-        for bus in buses:
-            # Get children assigned to this bus
-            children = bus.children.all()
+        for bus_assignment in bus_assignments:
+            bus = bus_assignment.assigned_to
+
+            # Get children assigned to this bus using Assignment API
+            child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
             children_data = [{
-                "id": child.id,
-                "name": f"{child.first_name} {child.last_name}",
-                "class_grade": child.class_grade,
-            } for child in children]
+                "id": ca.assignee.id,
+                "name": f"{ca.assignee.first_name} {ca.assignee.last_name}",
+                "class_grade": ca.assignee.class_grade,
+            } for ca in child_assignments]
 
             buses_data.append({
                 "id": bus.id,
+                "bus_number": bus.bus_number,
                 "number_plate": bus.number_plate,
                 "is_active": bus.is_active,
                 "current_location": bus.current_location,
                 "latitude": str(bus.latitude) if bus.latitude else None,
                 "longitude": str(bus.longitude) if bus.longitude else None,
-                "children_count": children.count(),
+                "children_count": len(children_data),
                 "children": children_data,
             })
 
@@ -132,23 +145,39 @@ class BusChildrenView(APIView):
     permission_classes = [IsAuthenticated, IsBusMinder]
 
     def get(self, request, bus_id):
-        # Get the bus and verify it's assigned to this bus minder
+        # Get the bus minder
+        try:
+            busminder = BusMinder.objects.get(user=request.user)
+        except BusMinder.DoesNotExist:
+            return Response(
+                {"error": "Bus minder profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get the bus
         bus = get_object_or_404(Bus, id=bus_id)
 
-        if bus.bus_minder != request.user:
+        # Verify this bus minder is assigned to this bus using Assignment API
+        minder_assignment = Assignment.get_active_assignments_for(busminder, 'minder_to_bus').filter(
+            assigned_to_object_id=bus.id
+        ).first()
+
+        if not minder_assignment:
             return Response(
                 {"error": "You can only view children for buses you manage"},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Get all children assigned to this bus
-        children = Child.objects.filter(assigned_bus=bus).select_related('parent', 'parent__user')
+        # Get all children assigned to this bus using Assignment API
+        child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
 
         # Get today's date
         today = date.today()
 
         children_data = []
-        for child in children:
+        for child_assignment in child_assignments:
+            child = child_assignment.assignee  # Use assignee from Assignment
+
             # Get today's attendance if it exists
             try:
                 attendance = Attendance.objects.get(child=child, date=today)
@@ -201,6 +230,7 @@ class MarkAttendanceView(APIView):
         child_id = request.data.get('child_id')
         new_status = request.data.get('status')
         notes = request.data.get('notes', '')
+        trip_type = request.data.get('trip_type')  # 'pickup' or 'dropoff'
 
         if not child_id or not new_status:
             return Response(
@@ -209,25 +239,56 @@ class MarkAttendanceView(APIView):
             )
 
         # Validate status
-        valid_statuses = ['not_on_bus', 'on_bus', 'at_school', 'on_way_home', 'dropped_off', 'absent']
+        valid_statuses = ['pending', 'picked_up', 'dropped_off', 'absent']
         if new_status not in valid_statuses:
             return Response(
                 {"error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Validate trip_type if provided
+        if trip_type and trip_type not in ['pickup', 'dropoff']:
+            return Response(
+                {"error": "trip_type must be either 'pickup' or 'dropoff'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Auto-detect trip_type from status if not provided
+        if not trip_type:
+            if new_status == 'picked_up':
+                trip_type = 'pickup'
+            elif new_status == 'dropped_off':
+                trip_type = 'dropoff'
+
         # Get the child
         child = get_object_or_404(Child, id=child_id)
 
-        # Verify the child has a bus assigned
-        if not child.assigned_bus:
+        # Get bus minder
+        try:
+            busminder = BusMinder.objects.get(user=request.user)
+        except BusMinder.DoesNotExist:
+            return Response(
+                {"error": "Bus minder profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get child's bus assignment using Assignment API
+        child_bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
+
+        if not child_bus_assignment:
             return Response(
                 {"error": "This child is not assigned to any bus"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Verify the bus minder is assigned to this child's bus
-        if child.assigned_bus.bus_minder != request.user:
+        bus = child_bus_assignment.assigned_to
+
+        # Verify the bus minder is assigned to this child's bus using Assignment API
+        minder_assignment = Assignment.get_active_assignments_for(busminder, 'minder_to_bus').filter(
+            assigned_to_object_id=bus.id
+        ).first()
+
+        if not minder_assignment:
             return Response(
                 {"error": "You can only mark attendance for children on buses you manage"},
                 status=status.HTTP_403_FORBIDDEN
@@ -239,18 +300,20 @@ class MarkAttendanceView(APIView):
             child=child,
             date=today,
             defaults={
-                'bus': child.assigned_bus,
+                'bus': bus,
                 'status': new_status,
+                'trip_type': trip_type,
                 'marked_by': request.user,
-                'notes': notes,
+                'notes': notes or '',  # Ensure notes is never None
             }
         )
 
         # If attendance already exists, update it
         if not created:
             attendance.status = new_status
+            attendance.trip_type = trip_type
             attendance.marked_by = request.user
-            attendance.notes = notes
+            attendance.notes = notes or ''  # Ensure notes is never None
             attendance.save()
 
         return Response({
@@ -267,7 +330,7 @@ class MarkAttendanceView(APIView):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def busminder_phone_login(request):
     """
     Simple phone-based login for bus minders (passwordless).
