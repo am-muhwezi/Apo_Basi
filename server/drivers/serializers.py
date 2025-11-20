@@ -1,10 +1,14 @@
 from rest_framework import serializers
 from .models import Driver
 from users.models import User
+from assignments.models import Assignment
 
 
 class DriverSerializer(serializers.ModelSerializer):
-    """For GET requests - includes all data with relationships"""
+    """For GET requests - includes all data with relationships
+
+    NOTE: Uses Assignment API for assignedBusId and assignedBusNumber
+    """
     id = serializers.IntegerField(source='user.id', read_only=True)
     firstName = serializers.CharField(source='user.first_name', read_only=True)
     lastName = serializers.CharField(source='user.last_name', read_only=True)
@@ -12,8 +16,8 @@ class DriverSerializer(serializers.ModelSerializer):
     phone = serializers.CharField(source='phone_number', read_only=True)
     licenseNumber = serializers.CharField(source='license_number', read_only=True)
     licenseExpiry = serializers.DateField(source='license_expiry', read_only=True)
-    assignedBusId = serializers.IntegerField(source='assigned_bus.id', read_only=True, allow_null=True)
-    assignedBusNumber = serializers.CharField(source='assigned_bus.bus_number', read_only=True, allow_null=True)
+    assignedBusId = serializers.SerializerMethodField()
+    assignedBusNumber = serializers.SerializerMethodField()
 
     class Meta:
         model = Driver
@@ -22,6 +26,16 @@ class DriverSerializer(serializers.ModelSerializer):
             'licenseNumber', 'licenseExpiry', 'status',
             'assignedBusId', 'assignedBusNumber'
         ]
+
+    def get_assignedBusId(self, obj):
+        """Get assigned bus ID from Assignment API"""
+        assignment = Assignment.get_active_assignments_for(obj, 'driver_to_bus').first()
+        return assignment.assigned_to.id if assignment else None
+
+    def get_assignedBusNumber(self, obj):
+        """Get assigned bus number from Assignment API"""
+        assignment = Assignment.get_active_assignments_for(obj, 'driver_to_bus').first()
+        return assignment.assigned_to.bus_number if assignment else None
 
 
 class DriverCreateSerializer(serializers.Serializer):
@@ -62,13 +76,21 @@ class DriverCreateSerializer(serializers.Serializer):
             status=validated_data.get('status', 'active'),
         )
 
-        # Assign bus if provided
+        # Assign bus if provided (using Assignment API)
         if assigned_bus_id:
             from buses.models import Bus
+            from assignments.services import AssignmentService
             try:
                 bus = Bus.objects.get(id=assigned_bus_id)
-                driver.assigned_bus = bus
-                driver.save()
+                # Use Assignment API instead of direct ForeignKey
+                AssignmentService.create_assignment(
+                    assignment_type='driver_to_bus',
+                    assignee=driver,
+                    assigned_to=bus,
+                    assigned_by=None,  # System assignment
+                    reason="Created via driver creation",
+                    auto_cancel_conflicting=True
+                )
             except Bus.DoesNotExist:
                 pass
 
@@ -96,15 +118,29 @@ class DriverCreateSerializer(serializers.Serializer):
             instance.status = validated_data.pop('status')
         if 'assignedBusId' in validated_data:
             bus_id = validated_data.pop('assignedBusId')
+            from buses.models import Bus
+            from assignments.services import AssignmentService
+
             if bus_id:
-                from buses.models import Bus
+                # Assign to new bus using Assignment API
                 try:
                     bus = Bus.objects.get(id=bus_id)
-                    instance.assigned_bus = bus
+                    AssignmentService.create_assignment(
+                        assignment_type='driver_to_bus',
+                        assignee=instance,
+                        assigned_to=bus,
+                        assigned_by=None,  # System assignment
+                        reason="Updated via driver edit",
+                        auto_cancel_conflicting=True  # This will cancel old assignments
+                    )
                 except Bus.DoesNotExist:
                     pass
             else:
-                instance.assigned_bus = None
+                # Cancel existing bus assignment
+                existing_assignment = Assignment.get_active_assignments_for(instance, 'driver_to_bus').first()
+                if existing_assignment:
+                    existing_assignment.status = 'cancelled'
+                    existing_assignment.save()
 
         instance.save()
         return instance

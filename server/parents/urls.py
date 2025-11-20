@@ -1,29 +1,39 @@
-from django.urls import path
+"""
+Parent URL Configuration using DRF Router.
+
+DRF Router automatically generates URL patterns for ViewSets.
+
+Generated URLs:
+    GET    /api/parents/                          → list
+    POST   /api/parents/                          → create
+    GET    /api/parents/:id/                      → retrieve
+    PUT    /api/parents/:id/                      → update
+    PATCH  /api/parents/:id/                      → partial_update
+    DELETE /api/parents/:id/                      → destroy
+    GET    /api/parents/:id/children/             → custom action
+
+Additional endpoints (non-ViewSet):
+    POST   /api/parents/login/                    → parent login
+    GET    /api/parents/children/<id>/attendance/ → child attendance history
+"""
+
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from .views import (
-    ParentListCreateView,
-    ParentDetailView,
-    ParentRegistrationView,
+    ParentViewSet,
     ParentLoginView,
-    ParentDirectPhoneLoginView,
-    MyChildrenView,
-    ChildAttendanceHistoryView,
-    ParentAssignChildrenView,
-    ParentChildrenView,
+    ChildAttendanceHistoryView
 )
 
+# Create a router and register the ParentViewSet
+router = DefaultRouter()
+router.register(r'', ParentViewSet, basename='parent')
+
 urlpatterns = [
-    # RESTful CRUD endpoints
-    path("", ParentListCreateView.as_view(), name="parent-list-create"),
-    path("<int:user_id>/", ParentDetailView.as_view(), name="parent-detail"),
+    # Authentication - must come before router to avoid conflicts
+    path('login/', ParentLoginView.as_view(), name='parent-login'),
+    path('children/<int:child_id>/attendance/', ChildAttendanceHistoryView.as_view(), name='child-attendance-history'),
 
-    # Assignment endpoints
-    path("<int:user_id>/assign-children/", ParentAssignChildrenView.as_view(), name="parent-assign-children"),
-    path("<int:user_id>/children/", ParentChildrenView.as_view(), name="parent-children"),
-
-    # Parent-specific endpoints
-    path("register/", ParentRegistrationView.as_view(), name="parent-register"),
-    path("login/", ParentLoginView.as_view(), name="parent-login"),
-    path("direct-phone-login/", ParentDirectPhoneLoginView.as_view(), name="parent-direct-phone-login"),
-    path("my-children/", MyChildrenView.as_view(), name="my-children"),
-    path("children/<int:child_id>/attendance/", ChildAttendanceHistoryView.as_view(), name="child-attendance-history"),
+    # Include router URLs
+    path('', include(router.urls)),
 ]

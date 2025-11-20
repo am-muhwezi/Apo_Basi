@@ -8,6 +8,7 @@ from users.serializers import UserSerializer
 from parents.models import Parent
 from busminders.models import BusMinder
 from .models import Admin
+from users.permissions import IsAdmin
 from .serializers import AdminSerializer, AdminCreateSerializer, AdminRegistrationSerializer
 
 import uuid
@@ -72,7 +73,7 @@ class AdminDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class AdminAddParentView(generics.CreateAPIView):
-    permission_classes = [permissions.IsAuthenticated]  # Secured: requires authentication
+    permission_classes = [permissions.IsAuthenticated]#isAdmin]  # Secured: requires authentication
     queryset = User.objects.all()
 
     def post(self, request, *args, **kwargs):
@@ -291,6 +292,8 @@ from buses.models import Bus
 from rest_framework.views import APIView
 from django.db.models import Count, Q
 from datetime import datetime, timedelta
+from assignments.services import AssignmentService
+from assignments.models import Assignment
 
 
 @api_view(['GET'])
@@ -427,6 +430,7 @@ class AdminAssignDriverToBusView(APIView):
 
         try:
             driver_user = User.objects.get(id=driver_id, user_type="driver")
+            driver = driver_user.driver_profile
             bus = Bus.objects.get(id=bus_id)
         except User.DoesNotExist:
             return Response(
@@ -436,9 +440,25 @@ class AdminAssignDriverToBusView(APIView):
             return Response(
                 {"error": "Bus not found"}, status=status.HTTP_404_NOT_FOUND
             )
+        except AttributeError:
+            return Response(
+                {"error": "Driver profile not found"}, status=status.HTTP_404_NOT_FOUND
+            )
 
-        bus.driver = driver_user
-        bus.save()
+        # Use Assignment API instead of direct ForeignKey
+        try:
+            assignment = AssignmentService.create_assignment(
+                assignment_type='driver_to_bus',
+                assignee=driver,
+                assigned_to=bus,
+                assigned_by=request.user,
+                reason=f"Admin assignment via dashboard",
+                auto_cancel_conflicting=True
+            )
+        except Exception as e:
+            return Response(
+                {"error": str(e)}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         return Response(
             {
@@ -448,6 +468,7 @@ class AdminAssignDriverToBusView(APIView):
                     "id": driver_user.id,
                     "name": driver_user.get_full_name(),
                 },
+                "assignment_id": assignment.id
             },
             status=status.HTTP_200_OK,
         )

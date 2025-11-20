@@ -1,17 +1,24 @@
 from rest_framework import serializers
 from .models import Bus
 from django.contrib.auth import get_user_model
+from assignments.models import Assignment
 
 User = get_user_model()
 
 
 class BusSerializer(serializers.ModelSerializer):
-    """Full bus serializer - uses camelCase for frontend consistency"""
+    """Full bus serializer - uses camelCase for frontend consistency
+
+    NOTE: Uses Assignment API instead of legacy ForeignKeys for:
+    - driverId, driverName (via Assignment)
+    - minderId, minderName (via Assignment)
+    - assignedChildrenCount, assignedChildrenIds (via Assignment)
+    """
     busNumber = serializers.CharField(source='bus_number')
     licensePlate = serializers.CharField(source='number_plate')
-    driverId = serializers.IntegerField(source='driver.id', read_only=True, allow_null=True)
+    driverId = serializers.SerializerMethodField()
     driverName = serializers.SerializerMethodField()
-    minderId = serializers.IntegerField(source='bus_minder.id', read_only=True, allow_null=True)
+    minderId = serializers.SerializerMethodField()
     minderName = serializers.SerializerMethodField()
     assignedChildrenCount = serializers.SerializerMethodField()
     assignedChildrenIds = serializers.SerializerMethodField()
@@ -31,20 +38,41 @@ class BusSerializer(serializers.ModelSerializer):
             'latitude', 'longitude', 'lastUpdated'
         ]
 
+    def get_driverId(self, obj):
+        """Get driver ID from Assignment API"""
+        driver_assignment = Assignment.get_assignments_to(obj, 'driver_to_bus').first()
+        return driver_assignment.assignee.user_id if driver_assignment else None
+
     def get_driverName(self, obj):
-        return f"{obj.driver.first_name} {obj.driver.last_name}" if obj.driver else None
+        """Get driver name from Assignment API"""
+        driver_assignment = Assignment.get_assignments_to(obj, 'driver_to_bus').first()
+        if driver_assignment:
+            driver = driver_assignment.assignee
+            return f"{driver.user.first_name} {driver.user.last_name}"
+        return None
+
+    def get_minderId(self, obj):
+        """Get minder ID from Assignment API"""
+        minder_assignment = Assignment.get_assignments_to(obj, 'minder_to_bus').first()
+        return minder_assignment.assignee.user_id if minder_assignment else None
 
     def get_minderName(self, obj):
-        return f"{obj.bus_minder.first_name} {obj.bus_minder.last_name}" if obj.bus_minder else None
+        """Get minder name from Assignment API"""
+        minder_assignment = Assignment.get_assignments_to(obj, 'minder_to_bus').first()
+        if minder_assignment:
+            minder = minder_assignment.assignee
+            return f"{minder.user.first_name} {minder.user.last_name}"
+        return None
 
     def get_assignedChildrenCount(self, obj):
-        return obj.children.count() if hasattr(obj, 'children') else 0
+        """Get children count from Assignment API"""
+        child_assignments = Assignment.get_assignments_to(obj, 'child_to_bus')
+        return child_assignments.count()
 
     def get_assignedChildrenIds(self, obj):
-        """Return list of child IDs assigned to this bus"""
-        if hasattr(obj, 'children'):
-            return list(obj.children.values_list('id', flat=True))
-        return []
+        """Get list of child IDs from Assignment API"""
+        child_assignments = Assignment.get_assignments_to(obj, 'child_to_bus')
+        return [ca.assignee_object_id for ca in child_assignments]
 
     def get_status(self, obj):
         """Convert is_active boolean to status string for frontend"""

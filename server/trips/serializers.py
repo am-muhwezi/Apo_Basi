@@ -64,8 +64,11 @@ class StopCreateSerializer(serializers.ModelSerializer):
 class TripSerializer(serializers.ModelSerializer):
     """Full trip serializer - uses camelCase for frontend consistency"""
     busId = serializers.IntegerField(source='bus.id', read_only=True)
+    busNumber = serializers.CharField(source='bus.bus_number', read_only=True)
     driverId = serializers.IntegerField(source='driver.id', read_only=True)
+    driverName = serializers.CharField(source='driver.get_full_name', read_only=True)
     minderId = serializers.IntegerField(source='bus_minder.id', read_only=True, allow_null=True)
+    minderName = serializers.SerializerMethodField()
     type = serializers.CharField(source='trip_type')
     scheduledTime = serializers.DateTimeField(source='scheduled_time')
     startTime = serializers.DateTimeField(source='start_time', allow_null=True, required=False)
@@ -77,15 +80,26 @@ class TripSerializer(serializers.ModelSerializer):
         many=True,
         read_only=True
     )
+    totalStudents = serializers.IntegerField(source='total_students', allow_null=True, required=False)
+    studentsCompleted = serializers.IntegerField(source='students_completed', allow_null=True, required=False)
+    studentsAbsent = serializers.IntegerField(source='students_absent', allow_null=True, required=False)
+    studentsPending = serializers.IntegerField(source='students_pending', allow_null=True, required=False)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
 
     class Meta:
         model = Trip
         fields = [
-            'id', 'busId', 'driverId', 'minderId', 'route', 'type', 'status',
+            'id', 'busId', 'busNumber', 'driverId', 'driverName', 'minderId', 'minderName',
+            'route', 'type', 'status',
             'scheduledTime', 'startTime', 'endTime', 'currentLocation',
-            'stops', 'childrenIds', 'createdAt'
+            'stops', 'childrenIds', 'totalStudents', 'studentsCompleted',
+            'studentsAbsent', 'studentsPending', 'createdAt'
         ]
+
+    def get_minderName(self, obj):
+        if obj.bus_minder:
+            return obj.bus_minder.get_full_name()
+        return None
 
     def get_currentLocation(self, obj):
         if obj.current_latitude and obj.current_longitude:

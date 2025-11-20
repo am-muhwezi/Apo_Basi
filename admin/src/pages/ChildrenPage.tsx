@@ -20,14 +20,14 @@ export default function ChildrenPage() {
     refreshChildren
   } = useChildren();
 
-  // Load children on mount (assignedBusNumber is included in children response)
+  // Load children on mount (assignedBusNumber and parentName are included in children response)
   React.useEffect(() => {
     loadChildren();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Local state for parents (loaded on demand)
+  // Local state for parents (loaded only for create/edit forms)
   const [parents, setParents] = useState<Parent[]>([]);
-  const [parentsLoaded, setParentsLoaded] = useState(false);
+  const [parentsLoading, setParentsLoading] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [gradeFilter, setGradeFilter] = useState('all');
@@ -38,13 +38,12 @@ export default function ChildrenPage() {
 
   const grades = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6'];
 
-  // Load parents when modal opens
+  // Load parents for dropdown in create/edit modal
   const loadParentsForModal = async () => {
-    if (parentsLoaded) return;
+    if (parents.length > 0 || parentsLoading) return;
 
     try {
-      // For now, we'll need to create a parent API/service
-      // This is a temporary workaround - parents should have their own hook
+      setParentsLoading(true);
       const response = await fetch('http://localhost:8000/api/parents/?limit=100', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
@@ -52,10 +51,11 @@ export default function ChildrenPage() {
       });
       const data = await response.json();
       setParents(data.results || []);
-      setParentsLoaded(true);
     } catch (error) {
       console.error('Failed to load parents:', error);
       setParents([]);
+    } finally {
+      setParentsLoading(false);
     }
   };
 
@@ -136,12 +136,6 @@ export default function ChildrenPage() {
       }
     }
   };
-
-  const getParentName = (parentId: string) => {
-    const parent = parents.find((p) => p.id === parentId);
-    return parent ? `${parent.firstName} ${parent.lastName}` : 'Unknown';
-  };
-
 
   if (childrenError) {
     return (
@@ -269,7 +263,7 @@ export default function ChildrenPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">{child.grade}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">{child.age}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                    {getParentName(child.parentId)}
+                    {child.parentName || 'Unknown'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
                     {child.assignedBusNumber || 'Not Assigned'}
@@ -434,7 +428,7 @@ export default function ChildrenPage() {
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-700">Parent</p>
-                <p className="text-base text-slate-900">{getParentName(selectedChild.parentId)}</p>
+                <p className="text-base text-slate-900">{selectedChild.parentName || 'Unknown'}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-700">Bus</p>

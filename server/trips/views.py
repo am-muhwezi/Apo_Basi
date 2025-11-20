@@ -89,6 +89,12 @@ class TripStartView(APIView):
 class TripCompleteView(APIView):
     """
     POST /api/trips/{id}/complete/ - Complete a trip
+    Body (optional): {
+        "totalStudents": 10,
+        "studentsCompleted": 8,
+        "studentsAbsent": 2,
+        "studentsPending": 0
+    }
     """
     permission_classes = [IsAuthenticated]
 
@@ -103,6 +109,17 @@ class TripCompleteView(APIView):
 
         trip.status = 'completed'
         trip.end_time = timezone.now()
+
+        # Save attendance summary if provided
+        if 'totalStudents' in request.data:
+            trip.total_students = request.data.get('totalStudents')
+        if 'studentsCompleted' in request.data:
+            trip.students_completed = request.data.get('studentsCompleted')
+        if 'studentsAbsent' in request.data:
+            trip.students_absent = request.data.get('studentsAbsent')
+        if 'studentsPending' in request.data:
+            trip.students_pending = request.data.get('studentsPending')
+
         trip.save()
 
         serializer = TripSerializer(trip)

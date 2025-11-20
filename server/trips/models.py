@@ -84,6 +84,12 @@ class Trip(models.Model):
         help_text="Children assigned to this trip"
     )
 
+    # Trip Summary (populated when trip is completed)
+    total_students = models.IntegerField(null=True, blank=True, help_text="Total students on this trip")
+    students_completed = models.IntegerField(null=True, blank=True, help_text="Students picked up/dropped off")
+    students_absent = models.IntegerField(null=True, blank=True, help_text="Students marked absent")
+    students_pending = models.IntegerField(null=True, blank=True, help_text="Students not marked")
+
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

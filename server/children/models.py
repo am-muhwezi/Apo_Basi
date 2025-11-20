@@ -28,16 +28,57 @@ class Child(models.Model):
     - Used by attendance, notification, and reporting modules to aggregate and display student data to parents and school admins.
     """
 
+    # Enrollment status - for admin management
     STATUS_CHOICES = [
         ('active', 'Active'),
         ('inactive', 'Inactive'),
+    ]
+
+    # Location/tracking status - for real-time tracking
+    LOCATION_STATUS_CHOICES = [
+        ('home', 'Home'),
+        ('at-school', 'At School'),
+        ('on-bus', 'On Bus'),
+        ('picked-up', 'Picked Up'),
+        ('dropped-off', 'Dropped Off'),
     ]
 
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
     class_grade = models.CharField(max_length=10)
     age = models.IntegerField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+
+    # Enrollment status (active/inactive)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='active',
+        help_text="Enrollment status - whether child is actively using the service"
+    )
+
+    # Location/tracking status (home/school/on-bus/etc)
+    location_status = models.CharField(
+        max_length=20,
+        choices=LOCATION_STATUS_CHOICES,
+        default='home',
+        help_text="Current location status - for real-time tracking"
+    )
+
+    # Contact information - optional, inherits from parent if not provided
+    address = models.TextField(
+        blank=True,
+        help_text="Child's address (optional, defaults to parent's address)"
+    )
+    emergency_contact = models.CharField(
+        max_length=15,
+        blank=True,
+        help_text="Emergency contact (optional, defaults to parent's emergency contact)"
+    )
+    medical_info = models.TextField(
+        blank=True,
+        help_text="Medical information or special needs"
+    )
+
     parent = models.ForeignKey(
         "parents.Parent", on_delete=models.CASCADE, related_name="parent_children"
     )

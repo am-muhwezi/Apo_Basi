@@ -1,21 +1,31 @@
 from rest_framework import serializers
 from .models import Child
+from assignments.models import Assignment
 
 
 class ChildSerializer(serializers.ModelSerializer):
-    """For GET requests - includes all data with relationships"""
+    """For GET requests - includes all data with relationships
+
+    NOTE: Uses Assignment API for assignedBusId and assignedBusNumber
+    """
     firstName = serializers.CharField(source='first_name', read_only=True)
     lastName = serializers.CharField(source='last_name', read_only=True)
     grade = serializers.CharField(source='class_grade', read_only=True)
+    status = serializers.CharField(read_only=True)
+    locationStatus = serializers.CharField(source='location_status', read_only=True)
+    address = serializers.CharField(read_only=True)
+    emergencyContact = serializers.CharField(source='emergency_contact', read_only=True)
+    medicalInfo = serializers.CharField(source='medical_info', read_only=True)
     parentId = serializers.IntegerField(source='parent.user.id', read_only=True)
     parentName = serializers.SerializerMethodField()
-    assignedBusId = serializers.IntegerField(source='assigned_bus.id', read_only=True, allow_null=True)
-    assignedBusNumber = serializers.CharField(source='assigned_bus.bus_number', read_only=True, allow_null=True)
+    assignedBusId = serializers.SerializerMethodField()
+    assignedBusNumber = serializers.SerializerMethodField()
 
     class Meta:
         model = Child
         fields = [
-            'id', 'firstName', 'lastName', 'grade', 'age', 'status',
+            'id', 'firstName', 'lastName', 'grade', 'age', 'status', 'locationStatus',
+            'address', 'emergencyContact', 'medicalInfo',
             'parentId', 'parentName', 'assignedBusId', 'assignedBusNumber'
         ]
 
@@ -24,6 +34,16 @@ class ChildSerializer(serializers.ModelSerializer):
             return f"{obj.parent.user.first_name} {obj.parent.user.last_name}"
         return None
 
+    def get_assignedBusId(self, obj):
+        """Get assigned bus ID from Assignment API"""
+        assignment = Assignment.get_active_assignments_for(obj, 'child_to_bus').first()
+        return assignment.assigned_to.id if assignment else None
+
+    def get_assignedBusNumber(self, obj):
+        """Get assigned bus number from Assignment API"""
+        assignment = Assignment.get_active_assignments_for(obj, 'child_to_bus').first()
+        return assignment.assigned_to.bus_number if assignment else None
+
 
 class ChildCreateSerializer(serializers.Serializer):
     """For POST/PUT requests - validates input"""
@@ -31,7 +51,37 @@ class ChildCreateSerializer(serializers.Serializer):
     lastName = serializers.CharField(write_only=True)
     grade = serializers.CharField(write_only=True)
     age = serializers.IntegerField(required=False, allow_null=True, write_only=True)
-    status = serializers.ChoiceField(choices=['active', 'inactive'], default='active', write_only=True)
+    status = serializers.ChoiceField(
+        choices=['active', 'inactive'],
+        default='active',
+        write_only=True,
+        help_text="Enrollment status"
+    )
+    locationStatus = serializers.ChoiceField(
+        choices=['home', 'at-school', 'on-bus', 'picked-up', 'dropped-off'],
+        default='home',
+        required=False,
+        write_only=True,
+        help_text="Current location/tracking status"
+    )
+    address = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        write_only=True,
+        help_text="Child's address (optional, inherits from parent if not provided)"
+    )
+    emergencyContact = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        write_only=True,
+        help_text="Emergency contact (optional, inherits from parent if not provided)"
+    )
+    medicalInfo = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        write_only=True,
+        help_text="Medical information"
+    )
     parentId = serializers.IntegerField(write_only=True)
     assignedBusId = serializers.IntegerField(required=False, allow_null=True, write_only=True)
 
@@ -48,23 +98,46 @@ class ChildCreateSerializer(serializers.Serializer):
 
         # Get bus if provided
         bus_id = validated_data.pop('assignedBusId', None)
-        bus = None
-        if bus_id:
-            try:
-                bus = Bus.objects.get(id=bus_id)
-            except Bus.DoesNotExist:
-                raise serializers.ValidationError({"assignedBusId": "Bus not found"})
 
-        # Create Child
+        # Auto-inherit address from parent if not provided
+        address = validated_data.get('address', '').strip()
+        if not address:
+            address = parent.address or ''
+
+        # Auto-inherit emergency contact from parent if not provided
+        emergency_contact = validated_data.get('emergencyContact', '').strip()
+        if not emergency_contact:
+            emergency_contact = parent.emergency_contact or ''
+
+        # Create Child (without assigned_bus - will use Assignment API)
         child = Child.objects.create(
             first_name=validated_data.get('firstName'),
             last_name=validated_data.get('lastName'),
             class_grade=validated_data.get('grade'),
             age=validated_data.get('age'),
             status=validated_data.get('status', 'active'),
-            parent=parent,
-            assigned_bus=bus
+            location_status=validated_data.get('locationStatus', 'home'),
+            address=address,
+            emergency_contact=emergency_contact,
+            medical_info=validated_data.get('medicalInfo', ''),
+            parent=parent
         )
+
+        # Assign to bus using Assignment API
+        if bus_id:
+            from assignments.services import AssignmentService
+            try:
+                bus = Bus.objects.get(id=bus_id)
+                AssignmentService.create_assignment(
+                    assignment_type='child_to_bus',
+                    assignee=child,
+                    assigned_to=bus,
+                    assigned_by=None,  # System assignment
+                    reason="Created via child creation",
+                    auto_cancel_conflicting=True
+                )
+            except Bus.DoesNotExist:
+                raise serializers.ValidationError({"assignedBusId": "Bus not found"})
 
         return child
 
@@ -83,6 +156,14 @@ class ChildCreateSerializer(serializers.Serializer):
             instance.age = validated_data.pop('age')
         if 'status' in validated_data:
             instance.status = validated_data.pop('status')
+        if 'locationStatus' in validated_data:
+            instance.location_status = validated_data.pop('locationStatus')
+        if 'address' in validated_data:
+            instance.address = validated_data.pop('address')
+        if 'emergencyContact' in validated_data:
+            instance.emergency_contact = validated_data.pop('emergencyContact')
+        if 'medicalInfo' in validated_data:
+            instance.medical_info = validated_data.pop('medicalInfo')
 
         # Update parent
         if 'parentId' in validated_data:
@@ -93,17 +174,31 @@ class ChildCreateSerializer(serializers.Serializer):
             except Parent.DoesNotExist:
                 raise serializers.ValidationError({"parentId": "Parent not found"})
 
-        # Update bus
+        # Update bus using Assignment API
         if 'assignedBusId' in validated_data:
             bus_id = validated_data.pop('assignedBusId')
+            from assignments.services import AssignmentService
+
             if bus_id:
+                # Assign to new bus
                 try:
                     bus = Bus.objects.get(id=bus_id)
-                    instance.assigned_bus = bus
+                    AssignmentService.create_assignment(
+                        assignment_type='child_to_bus',
+                        assignee=instance,
+                        assigned_to=bus,
+                        assigned_by=None,  # System assignment
+                        reason="Updated via child edit",
+                        auto_cancel_conflicting=True  # This will cancel old assignments
+                    )
                 except Bus.DoesNotExist:
                     raise serializers.ValidationError({"assignedBusId": "Bus not found"})
             else:
-                instance.assigned_bus = None
+                # Cancel existing bus assignment
+                existing_assignment = Assignment.get_active_assignments_for(instance, 'child_to_bus').first()
+                if existing_assignment:
+                    existing_assignment.status = 'cancelled'
+                    existing_assignment.save()
 
         instance.save()
         return instance
