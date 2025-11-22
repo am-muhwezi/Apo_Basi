@@ -10,11 +10,12 @@ export interface Child {
   assignedBusId?: string;
   assignedBusNumber?: string;
   photoUrl?: string;
-  address: string;
-  emergencyContact: string;
+  address?: string;  // Optional - inherits from parent if not provided
+  emergencyContact?: string;  // Optional - inherits from parent if not provided
   medicalInfo?: string;
-  status: 'active' | 'inactive';
-  createdAt: string;
+  status: 'active' | 'inactive';  // Enrollment status
+  locationStatus?: 'home' | 'at-school' | 'on-bus' | 'picked-up' | 'dropped-off';  // Real-time tracking status
+  createdAt?: string;
 }
 
 export interface Parent {
@@ -24,9 +25,11 @@ export interface Parent {
   email: string;
   phone: string;
   address: string;
+  emergencyContact?: string;
   childrenIds: string[];
+  childrenCount?: number;
   status: 'active' | 'inactive';
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface Bus {
@@ -76,7 +79,6 @@ export interface Minder {
   assignedBusId?: string;
   assignedBusNumber?: string;
   photoUrl?: string;
-  certifications?: string[];
   status: 'active' | 'inactive';
   createdAt: string;
 }

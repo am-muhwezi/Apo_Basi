@@ -118,7 +118,6 @@ export interface MinderCreateData {
   lastName: string;
   email: string;
   phone: string;
-  certifications?: string[];
   status?: 'active' | 'inactive';
 }
 
@@ -134,10 +133,11 @@ export interface ChildCreateData {
   grade: string;
   age: number;
   parentId: string;
-  address: string;
-  emergencyContact: string;
+  address?: string;  // Optional - inherits from parent if not provided
+  emergencyContact?: string;  // Optional - inherits from parent if not provided
   medicalInfo?: string;
-  status?: 'active' | 'inactive';
+  status?: 'active' | 'inactive';  // Enrollment status
+  locationStatus?: 'home' | 'at-school' | 'on-bus' | 'picked-up' | 'dropped-off';  // Tracking status
 }
 
 export interface ChildUpdateData extends Partial<ChildCreateData> {}
@@ -165,3 +165,25 @@ export interface AssignmentFilterParams extends PaginationParams {
   assigneeId?: number;
   assignedToId?: number;
 }
+
+// ============================================
+// Parent-specific API Types
+// ============================================
+
+/**
+ * Data required to create a new parent
+ */
+export interface ParentCreateData {
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone: string;
+  address?: string;
+  emergencyContact?: string;
+  status?: 'active' | 'inactive';
+}
+
+/**
+ * Data for updating an existing parent (all fields optional)
+ */
+export interface ParentUpdateData extends Partial<ParentCreateData> {}

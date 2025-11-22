@@ -1,21 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import {
-  BarChart3,
   TrendingUp,
   Users,
   Bus,
   Clock,
   MapPin,
-  Calendar,
   Activity,
-  DollarSign,
   AlertCircle,
   CheckCircle,
   ArrowUp,
   ArrowDown,
+  RefreshCw,
 } from 'lucide-react';
+import { analyticsService } from '../services/analyticsService';
+import type {
+  AnalyticsPeriod,
+  FullAnalytics,
+  TripAnalyticsDay,
+  BusPerformance,
+} from '../services/analyticsService';
 
-interface MetricCard {
+interface MetricCardData {
   title: string;
   value: string | number;
   change: number;
@@ -25,62 +30,96 @@ interface MetricCard {
 }
 
 export default function AnalyticsPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
-  const [loading, setLoading] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState<AnalyticsPeriod>('month');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - replace with actual API calls
-  const metrics: MetricCard[] = [
-    {
-      title: 'Total Trips',
-      value: '1,234',
-      change: 12.5,
-      changeLabel: 'vs last month',
-      icon: <MapPin className="w-6 h-6" />,
-      color: 'blue',
+  // Analytics data state
+  const [metrics, setMetrics] = useState<MetricCardData[]>([]);
+  const [tripAnalytics, setTripAnalytics] = useState<TripAnalyticsDay[]>([]);
+  const [busPerformance, setBusPerformance] = useState<BusPerformance[]>([]);
+  const [attendanceStats, setAttendanceStats] = useState({
+    present_today: 0,
+    absent_today: 0,
+    attendance_rate: 0,
+  });
+  const [routeEfficiency, setRouteEfficiency] = useState({
+    avg_distance: 0,
+    fuel_efficiency: 0,
+    cost_per_trip: 0,
+    data_sources: {
+      avg_distance: '',
+      fuel_efficiency: '',
+      cost_per_trip: '',
     },
-    {
-      title: 'Active Users',
-      value: '856',
-      change: 8.2,
-      changeLabel: 'vs last month',
-      icon: <Users className="w-6 h-6" />,
-      color: 'green',
-    },
-    {
-      title: 'Fleet Utilization',
-      value: '87%',
-      change: 5.3,
-      changeLabel: 'vs last month',
-      icon: <Bus className="w-6 h-6" />,
-      color: 'purple',
-    },
-    {
-      title: 'Avg Trip Duration',
-      value: '42 min',
-      change: -3.1,
-      changeLabel: 'vs last month',
-      icon: <Clock className="w-6 h-6" />,
-      color: 'orange',
-    },
-  ];
+  });
+  const [safetyAlerts, setSafetyAlerts] = useState({
+    active_alerts: 0,
+    resolved_today: 0,
+    safety_score: 0,
+  });
 
-  const tripAnalytics = [
-    { day: 'Mon', completed: 45, cancelled: 2, delayed: 3 },
-    { day: 'Tue', completed: 52, cancelled: 1, delayed: 5 },
-    { day: 'Wed', completed: 48, cancelled: 3, delayed: 2 },
-    { day: 'Thu', completed: 55, cancelled: 1, delayed: 4 },
-    { day: 'Fri', completed: 50, cancelled: 2, delayed: 3 },
-    { day: 'Sat', completed: 20, cancelled: 0, delayed: 1 },
-    { day: 'Sun', completed: 15, cancelled: 0, delayed: 0 },
-  ];
+  const fetchAnalytics = async () => {
+    setLoading(true);
+    setError(null);
 
-  const busPerformance = [
-    { busNumber: 'BUS-001', trips: 45, onTime: 95, rating: 4.8 },
-    { busNumber: 'BUS-002', trips: 42, onTime: 92, rating: 4.6 },
-    { busNumber: 'BUS-003', trips: 38, onTime: 88, rating: 4.5 },
-    { busNumber: 'BUS-004', trips: 35, onTime: 90, rating: 4.7 },
-    { busNumber: 'BUS-005', trips: 32, onTime: 85, rating: 4.4 },
-  ];
+    const result = await analyticsService.getFullAnalytics(selectedPeriod);
+
+    if (result.success && result.data) {
+      const data = result.data;
+
+      // Transform metrics to card format
+      const metricsData: MetricCardData[] = [
+        {
+          title: 'Total Trips',
+          value: data.metrics.total_trips.value.toLocaleString(),
+          change: data.metrics.total_trips.change,
+          changeLabel: data.metrics.total_trips.change_label,
+          icon: <MapPin className="w-6 h-6" />,
+          color: 'blue',
+        },
+        {
+          title: 'Active Users',
+          value: data.metrics.active_users.value.toLocaleString(),
+          change: data.metrics.active_users.change,
+          changeLabel: data.metrics.active_users.change_label,
+          icon: <Users className="w-6 h-6" />,
+          color: 'green',
+        },
+        {
+          title: 'Fleet Utilization',
+          value: `${data.metrics.fleet_utilization.value}%`,
+          change: data.metrics.fleet_utilization.change,
+          changeLabel: data.metrics.fleet_utilization.change_label,
+          icon: <Bus className="w-6 h-6" />,
+          color: 'purple',
+        },
+        {
+          title: 'Avg Trip Duration',
+          value: `${data.metrics.avg_trip_duration.value} min`,
+          change: data.metrics.avg_trip_duration.change,
+          changeLabel: data.metrics.avg_trip_duration.change_label,
+          icon: <Clock className="w-6 h-6" />,
+          color: 'orange',
+        },
+      ];
+
+      setMetrics(metricsData);
+      setTripAnalytics(data.trip_analytics);
+      setBusPerformance(data.bus_performance);
+      setAttendanceStats(data.attendance);
+      setRouteEfficiency(data.route_efficiency);
+      setSafetyAlerts(data.safety);
+    } else {
+      setError(result.error?.message || 'Failed to load analytics data');
+    }
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [selectedPeriod]);
 
   const getColorClasses = (color: string) => {
     const colors: { [key: string]: { bg: string; text: string; iconBg: string } } = {
@@ -91,6 +130,35 @@ export default function AnalyticsPage() {
     };
     return colors[color] || colors.blue;
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="flex flex-col items-center gap-4">
+          <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+          <p className="text-slate-600">Loading analytics...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <AlertCircle className="w-12 h-12 text-red-500" />
+          <p className="text-slate-900 font-medium">Failed to load analytics</p>
+          <p className="text-slate-600">{error}</p>
+          <button
+            onClick={fetchAnalytics}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -133,6 +201,13 @@ export default function AnalyticsPage() {
           >
             Year
           </button>
+          <button
+            onClick={fetchAnalytics}
+            className="px-3 py-2 rounded-lg text-sm font-medium bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-colors"
+            title="Refresh data"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -172,41 +247,58 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="space-y-4">
-            {tripAnalytics.map((day, index) => {
-              const total = day.completed + day.cancelled + day.delayed;
-              const completedPercent = (day.completed / total) * 100;
-              const delayedPercent = (day.delayed / total) * 100;
-              const cancelledPercent = (day.cancelled / total) * 100;
+            {tripAnalytics.length > 0 ? (
+              tripAnalytics.map((day, index) => {
+                const total = day.completed + day.cancelled + day.delayed;
+                if (total === 0) {
+                  return (
+                    <div key={index}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-slate-700">{day.day}</span>
+                        <span className="text-sm text-slate-600">No trips</span>
+                      </div>
+                      <div className="w-full h-8 rounded-lg bg-slate-100"></div>
+                    </div>
+                  );
+                }
+                const completedPercent = (day.completed / total) * 100;
+                const delayedPercent = (day.delayed / total) * 100;
+                const cancelledPercent = (day.cancelled / total) * 100;
 
-              return (
-                <div key={index}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-slate-700">{day.day}</span>
-                    <span className="text-sm text-slate-600">{total} trips</span>
+                return (
+                  <div key={index}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-slate-700">{day.day}</span>
+                      <span className="text-sm text-slate-600">{total} trips</span>
+                    </div>
+                    <div className="flex w-full h-8 rounded-lg overflow-hidden">
+                      <div
+                        className="bg-green-500 flex items-center justify-center text-xs text-white font-medium"
+                        style={{ width: `${completedPercent}%` }}
+                      >
+                        {day.completed > 0 && day.completed}
+                      </div>
+                      <div
+                        className="bg-yellow-500 flex items-center justify-center text-xs text-white font-medium"
+                        style={{ width: `${delayedPercent}%` }}
+                      >
+                        {day.delayed > 0 && day.delayed}
+                      </div>
+                      <div
+                        className="bg-red-500 flex items-center justify-center text-xs text-white font-medium"
+                        style={{ width: `${cancelledPercent}%` }}
+                      >
+                        {day.cancelled > 0 && day.cancelled}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex w-full h-8 rounded-lg overflow-hidden">
-                    <div
-                      className="bg-green-500 flex items-center justify-center text-xs text-white font-medium"
-                      style={{ width: `${completedPercent}%` }}
-                    >
-                      {day.completed > 0 && day.completed}
-                    </div>
-                    <div
-                      className="bg-yellow-500 flex items-center justify-center text-xs text-white font-medium"
-                      style={{ width: `${delayedPercent}%` }}
-                    >
-                      {day.delayed > 0 && day.delayed}
-                    </div>
-                    <div
-                      className="bg-red-500 flex items-center justify-center text-xs text-white font-medium"
-                      style={{ width: `${cancelledPercent}%` }}
-                    >
-                      {day.cancelled > 0 && day.cancelled}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              <div className="text-center py-8 text-slate-500">
+                No trip data available for this period
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-center gap-6 mt-6 pt-6 border-t border-slate-200">
@@ -233,32 +325,38 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="space-y-4">
-            {busPerformance.map((bus, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 text-blue-600 font-bold text-sm">
-                    #{index + 1}
+            {busPerformance.length > 0 ? (
+              busPerformance.map((bus, index) => (
+                <div
+                  key={bus.bus_id}
+                  className="flex items-center justify-between p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 text-blue-600 font-bold text-sm">
+                      #{index + 1}
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900">{bus.bus_number}</p>
+                      <p className="text-xs text-slate-600">{bus.trips} trips</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-slate-900">{bus.busNumber}</p>
-                    <p className="text-xs text-slate-600">{bus.trips} trips</p>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-green-600">{bus.on_time}%</p>
+                      <p className="text-xs text-slate-600">On-time</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-yellow-600">{bus.rating.toFixed(1)}</p>
+                      <p className="text-xs text-slate-600">Rating</p>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-green-600">{bus.onTime}%</p>
-                    <p className="text-xs text-slate-600">On-time</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-yellow-600">⭐ {bus.rating}</p>
-                    <p className="text-xs text-slate-600">Rating</p>
-                  </div>
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-slate-500">
+                No bus performance data available
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
@@ -274,15 +372,15 @@ export default function AnalyticsPage() {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-600">Present Today</span>
-              <span className="text-lg font-bold text-green-600">742</span>
+              <span className="text-lg font-bold text-green-600">{attendanceStats.present_today}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-600">Absent</span>
-              <span className="text-lg font-bold text-red-600">28</span>
+              <span className="text-lg font-bold text-red-600">{attendanceStats.absent_today}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-600">Attendance Rate</span>
-              <span className="text-lg font-bold text-blue-600">96.4%</span>
+              <span className="text-lg font-bold text-blue-600">{attendanceStats.attendance_rate}%</span>
             </div>
           </div>
         </div>
@@ -294,17 +392,32 @@ export default function AnalyticsPage() {
             <MapPin className="w-5 h-5 text-purple-600" />
           </div>
           <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-600">Avg Distance</span>
-              <span className="text-lg font-bold text-slate-900">18.5 km</span>
+            <div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-600">Avg Distance</span>
+                <span className="text-lg font-bold text-slate-900">{routeEfficiency.avg_distance} km</span>
+              </div>
+              {routeEfficiency.data_sources?.avg_distance && (
+                <p className="text-xs text-slate-400 mt-1">Source: {routeEfficiency.data_sources.avg_distance}</p>
+              )}
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-600">Fuel Efficiency</span>
-              <span className="text-lg font-bold text-green-600">12.3 km/L</span>
+            <div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-600">Fuel Efficiency</span>
+                <span className="text-lg font-bold text-green-600">{routeEfficiency.fuel_efficiency} km/L</span>
+              </div>
+              {routeEfficiency.data_sources?.fuel_efficiency && (
+                <p className="text-xs text-slate-400 mt-1">Source: {routeEfficiency.data_sources.fuel_efficiency}</p>
+              )}
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-600">Cost per Trip</span>
-              <span className="text-lg font-bold text-orange-600">$45.20</span>
+            <div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-600">Cost per Trip</span>
+                <span className="text-lg font-bold text-orange-600">${routeEfficiency.cost_per_trip.toFixed(2)}</span>
+              </div>
+              {routeEfficiency.data_sources?.cost_per_trip && (
+                <p className="text-xs text-slate-400 mt-1">Source: {routeEfficiency.data_sources.cost_per_trip}</p>
+              )}
             </div>
           </div>
         </div>
@@ -318,15 +431,15 @@ export default function AnalyticsPage() {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-600">Active Alerts</span>
-              <span className="text-lg font-bold text-yellow-600">3</span>
+              <span className="text-lg font-bold text-yellow-600">{safetyAlerts.active_alerts}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-600">Resolved Today</span>
-              <span className="text-lg font-bold text-green-600">12</span>
+              <span className="text-lg font-bold text-green-600">{safetyAlerts.resolved_today}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-600">Safety Score</span>
-              <span className="text-lg font-bold text-blue-600">98.5%</span>
+              <span className="text-lg font-bold text-blue-600">{safetyAlerts.safety_score}%</span>
             </div>
           </div>
         </div>
