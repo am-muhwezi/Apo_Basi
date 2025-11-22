@@ -42,22 +42,58 @@ class DriverCreateSerializer(serializers.Serializer):
     """For POST/PUT requests - validates input and creates User + Driver"""
     firstName = serializers.CharField(write_only=True)
     lastName = serializers.CharField(write_only=True)
-    email = serializers.EmailField(required=False, write_only=True)
+    email = serializers.EmailField(required=False, allow_blank=True, write_only=True)
     phone = serializers.CharField(write_only=True)
     licenseNumber = serializers.CharField(write_only=True)
     licenseExpiry = serializers.DateField(required=False, allow_null=True, write_only=True)
     status = serializers.ChoiceField(choices=['active', 'inactive'], default='active', write_only=True)
     assignedBusId = serializers.IntegerField(required=False, allow_null=True, write_only=True)
 
+    def validate_phone(self, value):
+        """Check that phone number is unique among drivers"""
+        instance = getattr(self, 'instance', None)
+        qs = Driver.objects.filter(phone_number=value)
+        if instance:
+            qs = qs.exclude(pk=instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(f"A driver with phone number '{value}' already exists.")
+        return value
+
+    def validate_licenseNumber(self, value):
+        """Check that license number is unique among drivers"""
+        instance = getattr(self, 'instance', None)
+        qs = Driver.objects.filter(license_number__iexact=value)
+        if instance:
+            qs = qs.exclude(pk=instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(f"A driver with license number '{value}' already exists.")
+        return value
+
+    def validate_email(self, value):
+        """Check that email is unique if provided"""
+        if not value:
+            return value
+        instance = getattr(self, 'instance', None)
+        qs = User.objects.filter(email__iexact=value)
+        if instance:
+            qs = qs.exclude(pk=instance.user.pk)
+        if qs.exists():
+            raise serializers.ValidationError(f"A user with email '{value}' already exists.")
+        return value
+
     def create(self, validated_data):
         # Extract user data
         first_name = validated_data.pop('firstName')
         last_name = validated_data.pop('lastName')
-        email = validated_data.pop('email', f"{first_name.lower()}.{last_name.lower()}@driver.com")
+        email = validated_data.pop('email', '') or ''
+
+        # Generate a unique username (required by Django)
+        import uuid
+        username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
 
         # Create User
         user = User.objects.create_user(
-            username=email,
+            username=username,
             email=email,
             first_name=first_name,
             last_name=last_name,
