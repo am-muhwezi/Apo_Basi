@@ -9,6 +9,7 @@ import { useChildren } from '../hooks/useChildren';
 import { childService } from '../services/childService';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
+import { config } from '../config/environment';
 import type { Child, Parent } from '../types';
 
 export default function ChildrenPage() {
@@ -51,7 +52,7 @@ export default function ChildrenPage() {
 
     try {
       setParentsLoading(true);
-      const response = await fetch('http://localhost:8000/api/parents/?limit=100', {
+      const response = await fetch(`${config.apiBaseUrl}/api/parents/?limit=100`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
         }

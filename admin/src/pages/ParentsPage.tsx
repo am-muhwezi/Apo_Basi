@@ -132,12 +132,12 @@ export default function ParentsPage() {
     });
 
     if (confirmed) {
-      try {
-        await parentService.deleteParent(id);
+      const result = await parentService.deleteParent(id);
+      if (result.success) {
         toast.success('Parent deleted successfully');
         loadParents();
-      } catch (error) {
-        toast.error('Failed to delete parent');
+      } else {
+        toast.error(result.error?.message || 'Failed to delete parent');
       }
     }
   };
@@ -145,22 +145,25 @@ export default function ParentsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
-    try {
-      if (selectedParent) {
-        await parentService.updateParent(selectedParent.id, formData);
+
+    if (selectedParent) {
+      const result = await parentService.updateParent(selectedParent.id, formData);
+      if (result.success) {
         toast.success('Parent updated successfully');
+        loadParents();
+        setShowModal(false);
       } else {
-        await parentService.createParent(formData);
-        toast.success('Parent created successfully');
+        setFormError(result.error?.message || 'Failed to update parent');
       }
-      loadParents();
-      setShowModal(false);
-    } catch (error: any) {
-      const message = error?.response?.data?.detail ||
-                      error?.response?.data?.email?.[0] ||
-                      error?.message ||
-                      `Failed to ${selectedParent ? 'update' : 'create'} parent`;
-      setFormError(message);
+    } else {
+      const result = await parentService.createParent(formData);
+      if (result.success) {
+        toast.success('Parent created successfully');
+        loadParents();
+        setShowModal(false);
+      } else {
+        setFormError(result.error?.message || 'Failed to create parent');
+      }
     }
   };
 
@@ -183,16 +186,14 @@ export default function ParentsPage() {
   const handleChildSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setChildFormError(null);
-    try {
-      await childService.createChild(childFormData);
+
+    const result = await childService.createChild(childFormData);
+    if (result.success) {
       toast.success('Child added successfully');
       loadParents(); // Reload parents to get updated childrenCount and childrenIds
       setShowAddChildModal(false);
-    } catch (error: any) {
-      const message = error?.response?.data?.detail ||
-                      error?.message ||
-                      'Failed to create child';
-      setChildFormError(message);
+    } else {
+      setChildFormError(result.error?.message || 'Failed to create child');
     }
   };
 

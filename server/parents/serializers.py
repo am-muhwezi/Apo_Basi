@@ -55,7 +55,7 @@ class ParentCreateSerializer(serializers.Serializer):
     """
     For POST/PUT requests - validates input and creates User + Parent.
 
-    Email is optional - if not provided, auto-generates: firstname.lastname@parent.com
+    Email is optional but must be unique if provided.
     Phone number is mandatory.
     Address and emergency contact are optional.
     """
@@ -65,33 +65,49 @@ class ParentCreateSerializer(serializers.Serializer):
         required=False,
         allow_blank=True,
         write_only=True,
-        help_text="Optional - auto-generates if not provided"
+        help_text="Optional - must be unique if provided"
     )
     phone = serializers.CharField(write_only=True, help_text="Mandatory - primary contact number")
     address = serializers.CharField(required=False, allow_blank=True, write_only=True)
     emergencyContact = serializers.CharField(required=False, allow_blank=True, write_only=True)
     status = serializers.ChoiceField(choices=['active', 'inactive'], default='active', write_only=True)
 
+    def validate_phone(self, value):
+        """Check that phone number is unique among parents"""
+        instance = getattr(self, 'instance', None)
+        qs = Parent.objects.filter(contact_number=value)
+        if instance:
+            qs = qs.exclude(pk=instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(f"A parent with phone number '{value}' already exists.")
+        return value
+
+    def validate_email(self, value):
+        """Check that email is unique if provided"""
+        if not value:
+            return value
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        instance = getattr(self, 'instance', None)
+        qs = User.objects.filter(email__iexact=value)
+        if instance:
+            qs = qs.exclude(pk=instance.user.pk)
+        if qs.exists():
+            raise serializers.ValidationError(f"A user with email '{value}' already exists.")
+        return value
+
     def create(self, validated_data):
         from django.contrib.auth import get_user_model
         User = get_user_model()
+        import uuid
 
         # Extract user data
         first_name = validated_data.pop('firstName')
         last_name = validated_data.pop('lastName')
-        email = validated_data.pop('email', f"{first_name.lower()}.{last_name.lower()}@parent.com")
+        email = validated_data.pop('email', '') or ''
 
-        # Generate unique username and email
-        if not User.objects.filter(email=email).exists():
-            username = email
-        else:
-            base_email = f"{first_name.lower()}.{last_name.lower()}@parent.com"
-            email = base_email
-            counter = 1
-            while User.objects.filter(email=email).exists():
-                email = f"{first_name.lower()}.{last_name.lower()}{counter}@parent.com"
-                counter += 1
-            username = email
+        # Generate a unique username (required by Django)
+        username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
 
         # Create User
         user = User.objects.create_user(

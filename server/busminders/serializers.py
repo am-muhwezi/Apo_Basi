@@ -45,27 +45,41 @@ class BusMinderCreateSerializer(serializers.Serializer):
     """For POST/PUT requests - validates input and creates User + BusMinder"""
     firstName = serializers.CharField(write_only=True)
     lastName = serializers.CharField(write_only=True)
-    email = serializers.EmailField(required=False, write_only=True)
+    email = serializers.EmailField(required=False, allow_blank=True, write_only=True)
     phone = serializers.CharField(write_only=True)
     status = serializers.ChoiceField(choices=['active', 'inactive'], default='active', write_only=True)
+
+    def validate_phone(self, value):
+        """Check that phone number is unique among bus minders"""
+        instance = getattr(self, 'instance', None)
+        qs = BusMinder.objects.filter(phone_number=value)
+        if instance:
+            qs = qs.exclude(pk=instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(f"A bus minder with phone number '{value}' already exists.")
+        return value
+
+    def validate_email(self, value):
+        """Check that email is unique if provided"""
+        if not value:
+            return value
+        instance = getattr(self, 'instance', None)
+        qs = User.objects.filter(email__iexact=value)
+        if instance:
+            qs = qs.exclude(pk=instance.user.pk)
+        if qs.exists():
+            raise serializers.ValidationError(f"A user with email '{value}' already exists.")
+        return value
 
     def create(self, validated_data):
         # Extract user data
         first_name = validated_data.pop('firstName')
         last_name = validated_data.pop('lastName')
-        email = validated_data.pop('email', f"{first_name.lower()}.{last_name.lower()}@busminder.com")
+        email = validated_data.pop('email', '') or ''
 
-        # Generate unique username and email
-        if not User.objects.filter(email=email).exists():
-            username = email
-        else:
-            base_email = f"{first_name.lower()}.{last_name.lower()}@busminder.com"
-            email = base_email
-            counter = 1
-            while User.objects.filter(email=email).exists():
-                email = f"{first_name.lower()}.{last_name.lower()}{counter}@busminder.com"
-                counter += 1
-            username = email
+        # Generate a unique username (required by Django)
+        import uuid
+        username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
 
         # Create User
         user = User.objects.create_user(
