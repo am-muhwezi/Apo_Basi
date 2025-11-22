@@ -4,11 +4,18 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
+import FormError from '../components/common/FormError';
 import { parentService } from '../services/parentService';
 import { childService } from '../services/childService';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import type { Parent, Child } from '../types';
 
 export default function ParentsPage() {
+  const toast = useToast();
+  const confirmDialog = useConfirm();
+  const [formError, setFormError] = useState<string | null>(null);
+  const [childFormError, setChildFormError] = useState<string | null>(null);
   const [parents, setParents] = useState<Parent[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -64,6 +71,7 @@ export default function ParentsPage() {
 
   const handleCreate = () => {
     setSelectedParent(null);
+    setFormError(null);
     setFormData({
       firstName: '',
       lastName: '',
@@ -78,6 +86,7 @@ export default function ParentsPage() {
 
   const handleEdit = (parent: Parent) => {
     setSelectedParent(parent);
+    setFormError(null);
     setFormData(parent);
     setShowModal(true);
   };
@@ -114,33 +123,50 @@ export default function ParentsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this parent?')) {
+    const confirmed = await confirmDialog({
+      title: 'Delete Parent',
+      message: 'Are you sure you want to delete this parent? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (confirmed) {
       try {
         await parentService.deleteParent(id);
+        toast.success('Parent deleted successfully');
         loadParents();
       } catch (error) {
-        alert('Failed to delete parent');
+        toast.error('Failed to delete parent');
       }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     try {
       if (selectedParent) {
         await parentService.updateParent(selectedParent.id, formData);
+        toast.success('Parent updated successfully');
       } else {
         await parentService.createParent(formData);
+        toast.success('Parent created successfully');
       }
       loadParents();
       setShowModal(false);
-    } catch (error) {
-      alert(`Failed to ${selectedParent ? 'update' : 'create'} parent`);
+    } catch (error: any) {
+      const message = error?.response?.data?.detail ||
+                      error?.response?.data?.email?.[0] ||
+                      error?.message ||
+                      `Failed to ${selectedParent ? 'update' : 'create'} parent`;
+      setFormError(message);
     }
   };
 
   const handleAddChild = (parent: Parent) => {
     setSelectedParent(parent);
+    setChildFormError(null);
     setChildFormData({
       firstName: '',
       lastName: parent.lastName,
@@ -156,12 +182,17 @@ export default function ParentsPage() {
 
   const handleChildSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setChildFormError(null);
     try {
       await childService.createChild(childFormData);
+      toast.success('Child added successfully');
       loadParents(); // Reload parents to get updated childrenCount and childrenIds
       setShowAddChildModal(false);
-    } catch (error) {
-      alert('Failed to create child');
+    } catch (error: any) {
+      const message = error?.response?.data?.detail ||
+                      error?.message ||
+                      'Failed to create child';
+      setChildFormError(message);
     }
   };
 
@@ -347,7 +378,8 @@ export default function ParentsPage() {
         title={selectedParent ? 'Edit Parent' : 'Add New Parent'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <FormError message={formError} onDismiss={() => setFormError(null)} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="First Name"
               value={formData.firstName || ''}
@@ -472,7 +504,8 @@ export default function ParentsPage() {
         title={`Add Child to ${selectedParent?.firstName} ${selectedParent?.lastName}`}
       >
         <form onSubmit={handleChildSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <FormError message={childFormError} onDismiss={() => setChildFormError(null)} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="First Name"
               value={childFormData.firstName || ''}
@@ -486,7 +519,7 @@ export default function ParentsPage() {
               required
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
               label="Grade"
               value={childFormData.grade || ''}

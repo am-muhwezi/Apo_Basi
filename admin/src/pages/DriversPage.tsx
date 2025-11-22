@@ -4,11 +4,17 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
+import FormError from '../components/common/FormError';
 import { useDrivers } from '../hooks/useDrivers';
 import { driverService } from '../services/driverService';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import type { Driver } from '../types';
 
 export default function DriversPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [formError, setFormError] = useState<string | null>(null);
   // Use hooks for drivers
   const { drivers, loading, hasMore, loadDrivers, loadMore: loadMoreDrivers } = useDrivers();
 
@@ -32,6 +38,7 @@ export default function DriversPage() {
 
   const handleCreate = () => {
     setSelectedDriver(null);
+    setFormError(null);
     setFormData({
       firstName: '',
       lastName: '',
@@ -46,6 +53,7 @@ export default function DriversPage() {
 
   const handleEdit = (driver: Driver) => {
     setSelectedDriver(driver);
+    setFormError(null);
     setFormData(driver);
     setShowModal(true);
   };
@@ -56,18 +64,28 @@ export default function DriversPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this driver?')) {
+    const confirmed = await confirm({
+      title: 'Delete Driver',
+      message: 'Are you sure you want to delete this driver? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (confirmed) {
       const result = await driverService.deleteDriver(id);
       if (result.success) {
+        toast.success('Driver deleted successfully');
         loadDrivers();
       } else {
-        alert(result.error?.message || 'Failed to delete driver');
+        toast.error(result.error?.message || 'Failed to delete driver');
       }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     let result;
     if (selectedDriver) {
       result = await driverService.updateDriver(selectedDriver.id, formData);
@@ -76,10 +94,11 @@ export default function DriversPage() {
     }
 
     if (result.success) {
+      toast.success(`Driver ${selectedDriver ? 'updated' : 'created'} successfully`);
       loadDrivers();
       setShowModal(false);
     } else {
-      alert(result.error?.message || `Failed to ${selectedDriver ? 'update' : 'create'} driver`);
+      setFormError(result.error?.message || `Failed to ${selectedDriver ? 'update' : 'create'} driver`);
     }
   };
 
@@ -261,7 +280,8 @@ export default function DriversPage() {
         title={selectedDriver ? 'Edit Driver' : 'Add New Driver'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <FormError message={formError} onDismiss={() => setFormError(null)} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="First Name"
               value={formData.firstName || ''}
@@ -288,7 +308,7 @@ export default function DriversPage() {
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             required
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="License Number"
               value={formData.licenseNumber || ''}

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1D4ED8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="busGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FCD34D;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F59E0B;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#bgGrad)"/>
+
+  <!-- Inner subtle ring -->
+  <circle cx="256" cy="256" r="200" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="4"/>
+
+  <!-- Letter A -->
+  <path d="M120 340 L180 140 L220 140 L280 340 L240 340 L228 300 L172 300 L160 340 Z M185 265 L215 265 L200 195 Z"
+        fill="white" opacity="0.95"/>
+
+  <!-- Letter B -->
+  <path d="M300 140 L300 340 L380 340 C420 340 445 315 445 280 C445 255 430 240 410 235 C425 230 435 215 435 195 C435 160 410 140 375 140 Z M340 175 L370 175 C388 175 398 185 398 200 C398 215 388 225 370 225 L340 225 Z M340 260 L375 260 C395 260 408 272 408 290 C408 308 395 305 375 305 L340 305 Z"
+        fill="white" opacity="0.95"/>
+
+  <!-- Small school bus icon at bottom -->
+  <g transform="translate(180, 360) scale(0.35)">
+    <rect x="0" y="20" width="140" height="60" rx="8" fill="url(#busGrad)"/>
+    <rect x="10" y="30" width="25" height="20" rx="3" fill="rgba(255,255,255,0.9)"/>
+    <rect x="45" y="30" width="25" height="20" rx="3" fill="rgba(255,255,255,0.9)"/>
+    <rect x="80" y="30" width="25" height="20" rx="3" fill="rgba(255,255,255,0.9)"/>
+    <rect x="115" y="30" width="20" height="35" rx="3" fill="rgba(255,255,255,0.9)"/>
+    <circle cx="30" cy="80" r="12" fill="#374151"/>
+    <circle cx="110" cy="80" r="12" fill="#374151"/>
+    <circle cx="30" cy="80" r="6" fill="#6B7280"/>
+    <circle cx="110" cy="80" r="6" fill="#6B7280"/>
+  </g>
+</svg>

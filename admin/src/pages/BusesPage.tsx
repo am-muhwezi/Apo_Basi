@@ -4,13 +4,20 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
+import FormError from '../components/common/FormError';
 import { useBuses } from '../hooks/useBuses';
 import { useDrivers } from '../hooks/useDrivers';
 import { useMinders } from '../hooks/useMinders';
 import { useChildren } from '../hooks/useChildren';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import type { Bus } from '../types';
 
 export default function BusesPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [formError, setFormError] = useState<string | null>(null);
+  const [assignError, setAssignError] = useState<string | null>(null);
   const { buses, loadBuses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren, hasMore: busesHasMore, loadMore: loadMoreBuses, loading: busesLoading } = useBuses();
 
   // Lazy load drivers, minders, children only when needed
@@ -42,6 +49,7 @@ export default function BusesPage() {
 
   const handleCreate = () => {
     setSelectedBus(null);
+    setFormError(null);
     setFormData({
       busNumber: '',
       licensePlate: '',
@@ -55,6 +63,7 @@ export default function BusesPage() {
 
   const handleEdit = (bus: Bus) => {
     setSelectedBus(bus);
+    setFormError(null);
     setFormData(bus);
     setShowModal(true);
   };
@@ -66,6 +75,7 @@ export default function BusesPage() {
 
   const handleAssign = async (bus: Bus) => {
     setSelectedBus(bus);
+    setAssignError(null);
     setAssignData({
       driverId: bus.driverId?.toString() || '',
       minderId: bus.minderId?.toString() || '',
@@ -86,39 +96,49 @@ export default function BusesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this bus?')) {
+    const confirmed = await confirm({
+      title: 'Delete Bus',
+      message: 'Are you sure you want to delete this bus? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (confirmed) {
       const result = await deleteBus(id);
       if (result.success) {
-        alert('Bus deleted successfully');
+        toast.success('Bus deleted successfully');
       } else {
-        alert(result.error?.message || 'Failed to delete bus');
+        toast.error(result.error?.message || 'Failed to delete bus');
       }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     if (selectedBus) {
       const result = await updateBus(selectedBus.id, formData);
       if (result.success) {
-        alert('Bus updated successfully');
+        toast.success('Bus updated successfully');
         setShowModal(false);
       } else {
-        alert(result.error?.message || 'Failed to update bus');
+        setFormError(result.error?.message || 'Failed to update bus');
       }
     } else {
       const result = await createBus(formData);
       if (result.success) {
-        alert('Bus created successfully');
+        toast.success('Bus created successfully');
         setShowModal(false);
       } else {
-        alert(result.error?.message || 'Failed to create bus');
+        setFormError(result.error?.message || 'Failed to create bus');
       }
     }
   };
 
   const handleAssignSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAssignError(null);
     if (!selectedBus) return;
 
     const results = await Promise.all([
@@ -129,10 +149,10 @@ export default function BusesPage() {
 
     const failedResult = results.find(r => r && !r.success);
     if (!failedResult) {
-      alert('Assignments saved successfully');
+      toast.success('Assignments saved successfully');
       setShowAssignModal(false);
     } else {
-      alert(failedResult.error?.message || 'Failed to save some assignments');
+      setAssignError(failedResult.error?.message || 'Failed to save some assignments');
     }
   };
 
@@ -335,7 +355,8 @@ export default function BusesPage() {
         title={selectedBus ? 'Edit Bus' : 'Add New Bus'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <FormError message={formError} onDismiss={() => setFormError(null)} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Bus Number"
               value={formData.busNumber || ''}
@@ -406,7 +427,8 @@ export default function BusesPage() {
         size="lg"
       >
         <form onSubmit={handleAssignSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+          <FormError message={assignError} onDismiss={() => setAssignError(null)} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
               label="Driver"
               value={assignData.driverId}

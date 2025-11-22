@@ -4,11 +4,17 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
+import FormError from '../components/common/FormError';
 import { useMinders } from '../hooks/useMinders';
 import { busMinderService } from '../services/busMinderService';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import type { BusMinder } from '../types';
 
 export default function MindersPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [formError, setFormError] = useState<string | null>(null);
   // Use hooks for minders
   const { minders, loading, hasMore, loadMinders, loadMore: loadMoreMinders } = useMinders();
 
@@ -35,6 +41,7 @@ export default function MindersPage() {
 
   const handleCreate = () => {
     setSelectedMinder(null);
+    setFormError(null);
     setFormData({
       firstName: '',
       lastName: '',
@@ -47,6 +54,7 @@ export default function MindersPage() {
 
   const handleEdit = (minder: BusMinder) => {
     setSelectedMinder(minder);
+    setFormError(null);
     setFormData(minder);
     setShowModal(true);
   };
@@ -57,18 +65,28 @@ export default function MindersPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this bus minder?')) {
+    const confirmed = await confirm({
+      title: 'Delete Bus Minder',
+      message: 'Are you sure you want to delete this bus minder? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (confirmed) {
       const result = await busMinderService.deleteBusMinder(id);
       if (result.success) {
+        toast.success('Bus minder deleted successfully');
         loadMinders();
       } else {
-        alert(result.error?.message || 'Failed to delete bus minder');
+        toast.error(result.error?.message || 'Failed to delete bus minder');
       }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     let result;
     if (selectedMinder) {
       result = await busMinderService.updateBusMinder(selectedMinder.id, formData);
@@ -77,10 +95,11 @@ export default function MindersPage() {
     }
 
     if (result.success) {
+      toast.success(`Bus minder ${selectedMinder ? 'updated' : 'created'} successfully`);
       loadMinders();
       setShowModal(false);
     } else {
-      alert(result.error?.message || `Failed to ${selectedMinder ? 'update' : 'create'} bus minder`);
+      setFormError(result.error?.message || `Failed to ${selectedMinder ? 'update' : 'create'} bus minder`);
     }
   };
 
@@ -256,7 +275,8 @@ export default function MindersPage() {
         title={selectedMinder ? 'Edit Bus Minder' : 'Add New Bus Minder'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <FormError message={formError} onDismiss={() => setFormError(null)} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="First Name"
               value={formData.firstName || ''}
