@@ -1,4 +1,6 @@
 from pathlib import Path
+from decouple import config
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -8,15 +10,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-ix73(likf$2t&4p=jo0r#j34_36c-@ib6z=%bzp!ll^)p5$jhp"
+SECRET_KEY=config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config("DEBUG", cast=bool)
 
-ALLOWED_HOSTS = ['*']  # For development only - allows all hosts
+ALLOWED_HOSTS = ["192.168.100.33", "localhost", "142.93.40.214"]
 
-
-# Application definition
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -25,21 +25,26 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+
+    # Local apps
+    "busminders.apps.BusmindersConfig",
+    "drivers.apps.DriversConfig",
+    "children.apps.ChildrenConfig",
+    "parents.apps.ParentsConfig",
+    "buses.apps.BusesConfig",
+    "users.apps.UsersConfig",
+    "attendance.apps.AttendanceConfig",
+    "admins.apps.AdminsConfig",
+    "trips.apps.TripsConfig",
+    "assignments.apps.AssignmentsConfig",
+    "analytics.apps.AnalyticsConfig",
+
+    # Third-party apps
     "rest_framework",
     "django_extensions",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
-    "corsheaders",
-    "busminders",
-    "drivers",
-    "children",
-    "parents",
-    "buses",
-    "users",
-    "attendance",
-    "admins",
-    "trips",
-    "assignments",
+    "corsheaders"
 ]
 
 MIDDLEWARE = [
@@ -138,7 +143,7 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 20,  # Updated to match frontend expectations
+    "PAGE_SIZE": 20, 
 }
 
 # JWT Configuration
@@ -172,13 +177,9 @@ SIMPLE_JWT = {
 }
 
 # CORS Configuration for React Native
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:19000",  # Expo development server
-    "http://localhost:19006",  # Expo web
-    "http://localhost:8081",  # Metro bundler
-]
+CORS_ALLOWED_ORIGINS = []
 
 CORS_ALLOW_CREDENTIALS = True
 
 # For development, allow all origins
-CORS_ALLOW_ALL_ORIGINS = DEBUG
+CORS_ALLOW_ALL_ORIGINS = True

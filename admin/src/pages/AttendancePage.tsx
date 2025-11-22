@@ -85,7 +85,8 @@ export default function AttendancePage() {
             dropoffTime: '-',
             status: child.status,
             parentNotified: true,
-          });
+            trip_type: child.trip_type, // Include trip_type from API
+          } as any);
         });
       });
       setAttendanceRecords(records);
@@ -210,14 +211,24 @@ export default function AttendancePage() {
 
     const matchesStatus = statusFilter === 'all' || record.status === statusFilter;
 
-    // Filter by trip type - use trip_type field if available, otherwise infer from status
-    const recordTripType = (record as any).trip_type ||
-      (record.status === 'picked_up' ? 'pickup' :
-       record.status === 'dropped_off' ? 'dropoff' : null);
+    // Filter by trip type
+    const recordTripType = (record as any).trip_type;
 
-    const matchesTripType = !recordTripType || recordTripType === tripType;
+    // If trip_type is set, use it directly
+    if (recordTripType) {
+      return matchesSearch && matchesStatus && recordTripType === tripType;
+    }
 
-    return matchesSearch && matchesStatus && matchesTripType;
+    // If trip_type is not set, infer from status
+    if (record.status === 'picked_up') {
+      return matchesSearch && matchesStatus && tripType === 'pickup';
+    } else if (record.status === 'dropped_off') {
+      return matchesSearch && matchesStatus && tripType === 'dropoff';
+    }
+
+    // For pending and absent without trip_type, don't show them
+    // (they need to be marked with proper trip_type going forward)
+    return false;
   });
 
   return (
