@@ -101,6 +101,26 @@ class BusCreateSerializer(serializers.ModelSerializer):
         model = Bus
         fields = ["busNumber", "licensePlate", "capacity", "model", "year", "status", "lastMaintenance"]
 
+    def validate_licensePlate(self, value):
+        """Check that license plate is unique"""
+        instance = getattr(self, 'instance', None)
+        qs = Bus.objects.filter(number_plate__iexact=value)
+        if instance:
+            qs = qs.exclude(pk=instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(f"A bus with license plate '{value}' already exists.")
+        return value
+
+    def validate_busNumber(self, value):
+        """Check that bus number is unique"""
+        instance = getattr(self, 'instance', None)
+        qs = Bus.objects.filter(bus_number__iexact=value)
+        if instance:
+            qs = qs.exclude(pk=instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(f"A bus with number '{value}' already exists.")
+        return value
+
     def create(self, validated_data):
         # Convert status to is_active boolean
         status = validated_data.pop('status', 'active')

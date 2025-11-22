@@ -56,8 +56,8 @@ export default function Layout() {
           >
             {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
-          <Bus className="text-blue-600 mr-3" size={28} />
-          <h1 className="text-xl font-bold text-slate-900">AppBasi Admin</h1>
+          <img src="/logo.svg" alt="ApoBasi" className="w-8 h-8 mr-3" />
+          <h1 className="text-xl font-bold text-slate-900">ApoBasi</h1>
         </div>
         <div className="flex items-center gap-4">
           {adminName && (

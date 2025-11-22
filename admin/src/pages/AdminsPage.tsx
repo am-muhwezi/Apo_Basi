@@ -4,10 +4,16 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
+import FormError from '../components/common/FormError';
 import { getAdmins, createAdmin, updateAdmin, deleteAdmin } from '../services/adminApi';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import type { Admin, Permission } from '../types';
 
 export default function AdminsPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [formError, setFormError] = useState<string | null>(null);
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -66,6 +72,7 @@ export default function AdminsPage() {
 
   const handleCreate = () => {
     setSelectedAdmin(null);
+    setFormError(null);
     setFormData({
       firstName: '',
       lastName: '',
@@ -80,6 +87,7 @@ export default function AdminsPage() {
 
   const handleEdit = (admin: Admin) => {
     setSelectedAdmin(admin);
+    setFormError(null);
     setFormData(admin);
     setShowModal(true);
   };
@@ -90,21 +98,33 @@ export default function AdminsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this admin?')) {
+    const confirmed = await confirm({
+      title: 'Delete Admin',
+      message: 'Are you sure you want to delete this admin? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (confirmed) {
       try {
         await deleteAdmin(id);
+        toast.success('Admin deleted successfully');
         await loadAdmins();
       } catch (error) {
         console.error('Failed to delete admin:', error);
+        toast.error('Failed to delete admin');
       }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     try {
       if (selectedAdmin) {
         await updateAdmin(selectedAdmin.id, formData);
+        toast.success('Admin updated successfully');
       } else {
         await createAdmin({
           firstName: formData.firstName!,
@@ -114,12 +134,17 @@ export default function AdminsPage() {
           role: formData.role as 'super-admin' | 'admin' | 'viewer',
           status: formData.status as 'active' | 'inactive'
         });
+        toast.success('Admin created successfully');
       }
       await loadAdmins();
       setShowModal(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save admin:', error);
-      alert('Failed to save admin. Please check the console for errors.');
+      const message = error?.response?.data?.detail ||
+                      error?.response?.data?.email?.[0] ||
+                      error?.message ||
+                      'Failed to save admin. Please check the form.';
+      setFormError(message);
     }
   };
 
@@ -289,7 +314,8 @@ export default function AdminsPage() {
         size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <FormError message={formError} onDismiss={() => setFormError(null)} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="First Name"
               value={formData.firstName || ''}

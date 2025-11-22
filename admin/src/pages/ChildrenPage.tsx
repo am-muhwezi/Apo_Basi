@@ -4,11 +4,18 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
+import FormError from '../components/common/FormError';
 import { useChildren } from '../hooks/useChildren';
 import { childService } from '../services/childService';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import type { Child, Parent } from '../types';
 
 export default function ChildrenPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [formError, setFormError] = useState<string | null>(null);
+
   // Use hooks for data management
   const {
     children,
@@ -76,6 +83,7 @@ export default function ChildrenPage() {
   const handleCreate = async () => {
     await loadParentsForModal();
     setSelectedChild(null);
+    setFormError(null);
     setFormData({
       firstName: '',
       lastName: '',
@@ -92,6 +100,7 @@ export default function ChildrenPage() {
   const handleEdit = async (child: Child) => {
     await loadParentsForModal();
     setSelectedChild(child);
+    setFormError(null);
     setFormData(child);
     setShowModal(true);
   };
@@ -102,37 +111,46 @@ export default function ChildrenPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this child?')) {
+    const confirmed = await confirm({
+      title: 'Delete Child',
+      message: 'Are you sure you want to delete this child? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (confirmed) {
       const result = await childService.deleteChild(id);
       if (result.success) {
-        alert('Child deleted successfully');
+        toast.success('Child deleted successfully');
         await refreshChildren();
       } else {
-        alert(result.error?.message || 'Failed to delete child');
+        toast.error(result.error?.message || 'Failed to delete child');
       }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
 
     if (selectedChild) {
       const result = await childService.updateChild(selectedChild.id, formData);
       if (result.success) {
-        alert('Child updated successfully');
+        toast.success('Child updated successfully');
         setShowModal(false);
         await refreshChildren();
       } else {
-        alert(result.error?.message || 'Failed to update child');
+        setFormError(result.error?.message || 'Failed to update child');
       }
     } else {
       const result = await childService.createChild(formData);
       if (result.success) {
-        alert('Child created successfully');
+        toast.success('Child created successfully');
         setShowModal(false);
         await refreshChildren();
       } else {
-        alert(result.error?.message || 'Failed to create child');
+        setFormError(result.error?.message || 'Failed to create child');
       }
     }
   };
@@ -334,7 +352,8 @@ export default function ChildrenPage() {
         title={selectedChild ? 'Edit Child' : 'Add New Child'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <FormError message={formError} onDismiss={() => setFormError(null)} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="First Name"
               value={formData.firstName || ''}
@@ -348,7 +367,7 @@ export default function ChildrenPage() {
               required
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
               label="Grade"
               value={formData.grade || ''}

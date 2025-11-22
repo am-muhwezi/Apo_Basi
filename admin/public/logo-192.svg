@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1D4ED8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="96" cy="96" r="90" fill="url(#bgGrad)"/>
+
+  <!-- Letter A -->
+  <path d="M45 145 L75 55 L95 55 L125 145 L105 145 L99 125 L71 125 L65 145 Z M78 105 L92 105 L85 75 Z"
+        fill="white" opacity="0.95"/>
+
+  <!-- Letter B -->
+  <path d="M130 55 L130 145 L165 145 C182 145 192 132 192 115 C192 102 185 94 175 91 C182 88 188 80 188 70 C188 55 177 55 165 55 Z M145 70 L160 70 C168 70 173 75 173 82 C173 89 168 94 160 94 L145 94 Z M145 108 L162 108 C172 108 178 114 178 123 C178 132 172 130 162 130 L145 130 Z"
+        fill="white" opacity="0.95"/>
+</svg>

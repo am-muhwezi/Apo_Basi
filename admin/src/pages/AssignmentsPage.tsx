@@ -435,20 +435,20 @@ export default function AssignmentsPage() {
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Assignments & Routes</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="secondary" size="sm" onClick={loadBusUtilization}>
             <TrendingUp size={18} />
-            Bus Utilization
+            <span className="hidden sm:inline ml-1">Bus Utilization</span>
           </Button>
           <Button variant="secondary" size="sm" onClick={() => setShowBulkAssignModal(true)}>
             <Users size={18} />
-            Bulk Assign
+            <span className="hidden sm:inline ml-1">Bulk Assign</span>
           </Button>
           <Button size="sm" onClick={loadAllData}>
             <RefreshCw size={18} />
-            Refresh
+            <span className="hidden sm:inline ml-1">Refresh</span>
           </Button>
         </div>
       </div>
@@ -539,20 +539,20 @@ export default function AssignmentsPage() {
 
           {/* Search and Filters */}
           <div className="bg-white rounded-xl p-4 mb-6 border border-slate-200">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="sm:col-span-2 lg:col-span-1">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
                   <input
                     type="text"
-                    placeholder="Search by assignee or assigned to..."
+                    placeholder="Search..."
                     value={assignmentSearchTerm}
                     onChange={(e) => setAssignmentSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
-              <div className="w-full md:w-64">
+              <div>
                 <select
                   value={assignmentTypeFilter}
                   onChange={(e) => setAssignmentTypeFilter(e.target.value)}
@@ -565,7 +565,7 @@ export default function AssignmentsPage() {
                   ))}
                 </select>
               </div>
-              <div className="w-full md:w-48">
+              <div>
                 <select
                   value={assignmentStatusFilter}
                   onChange={(e) => setAssignmentStatusFilter(e.target.value)}
@@ -578,10 +578,12 @@ export default function AssignmentsPage() {
                   ))}
                 </select>
               </div>
-              <Button onClick={handleCreateAssignment}>
-                <Plus size={20} />
-                New Assignment
-              </Button>
+              <div>
+                <Button onClick={handleCreateAssignment} className="w-full">
+                  <Plus size={20} />
+                  <span className="ml-1">New</span>
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -885,7 +887,7 @@ export default function AssignmentsPage() {
           </div>
 
           {/* Context-aware searchable selects based on assignment type */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Left side - Who is being assigned */}
             <div>
               {assignmentFormData.assignmentType === 'driver_to_bus' || assignmentFormData.assignmentType === 'driver_to_route' ? (
@@ -976,7 +978,7 @@ export default function AssignmentsPage() {
           </div>
 
           {/* Dates */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Effective Date</label>
               <input
@@ -1030,7 +1032,7 @@ export default function AssignmentsPage() {
         size="lg"
       >
         <form onSubmit={handleSubmitRoute} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Route Name</label>
               <input
@@ -1067,7 +1069,7 @@ export default function AssignmentsPage() {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Default Bus</label>
               <select
@@ -1117,7 +1119,7 @@ export default function AssignmentsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Duration (minutes)</label>
               <input
