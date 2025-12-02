@@ -15,8 +15,8 @@ SECRET_KEY=config("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG", cast=bool)
 
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="", cast=lambda v: [s.strip() for s in v.split(",") if s.strip()])
-
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", 
+    cast=lambda v: [s.strip() for s in v.split(",") if s.strip()])
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "trips.apps.TripsConfig",
     "assignments.apps.AssignmentsConfig",
     "analytics.apps.AnalyticsConfig",
+    "notifications.apps.NotificationsConfig",
 
     # Third-party apps
     "rest_framework",
@@ -186,3 +187,29 @@ if not CORS_ALLOW_ALL_ORIGINS:
         cast=lambda v: [s.strip() for s in v.split(",") if s.strip()],
         default=[],
     )
+
+# Socket.IO Server URL for real-time notifications
+SOCKETIO_SERVER_URL = config("SOCKETIO_SERVER_URL", default="http://localhost:3000")
+
+# Redis Configuration for real-time location tracking
+REDIS_HOST = config("REDIS_HOST", default="localhost")
+REDIS_PORT = config("REDIS_PORT", default=6379, cast=int)
+REDIS_DB = config("REDIS_DB", default=0, cast=int)
+REDIS_PASSWORD = config("REDIS_PASSWORD", default=None)
+
+# Django-Redis cache configuration
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "PASSWORD": REDIS_PASSWORD,
+        }
+    }
+}
+
+# Redis pub/sub channel names
+REDIS_LOCATION_UPDATES_CHANNEL = "location_updates"
+REDIS_BUS_LOCATION_KEY_PATTERN = "bus:{bus_id}:location"
+REDIS_LOCATION_TTL = 60  # seconds

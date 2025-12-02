@@ -69,6 +69,11 @@ def login_view(request):
             pass
 
     if user is not None:
+        # Update last_login timestamp
+        from django.utils import timezone
+        user.last_login = timezone.now()
+        user.save(update_fields=['last_login'])
+
         refresh = RefreshToken.for_user(user)
         return Response({
             'user': UserSerializer(user).data,

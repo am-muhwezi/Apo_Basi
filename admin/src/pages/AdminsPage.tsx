@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, Key } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
 import FormError from '../components/common/FormError';
-import { getAdmins, createAdmin, updateAdmin, deleteAdmin } from '../services/adminApi';
+import { getAdmins, createAdmin, updateAdmin, deleteAdmin, changeAdminPassword } from '../services/adminApi';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import type { Admin, Permission } from '../types';
@@ -49,7 +49,12 @@ export default function AdminsPage() {
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [formData, setFormData] = useState<Partial<Admin>>({});
+  const [passwordData, setPasswordData] = useState({
+    newPassword: '',
+    confirmPassword: ''
+  });
 
   const allPermissions: Permission[] = [
     'manage-children',
@@ -95,6 +100,13 @@ export default function AdminsPage() {
   const handleView = (admin: Admin) => {
     setSelectedAdmin(admin);
     setShowDetailModal(true);
+  };
+
+  const handleChangePassword = (admin: Admin) => {
+    setSelectedAdmin(admin);
+    setFormError(null);
+    setPasswordData({ newPassword: '', confirmPassword: '' });
+    setShowPasswordModal(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -144,6 +156,37 @@ export default function AdminsPage() {
                       error?.response?.data?.email?.[0] ||
                       error?.message ||
                       'Failed to save admin. Please check the form.';
+      setFormError(message);
+    }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setFormError('Passwords do not match');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      setFormError('Password must be at least 6 characters');
+      return;
+    }
+
+    if (!selectedAdmin) return;
+
+    try {
+      await changeAdminPassword(selectedAdmin.id, passwordData);
+      toast.success('Password changed successfully');
+      setShowPasswordModal(false);
+      setPasswordData({ newPassword: '', confirmPassword: '' });
+    } catch (error: any) {
+      console.error('Failed to change password:', error);
+      const message = error?.response?.data?.confirmPassword?.[0] ||
+                      error?.response?.data?.detail ||
+                      error?.message ||
+                      'Failed to change password. Please try again.';
       setFormError(message);
     }
   };
@@ -266,18 +309,28 @@ export default function AdminsPage() {
                       <button
                         onClick={() => handleView(admin)}
                         className="p-2 hover:bg-blue-50 rounded-lg text-blue-600"
+                        title="View details"
                       >
                         <Eye size={18} />
                       </button>
                       <button
+                        onClick={() => handleChangePassword(admin)}
+                        className="p-2 hover:bg-purple-50 rounded-lg text-purple-600"
+                        title="Change password"
+                      >
+                        <Key size={18} />
+                      </button>
+                      <button
                         onClick={() => handleEdit(admin)}
                         className="p-2 hover:bg-slate-100 rounded-lg text-slate-600"
+                        title="Edit admin"
                       >
                         <Edit size={18} />
                       </button>
                       <button
                         onClick={() => handleDelete(admin.id)}
                         className="p-2 hover:bg-red-50 rounded-lg text-red-600"
+                        title="Delete admin"
                       >
                         <Trash2 size={18} />
                       </button>
@@ -450,6 +503,43 @@ export default function AdminsPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        title={`Change Password - ${selectedAdmin?.firstName} ${selectedAdmin?.lastName}`}
+      >
+        <form onSubmit={handlePasswordSubmit} className="space-y-4">
+          <FormError message={formError} onDismiss={() => setFormError(null)} />
+
+          <Input
+            label="New Password"
+            type="password"
+            value={passwordData.newPassword}
+            onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+            required
+            minLength={6}
+            placeholder="Enter new password (min 6 characters)"
+          />
+
+          <Input
+            label="Confirm Password"
+            type="password"
+            value={passwordData.confirmPassword}
+            onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+            required
+            minLength={6}
+            placeholder="Confirm new password"
+          />
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button type="button" variant="secondary" onClick={() => setShowPasswordModal(false)}>
+              Cancel
+            </Button>
+            <Button type="submit">Change Password</Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

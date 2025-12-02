@@ -2,12 +2,15 @@ from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view, permission_classes
 from django.db.models import Q, Count, Case, When, IntegerField
 from datetime import date, datetime, timedelta
 from .models import Attendance
 from .serializers import AttendanceSerializer, AttendanceListSerializer
 from children.models import Child
 from buses.models import Bus
+from drivers.models import Driver
+from busminders.models import BusMinder
 
 
 class AttendanceListView(generics.ListAPIView):
@@ -204,3 +207,152 @@ class DailyAttendanceReportView(APIView):
             'buses': list(buses_data.values()),
             'total_records': len(attendance_records)
         })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_attendance(request):
+    """
+    Unified attendance marking endpoint for BOTH Drivers and Bus Minders.
+
+    POST /api/attendance/mark/
+
+    Body: {
+        "child_id": 1,
+        "status": "picked_up",  # Options: pending, picked_up, dropped_off, absent
+        "trip_type": "pickup",  # pickup or dropoff (optional)
+        "notes": "Optional notes"
+    }
+
+    This endpoint:
+    - Allows both drivers and bus minders to mark attendance
+    - Validates that the marker has access to the child's bus
+    - Creates parent notifications for pickup/dropoff confirmations
+    - Updates attendance in real-time
+
+    Returns:
+    {
+        "success": true,
+        "message": "Attendance marked as Picked Up",
+        "attendance": {...attendance details...}
+    }
+    """
+    child_id = request.data.get('child_id')
+    new_status = request.data.get('status')
+    notes = request.data.get('notes', '')
+    trip_type = request.data.get('trip_type')
+
+    # Validate required fields
+    if not child_id or not new_status:
+        return Response(
+            {"error": "child_id and status are required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Validate status
+    valid_statuses = ['pending', 'picked_up', 'dropped_off', 'absent']
+    if new_status not in valid_statuses:
+        return Response(
+            {"error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Get the child
+    try:
+        child = Child.objects.select_related('parent', 'assigned_bus').get(id=child_id)
+    except Child.DoesNotExist:
+        return Response(
+            {"error": "Child not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Verify the user has permission to mark attendance for this child's bus
+    user = request.user
+    has_permission = False
+
+    if user.user_type == 'driver':
+        try:
+            driver = Driver.objects.get(user=user)
+            has_permission = child.assigned_bus and driver.bus == child.assigned_bus
+        except Driver.DoesNotExist:
+            has_permission = False
+    elif user.user_type == 'busminder':
+        try:
+            busminder = BusMinder.objects.get(user=user)
+            has_permission = busminder.bus and child.assigned_bus and busminder.bus == child.assigned_bus
+        except BusMinder.DoesNotExist:
+            has_permission = False
+
+    if not has_permission:
+        return Response(
+            {"error": "You can only mark attendance for children on your assigned bus"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Get or create today's attendance record
+    today = date.today()
+    attendance, created = Attendance.objects.get_or_create(
+        child=child,
+        date=today,
+        defaults={
+            'bus': child.assigned_bus,
+            'status': new_status,
+            'trip_type': trip_type,
+            'marked_by': request.user,
+            'notes': notes or '',
+        }
+    )
+
+    # If attendance already exists, update it
+    if not created:
+        attendance.status = new_status
+        if trip_type:
+            attendance.trip_type = trip_type
+        attendance.marked_by = request.user
+        attendance.notes = notes or ''
+        attendance.save()
+
+    # Create notification for parent when pickup or dropoff is confirmed
+    if child.parent and new_status in ['picked_up', 'dropped_off']:
+        from notifications.views import create_notification
+
+        # Determine notification type and message
+        if new_status == 'picked_up':
+            notification_type = 'pickup_confirmed'
+            title = f"{child.first_name} Picked Up"
+            message = f"Your child {child.first_name} {child.last_name} has been safely picked up by the bus at {attendance.timestamp.strftime('%I:%M %p')}."
+        else:  # dropped_off
+            notification_type = 'dropoff_complete'
+            title = f"{child.first_name} Dropped Off"
+            message = f"Your child {child.first_name} {child.last_name} has been safely dropped off at {attendance.timestamp.strftime('%I:%M %p')}."
+
+        # Create the notification
+        try:
+            create_notification(
+                user=child.parent.user,
+                notification_type=notification_type,
+                title=title,
+                message=message
+            )
+        except Exception as e:
+            # Log error but don't fail the attendance marking
+            print(f"Failed to create notification: {e}")
+
+    return Response({
+        "success": True,
+        "message": f"Attendance marked as {attendance.get_status_display()}",
+        "attendance": {
+            "id": attendance.id,
+            "child": {
+                "id": child.id,
+                "name": f"{child.first_name} {child.last_name}",
+            },
+            "status": attendance.status,
+            "status_display": attendance.get_status_display(),
+            "trip_type": attendance.trip_type,
+            "date": attendance.date,
+            "timestamp": attendance.timestamp,
+            "notes": attendance.notes,
+            "marked_by": request.user.get_full_name(),
+        }
+    }, status=status.HTTP_200_OK if not created else status.HTTP_201_CREATED)

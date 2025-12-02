@@ -476,7 +476,7 @@ export default function BusesPage() {
                       {child.firstName} {child.lastName}
                     </p>
                     <p className="text-xs text-slate-600">
-                      {child.grade} - {child.address}
+                      Grade {child.grade} - {child.school}
                     </p>
                   </div>
                 </label>

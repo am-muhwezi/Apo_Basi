@@ -4,6 +4,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.conf import settings
+import requests
 from .models import Trip, Stop
 from .serializers import TripSerializer, TripCreateSerializer, StopSerializer, StopCreateSerializer
 
@@ -82,6 +84,52 @@ class TripStartView(APIView):
         trip.start_time = timezone.now()
         trip.save()
 
+        # Notify Socket.IO server about trip start
+        try:
+            socketio_url = getattr(settings, 'SOCKETIO_SERVER_URL', 'http://localhost:3000')
+            response = requests.post(
+                f'{socketio_url}/api/notify/trip-start',
+                json={
+                    'busId': trip.bus.id,
+                    'tripType': trip.trip_type,
+                    'tripId': trip.id,
+                    'driverUserId': request.user.id
+                },
+                timeout=2
+            )
+            print(f"Notified Socket.IO server: {response.status_code}")
+        except Exception as e:
+            # Don't fail the request if Socket.IO notification fails
+            print(f"Failed to notify Socket.IO server: {e}")
+
+        # Create notifications for all parents with children on this bus
+        try:
+            from notifications.views import create_notification
+            from children.models import Child
+
+            # Get all children assigned to this bus
+            children = Child.objects.filter(
+                trips=trip
+            ).select_related('parent').distinct()
+
+            for child in children:
+                if child.parent:
+                    title = f"Bus {trip.bus.bus_number} Started {trip.get_trip_type_display()} Trip"
+                    message = f"Your child's bus has started the {trip.get_trip_type_display().lower()} trip."
+
+                    try:
+                        create_notification(
+                            parent=child.parent,
+                            notification_type='general',
+                            title=title,
+                            message=message,
+                            related_object=trip
+                        )
+                    except Exception as e:
+                        print(f"Failed to create notification for parent {child.parent.user.id}: {e}")
+        except Exception as e:
+            print(f"Failed to create parent notifications: {e}")
+
         serializer = TripSerializer(trip)
         return Response(serializer.data)
 
@@ -151,7 +199,7 @@ class TripCancelView(APIView):
 class TripUpdateLocationView(APIView):
     """
     POST /api/trips/{id}/update-location/ - Update trip location
-    Body: { "latitude": 40.7128, "longitude": -74.0060 }
+    Body: { "latitude": 40.7128, "longitude": -74.0060, "speed": 50, "heading": 90 }
     """
     permission_classes = [IsAuthenticated]
 
@@ -160,6 +208,8 @@ class TripUpdateLocationView(APIView):
 
         latitude = request.data.get('latitude')
         longitude = request.data.get('longitude')
+        speed = request.data.get('speed', 0)
+        heading = request.data.get('heading', 0)
 
         if latitude is None or longitude is None:
             return Response(
@@ -171,6 +221,24 @@ class TripUpdateLocationView(APIView):
         trip.current_longitude = longitude
         trip.location_timestamp = timezone.now()
         trip.save()
+
+        # Notify Socket.IO server about location update
+        try:
+            socketio_url = getattr(settings, 'SOCKETIO_SERVER_URL', 'http://localhost:3000')
+            requests.post(
+                f'{socketio_url}/api/notify/location-update',
+                json={
+                    'busId': trip.bus.id,
+                    'latitude': float(latitude),
+                    'longitude': float(longitude),
+                    'speed': speed,
+                    'heading': heading
+                },
+                timeout=1
+            )
+        except Exception as e:
+            # Don't fail the request if Socket.IO notification fails
+            print(f"Failed to notify Socket.IO server of location: {e}")
 
         serializer = TripSerializer(trip)
         return Response(serializer.data)
