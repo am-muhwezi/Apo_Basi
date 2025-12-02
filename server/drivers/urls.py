@@ -4,7 +4,10 @@ from .views import (
     DriverDetailView,
     MyBusView,
     MyRouteView,
-    driver_phone_login
+    driver_phone_login,
+    start_trip,
+    end_trip,
+    get_active_trip
 )
 
 urlpatterns = [
@@ -18,4 +21,9 @@ urlpatterns = [
     # Driver-specific endpoints
     path("my-bus/", MyBusView.as_view(), name="my-bus"),
     path("my-route/", MyRouteView.as_view(), name="my-route"),
+
+    # Trip management
+    path("start-trip/", start_trip, name="start-trip"),
+    path("end-trip/<int:trip_id>/", end_trip, name="end-trip"),
+    path("active-trip/", get_active_trip, name="active-trip"),
 ]

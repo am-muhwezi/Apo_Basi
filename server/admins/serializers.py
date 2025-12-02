@@ -170,3 +170,21 @@ class AdminCreateSerializer(serializers.Serializer):
 
     def to_representation(self, instance):
         return AdminSerializer(instance).data
+
+
+class AdminPasswordChangeSerializer(serializers.Serializer):
+    """Serializer for admin to change another admin's password without old password"""
+    newPassword = serializers.CharField(write_only=True, min_length=6)
+    confirmPassword = serializers.CharField(write_only=True, min_length=6)
+
+    def validate(self, attrs):
+        if attrs['newPassword'] != attrs['confirmPassword']:
+            raise serializers.ValidationError({"confirmPassword": "Passwords don't match"})
+        return attrs
+
+    def save(self, admin_instance):
+        """Update the admin user's password"""
+        password = self.validated_data['newPassword']
+        admin_instance.user.set_password(password)
+        admin_instance.user.save()
+        return admin_instance

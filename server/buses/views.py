@@ -16,7 +16,7 @@ Architecture Benefits:
 """
 
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
@@ -25,16 +25,26 @@ from django.contrib.auth import get_user_model
 from django.http import StreamingHttpResponse
 from django.views.decorators.cache import never_cache
 from django.utils.decorators import method_decorator
+from django.conf import settings
+from django.core.cache import cache
+from django.utils import timezone
 import json
 import time
+import redis
 
-from .models import Bus
-from .serializers import BusSerializer, BusCreateSerializer
+from .models import Bus, BusLocationHistory
+from .serializers import (
+    BusSerializer,
+    BusCreateSerializer,
+    PushLocationSerializer,
+    CurrentLocationSerializer
+)
 from .permissions import IsAdminOrReadOnly, CanManageBusAssignments
 from children.models import Child
 from assignments.models import Assignment
 from drivers.models import Driver
 from busminders.models import BusMinder
+from users.permissions import IsDriver
 
 User = get_user_model()
 
@@ -697,3 +707,307 @@ class BusViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK
         )
+
+
+# ============================================
+# Real-time Location Tracking Endpoints
+# ============================================
+
+def get_redis_client():
+    """
+    Get a Redis client for pub/sub operations.
+
+    Returns a direct Redis client (not Django cache) for pub/sub functionality.
+    """
+    return redis.Redis(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        db=settings.REDIS_DB,
+        password=settings.REDIS_PASSWORD,
+        decode_responses=True
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsDriver])
+def push_location(request):
+    """
+    Push real-time location updates from driver's mobile app.
+
+    POST /api/buses/push-location/
+
+    Request Body:
+    {
+        "lat": 9.0820,
+        "lng": 7.5340,
+        "speed": 45.5,       // Optional
+        "heading": 180.0     // Optional
+    }
+
+    How it works:
+    1. Driver sends location via HTTP POST
+    2. Validates driver is assigned to a bus
+    3. Stores location in Redis (fast, 60s TTL)
+    4. Stores in PostgreSQL for trip history
+    5. Publishes to Redis pub/sub for Socket.IO relay
+
+    Architecture:
+    - HTTP POST: Works with mobile background services
+    - Redis cache: Fast retrieval for current location
+    - Redis pub/sub: Bridge to Socket.IO server
+    - PostgreSQL: Persistent history for analytics
+
+    Response:
+    {
+        "success": true,
+        "message": "Location updated successfully",
+        "busId": 1,
+        "busNumber": "BUS-001"
+    }
+
+    Errors:
+    - 400: Invalid location data
+    - 403: Driver not assigned to any bus
+    - 500: Redis connection error
+    """
+    # Validate request data
+    serializer = PushLocationSerializer(data=request.data)
+    if not serializer.is_valid():
+        # Log the error details for debugging
+        print(f"❌ Location validation failed: {serializer.errors}")
+        print(f"📦 Received data: {request.data}")
+        return Response(
+            {
+                "success": False,
+                "error": {
+                    "message": "Invalid location data",
+                    "details": serializer.errors
+                }
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Get driver's assigned bus
+    try:
+        driver = request.user.driver
+
+        # Try to get bus from Assignment API first (preferred method)
+        driver_assignment = Assignment.get_active_assignments_for(driver, 'driver_to_bus').first()
+
+        if driver_assignment:
+            bus = driver_assignment.assigned_to
+        else:
+            # Fallback to direct foreign key relationship
+            bus = driver.assigned_bus
+
+        if not bus:
+            print(f"⚠️ Driver {driver.user.get_full_name()} has no assigned bus")
+            return Response(
+                {
+                    "success": False,
+                    "error": {
+                        "message": "Driver is not assigned to any bus",
+                        "code": "NO_BUS_ASSIGNED"
+                    }
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        print(f"✅ Driver {driver.user.get_full_name()} pushing location for bus {bus.bus_number}")
+
+    except Driver.DoesNotExist:
+        return Response(
+            {
+                "success": False,
+                "error": {
+                    "message": "Driver profile not found",
+                    "code": "DRIVER_NOT_FOUND"
+                }
+            },
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    validated_data = serializer.validated_data
+    lat = validated_data['lat']
+    lng = validated_data['lng']
+    speed = validated_data.get('speed')
+    heading = validated_data.get('heading')
+    timestamp = timezone.now()
+
+    try:
+        # 1. Store in Redis for fast retrieval (60 second TTL)
+        redis_key = settings.REDIS_BUS_LOCATION_KEY_PATTERN.format(bus_id=bus.id)
+        location_data = {
+            'bus_id': bus.id,
+            'bus_number': bus.bus_number,
+            'lat': str(lat),
+            'lng': str(lng),
+            'speed': speed,
+            'heading': heading,
+            'is_active': True,
+            'timestamp': timestamp.isoformat()
+        }
+
+        # Use Django cache (django-redis) for easier serialization
+        cache.set(redis_key, location_data, settings.REDIS_LOCATION_TTL)
+
+        # 2. Store in PostgreSQL for trip history
+        BusLocationHistory.objects.create(
+            bus=bus,
+            latitude=lat,
+            longitude=lng,
+            speed=speed,
+            heading=heading,
+            is_active=True,
+            timestamp=timestamp
+        )
+
+        # 3. Publish to Redis pub/sub for Socket.IO relay
+        redis_client = get_redis_client()
+        redis_client.publish(
+            settings.REDIS_LOCATION_UPDATES_CHANNEL,
+            json.dumps(location_data)
+        )
+
+        # 4. Send to Socket.IO server via HTTP (fallback if Redis pub/sub fails)
+        try:
+            import requests
+            requests.post(
+                f'{settings.SOCKETIO_SERVER_URL}/api/notify/location-update',
+                json={
+                    'busId': bus.id,
+                    'latitude': float(lat),
+                    'longitude': float(lng),
+                    'speed': speed,
+                    'heading': heading
+                },
+                timeout=1  # Don't block if Socket.IO is down
+            )
+        except Exception as e:
+            # Log but don't fail the request if Socket.IO is unreachable
+            print(f"Warning: Could not notify Socket.IO server: {str(e)}")
+
+        return Response(
+            {
+                "success": True,
+                "message": "Location updated successfully",
+                "busId": bus.id,
+                "busNumber": bus.bus_number
+            },
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        # Log error in production
+        print(f"Error updating location: {str(e)}")
+        return Response(
+            {
+                "success": False,
+                "error": {
+                    "message": "Failed to update location",
+                    "code": "INTERNAL_ERROR"
+                }
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_location(request, bus_id):
+    """
+    Get current location of a bus from Redis cache.
+
+    GET /api/buses/{bus_id}/current-location/
+
+    Used by parents and admins when opening the app to show latest location.
+
+    How it works:
+    1. Checks Redis for cached location (60s TTL)
+    2. If not in Redis, falls back to PostgreSQL last known location
+    3. Returns location with timestamp
+
+    Response:
+    {
+        "success": true,
+        "data": {
+            "busId": 1,
+            "busNumber": "BUS-001",
+            "lat": "9.082000",
+            "lng": "7.534000",
+            "speed": 45.5,
+            "heading": 180.0,
+            "isActive": true,
+            "timestamp": "2025-01-15T10:30:00Z"
+        }
+    }
+
+    Errors:
+    - 404: Bus not found
+    - 404: No location data available
+    """
+    # Get bus
+    try:
+        bus = Bus.objects.get(id=bus_id)
+    except Bus.DoesNotExist:
+        return Response(
+            {
+                "success": False,
+                "error": {
+                    "message": "Bus not found",
+                    "code": "BUS_NOT_FOUND"
+                }
+            },
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Try to get from Redis first (fastest)
+    redis_key = settings.REDIS_BUS_LOCATION_KEY_PATTERN.format(bus_id=bus_id)
+    cached_location = cache.get(redis_key)
+
+    if cached_location:
+        serializer = CurrentLocationSerializer(cached_location)
+        return Response(
+            {
+                "success": True,
+                "data": serializer.data,
+                "source": "realtime"
+            },
+            status=status.HTTP_200_OK
+        )
+
+    # Fallback to PostgreSQL last known location
+    last_location = BusLocationHistory.objects.filter(bus=bus).order_by('-timestamp').first()
+
+    if last_location:
+        location_data = {
+            'bus_id': bus.id,
+            'bus_number': bus.bus_number,
+            'lat': last_location.latitude,
+            'lng': last_location.longitude,
+            'speed': last_location.speed,
+            'heading': last_location.heading,
+            'is_active': last_location.is_active,
+            'timestamp': last_location.timestamp
+        }
+        serializer = CurrentLocationSerializer(location_data)
+        return Response(
+            {
+                "success": True,
+                "data": serializer.data,
+                "source": "history"
+            },
+            status=status.HTTP_200_OK
+        )
+
+    # No location data available
+    return Response(
+        {
+            "success": False,
+            "error": {
+                "message": "No location data available for this bus",
+                "code": "NO_LOCATION_DATA"
+            }
+        },
+        status=status.HTTP_404_NOT_FOUND
+    )

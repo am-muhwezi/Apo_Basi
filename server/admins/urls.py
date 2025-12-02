@@ -3,6 +3,7 @@ from .views import (
     admin_register,
     AdminListCreateView,
     AdminDetailView,
+    admin_change_password,
     AdminAddParentView,
     AdminAddDriverView,
     AdminAddBusminderView,
@@ -23,6 +24,7 @@ urlpatterns = [
     # Admin CRUD endpoints
     path("", AdminListCreateView.as_view(), name="admin-list-create"),
     path("<int:user_id>/", AdminDetailView.as_view(), name="admin-detail"),
+    path("<int:user_id>/change-password/", admin_change_password, name="admin-change-password"),
 
     # Admin action endpoints
     path(

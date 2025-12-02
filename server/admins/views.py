@@ -9,7 +9,7 @@ from parents.models import Parent
 from busminders.models import BusMinder
 from .models import Admin
 from users.permissions import IsAdmin
-from .serializers import AdminSerializer, AdminCreateSerializer, AdminRegistrationSerializer
+from .serializers import AdminSerializer, AdminCreateSerializer, AdminRegistrationSerializer, AdminPasswordChangeSerializer
 
 import uuid
 from children.models import Child
@@ -66,6 +66,32 @@ class AdminDetailView(generics.RetrieveUpdateDestroyAPIView):
         if self.request.method in ['PUT', 'PATCH']:
             return AdminCreateSerializer
         return AdminSerializer
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def admin_change_password(request, user_id):
+    """
+    Admin endpoint to change another admin's password without requiring old password.
+
+    POST /api/admins/{id}/change-password/
+    Body: {"newPassword": "password123", "confirmPassword": "password123"}
+    """
+    try:
+        admin = Admin.objects.select_related('user').get(user_id=user_id)
+    except Admin.DoesNotExist:
+        return Response({
+            'error': 'Admin not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = AdminPasswordChangeSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save(admin_instance=admin)
+        return Response({
+            'message': 'Password changed successfully'
+        }, status=status.HTTP_200_OK)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Bus creation moved to /api/buses/ endpoint

@@ -316,6 +316,33 @@ class MarkAttendanceView(APIView):
             attendance.notes = notes or ''  # Ensure notes is never None
             attendance.save()
 
+        # Create notification for parent when pickup or dropoff is confirmed
+        if child.parent and new_status in ['picked_up', 'dropped_off']:
+            from notifications.views import create_notification
+
+            # Determine notification type and message
+            if new_status == 'picked_up':
+                notification_type = 'pickup_confirmed'
+                title = f"{child.first_name} Picked Up"
+                message = f"Your child {child.first_name} {child.last_name} has been safely picked up by the bus at {attendance.timestamp.strftime('%I:%M %p')}."
+            else:  # dropped_off
+                notification_type = 'dropoff_complete'
+                title = f"{child.first_name} Dropped Off"
+                message = f"Your child {child.first_name} {child.last_name} has been safely dropped off at {attendance.timestamp.strftime('%I:%M %p')}."
+
+            # Create the notification
+            try:
+                create_notification(
+                    parent=child.parent,
+                    notification_type=notification_type,
+                    title=title,
+                    message=message,
+                    related_object=attendance
+                )
+            except Exception as e:
+                # Log error but don't fail the attendance marking
+                print(f"Failed to create notification: {e}")
+
         return Response({
             "message": f"Attendance marked as {attendance.get_status_display()}",
             "attendance": {

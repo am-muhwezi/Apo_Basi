@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Bus
+from .models import Bus, BusLocationHistory
 from django.contrib.auth import get_user_model
 from assignments.models import Assignment
 
@@ -133,3 +133,91 @@ class BusCreateSerializer(serializers.ModelSerializer):
         if status:
             validated_data['is_active'] = (status == 'active')
         return super().update(instance, validated_data)
+
+
+class PushLocationSerializer(serializers.Serializer):
+    """
+    Serializer for driver pushing location updates.
+
+    Used by drivers to send real-time GPS coordinates from their mobile app.
+
+    Example Request Body:
+    {
+        "lat": 9.0820,
+        "lng": 7.5340,
+        "speed": 45.5,       // Optional
+        "heading": 180.0     // Optional
+    }
+    """
+    lat = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=8,
+        required=True,
+        help_text="GPS latitude (-90 to 90)",
+        coerce_to_string=False
+    )
+    lng = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=8,
+        required=True,
+        help_text="GPS longitude (-180 to 180)",
+        coerce_to_string=False
+    )
+    speed = serializers.FloatField(
+        required=False,
+        allow_null=True,
+        help_text="Speed in m/s (will be converted from GPS speed)"
+    )
+    heading = serializers.FloatField(
+        required=False,
+        allow_null=True,
+        help_text="Direction in degrees (0-360)"
+    )
+
+    def validate_lat(self, value):
+        """Validate latitude is within valid range"""
+        if not (-90 <= value <= 90):
+            raise serializers.ValidationError("Latitude must be between -90 and 90")
+        return value
+
+    def validate_lng(self, value):
+        """Validate longitude is within valid range"""
+        if not (-180 <= value <= 180):
+            raise serializers.ValidationError("Longitude must be between -180 and 180")
+        return value
+
+    def validate_heading(self, value):
+        """Validate heading is within valid range"""
+        if value is not None and not (0 <= value <= 360):
+            raise serializers.ValidationError("Heading must be between 0 and 360 degrees")
+        return value
+
+
+class CurrentLocationSerializer(serializers.Serializer):
+    """
+    Serializer for returning current bus location to parents/admins.
+
+    Response format optimized for mobile map display.
+    """
+    busId = serializers.IntegerField(source='bus_id')
+    busNumber = serializers.CharField(source='bus_number')
+    lat = serializers.DecimalField(max_digits=9, decimal_places=6)
+    lng = serializers.DecimalField(max_digits=9, decimal_places=6)
+    speed = serializers.FloatField(allow_null=True)
+    heading = serializers.FloatField(allow_null=True)
+    isActive = serializers.BooleanField(source='is_active')
+    timestamp = serializers.DateTimeField()
+
+
+class BusLocationHistorySerializer(serializers.ModelSerializer):
+    """
+    Serializer for historical location data.
+
+    Used for trip reports and analytics.
+    """
+    busNumber = serializers.CharField(source='bus.bus_number', read_only=True)
+
+    class Meta:
+        model = BusLocationHistory
+        fields = ['id', 'busNumber', 'latitude', 'longitude', 'speed', 'heading', 'is_active', 'timestamp', 'trip']
+        read_only_fields = ['id', 'timestamp']

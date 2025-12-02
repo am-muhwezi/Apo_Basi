@@ -38,3 +38,11 @@ export async function updateAdmin(id: string | number, data: {
 export async function deleteAdmin(id: string | number) {
   return axiosInstance.delete(`/admins/${id}/`);
 }
+
+// Change admin password
+export async function changeAdminPassword(id: string | number, data: {
+  newPassword: string;
+  confirmPassword: string;
+}) {
+  return axiosInstance.post(`/admins/${id}/change-password/`, data);
+}

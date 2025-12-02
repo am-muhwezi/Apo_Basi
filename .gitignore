@@ -7,6 +7,12 @@ __pycache__/
 db.sqlite3
 server/.python-version
 
+
+# Django
+*migrations/
+
+
+
 # Flutter
 **/build/
 **/.dart_tool/
@@ -31,3 +37,6 @@ yarn-debug.log*
 .idea/
 .DS_Store
 *.swp
+
+# Documentation
+/docs
