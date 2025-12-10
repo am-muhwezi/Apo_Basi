@@ -226,6 +226,7 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
       await _apiService.markAttendance(
         childId: int.parse(studentId),
         status: newStatus,
+        tripType: _tripType,
       );
 
       // Show success toast

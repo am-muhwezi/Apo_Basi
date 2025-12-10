@@ -1,22 +1,14 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/api_config.dart';
 
 class ApiService {
-  // DEVELOPMENT: Use WiFi IP for testing on physical device
-  // TODO: Update this to match your backend server IP/domain
-  static const String baseUrl = 'http://localhost:8000';
-
-  // OTHER OPTIONS:
-  // Android emulator: 'http://10.0.2.2:8000'
-  // iOS simulator: 'http://localhost:8000'
-  // Production: 'http://YOUR_VPS_IP' or 'https://yourdomain.com'
-
   late Dio _dio;
   String? _accessToken;
 
   ApiService() {
     _dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
+      baseUrl: ApiConfig.apiBaseUrl,
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
       headers: {
@@ -27,14 +19,24 @@ class ApiService {
 
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        // Add token to requests if available
-        if (_accessToken != null) {
-          options.headers['Authorization'] = 'Bearer $_accessToken';
+        // Skip authentication for login endpoints
+        final isLoginEndpoint = options.path.contains('/phone-login/') ||
+            options.path.contains('/login/');
+
+        if (!isLoginEndpoint) {
+          // Load and add token for authenticated requests
+          await loadToken();
+          if (_accessToken != null) {
+            options.headers['Authorization'] = 'Bearer $_accessToken';
+          }
         }
         return handler.next(options);
       },
       onError: (error, handler) {
         print('API Error: ${error.message}');
+        if (error.response != null) {
+          print('Error Response: ${error.response?.data}');
+        }
         return handler.next(error);
       },
     ));
@@ -78,17 +80,10 @@ class ApiService {
     return prefs.getInt('user_id');
   }
 
-  // TODO: BACKEND IMPLEMENTATION NEEDED
-  // Phone-based login for drivers (passwordless, similar to parent phone login)
-  // The backend needs to implement: POST /api/drivers/phone-login/
-  // Expected request body: {"phone_number": "0773882123"}
-  // Expected response: {"user": {...}, "tokens": {...}, "driver": {...}, "bus": {...}}
+  // Phone-based login for drivers (passwordless)
+  // Returns user, tokens, bus, and route in a single response
   Future<Map<String, dynamic>> driverPhoneLogin(String phoneNumber) async {
     try {
-      // TODO: Replace this endpoint when backend implements phone-login
-      // For now, trying to login by searching for driver with this phone number
-      // TEMPORARY: Uses username/password login as fallback
-
       final response = await _dio.post(
         '/api/drivers/phone-login/',
         data: {
@@ -110,6 +105,11 @@ class ApiService {
         await prefs.setString('user_name', data['name']);
         await prefs.setString('user_phone', data['phone']);
         await prefs.setBool('is_logged_in', true);
+
+        // Save bus ID if available
+        if (data['bus'] != null && data['bus']['id'] != null) {
+          await prefs.setInt('current_bus_id', data['bus']['id']);
+        }
 
         return data;
       } else {
@@ -170,7 +170,6 @@ class ApiService {
   // Backend endpoint: GET /api/drivers/my-bus/
   Future<Map<String, dynamic>> getDriverBus() async {
     try {
-      await loadToken();
       final response = await _dio.get('/api/drivers/my-bus/');
 
       if (response.statusCode == 200) {
@@ -180,8 +179,9 @@ class ApiService {
       }
     } on DioException catch (e) {
       if (e.response != null) {
-        throw Exception(
-            e.response?.data['error'] ?? 'Failed to load bus information');
+        throw Exception(e.response?.data['message'] ??
+            e.response?.data['error'] ??
+            'Failed to load bus information');
       } else {
         throw Exception('Network error. Please check your connection.');
       }
@@ -192,7 +192,6 @@ class ApiService {
   // Backend endpoint: GET /api/drivers/my-route/
   Future<Map<String, dynamic>> getDriverRoute() async {
     try {
-      await loadToken();
       final response = await _dio.get('/api/drivers/my-route/');
 
       if (response.statusCode == 200) {
@@ -202,8 +201,9 @@ class ApiService {
       }
     } on DioException catch (e) {
       if (e.response != null) {
-        throw Exception(
-            e.response?.data['error'] ?? 'Failed to load route information');
+        throw Exception(e.response?.data['message'] ??
+            e.response?.data['error'] ??
+            'Failed to load route information');
       } else {
         throw Exception('Network error. Please check your connection.');
       }
@@ -214,7 +214,6 @@ class ApiService {
   // Backend endpoint: GET /api/busminders/my-buses/
   Future<Map<String, dynamic>> getBusMinderBuses() async {
     try {
-      await loadToken();
       final response = await _dio.get('/api/busminders/my-buses/');
 
       if (response.statusCode == 200) {
@@ -224,8 +223,9 @@ class ApiService {
       }
     } on DioException catch (e) {
       if (e.response != null) {
-        throw Exception(
-            e.response?.data['error'] ?? 'Failed to load buses information');
+        throw Exception(e.response?.data['message'] ??
+            e.response?.data['error'] ??
+            'Failed to load buses information');
       } else {
         throw Exception('Network error. Please check your connection.');
       }
@@ -236,7 +236,6 @@ class ApiService {
   // Backend endpoint: GET /api/busminders/buses/{bus_id}/children/
   Future<List<dynamic>> getBusChildren(int busId) async {
     try {
-      await loadToken();
       final response = await _dio.get('/api/busminders/buses/$busId/children/');
 
       if (response.statusCode == 200) {
@@ -246,8 +245,9 @@ class ApiService {
       }
     } on DioException catch (e) {
       if (e.response != null) {
-        throw Exception(
-            e.response?.data['error'] ?? 'Failed to load children information');
+        throw Exception(e.response?.data['message'] ??
+            e.response?.data['error'] ??
+            'Failed to load children information');
       } else {
         throw Exception('Network error. Please check your connection.');
       }
@@ -260,15 +260,17 @@ class ApiService {
     required int childId,
     required String status,
     String? notes,
+    String? tripType,
   }) async {
     try {
-      await loadToken();
+      // Use the unified attendance endpoint that works for both drivers and bus minders
       final response = await _dio.post(
-        '/api/busminders/mark-attendance/',
+        '/api/attendance/mark/',
         data: {
           'child_id': childId,
           'status': status,
           'notes': notes,
+          'trip_type': tripType,
         },
       );
 
@@ -279,8 +281,9 @@ class ApiService {
       }
     } on DioException catch (e) {
       if (e.response != null) {
-        throw Exception(
-            e.response?.data['error'] ?? 'Failed to mark attendance');
+        throw Exception(e.response?.data['message'] ??
+            e.response?.data['error'] ??
+            'Failed to mark attendance');
       } else {
         throw Exception('Network error. Please check your connection.');
       }
@@ -297,5 +300,158 @@ class ApiService {
   Future<String?> getUserRole() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('user_role');
+  }
+
+  // ==================== Trip Management ====================
+
+  // Complete a trip with attendance summary
+  Future<Map<String, dynamic>> completeTrip({
+    required int tripId,
+    required int totalStudents,
+    required int studentsCompleted,
+    required int studentsAbsent,
+    required int studentsPending,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/trips/$tripId/complete/',
+        data: {
+          'totalStudents': totalStudents,
+          'studentsCompleted': studentsCompleted,
+          'studentsAbsent': studentsAbsent,
+          'studentsPending': studentsPending,
+        },
+      );
+      return response.data;
+    } catch (e) {
+      print('Error completing trip: $e');
+      rethrow;
+    }
+  }
+
+  // Get trip history for current user
+  Future<List<dynamic>> getTripHistory({
+    String? status,
+    String? tripType,
+    int? busId,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (status != null) queryParams['status'] = status;
+      if (tripType != null) queryParams['type'] = tripType;
+      if (busId != null) queryParams['bus_id'] = busId;
+
+      final response = await _dio.get(
+        '/api/trips/',
+        queryParameters: queryParams,
+      );
+
+      // Handle response - ensure it's a list
+      if (response.data is List) {
+        return response.data as List<dynamic>;
+      } else {
+        // If it's not a list, return empty list
+        print(
+            'Warning: getTripHistory expected a list but got: ${response.data.runtimeType}');
+        return [];
+      }
+    } catch (e) {
+      print('Error getting trip history: $e');
+      return []; // Return empty list instead of rethrowing
+    }
+  }
+
+  // Get specific trip details
+  Future<Map<String, dynamic>> getTripDetails(int tripId) async {
+    try {
+      final response = await _dio.get('/api/trips/$tripId/');
+      return response.data;
+    } catch (e) {
+      print('Error getting trip details: $e');
+      rethrow;
+    }
+  }
+
+  // ==================== Driver Trip Management ====================
+
+  // Start a new trip
+  Future<Map<String, dynamic>> startTrip({String tripType = 'pickup'}) async {
+    try {
+      final response = await _dio.post(
+        '/api/drivers/start-trip/',
+        data: {
+          'trip_type': tripType,
+        },
+      );
+      return response.data;
+    } catch (e) {
+      print('Error starting trip: $e');
+      rethrow;
+    }
+  }
+
+  // End a trip
+  Future<Map<String, dynamic>> endTrip({
+    required int tripId,
+    int? totalStudents,
+    int? studentsCompleted,
+    int? studentsAbsent,
+    int? studentsPending,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/drivers/end-trip/$tripId/',
+        data: {
+          if (totalStudents != null) 'totalStudents': totalStudents,
+          if (studentsCompleted != null) 'studentsCompleted': studentsCompleted,
+          if (studentsAbsent != null) 'studentsAbsent': studentsAbsent,
+          if (studentsPending != null) 'studentsPending': studentsPending,
+        },
+      );
+      return response.data;
+    } catch (e) {
+      print('Error ending trip: $e');
+      rethrow;
+    }
+  }
+
+  // Get active trip for current driver
+  Future<Map<String, dynamic>?> getActiveTrip() async {
+    try {
+      final response = await _dio.get('/api/drivers/active-trip/');
+      if (response.data['trip'] != null) {
+        return response.data['trip'];
+      }
+      return null;
+    } catch (e) {
+      print('Error getting active trip: $e');
+      return null;
+    }
+  }
+
+  // ==================== Location Tracking ====================
+
+  // Push location update for trip
+  Future<void> pushLocation({
+    required int tripId,
+    required double latitude,
+    required double longitude,
+    double? speed,
+    double? heading,
+  }) async {
+    try {
+      await _dio.post(
+        '/api/trips/$tripId/update-location/',
+        data: {
+          'latitude': latitude,
+          'longitude': longitude,
+          if (speed != null) 'speed': speed,
+          if (heading != null) 'heading': heading,
+        },
+      );
+    } catch (e) {
+      print('Error pushing location: $e');
+      rethrow;
+    }
   }
 }

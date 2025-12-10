@@ -54,7 +54,7 @@ class AppLogoWidget extends StatelessWidget {
 
           // App Name
           Text(
-            'BusTracker Pro',
+            'ApoBasi',
             style: theme.textTheme.headlineMedium?.copyWith(
               color: colorScheme.onSurface,
               fontWeight: FontWeight.w700,
@@ -67,7 +67,7 @@ class AppLogoWidget extends StatelessWidget {
 
           // App Tagline
           Text(
-            'Transportation Management System',
+            'School Bus Tracking & Management',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurface.withValues(alpha: 0.7),
               fontWeight: FontWeight.w400,

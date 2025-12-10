@@ -6,6 +6,7 @@ import '../presentation/driver_trip_history_screen/driver_trip_history_screen.da
 import '../presentation/busminder_start_shift_screen/busminder_start_shift_screen.dart';
 import '../presentation/busminder_attendance_screen/busminder_attendance_screen/busminder_attendance_screen.dart';
 import '../presentation/busminder_trip_progress_screen/busminder_trip_progress_screen.dart';
+import '../presentation/busminder_trip_history_screen/busminder_trip_history_screen.dart';
 
 class AppRoutes {
   // Routes
@@ -21,6 +22,7 @@ class AppRoutes {
   static const String busminderStartShift = '/busminder-start-shift-screen';
   static const String busminderAttendance = '/busminder-attendance-screen';
   static const String busminderTripProgress = '/busminder-trip-progress-screen';
+  static const String busminderTripHistory = '/busminder-trip-history-screen';
 
   static Map<String, WidgetBuilder> routes = {
     initial: (context) => const SharedLoginScreen(),
@@ -31,5 +33,6 @@ class AppRoutes {
     busminderStartShift: (context) => const BusminderStartShiftScreen(),
     busminderAttendance: (context) => const BusminderAttendanceScreen(),
     busminderTripProgress: (context) => const BusminderTripProgressScreen(),
+    busminderTripHistory: (context) => const BusMinderTripHistoryScreen(),
   };
 }

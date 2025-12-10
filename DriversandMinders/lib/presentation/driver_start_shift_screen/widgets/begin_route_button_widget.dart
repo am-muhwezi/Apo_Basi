@@ -9,6 +9,8 @@ class BeginRouteButtonWidget extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onPressed;
   final VoidCallback onLongPress;
+  final bool isContinueTrip;
+  final String? tripDuration;
 
   const BeginRouteButtonWidget({
     super.key,
@@ -16,6 +18,8 @@ class BeginRouteButtonWidget extends StatelessWidget {
     required this.isLoading,
     required this.onPressed,
     required this.onLongPress,
+    this.isContinueTrip = false,
+    this.tripDuration,
   });
 
   @override
@@ -24,7 +28,55 @@ class BeginRouteButtonWidget extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
       child: Column(
         children: [
-          if (!isEnabled) ...[
+          if (isContinueTrip) ...[
+            Container(
+              padding: EdgeInsets.all(3.w),
+              margin: EdgeInsets.only(bottom: 2.h),
+              decoration: BoxDecoration(
+                color: AppTheme.successAction.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppTheme.successAction.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  CustomIconWidget(
+                    iconName: 'check_circle',
+                    color: AppTheme.successAction,
+                    size: 20,
+                  ),
+                  SizedBox(width: 3.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Active Trip in Progress',
+                          style: AppTheme.lightDriverTheme.textTheme.bodyMedium
+                              ?.copyWith(
+                            color: AppTheme.successAction,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (tripDuration != null) ...[
+                          SizedBox(height: 0.5.h),
+                          Text(
+                            'Duration: $tripDuration',
+                            style: AppTheme.lightDriverTheme.textTheme.bodySmall
+                                ?.copyWith(
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (!isEnabled) ...[
             Container(
               padding: EdgeInsets.all(3.w),
               margin: EdgeInsets.only(bottom: 2.h),
@@ -117,13 +169,13 @@ class BeginRouteButtonWidget extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           CustomIconWidget(
-                            iconName: 'play_arrow',
+                            iconName: isContinueTrip ? 'directions_bus' : 'play_arrow',
                             color: AppTheme.textOnPrimary,
                             size: 28,
                           ),
                           SizedBox(width: 3.w),
                           Text(
-                            'Begin Route',
+                            isContinueTrip ? 'Continue Trip' : 'Begin Route',
                             style: AppTheme
                                 .lightDriverTheme.textTheme.titleLarge
                                 ?.copyWith(

@@ -2,16 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
+import 'package:geolocator/geolocator.dart';
+import 'dart:async';
 
 import '../../core/app_export.dart';
+import '../../config/api_config.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
+import '../../services/driver_location_service.dart';
+import '../../services/native_location_service.dart';
+import '../../services/trip_state_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import './widgets/route_map_widget.dart';
 import './widgets/socket_status_widget.dart';
 import './widgets/student_list_widget.dart';
 import './widgets/trip_statistics_widget.dart';
 import './widgets/trip_status_header_widget.dart';
+import './widgets/next_stop_widget.dart';
+import './widgets/upcoming_stops_widget.dart';
 
 class DriverActiveTripScreen extends StatefulWidget {
   const DriverActiveTripScreen({super.key});
@@ -26,6 +34,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   late Animation<double> _fadeAnimation;
   final ApiService _apiService = ApiService();
   final SocketService _socketService = SocketService();
+  final DriverLocationService _locationService = DriverLocationService();
+  final NativeLocationService _nativeLocationService = NativeLocationService();
+  final TripStateService _tripStateService = TripStateService();
 
   // Trip data
   DateTime _tripStartTime = DateTime.now();
@@ -33,6 +44,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   String _currentStop = "";
   bool _isLoadingData = true;
   String? _errorMessage;
+  int? _currentTripId;
+  Timer? _locationUpdateTimer;
 
   // Real trip data from API
   Map<String, dynamic> _tripData = {};
@@ -40,15 +53,75 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   Map<String, dynamic>? _routeDetails;
   Map<String, dynamic>? _busData;
 
-  // Socket.IO connection status
-  bool _isSocketConnected = false;
-
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
     _loadTripData();
     _startElapsedTimeTimer();
+    _initializeLocationTracking();
+  }
+
+  Future<void> _initializeLocationTracking() async {
+    try {
+      // Get credentials from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      final busId = prefs.getInt('current_bus_id');
+      final apiUrl = ApiConfig.apiBaseUrl;
+
+      if (token == null || busId == null) {
+        return;
+      }
+
+      // Save trip state for persistence
+      await _tripStateService.saveTripState(
+        tripId: _currentTripId ?? DateTime.now().millisecondsSinceEpoch,
+        tripType: 'active',
+        startTime: _tripStartTime,
+        busId: busId,
+        busNumber: _busData?['bus_number'] ?? 'BUS-$busId',
+      );
+
+      // Start native background location service
+      await _nativeLocationService.startLocationTracking(
+        token: token,
+        busId: busId,
+        apiUrl: apiUrl,
+      );
+
+      // Also start Flutter location service for map display
+      await _locationService.initialize();
+      await _locationService.setBusId(busId);
+      await _locationService.startTracking();
+
+      // Start periodic location updates to trip API
+      _startLocationUpdateTimer();
+    } catch (e) {
+      // Silently handle error
+    }
+  }
+
+  void _startLocationUpdateTimer() {
+    // Send location to trip API every 5 seconds
+    _locationUpdateTimer = Timer.periodic(Duration(seconds: 5), (_) async {
+      if (_currentTripId != null) {
+        final position = _locationService.lastPosition;
+        if (position != null) {
+          try {
+            await _apiService.pushLocation(
+              tripId: _currentTripId!,
+              latitude: position.latitude,
+              longitude: position.longitude,
+              speed: position.speed,
+              heading: position.heading,
+            );
+          } catch (e) {
+            // Silently handle error
+          }
+        }
+      }
+    });
   }
 
   Future<void> _loadTripData() async {
@@ -58,8 +131,16 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     });
 
     try {
-      // Get user info from SharedPreferences
+      // Get trip state from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
+      _currentTripId = prefs.getInt('current_trip_id');
+      final tripStartTimeStr = prefs.getString('trip_start_time');
+
+      if (tripStartTimeStr != null) {
+        _tripStartTime = DateTime.parse(tripStartTimeStr);
+      }
+
+      // Get user info from SharedPreferences
       final userName = prefs.getString('user_name') ?? 'Driver';
 
       // Fetch bus and route data from API
@@ -77,9 +158,13 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       // Extract route data
       _routeDetails = routeResponse;
 
+      // Get trip type from SharedPreferences
+      final tripType = prefs.getString('current_trip_type') ?? 'pickup';
+
       // Build trip data object
       _tripData = {
         "tripId": "TRP_${DateTime.now().toString().substring(0, 10).replaceAll('-', '')}_${_busData?['id'] ?? '001'}",
+        "trip_type": tripType,
         "routeNumber": routeResponse['route_name']?.toString() ?? "N/A",
         "routeName": routeResponse['route_name'] ?? 'No Route',
         "driverName": userName,
@@ -115,8 +200,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
         _isLoadingData = false;
       });
 
-      // Initialize Socket.IO connection after data is loaded
-      _initializeSocketConnection();
+      // Drivers use REST API to push location, not Socket.IO
+      // Socket.IO is only needed for parents to receive real-time updates
+      // No need to initialize socket connection for drivers
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to load trip data: ${e.toString()}';
@@ -141,51 +227,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   @override
   void dispose() {
     _animationController.dispose();
-    _socketService.disconnect();
+    _locationUpdateTimer?.cancel();
+    // Don't stop location tracking on dispose - it should persist until trip ends
     super.dispose();
-  }
-
-  /// Initialize Socket.IO connection and start location tracking
-  Future<void> _initializeSocketConnection() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getInt('user_id');
-
-      if (userId == null || _busData == null) {
-        print('⚠️ Cannot initialize socket: Missing user ID or bus data');
-        return;
-      }
-
-      final busId = _busData!['id']?.toString() ?? _busData!['bus_number']?.toString() ?? 'unknown';
-
-      // Initialize socket connection
-      _socketService.initializeSocket(
-        serverUrl: 'http://192.168.100.43:4000', // TODO: Move to config
-        driverId: userId,
-        busId: busId,
-      );
-
-      // Wait a moment for connection to establish
-      await Future.delayed(Duration(seconds: 2));
-
-      // Check connection status
-      setState(() {
-        _isSocketConnected = _socketService.isConnected;
-      });
-
-      if (_socketService.isConnected) {
-        // Start location tracking and emission
-        _socketService.startLocationTracking();
-        print('✅ Socket.IO: Connected and tracking location');
-      } else {
-        print('⚠️ Socket.IO: Failed to connect');
-      }
-    } catch (e) {
-      print('❌ Socket.IO initialization error: $e');
-      setState(() {
-        _isSocketConnected = false;
-      });
-    }
   }
 
   void _initializeAnimations() {
@@ -223,23 +267,78 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     });
   }
 
-  void _onPickupStatusChanged(int index, bool isPickedUp) {
+  Future<void> _onPickupStatusChanged(int index, bool isPickedUp) async {
+    // Update local state immediately for responsiveness
     setState(() {
       _students[index]["isPickedUp"] = isPickedUp;
+
+      // Update current stop to next unpicked student
+      if (isPickedUp) {
+        final nextStudent = _nextStudent;
+        if (nextStudent != null) {
+          _currentStop = nextStudent["stopName"] as String? ?? '';
+        } else {
+          _currentStop = 'All students picked up';
+        }
+      }
     });
 
-    // Show confirmation
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isPickedUp
-              ? '${_students[index]["name"]} marked as picked up'
-              : '${_students[index]["name"]} marked as not picked up',
-        ),
-        duration: Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    // Sync with backend
+    try {
+      final studentId = _students[index]["id"];
+      final prefs = await SharedPreferences.getInstance();
+      final tripType = prefs.getString('current_trip_type') ?? 'pickup';
+
+      await _apiService.markAttendance(
+        childId: studentId,
+        status: isPickedUp ? 'picked_up' : 'pending',
+        tripType: tripType,
+      );
+
+      // Show success confirmation
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 2.w),
+                Expanded(
+                  child: Text(
+                    isPickedUp
+                        ? '${_students[index]["name"]} marked as picked up'
+                        : '${_students[index]["name"]} marked as not picked up',
+                  ),
+                ),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppTheme.successAction,
+          ),
+        );
+      }
+    } catch (e) {
+      // Show error but keep local state
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.warning, color: Colors.white),
+                SizedBox(width: 2.w),
+                Expanded(
+                  child: Text('Saved locally. Will sync when online.'),
+                ),
+              ],
+            ),
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppTheme.warningState,
+          ),
+        );
+      }
+    }
   }
 
   void _onFullScreenMapTap() {
@@ -289,97 +388,191 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     );
   }
 
-  void _endTrip() {
+  Future<void> _endTrip() async {
     HapticFeedback.mediumImpact();
 
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Trip ended successfully'),
-        backgroundColor: AppTheme.successAction,
-        duration: Duration(seconds: 3),
-      ),
-    );
+    if (_currentTripId == null) {
+      // Still try to clear local state if somehow we got here without a trip ID
+      await _clearTripStateLocally();
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/driver-start-shift-screen',
+          (route) => false,
+        );
+      }
+      return;
+    }
 
-    // Navigate to trip history
-    Navigator.pushReplacementNamed(context, '/driver-trip-history-screen');
-  }
+    // Calculate statistics
+    final totalStudents = _students.length;
+    final studentsCompleted = _students.where((s) => s["isPickedUp"] as bool? ?? false).length;
+    final studentsAbsent = totalStudents - studentsCompleted;
 
-  void _showSocketInfoDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            CustomIconWidget(
-              iconName: _isSocketConnected ? 'wifi' : 'wifi_off',
-              color: _isSocketConnected ? AppTheme.successAction : AppTheme.criticalAlert,
-              size: 24,
+    try {
+      // Call backend to end trip
+      await _apiService.endTrip(
+        tripId: _currentTripId!,
+        totalStudents: totalStudents,
+        studentsCompleted: studentsCompleted,
+        studentsAbsent: studentsAbsent,
+        studentsPending: 0,
+      );
+
+      // Backend confirmed - now clean up local state
+      await _clearTripStateLocally();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Trip ended successfully'),
+            backgroundColor: AppTheme.successAction,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+
+      // Navigate back to start shift screen
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/driver-start-shift-screen',
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      // Show error with option to force end trip locally
+      if (mounted) {
+        final shouldForceEnd = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.warning, color: AppTheme.criticalAlert),
+                SizedBox(width: 2.w),
+                Expanded(child: Text('Failed to End Trip')),
+              ],
             ),
-            SizedBox(width: 2.w),
-            Text('Live Tracking Status'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Connection: ${_isSocketConnected ? "Connected" : "Disconnected"}',
-              style: TextStyle(
-                color: _isSocketConnected ? AppTheme.successAction : AppTheme.criticalAlert,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            SizedBox(height: 2.h),
-            Text(
-              _isSocketConnected
-                  ? 'Your location is being shared in real-time with parents. They can see your bus location on their map.'
-                  : 'Unable to connect to the live tracking server. Your location is not being shared with parents in real-time.',
-              style: TextStyle(color: AppTheme.textSecondary),
-            ),
-            if (_socketService.isConnected) ...[
-              SizedBox(height: 2.h),
-              Divider(),
-              SizedBox(height: 1.h),
-              Text(
-                'Technical Info:',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 10.sp,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Could not connect to server to end trip:'),
+                SizedBox(height: 1.h),
+                Text(
+                  e.toString(),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
-              ),
-              SizedBox(height: 1.h),
-              Text(
-                'Socket ID: ${_socketService.socketId ?? "N/A"}\n'
-                'Bus ID: ${_socketService.currentBusId ?? "N/A"}\n'
-                'Server: http://192.168.100.43:4000',
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 9.sp,
-                  color: AppTheme.textSecondary,
+                SizedBox(height: 2.h),
+                Container(
+                  padding: EdgeInsets.all(2.w),
+                  decoration: BoxDecoration(
+                    color: AppTheme.warningState.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.warningState),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Options:',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      SizedBox(height: 1.h),
+                      Text(
+                        '• Try Again: Attempt to end trip again\n• Force End Locally: Stop timer and location tracking, clear local state (trip data may be lost)',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
                 ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text('Try Again'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.warningState,
+                ),
+                child: Text('Force End Locally'),
               ),
             ],
-          ],
-        ),
-        actions: [
-          if (!_isSocketConnected)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _initializeSocketConnection();
-              },
-              child: Text('Retry Connection'),
-            ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
           ),
-        ],
-      ),
-    );
+        );
+
+        if (shouldForceEnd == true) {
+          // User chose to force end locally
+          await _clearTripStateLocally();
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Trip ended locally. Location tracking stopped.'),
+                backgroundColor: AppTheme.warningState,
+                duration: Duration(seconds: 3),
+              ),
+            );
+
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/driver-start-shift-screen',
+              (route) => false,
+            );
+          }
+        }
+        // If shouldForceEnd is false/null, user will try again - stay on current screen
+      }
+    }
   }
+
+  /// Clears trip state locally (SharedPreferences, services, timers)
+  Future<void> _clearTripStateLocally() async {
+    // Stop native background location service
+    try {
+      await _nativeLocationService.stopLocationTracking();
+    } catch (e) {
+      // Silently handle error
+    }
+
+    // Stop Flutter location tracking
+    try {
+      await _locationService.stopTracking();
+    } catch (e) {
+      // Silently handle error
+    }
+
+    // Cancel location update timer
+    _locationUpdateTimer?.cancel();
+
+    // Clear trip state from TripStateService
+    try {
+      await _tripStateService.clearTripState();
+    } catch (e) {
+      // Silently handle error
+    }
+
+    // Clear trip state from SharedPreferences
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('current_trip_id');
+      await prefs.remove('current_trip_type');
+      await prefs.remove('trip_start_time');
+      await prefs.setBool('trip_in_progress', false);
+    } catch (e) {
+      // Silently handle error
+    }
+  }
+
+  // Socket info dialog removed - drivers use REST API for location push, not Socket.IO
 
   void _onEmergencyPressed() {
     showDialog(
@@ -443,6 +636,42 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       ? (_tripData["stops"] as List).where((s) => !(s["isCompleted"] as bool? ?? false)).length
       : _students.length - _studentsPickedUp;
 
+  /// Get the next student to pick up (first not-picked-up student)
+  Map<String, dynamic>? get _nextStudent {
+    try {
+      return _students.firstWhere(
+        (s) => !(s["isPickedUp"] as bool? ?? false),
+      );
+    } catch (e) {
+      return null; // All students picked up
+    }
+  }
+
+  /// Get upcoming students (all not-picked-up students after the next one)
+  List<Map<String, dynamic>> get _upcomingStudents {
+    final notPickedUp = _students
+        .where((s) => !(s["isPickedUp"] as bool? ?? false))
+        .toList();
+
+    if (notPickedUp.length <= 1) {
+      return [];
+    }
+
+    // Return all except the first one (which is the next stop)
+    return notPickedUp.sublist(1);
+  }
+
+  /// Mark the next student as picked up
+  void _markNextStudentPickedUp() {
+    final nextStudent = _nextStudent;
+    if (nextStudent == null) return;
+
+    final index = _students.indexOf(nextStudent);
+    if (index != -1) {
+      _onPickupStatusChanged(index, true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Theme(
@@ -450,8 +679,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       child: Scaffold(
         backgroundColor: AppTheme.backgroundPrimary,
         appBar: CustomAppBar(
-          title: 'Active Trip',
-          subtitle: 'Route ${_tripData["routeNumber"] ?? "N/A"}',
+          title: _tripData["trip_type"] == 'pickup' ? 'Pickup Trip' : 'Dropoff Trip',
+          subtitle: '${_studentsPickedUp}/${_students.length} • $_elapsedTime',
           actions: [
             IconButton(
               onPressed: () =>
@@ -515,44 +744,29 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
                             ),
                           ),
 
-                        // Trip status header
-                        TripStatusHeaderWidget(
-                          tripData: _tripData,
-                          elapsedTime: _elapsedTime,
-                          currentStop: _currentStop.isEmpty ? 'Starting route...' : _currentStop,
-                        ),
-
                         SizedBox(height: 2.h),
 
-                        // Socket.IO connection status
-                        SocketStatusWidget(
-                          isConnected: _isSocketConnected,
-                          onTap: () {
-                            _showSocketInfoDialog();
+                        // NEXT STOP - Most prominent section
+                        NextStopWidget(
+                          nextStudent: _nextStudent,
+                          remainingStops: _remainingStops,
+                          onMarkPickedUp: _markNextStudentPickedUp,
+                        ),
+
+                        SizedBox(height: 3.h),
+
+                        // Upcoming stops preview
+                        UpcomingStopsWidget(
+                          upcomingStudents: _upcomingStudents,
+                          onViewAll: () {
+                            // Scroll to full student list
+                            // Can implement smooth scroll if needed
                           },
                         ),
 
-                        SizedBox(height: 2.h),
+                        SizedBox(height: 3.h),
 
-                        // Route map
-                        RouteMapWidget(
-                          tripData: _tripData,
-                          onFullScreenTap: _onFullScreenMapTap,
-                        ),
-
-                        SizedBox(height: 2.h),
-
-                        // Trip statistics
-                        TripStatisticsWidget(
-                          studentsPickedUp: _studentsPickedUp,
-                          totalStudents: _students.length,
-                          remainingStops: _remainingStops,
-                          estimatedArrival: _tripData["estimatedEndTime"]?.toString() ?? "N/A",
-                        ),
-
-                        SizedBox(height: 2.h),
-
-                        // Student list
+                        // Full student list - For reference
                         StudentListWidget(
                           students: _students,
                           onPickupStatusChanged: _onPickupStatusChanged,
@@ -564,14 +778,33 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
                   ),
                 ),
               ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: _onEmergencyPressed,
-          backgroundColor: AppTheme.criticalAlert,
-          child: CustomIconWidget(
-            iconName: 'emergency',
-            color: AppTheme.textOnPrimary,
-            size: 24,
-          ),
+        floatingActionButton: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            // Map button
+            FloatingActionButton(
+              heroTag: 'map',
+              onPressed: _onFullScreenMapTap,
+              backgroundColor: AppTheme.primaryDriver,
+              child: CustomIconWidget(
+                iconName: 'map',
+                color: AppTheme.textOnPrimary,
+                size: 24,
+              ),
+            ),
+            SizedBox(height: 2.h),
+            // Emergency button
+            FloatingActionButton(
+              heroTag: 'emergency',
+              onPressed: _onEmergencyPressed,
+              backgroundColor: AppTheme.criticalAlert,
+              child: CustomIconWidget(
+                iconName: 'emergency',
+                color: AppTheme.textOnPrimary,
+                size: 24,
+              ),
+            ),
+          ],
         ),
         bottomSheet: Container(
           width: double.infinity,
