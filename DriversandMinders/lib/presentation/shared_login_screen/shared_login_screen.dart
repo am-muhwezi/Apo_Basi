@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -132,6 +134,16 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_phone', phoneNumber);
 
+      // Cache bus and route data from login response for faster app startup
+      if (role == 'driver' && response != null) {
+        if (response['bus'] != null) {
+          await prefs.setString('cached_bus_data', jsonEncode(response['bus']));
+        }
+        if (response['route'] != null) {
+          await prefs.setString('cached_route_data', jsonEncode(response['route']));
+        }
+      }
+
       // Success haptic feedback
       HapticFeedback.mediumImpact();
 
@@ -234,7 +246,7 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
                           children: [
                             // Copyright
                             Text(
-                              '© 2024 BusTracker Pro. All rights reserved.',
+                              '© 2024 ApoBasi. All rights reserved.',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: colorScheme.onSurface
                                     .withValues(alpha: 0.5),

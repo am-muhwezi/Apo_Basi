@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
+import '../../../config/api_config.dart';
 
 /// Compact map widget showing driver's current location with bus icon
 /// Displayed on the Driver Start Shift screen
@@ -24,9 +26,8 @@ class DriverLocationMapWidget extends StatefulWidget {
 }
 
 class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
-  GoogleMapController? _mapController;
+  MapController? _mapController;
   Position? _currentPosition;
-  Set<Marker> _markers = {};
   bool _isLoading = true;
   bool _hasLocationPermission = false;
   StreamSubscription<Position>? _positionStream;
@@ -34,6 +35,7 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
   @override
   void initState() {
     super.initState();
+    _mapController = MapController();
     _initializeMap();
   }
 
@@ -88,7 +90,11 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
         _currentPosition = position;
       });
 
-      _updateBusMarker(position);
+      // Move map to current location
+      _mapController?.move(
+        LatLng(position.latitude, position.longitude),
+        16.0,
+      );
     } catch (e) {
       print('Error getting location: $e');
     }
@@ -105,52 +111,16 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
       setState(() {
         _currentPosition = position;
       });
-      _updateBusMarker(position);
       _updateCamera(position);
-    });
-  }
-
-  /// Update bus marker on the map
-  void _updateBusMarker(Position position) {
-    final busMarker = Marker(
-      markerId: MarkerId('bus_location'),
-      position: LatLng(position.latitude, position.longitude),
-      icon: BitmapDescriptor.defaultMarkerWithHue(
-        BitmapDescriptor.hueYellow, // Yellow marker for bus
-      ),
-      infoWindow: InfoWindow(
-        title: 'Bus ${widget.busNumber}',
-        snippet: 'Your current location',
-      ),
-      rotation: position.heading,
-    );
-
-    setState(() {
-      _markers = {busMarker};
     });
   }
 
   /// Update camera to follow bus
   void _updateCamera(Position position) {
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLng(
-        LatLng(position.latitude, position.longitude),
-      ),
+    _mapController?.move(
+      LatLng(position.latitude, position.longitude),
+      16.0,
     );
-  }
-
-  void _onMapCreated(GoogleMapController controller) {
-    _mapController = controller;
-
-    // Move camera to current location
-    if (_currentPosition != null) {
-      controller.animateCamera(
-        CameraUpdate.newLatLngZoom(
-          LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-          16.0,
-        ),
-      );
-    }
   }
 
   @override
@@ -362,23 +332,63 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
   }
 
   Widget _buildMapView() {
-    return GoogleMap(
-      onMapCreated: _onMapCreated,
-      initialCameraPosition: CameraPosition(
-        target: _currentPosition != null
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: _currentPosition != null
             ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
             : LatLng(0.3476, 32.5825), // Default: Kampala, Uganda
-        zoom: 16.0,
+        initialZoom: 16.0,
+        minZoom: 5.0,
+        maxZoom: 18.0,
       ),
-      markers: _markers,
-      myLocationEnabled: false, // We're using custom bus marker
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
-      mapToolbarEnabled: false,
-      compassEnabled: true,
-      trafficEnabled: false,
-      buildingsEnabled: true,
-      mapType: MapType.normal,
+      children: [
+        TileLayer(
+          urlTemplate: ApiConfig.getMapboxTileUrl(),
+          userAgentPackageName: 'com.apobasi.driversandminders',
+          maxZoom: 19,
+        ),
+        if (_currentPosition != null)
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: LatLng(
+                  _currentPosition!.latitude,
+                  _currentPosition!.longitude,
+                ),
+                width: 80,
+                height: 80,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 2.w,
+                        vertical: 0.5.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryDriver,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Bus ${widget.busNumber}',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10.sp,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.directions_bus,
+                      color: AppTheme.primaryDriver,
+                      size: 40,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+      ],
     );
   }
 }

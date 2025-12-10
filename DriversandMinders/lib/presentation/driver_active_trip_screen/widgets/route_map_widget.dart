@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
+import '../../../config/api_config.dart';
+import 'bus_marker_3d.dart';
 
 /// Interactive route map widget with real-time location
 class RouteMapWidget extends StatefulWidget {
@@ -25,10 +28,10 @@ class RouteMapWidget extends StatefulWidget {
 }
 
 class _RouteMapWidgetState extends State<RouteMapWidget> {
-  GoogleMapController? _mapController;
+  final MapController _mapController = MapController();
   Position? _currentPosition;
-  Set<Marker> _markers = {};
-  Set<Polyline> _polylines = {};
+  List<Marker> _markers = [];
+  List<Polyline> _polylines = [];
   bool _isLoading = true;
   bool _hasLocationPermission = false;
   StreamSubscription<Position>? _positionStream;
@@ -42,7 +45,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
   @override
   void dispose() {
     _positionStream?.cancel();
-    _mapController?.dispose();
+    _mapController.dispose();
     super.dispose();
   }
 
@@ -114,34 +117,29 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
 
   /// Update camera to follow bus
   void _updateCamera(Position position) {
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLng(
-        LatLng(position.latitude, position.longitude),
-      ),
+    _mapController.move(
+      LatLng(position.latitude, position.longitude),
+      _mapController.camera.zoom,
     );
   }
 
   void _setupMarkersAndRoute() {
     final stops = (widget.tripData["stops"] as List? ?? []);
-    final Set<Marker> markers = {};
-    final Set<Polyline> polylines = {};
+    final List<Marker> markers = [];
+    final List<Polyline> polylines = [];
 
-    // Add current bus location marker (YELLOW)
+    // Driver's current location with 3D bus marker that rotates based on heading
     if (_currentPosition != null) {
-      final busNumber = widget.tripData["busNumber"]?.toString() ?? 'Bus';
       markers.add(
         Marker(
-          markerId: MarkerId('bus_location'),
-          position:
-              LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueYellow, // Yellow marker for bus
+          point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+          width: 60,
+          height: 60,
+          child: BusMarker3D(
+            size: 60,
+            heading: _currentPosition!.heading, // Rotate based on GPS heading
+            isMoving: _currentPosition!.speed > 0.5, // Moving if speed > 0.5 m/s (~1.8 km/h)
           ),
-          infoWindow: InfoWindow(
-            title: 'Bus $busNumber',
-            snippet: 'Your current location',
-          ),
-          rotation: _currentPosition!.heading,
         ),
       );
     }
@@ -156,14 +154,13 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
 
       markers.add(
         Marker(
-          markerId: MarkerId('stop_$i'),
-          position: LatLng(lat, lng),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            isCompleted ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed,
-          ),
-          infoWindow: InfoWindow(
-            title: stopName,
-            snippet: isCompleted ? 'Completed' : 'Pending',
+          point: LatLng(lat, lng),
+          width: 40,
+          height: 40,
+          child: Icon(
+            Icons.location_on,
+            color: isCompleted ? Colors.green : Colors.red,
+            size: 40,
           ),
         ),
       );
@@ -188,11 +185,9 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
 
       polylines.add(
         Polyline(
-          polylineId: PolylineId('route'),
           points: routePoints,
           color: AppTheme.primaryDriver,
-          width: 4,
-          patterns: [],
+          strokeWidth: 4,
         ),
       );
     }
@@ -203,30 +198,6 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     });
   }
 
-  void _onMapCreated(GoogleMapController controller) {
-    _mapController = controller;
-
-    // Move camera to current location or first stop
-    if (_currentPosition != null) {
-      controller.animateCamera(
-        CameraUpdate.newLatLngZoom(
-          LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-          15.0,
-        ),
-      );
-    } else {
-      final stops = (widget.tripData["stops"] as List? ?? []);
-      if (stops.isNotEmpty) {
-        final firstStop = stops[0] as Map<String, dynamic>;
-        final lat = (firstStop["latitude"] as num?)?.toDouble() ?? 40.7128;
-        final lng = (firstStop["longitude"] as num?)?.toDouble() ?? -74.0060;
-
-        controller.animateCamera(
-          CameraUpdate.newLatLngZoom(LatLng(lat, lng), 13.0),
-        );
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -427,26 +398,27 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
   }
 
   Widget _buildMapView() {
-    return GoogleMap(
-      onMapCreated: _onMapCreated,
-      initialCameraPosition: CameraPosition(
-        target: _currentPosition != null
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: _currentPosition != null
             ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
-            : LatLng(40.7128, -74.0060), // Default to NYC
-        zoom: 13.0,
+            : LatLng(0.3476, 32.5825), // Default to Kampala
+        initialZoom: 13.0,
       ),
-      markers: _markers,
-      polylines: _polylines,
-      myLocationEnabled: _hasLocationPermission,
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
-      mapToolbarEnabled: false,
-      compassEnabled: true,
-      trafficEnabled: false,
-      buildingsEnabled: true,
-      onTap: (LatLng position) {
-        // Handle map tap if needed
-      },
+      children: [
+        TileLayer(
+          urlTemplate: ApiConfig.getMapboxTileUrl(),
+          userAgentPackageName: 'com.apobasi.driversandminders',
+          maxZoom: 19,
+        ),
+        PolylineLayer(
+          polylines: _polylines,
+        ),
+        MarkerLayer(
+          markers: _markers,
+        ),
+      ],
     );
   }
 }

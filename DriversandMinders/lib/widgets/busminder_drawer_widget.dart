@@ -288,6 +288,13 @@ class BusminderDrawerWidget extends StatelessWidget {
                       route: '/busminder-trip-progress-screen',
                       isActive: currentRoute == '/busminder-trip-progress-screen',
                     ),
+                    _buildDrawerItem(
+                      context,
+                      icon: Icons.history,
+                      title: 'Trip History',
+                      route: '/busminder-trip-history-screen',
+                      isActive: currentRoute == '/busminder-trip-history-screen',
+                    ),
                     SizedBox(height: 1.h),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4.w),
