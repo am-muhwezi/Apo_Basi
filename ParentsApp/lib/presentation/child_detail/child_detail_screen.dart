@@ -1,11 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:sizer/sizer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_export.dart';
+import '../../config/mapbox_config.dart';
+import '../../config/location_config.dart';
+import './widgets/home_marker_widget.dart';
+import '../../widgets/location/bus_marker_3d.dart';
+import '../../models/bus_location_model.dart';
+import '../../services/socket_service.dart';
 
 class ChildDetailScreen extends StatefulWidget {
   const ChildDetailScreen({Key? key}) : super(key: key);
@@ -16,12 +23,22 @@ class ChildDetailScreen extends StatefulWidget {
 
 class _ChildDetailScreenState extends State<ChildDetailScreen> {
   Map<String, dynamic>? _childData;
-  GoogleMapController? _mapController;
+  final MapController _mapController = MapController();
   Position? _currentPosition;
   bool _isLoadingLocation = true;
-  LatLng? _busLocation;
-  Timer? _locationTimer;
-  Set<Marker> _markers = {};
+
+  // Real-time bus tracking
+  final SocketService _socketService = SocketService();
+  BusLocation? _busLocation;
+  LocationConnectionState _connectionState = LocationConnectionState.disconnected;
+  StreamSubscription? _locationSubscription;
+  StreamSubscription? _connectionSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeSocketConnection();
+  }
 
   @override
   void didChangeDependencies() {
@@ -29,14 +46,67 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args != null && args is Map<String, dynamic>) {
       _childData = args;
+      // Don't subscribe immediately - wait for socket connection in initState
     }
     _getCurrentLocation();
   }
 
   @override
   void dispose() {
-    _locationTimer?.cancel();
+    _locationSubscription?.cancel();
+    _connectionSubscription?.cancel();
+    _socketService.disconnect();
     super.dispose();
+  }
+
+  /// Initialize Socket.IO connection for real-time bus tracking
+  Future<void> _initializeSocketConnection() async {
+    try {
+      // Connect to Socket.IO
+      await _socketService.connect();
+
+      // Listen to connection state FIRST
+      _connectionSubscription = _socketService.connectionStateStream.listen((state) {
+        if (mounted) {
+          setState(() {
+            _connectionState = state;
+          });
+
+          // Subscribe to bus when connected
+          if (state == LocationConnectionState.connected) {
+            _subscribeToBus();
+          }
+        }
+      });
+
+      // Listen to location updates
+      _locationSubscription = _socketService.locationUpdateStream.listen((location) {
+        if (mounted) {
+          setState(() {
+            _busLocation = location;
+          });
+        }
+      }, onError: (error) {
+        if (LocationConfig.enableSocketLogging) {
+          print('CHILD DETAIL: Error in location stream: $error');
+        }
+      });
+
+      // If already connected, subscribe immediately
+      if (_socketService.isConnected) {
+        _subscribeToBus();
+      }
+    } catch (e) {
+      print('ERROR: Failed to initialize socket connection: $e');
+    }
+  }
+
+  /// Subscribe to bus location updates
+  void _subscribeToBus() {
+    if (_childData != null && _childData!['busId'] != null) {
+      final busId = _childData!['busId'] as int;
+      _socketService.subscribeToBus(busId);
+    }
   }
 
   Future<void> _getCurrentLocation() async {
@@ -57,77 +127,26 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
       setState(() {
         _currentPosition = position;
-        // Simulate bus location nearby for demo
-        _busLocation = LatLng(
-          position.latitude + 0.01,
-          position.longitude + 0.01,
-        );
         _isLoadingLocation = false;
-        _updateMarkers();
       });
 
-      // Center map on current location
-      if (_mapController != null) {
-        _mapController!.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: LatLng(position.latitude, position.longitude),
-              zoom: 14.0,
-            ),
-          ),
+      // Center map on current location or bus if available
+      if (_busLocation != null) {
+        _mapController.move(
+          LatLng(_busLocation!.latitude, _busLocation!.longitude),
+          14.0,
+        );
+      } else {
+        _mapController.move(
+          LatLng(position.latitude, position.longitude),
+          14.0,
         );
       }
-
-      // Start periodic location updates
-      _startLocationUpdates();
     } catch (e) {
       setState(() => _isLoadingLocation = false);
     }
   }
 
-  void _startLocationUpdates() {
-    _locationTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
-      try {
-        Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
-        if (mounted) {
-          setState(() {
-            _currentPosition = position;
-          });
-        }
-      } catch (e) {
-        // Ignore errors in periodic updates
-      }
-    });
-  }
-
-  void _updateMarkers() {
-    _markers.clear();
-
-    if (_currentPosition != null) {
-      _markers.add(
-        Marker(
-          markerId: const MarkerId('home'),
-          position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-          infoWindow: const InfoWindow(title: '🏠 Home'),
-        ),
-      );
-    }
-
-    if (_busLocation != null) {
-      final String busNumber = _childData?['busNumber'] ?? 'YD';
-      _markers.add(
-        Marker(
-          markerId: const MarkerId('bus'),
-          position: _busLocation!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-          infoWindow: InfoWindow(title: '🚌 Bus $busNumber'),
-        ),
-      );
-    }
-  }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
     final Uri launchUri = Uri(
@@ -157,26 +176,61 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
       body: Stack(
         children: [
-          // Google Map as background
+          // Mapbox Map via flutter_map
           _isLoadingLocation
               ? const Center(child: CircularProgressIndicator())
               : _currentPosition != null
-                  ? GoogleMap(
-                      onMapCreated: (GoogleMapController controller) {
-                        _mapController = controller;
-                      },
-                      initialCameraPosition: CameraPosition(
-                        target: LatLng(
+                  ? FlutterMap(
+                      mapController: _mapController,
+                      options: MapOptions(
+                        initialCenter: LatLng(
                           _currentPosition!.latitude,
                           _currentPosition!.longitude,
                         ),
-                        zoom: 14.0,
+                        initialZoom: 14.0,
+                        minZoom: 5.0,
+                        maxZoom: 18.0,
                       ),
-                      markers: _markers,
-                      myLocationEnabled: true,
-                      myLocationButtonEnabled: false,
-                      zoomControlsEnabled: false,
-                      mapToolbarEnabled: false,
+                      children: [
+                        // Mapbox Tile Layer (falls back to OSM if not configured)
+                        TileLayer(
+                          urlTemplate: MapboxConfig.getTileUrl(),
+                          userAgentPackageName: 'com.apobasi.parentsapp',
+                          maxZoom: 19,
+                        ),
+                        // Marker Layer
+                        MarkerLayer(
+                          markers: [
+                            // Home marker
+                            if (_currentPosition != null)
+                              Marker(
+                                point: LatLng(
+                                  _currentPosition!.latitude,
+                                  _currentPosition!.longitude,
+                                ),
+                                width: 80,
+                                height: 80,
+                                child: const HomeMarkerWidget(),
+                              ),
+                            // Bus marker (3D) - Real-time location with heading
+                            if (_busLocation != null)
+                              Marker(
+                                point: LatLng(
+                                  _busLocation!.latitude,
+                                  _busLocation!.longitude,
+                                ),
+                                width: 100,
+                                height: 100,
+                                child: BusMarker3D(
+                                  size: 50,
+                                  heading: _busLocation!.heading ?? 0,
+                                  isMoving: (_busLocation!.speed ?? 0) > 0.5,
+                                  vehicleNumber: _childData?['busNumber'],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
                     )
                   : Center(
                       child: Column(

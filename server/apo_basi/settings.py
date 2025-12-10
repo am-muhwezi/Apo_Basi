@@ -38,7 +38,6 @@ INSTALLED_APPS = [
     "trips.apps.TripsConfig",
     "assignments.apps.AssignmentsConfig",
     "analytics.apps.AnalyticsConfig",
-    "notifications.apps.NotificationsConfig",
 
     # Third-party apps
     "rest_framework",

@@ -4,7 +4,7 @@ class Child {
   final String lastName;
   final String classGrade;
   final Bus? assignedBus;
-  final String? currentStatus;
+  final String? currentStatus;  // This is the locationStatus from backend
   final DateTime? lastUpdated;
 
   Child({
@@ -13,7 +13,7 @@ class Child {
     required this.lastName,
     required this.classGrade,
     this.assignedBus,
-    this.currentStatus,
+    this.currentStatus = 'At Home',  // Default to 'At Home'
     this.lastUpdated,
   });
 
@@ -26,12 +26,16 @@ class Child {
       firstName: json['first_name'] ?? json['firstName'] ?? '',
       lastName: json['last_name'] ?? json['lastName'] ?? '',
       classGrade: json['class_grade'] ?? json['grade'] ?? '',
-      assignedBus: json['assigned_bus'] != null
-          ? Bus.fromJson(json['assigned_bus'])
-          : (json['assignedBusId'] != null && json['assignedBusNumber'] != null)
-              ? Bus(id: json['assignedBusId'], numberPlate: json['assignedBusNumber'])
-              : null,
-      currentStatus: json['current_status'],
+      // Handle both camelCase (from /children/ endpoint) and snake_case (from login)
+      assignedBus: json['assignedBus'] != null
+          ? Bus.fromJson(json['assignedBus'])
+          : json['assigned_bus'] != null
+              ? Bus.fromJson(json['assigned_bus'])
+              : (json['assignedBusId'] != null && json['assignedBusNumber'] != null)
+                  ? Bus(id: json['assignedBusId'], numberPlate: json['assignedBusNumber'])
+                  : null,
+      // Use locationStatus from backend, default to 'At Home'
+      currentStatus: json['locationStatus'] ?? json['location_status'] ?? json['current_status'] ?? json['status'] ?? 'At Home',
       lastUpdated: json['last_updated'] != null
           ? DateTime.parse(json['last_updated'])
           : null,
@@ -45,7 +49,7 @@ class Child {
       'last_name': lastName,
       'class_grade': classGrade,
       'assigned_bus': assignedBus?.toJson(),
-      'current_status': currentStatus,
+      'location_status': currentStatus,
       'last_updated': lastUpdated?.toIso8601String(),
     };
   }
@@ -63,7 +67,8 @@ class Bus {
   factory Bus.fromJson(Map<String, dynamic> json) {
     return Bus(
       id: json['id'],
-      numberPlate: json['number_plate'] ?? '',
+      // Handle both snake_case and camelCase
+      numberPlate: json['number_plate'] ?? json['numberPlate'] ?? json['licensePlate'] ?? json['busNumber'] ?? '',
     );
   }
 

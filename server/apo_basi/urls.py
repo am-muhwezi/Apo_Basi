@@ -16,6 +16,5 @@ urlpatterns = [
     path("api/assignments/", include("assignments.urls")),
     path("api/attendance/", include("attendance.urls")),
     path("api/analytics/", include("analytics.urls")),
-    path("api/notifications/", include("notifications.urls")),
     path("api/health/", health_check, name="health_check"),  # Health check endpoint
 ]

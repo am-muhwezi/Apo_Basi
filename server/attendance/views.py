@@ -270,18 +270,63 @@ def mark_attendance(request):
     user = request.user
     has_permission = False
 
+    print(f"🔍 Permission check for user: {user.username} (type: {user.user_type})")
+    print(f"🔍 Child: {child.first_name} {child.last_name}, assigned_bus: {child.assigned_bus}")
+
     if user.user_type == 'driver':
         try:
             driver = Driver.objects.get(user=user)
-            has_permission = child.assigned_bus and driver.bus == child.assigned_bus
+            print(f"🔍 Driver assigned_bus: {driver.assigned_bus}")
+            has_permission = child.assigned_bus and driver.assigned_bus == child.assigned_bus
+            print(f"🔍 Driver has_permission: {has_permission}")
         except Driver.DoesNotExist:
+            print(f"❌ Driver profile not found for user {user.username}")
             has_permission = False
     elif user.user_type == 'busminder':
         try:
             busminder = BusMinder.objects.get(user=user)
-            has_permission = busminder.bus and child.assigned_bus and busminder.bus == child.assigned_bus
+            print(f"🔍 BusMinder found: {busminder}")
+            # Get busminder's assigned bus through Assignment model
+            from assignments.models import Assignment
+
+            # Get active bus assignment for this bus minder
+            busminder_bus_assignment = Assignment.get_active_assignments_for(
+                busminder,
+                'minder_to_bus'
+            ).first()
+
+            # Get child's bus assignment through Assignment model (NOT child.assigned_bus)
+            child_bus_assignment = Assignment.get_active_assignments_for(
+                child,
+                'child_to_bus'
+            ).first()
+
+            print(f"🔍 BusMinder bus assignment: {busminder_bus_assignment}")
+            print(f"🔍 Child bus assignment: {child_bus_assignment}")
+
+            if busminder_bus_assignment:
+                print(f"🔍 BusMinder assigned to bus: {busminder_bus_assignment.assigned_to} (ID: {busminder_bus_assignment.assigned_to.id})")
+            if child_bus_assignment:
+                print(f"🔍 Child assigned to bus: {child_bus_assignment.assigned_to} (ID: {child_bus_assignment.assigned_to.id})")
+
+            # Check if both have assignments and they match
+            if busminder_bus_assignment and child_bus_assignment:
+                # Compare the bus IDs
+                has_permission = busminder_bus_assignment.assigned_to.id == child_bus_assignment.assigned_to.id
+                print(f"🔍 BusMinder has_permission: {has_permission}")
+            else:
+                print(f"❌ Missing assignments: busminder={busminder_bus_assignment}, child={child_bus_assignment}")
+                has_permission = False
         except BusMinder.DoesNotExist:
+            print(f"❌ BusMinder profile not found for user {user.username}")
             has_permission = False
+        except Exception as e:
+            print(f"❌ Error checking busminder permission: {e}")
+            import traceback
+            traceback.print_exc()
+            has_permission = False
+
+    print(f"🔍 Final has_permission: {has_permission}")
 
     if not has_permission:
         return Response(
@@ -291,11 +336,17 @@ def mark_attendance(request):
 
     # Get or create today's attendance record
     today = date.today()
+
+    # Get the child's assigned bus from Assignment model for consistency
+    from assignments.models import Assignment
+    child_bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
+    assigned_bus = child_bus_assignment.assigned_to if child_bus_assignment else child.assigned_bus
+
     attendance, created = Attendance.objects.get_or_create(
         child=child,
         date=today,
         defaults={
-            'bus': child.assigned_bus,
+            'bus': assigned_bus,
             'status': new_status,
             'trip_type': trip_type,
             'marked_by': request.user,
@@ -312,31 +363,13 @@ def mark_attendance(request):
         attendance.notes = notes or ''
         attendance.save()
 
-    # Create notification for parent when pickup or dropoff is confirmed
+    # TODO: Create notification for parent when pickup or dropoff is confirmed
+    # Notifications feature will be implemented later
     if child.parent and new_status in ['picked_up', 'dropped_off']:
-        from notifications.views import create_notification
-
-        # Determine notification type and message
         if new_status == 'picked_up':
-            notification_type = 'pickup_confirmed'
-            title = f"{child.first_name} Picked Up"
-            message = f"Your child {child.first_name} {child.last_name} has been safely picked up by the bus at {attendance.timestamp.strftime('%I:%M %p')}."
+            print(f"📬 Notification: {child.first_name} {child.last_name} picked up at {attendance.timestamp.strftime('%I:%M %p')}")
         else:  # dropped_off
-            notification_type = 'dropoff_complete'
-            title = f"{child.first_name} Dropped Off"
-            message = f"Your child {child.first_name} {child.last_name} has been safely dropped off at {attendance.timestamp.strftime('%I:%M %p')}."
-
-        # Create the notification
-        try:
-            create_notification(
-                user=child.parent.user,
-                notification_type=notification_type,
-                title=title,
-                message=message
-            )
-        except Exception as e:
-            # Log error but don't fail the attendance marking
-            print(f"Failed to create notification: {e}")
+            print(f"📬 Notification: {child.first_name} {child.last_name} dropped off at {attendance.timestamp.strftime('%I:%M %p')}")
 
     return Response({
         "success": True,

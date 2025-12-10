@@ -298,6 +298,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
       "name": child.fullName,
       "grade": child.classGrade,
       "status": child.currentStatus ?? 'no record today',
+      "busId": child.assignedBus?.id,
+      "busNumber": child.assignedBus?.numberPlate,
     };
   }
 
