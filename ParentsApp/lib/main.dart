@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
+import 'dart:async';
 
 import '../core/app_export.dart';
 import '../widgets/custom_error_widget.dart';
+import '../services/notification_service.dart';
+import '../services/socket_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize notification service asynchronously (non-blocking)
+  NotificationService().initialize().catchError((error) {
+    print('Error initializing notifications: $error');
+  });
 
   bool _hasShownError = false;
 
@@ -35,7 +43,44 @@ void main() async {
   });
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final SocketService _socketService = SocketService();
+  final NotificationService _notificationService = NotificationService();
+  StreamSubscription? _tripStartSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    // Setup notifications asynchronously to avoid blocking UI
+    Future.microtask(() => _setupTripNotifications());
+  }
+
+  /// Setup listener for trip start notifications
+  void _setupTripNotifications() {
+    _tripStartSubscription = _socketService.tripStartedStream.listen((data) {
+      final busId = data['busId'] as int?;
+      final busNumber = data['busNumber'] as String? ?? 'Unknown';
+      final tripType = data['tripType'] as String? ?? 'Trip';
+
+      _notificationService.showTripStartNotification(
+        busNumber: busNumber,
+        tripType: tripType,
+        busId: busId ?? 0,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _tripStartSubscription?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Sizer(builder: (context, orientation, screenType) {

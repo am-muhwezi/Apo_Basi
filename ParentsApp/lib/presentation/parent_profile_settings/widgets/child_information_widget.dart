@@ -13,13 +13,6 @@ class ChildInformationWidget extends StatelessWidget {
     this.onTap,
   }) : super(key: key);
 
-  bool _canTrackChild() {
-    final status = (childData['status'] ?? 'no record today').toString().toLowerCase();
-    return status != 'at_home' &&
-           status != 'at_school' &&
-           status != 'no record today';
-  }
-
   String _getInitials(String name) {
     final parts = name.trim().split(' ');
     if (parts.isEmpty) return 'C';
@@ -29,11 +22,7 @@ class ChildInformationWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canTrack = _canTrackChild();
-
-    return GestureDetector(
-      onTap: canTrack ? (onTap ?? () => _navigateToLiveMap(context)) : null,
-      child: Container(
+    return Container(
       width: double.infinity,
       margin: EdgeInsets.only(left: 4.w, right: 4.w, bottom: 1.5.h),
       padding: EdgeInsets.all(3.w),
@@ -162,69 +151,8 @@ class ChildInformationWidget extends StatelessWidget {
               ],
             ),
           ),
-
-          // Track button if child is on bus
-          if (_canTrackChild()) ...[
-            SizedBox(height: 1.5.h),
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(vertical: 1.3.h, horizontal: 3.w),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppTheme.lightTheme.colorScheme.primary,
-                    AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.85),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.35),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.location_on_rounded,
-                    color: Colors.white,
-                    size: 5.w,
-                  ),
-                  SizedBox(width: 2.w),
-                  Text(
-                    'View Live Location',
-                    style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  SizedBox(width: 2.w),
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    color: Colors.white,
-                    size: 4.5.w,
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
-      ),
-    );
-  }
-
-  void _navigateToLiveMap(BuildContext context) {
-    Navigator.pushNamed(
-      context,
-      '/child-detail',
-      arguments: childData,
     );
   }
 

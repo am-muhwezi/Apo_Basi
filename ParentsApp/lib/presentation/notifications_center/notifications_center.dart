@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
+import '../../services/api_service.dart';
 import './widgets/empty_notifications_widget.dart';
 import './widgets/notification_card_widget.dart';
 import './widgets/notification_filter_sheet_widget.dart';
@@ -19,23 +21,87 @@ class NotificationsCenter extends StatefulWidget {
 class _NotificationsCenterState extends State<NotificationsCenter>
     with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
+  final ApiService _apiService = ApiService();
   bool _isSearchVisible = false;
   String _searchQuery = '';
   List<String> _selectedFilters = [];
   Map<String, List<Map<String, dynamic>>> _groupedNotifications = {};
+  bool _isLoading = true;
+  String? _errorMessage;
 
   // Notifications list - will be populated from API
-  final List<Map<String, dynamic>> _allNotifications = [];
+  List<Map<String, dynamic>> _allNotifications = [];
+
+  // Auto-refresh timer
+  Timer? _refreshTimer;
+  static const _refreshInterval = Duration(seconds: 30);
 
   @override
   void initState() {
     super.initState();
-    _groupNotificationsByDate();
     _scrollController.addListener(_onScroll);
+    _loadNotifications();
+    _startAutoRefresh();
+  }
+
+  // Load notifications from API
+  Future<void> _loadNotifications({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+
+    try {
+      final response = await _apiService.getNotifications();
+      final notifications = response['notifications'] as List<dynamic>;
+
+      setState(() {
+        _allNotifications = notifications.map((notification) {
+          return {
+            'id': notification['id'],
+            'type': notification['type'] ?? 'general',
+            'title': notification['title'] ?? '',
+            'message': notification['message'] ?? '',
+            'isRead': notification['is_read'] ?? false,
+            'timestamp': DateTime.parse(notification['created_at']),
+            'expanded': false,
+          };
+        }).toList();
+
+        _groupNotificationsByDate();
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!silent) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+      print('Error loading notifications: $e');
+    }
+  }
+
+  // Start auto-refresh timer
+  void _startAutoRefresh() {
+    _refreshTimer = Timer.periodic(_refreshInterval, (timer) {
+      if (mounted) {
+        _loadNotifications(silent: true);
+      }
+    });
+  }
+
+  // Stop auto-refresh timer
+  void _stopAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
   }
 
   @override
   void dispose() {
+    _stopAutoRefresh();
     _scrollController.dispose();
     super.dispose();
   }
@@ -122,21 +188,33 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     return _allNotifications.where((n) => !(n['isRead'] ?? true)).length;
   }
 
-  void _markAllAsRead() {
-    setState(() {
-      for (var notification in _allNotifications) {
-        notification['isRead'] = true;
-      }
-    });
-    _groupNotificationsByDate();
+  void _markAllAsRead() async {
+    try {
+      await _apiService.markNotificationsAsRead();
 
-    HapticFeedback.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('All notifications marked as read'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+      setState(() {
+        for (var notification in _allNotifications) {
+          notification['isRead'] = true;
+        }
+      });
+      _groupNotificationsByDate();
+
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('All notifications marked as read'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to mark as read: $e'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _toggleSearch() {
@@ -183,12 +261,20 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     HapticFeedback.selectionClick();
   }
 
-  void _markAsRead(Map<String, dynamic> notification) {
-    setState(() {
-      notification['isRead'] = true;
-      _groupNotificationsByDate();
-    });
-    HapticFeedback.lightImpact();
+  void _markAsRead(Map<String, dynamic> notification) async {
+    try {
+      await _apiService.markNotificationsAsRead(
+        notificationIds: [notification['id']],
+      );
+
+      setState(() {
+        notification['isRead'] = true;
+        _groupNotificationsByDate();
+      });
+      HapticFeedback.lightImpact();
+    } catch (e) {
+      print('Failed to mark notification as read: $e');
+    }
   }
 
   void _shareNotification(Map<String, dynamic> notification) {
@@ -202,30 +288,42 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     );
   }
 
-  void _deleteNotification(Map<String, dynamic> notification) {
+  void _deleteNotification(Map<String, dynamic> notification) async {
+    // Save the notification for undo functionality
+    final deletedNotification = Map<String, dynamic>.from(notification);
+
     setState(() {
       _allNotifications.removeWhere((n) => n['id'] == notification['id']);
       _groupNotificationsByDate();
     });
     HapticFeedback.mediumImpact();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Notification deleted'),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () {
-            setState(() {
-              _allNotifications.add(notification);
-              _allNotifications.sort((a, b) => (b['timestamp'] as DateTime)
-                  .compareTo(a['timestamp'] as DateTime));
-              _groupNotificationsByDate();
-            });
-          },
+    try {
+      await _apiService.deleteNotification(notification['id']);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Notification deleted'),
+          duration: const Duration(seconds: 3),
         ),
-        duration: const Duration(seconds: 4),
-      ),
-    );
+      );
+    } catch (e) {
+      // Restore notification on error
+      setState(() {
+        _allNotifications.add(deletedNotification);
+        _allNotifications.sort((a, b) => (b['timestamp'] as DateTime)
+            .compareTo(a['timestamp'] as DateTime));
+        _groupNotificationsByDate();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to delete notification: $e'),
+          duration: const Duration(seconds: 3),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _contactSchool() {
@@ -239,21 +337,56 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   }
 
   void _viewOnMap() {
-    Navigator.pushNamed(context, '/live-bus-tracking-map');
+    // Navigate back to dashboard where users can select child to view on map
+    Navigator.pop(context);
   }
 
   Future<void> _onRefresh() async {
     HapticFeedback.lightImpact();
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() {
-      // Simulate new notifications
-      _groupNotificationsByDate();
-    });
+    await _loadNotifications();
   }
 
   @override
   Widget build(BuildContext context) {
     final hasNotifications = _groupedNotifications.isNotEmpty;
+
+    // Show loading indicator
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          title: Text('Notifications'),
+        ),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // Show error message if any
+    if (_errorMessage != null) {
+      return Scaffold(
+        backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          title: Text('Notifications'),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.red),
+              SizedBox(height: 16),
+              Text('Failed to load notifications'),
+              SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: _loadNotifications,
+                child: Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,

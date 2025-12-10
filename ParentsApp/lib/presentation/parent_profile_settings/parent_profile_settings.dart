@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 
 import '../../core/app_export.dart';
 import '../../theme/app_theme.dart';
@@ -505,6 +506,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
       "class": child.classGrade,
       "homeAddress": _parent?.address ?? 'Not set',
       "status": child.currentStatus ?? 'no record today',
+      "busId": child.assignedBus?.id,
       "busNumber": child.assignedBus?.numberPlate,
     };
   }
@@ -578,8 +580,23 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      // Use coordinates as address (in real app, use reverse geocoding)
-      String locationAddress = '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+      // Use reverse geocoding to get human-readable address
+      String locationAddress;
+      try {
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          final placemark = placemarks.first;
+          locationAddress = '${placemark.street ?? ''}, ${placemark.subLocality ?? ''}, ${placemark.locality ?? ''}';
+        } else {
+          locationAddress = '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+        }
+      } catch (e) {
+        // Fallback to coordinates if geocoding fails
+        locationAddress = '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+      }
 
       // Update on server
       await _apiService.updateParentProfile(

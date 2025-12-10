@@ -185,20 +185,99 @@ io.on('connection', (socket) => {
 
 // REST endpoint for Django backend to trigger trip start notifications
 app.post('/api/notify/trip-start', async (req, res) => {
-  const { busId, tripType, tripId, driverUserId } = req.body;
+  const { busId, tripType, tripId, driverUserId, busNumber } = req.body;
 
   if (!busId || !tripType) {
     return res.status(400).json({ error: 'busId and tripType are required' });
   }
 
-  console.log(`Received trip start notification for bus ${busId}, type ${tripType}`);
+  console.log(`📢 Received trip start notification for bus ${busNumber || busId}, type ${tripType}`);
 
   // Emit to all parents subscribed to this bus
   io.to(`bus_${busId}`).emit('trip_started', {
     busId,
+    busNumber,
     tripType,
     tripId,
-    message: `Your child's bus has started the ${tripType} trip`,
+    title: 'Trip Started',
+    message: `Your child's bus (${busNumber || 'Bus ' + busId}) has started the ${tripType} trip`,
+    timestamp: new Date().toISOString()
+  });
+
+  res.json({ success: true, notified: true });
+});
+
+// REST endpoint for child pickup/dropoff notifications
+app.post('/api/notify/child-status', async (req, res) => {
+  const { busId, childId, childName, status, timestamp, parentUserIds, busNumber } = req.body;
+
+  if (!busId || !childId || !status) {
+    return res.status(400).json({ error: 'busId, childId, and status are required' });
+  }
+
+  const statusMessages = {
+    'on_bus': `${childName} has boarded the bus`,
+    'at_school': `${childName} has arrived at school`,
+    'on_way_home': `${childName} is on the way home`,
+    'dropped_off': `${childName} has been dropped off`,
+    'absent': `${childName} is marked absent`
+  };
+
+  const message = statusMessages[status] || `${childName} status updated to ${status}`;
+
+  console.log(`👶 Child ${childName} (ID: ${childId}) status: ${status} on bus ${busNumber || busId}`);
+
+  // If specific parent user IDs provided, notify only those parents
+  if (parentUserIds && Array.isArray(parentUserIds)) {
+    parentUserIds.forEach(parentId => {
+      const parentSocket = connections.parents.get(parentId);
+      if (parentSocket) {
+        parentSocket.emit('child_status_update', {
+          busId,
+          busNumber,
+          childId,
+          childName,
+          status,
+          title: 'Child Status Update',
+          message,
+          timestamp: timestamp || new Date().toISOString()
+        });
+      }
+    });
+  } else {
+    // Otherwise, broadcast to all parents on this bus
+    io.to(`bus_${busId}`).emit('child_status_update', {
+      busId,
+      busNumber,
+      childId,
+      childName,
+      status,
+      title: 'Child Status Update',
+      message,
+      timestamp: timestamp || new Date().toISOString()
+    });
+  }
+
+  res.json({ success: true, notified: true });
+});
+
+// REST endpoint for trip completion
+app.post('/api/notify/trip-end', async (req, res) => {
+  const { busId, tripType, tripId, busNumber } = req.body;
+
+  if (!busId) {
+    return res.status(400).json({ error: 'busId is required' });
+  }
+
+  console.log(`✅ Trip ended for bus ${busNumber || busId}`);
+
+  io.to(`bus_${busId}`).emit('trip_ended', {
+    busId,
+    busNumber,
+    tripType,
+    tripId,
+    title: 'Trip Completed',
+    message: `The ${tripType || ''} trip has been completed`,
     timestamp: new Date().toISOString()
   });
 

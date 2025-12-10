@@ -2,22 +2,15 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/child_model.dart';
 import '../models/parent_model.dart';
+import '../config/api_config.dart';
 
 class ApiService {
-  // DEVELOPMENT: Use WiFi IP for testing on physical device
-  static const String baseUrl = 'http://192.168.100.36:8000';
-
-  // OTHER OPTIONS:
-  // Android emulator: 'http://10.0.2.2:8000'
-  // iOS simulator: 'http://localhost:8000'
-  // Production: 'http://YOUR_VPS_IP' or 'https://yourdomain.com'
-
   late Dio _dio;
   String? _accessToken;
 
   ApiService() {
     _dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
+      baseUrl: ApiConfig.apiBaseUrl,
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
       headers: {
@@ -68,7 +61,7 @@ class ApiService {
   Future<Map<String, dynamic>> directPhoneLogin(String phoneNumber) async {
     try {
       final response = await _dio.post(
-        '/api/parents/direct-phone-login/',
+        '/api/parents/login/',
         data: {
           'phone_number': phoneNumber,
         },
@@ -82,16 +75,18 @@ class ApiService {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('refresh_token', data['tokens']['refresh']);
 
-        // Save user ID for profile access
-        if (data['user'] != null && data['user']['id'] != null) {
-          await _saveUserId(data['user']['id']);
-        } else if (data['parent'] != null && data['parent']['user'] != null) {
-          await _saveUserId(data['parent']['user']);
+        // Save user ID for profile access - parent object contains the user id
+        if (data['parent'] != null && data['parent']['id'] != null) {
+          await _saveUserId(data['parent']['id']);
         }
 
-        // Save user and children data
-        await prefs.setString('user_data', data['user'].toString());
-        await prefs.setString('children_data', data['children'].toString());
+        // Save user and children data (handle null safely)
+        if (data['parent'] != null) {
+          await prefs.setString('user_data', data['parent'].toString());
+        }
+        if (data['children'] != null) {
+          await prefs.setString('children_data', data['children'].toString());
+        }
 
         return data;
       } else {
@@ -110,11 +105,24 @@ class ApiService {
   Future<List<Child>> getMyChildren() async {
     try {
       await loadToken();
-      final response = await _dio.get('/api/parents/my-children/');
+
+      // Get saved user ID
+      final userId = await _getSavedUserId();
+      if (userId == null) {
+        throw Exception('User not logged in. Please login again.');
+      }
+
+      final response = await _dio.get('/api/parents/$userId/children/');
 
       if (response.statusCode == 200) {
         final data = response.data;
-        final List<dynamic> childrenJson = data['children'];
+        // Handle null or missing children array
+        final List<dynamic>? childrenJson = data['children'];
+
+        if (childrenJson == null || childrenJson.isEmpty) {
+          return []; // Return empty list if no children
+        }
+
         return childrenJson.map((json) => Child.fromJson(json)).toList();
       } else {
         throw Exception('Failed to load children');
@@ -160,21 +168,23 @@ class ApiService {
       final response = await _dio.get('/api/parents/$userId/');
 
       if (response.statusCode == 200) {
+        final data = response.data;
+
         // Return in a format that matches what the app expects
         return {
           'user': {
-            'id': response.data['id'],
-            'username': response.data['firstName'] ?? '',
-            'email': response.data['email'] ?? '',
-            'first_name': response.data['firstName'],
-            'last_name': response.data['lastName'],
+            'id': data['id'] ?? userId,
+            'username': data['firstName'] ?? '',
+            'email': data['email'] ?? '',
+            'first_name': data['firstName'] ?? '',
+            'last_name': data['lastName'] ?? '',
           },
           'parent': {
-            'user': response.data['id'],
-            'contact_number': response.data['phone'] ?? '',
-            'address': response.data['address'],
-            'emergency_contact': response.data['emergencyContact'],
-            'status': response.data['status'] ?? 'active',
+            'user': data['id'] ?? userId,
+            'contact_number': data['phone'] ?? '',
+            'address': data['address'] ?? '',
+            'emergency_contact': data['emergencyContact'] ?? '',
+            'status': data['status'] ?? 'active',
           }
         };
       } else {
@@ -203,6 +213,7 @@ class ApiService {
         throw Exception('User not logged in. Please login again.');
       }
 
+      // Prepare data with camelCase keys for backend
       final data = <String, dynamic>{};
       if (address != null) data['address'] = address;
       if (emergencyContact != null) data['emergencyContact'] = emergencyContact;
@@ -218,6 +229,101 @@ class ApiService {
       if (e.response != null) {
         throw Exception(
             e.response?.data['error'] ?? 'Failed to update profile');
+      } else {
+        throw Exception('Network error. Please check your connection.');
+      }
+    }
+  }
+
+  // Get all notifications for the logged-in parent
+  Future<Map<String, dynamic>> getNotifications({
+    bool? isRead,
+    String? type,
+    int limit = 50,
+  }) async {
+    try {
+      await loadToken();
+
+      final queryParams = <String, dynamic>{
+        'limit': limit.toString(),
+      };
+
+      if (isRead != null) {
+        queryParams['is_read'] = isRead.toString();
+      }
+
+      if (type != null) {
+        queryParams['type'] = type;
+      }
+
+      final response = await _dio.get(
+        '/api/notifications/',
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception('Failed to load notifications');
+      }
+    } on DioException catch (e) {
+      if (e.response != null) {
+        throw Exception(
+            e.response?.data['error'] ?? 'Failed to load notifications');
+      } else {
+        throw Exception('Network error. Please check your connection.');
+      }
+    }
+  }
+
+  // Mark notifications as read
+  Future<Map<String, dynamic>> markNotificationsAsRead({
+    List<int>? notificationIds,
+  }) async {
+    try {
+      await loadToken();
+
+      final data = <String, dynamic>{};
+      if (notificationIds != null && notificationIds.isNotEmpty) {
+        data['notification_ids'] = notificationIds;
+      }
+
+      final response = await _dio.post(
+        '/api/notifications/mark-as-read/',
+        data: data,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception('Failed to mark notifications as read');
+      }
+    } on DioException catch (e) {
+      if (e.response != null) {
+        throw Exception(e.response?.data['error'] ??
+            'Failed to mark notifications as read');
+      } else {
+        throw Exception('Network error. Please check your connection.');
+      }
+    }
+  }
+
+  // Delete a specific notification
+  Future<void> deleteNotification(int notificationId) async {
+    try {
+      await loadToken();
+
+      final response = await _dio.delete(
+        '/api/notifications/$notificationId/',
+      );
+
+      if (response.statusCode != 204 && response.statusCode != 200) {
+        throw Exception('Failed to delete notification');
+      }
+    } on DioException catch (e) {
+      if (e.response != null) {
+        throw Exception(
+            e.response?.data['error'] ?? 'Failed to delete notification');
       } else {
         throw Exception('Network error. Please check your connection.');
       }

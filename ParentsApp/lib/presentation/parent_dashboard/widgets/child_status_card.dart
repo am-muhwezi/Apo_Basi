@@ -134,35 +134,63 @@ class ChildStatusCard extends StatelessWidget {
     );
   }
 
-  Color _getStatusColor(String status) {
+  Color _getStatusColor(String? status) {
+    if (status == null || status.trim().isEmpty) {
+      return const Color(0xFF34C759); // Green for 'At home'
+    }
+
     switch (status.toLowerCase()) {
       case 'on_bus':
+      case 'on-bus':
         return AppTheme.lightTheme.colorScheme.primary;
       case 'at_school':
+      case 'at-school':
         return AppTheme.lightTheme.colorScheme.secondary;
       case 'at_home':
-        return const Color(0xFF34C759);
+      case 'at-home':
+      case 'home':
+        return const Color(0xFF34C759); // Green
+      case 'picked-up':
+      case 'picked_up':
+        return const Color(0xFF007AFF); // Blue
+      case 'dropped-off':
+      case 'dropped_off':
+        return const Color(0xFF34C759); // Green
       case 'waiting':
-        return const Color(0xFFFF9500);
+        return const Color(0xFFFF9500); // Orange
       default:
-        return AppTheme.lightTheme.colorScheme.onSurfaceVariant;
+        return const Color(0xFF34C759); // Default to green for 'At home'
     }
   }
 
-  String _getStatusText(String status) {
+  String _getStatusText(String? status) {
+    if (status == null || status.trim().isEmpty) {
+      return 'At home';
+    }
+
     switch (status.toLowerCase()) {
       case 'on_bus':
+      case 'on-bus':
         return 'On bus';
       case 'at_school':
+      case 'at-school':
         return 'At school';
       case 'at_home':
+      case 'at-home':
+      case 'home':
         return 'At home';
       case 'waiting':
         return 'Waiting';
+      case 'picked-up':
+      case 'picked_up':
+        return 'Picked up';
+      case 'dropped-off':
+      case 'dropped_off':
+        return 'Dropped off';
       case 'no record today':
         return 'No record today';
       default:
-        return 'Unknown';
+        return 'At home'; // Default to 'At home' instead of 'Unknown'
     }
   }
 }
