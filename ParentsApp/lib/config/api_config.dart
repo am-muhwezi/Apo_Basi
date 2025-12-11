@@ -26,7 +26,7 @@ class ApiConfig {
   /// Get your token from: https://account.mapbox.com/access-tokens/
   /// Free tier includes: 50,000 map loads per month
   static const String mapboxAccessToken =
-      'pk.eyJ1IjoieWFod2Voc2RlbGlnaHQiLCJhIjoiY21pZXAzNHpyMDR1bDNlcjFjYjhndzZ3MSJ9.OzjPk7KtUsKiuPTKUnTBSg';
+      '';
 
   /// Mapbox Style ID
   /// Available styles: streets-v12, outdoors-v12, light-v11, dark-v11,
