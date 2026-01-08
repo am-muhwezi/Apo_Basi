@@ -91,9 +91,14 @@ export async function patchParent(
 /**
  * Delete a parent
  * DELETE /api/parents/:id/
+ * @param id Parent ID
+ * @param params Optional query parameters (e.g., { action: 'keep_children' })
  */
-export async function deleteParent(id: string): Promise<AxiosResponse<void>> {
-  return axiosInstance.delete(`/parents/${id}/`);
+export async function deleteParent(
+  id: string,
+  params?: Record<string, string>
+): Promise<AxiosResponse<any>> {
+  return axiosInstance.delete(`/parents/${id}/`, { params });
 }
 
 /**

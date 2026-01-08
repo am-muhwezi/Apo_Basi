@@ -28,12 +28,12 @@ class BusMinderSerializer(serializers.ModelSerializer):
     def get_assignedBusId(self, obj):
         """Get the first assigned bus ID from Assignment API"""
         assignment = Assignment.get_active_assignments_for(obj, 'minder_to_bus').first()
-        return assignment.assigned_to.id if assignment else None
+        return assignment.assigned_to.id if assignment and assignment.assigned_to else None
 
     def get_assignedBusNumber(self, obj):
         """Get the first assigned bus number from Assignment API"""
         assignment = Assignment.get_active_assignments_for(obj, 'minder_to_bus').first()
-        return assignment.assigned_to.bus_number if assignment else None
+        return assignment.assigned_to.bus_number if assignment and assignment.assigned_to else None
 
     def get_assignedBusesCount(self, obj):
         """Get count of assigned buses from Assignment API"""

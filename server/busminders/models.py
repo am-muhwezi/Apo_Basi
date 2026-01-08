@@ -19,3 +19,18 @@ class BusMinder(models.Model):
 
     def __str__(self):
         return f"BusMinder: {self.user.get_full_name() or self.user.username}"
+
+    def delete(self, *args, **kwargs):
+        """Override delete to clean up assignments before deletion"""
+        from assignments.models import Assignment
+        from django.contrib.contenttypes.models import ContentType
+
+        # Clean up assignments where this busminder is the assignee
+        busminder_content_type = ContentType.objects.get_for_model(BusMinder)
+        Assignment.objects.filter(
+            assignee_content_type=busminder_content_type,
+            assignee_object_id=self.pk
+        ).delete()
+
+        # Now delete the busminder
+        super().delete(*args, **kwargs)

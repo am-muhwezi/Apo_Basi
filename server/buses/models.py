@@ -75,6 +75,21 @@ class Bus(models.Model):
     def __str__(self):
         return self.number_plate
 
+    def delete(self, *args, **kwargs):
+        """Override delete to clean up assignments before deletion"""
+        from assignments.models import Assignment
+        from django.contrib.contenttypes.models import ContentType
+
+        # Clean up assignments where this bus is assigned_to
+        bus_content_type = ContentType.objects.get_for_model(Bus)
+        Assignment.objects.filter(
+            assigned_to_content_type=bus_content_type,
+            assigned_to_object_id=self.id
+        ).delete()
+
+        # Now delete the bus
+        super().delete(*args, **kwargs)
+
     class Meta:
         verbose_name_plural = "Buses"
         ordering = ['bus_number', 'id']

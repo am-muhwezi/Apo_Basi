@@ -5,6 +5,7 @@ import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
 import FormError from '../components/common/FormError';
+import ParentSearchInput from '../components/ParentSearchInput';
 import { useChildren } from '../hooks/useChildren';
 import { childService } from '../services/childService';
 import { useToast } from '../contexts/ToastContext';
@@ -33,39 +34,15 @@ export default function ChildrenPage() {
     loadChildren();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Local state for parents (loaded only for create/edit forms)
-  const [parents, setParents] = useState<Parent[]>([]);
-  const [parentsLoading, setParentsLoading] = useState(false);
-
   const [searchTerm, setSearchTerm] = useState('');
   const [gradeFilter, setGradeFilter] = useState('all');
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [formData, setFormData] = useState<Partial<Child>>({});
+  const [selectedParent, setSelectedParent] = useState<Parent | null>(null);
 
   const grades = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6'];
-
-  // Load parents for dropdown in create/edit modal
-  const loadParentsForModal = async () => {
-    if (parents.length > 0 || parentsLoading) return;
-
-    try {
-      setParentsLoading(true);
-      const response = await fetch(`${config.apiBaseUrl}/api/parents/?limit=100`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        }
-      });
-      const data = await response.json();
-      setParents(data.results || []);
-    } catch (error) {
-      console.error('Failed to load parents:', error);
-      setParents([]);
-    } finally {
-      setParentsLoading(false);
-    }
-  };
 
   const filteredChildren = children.filter((child) => {
     const matchesSearch =
@@ -81,16 +58,16 @@ export default function ChildrenPage() {
   const childrenWithBus = children.filter((c) => c.busId).length;
   const childrenByGrade = filteredChildren.length;
 
-  const handleCreate = async () => {
-    await loadParentsForModal();
+  const handleCreate = () => {
     setSelectedChild(null);
+    setSelectedParent(null);
     setFormError(null);
     setFormData({
       firstName: '',
       lastName: '',
       grade: 'Grade 1',
       age: 6,
-      parentId: parents[0]?.id || '',
+      parentId: '',
       address: '',
       emergencyContact: '',
       status: 'active',
@@ -98,9 +75,9 @@ export default function ChildrenPage() {
     setShowModal(true);
   };
 
-  const handleEdit = async (child: Child) => {
-    await loadParentsForModal();
+  const handleEdit = (child: Child) => {
     setSelectedChild(child);
+    setSelectedParent(null); // Will be populated by ParentSearchInput if child has parent
     setFormError(null);
     setFormData(child);
     setShowModal(true);
@@ -383,14 +360,14 @@ export default function ChildrenPage() {
               required
             />
           </div>
-          <Select
-            label="Parent"
-            value={formData.parentId || ''}
-            onChange={(e) => setFormData({ ...formData, parentId: e.target.value })}
-            options={parents.map((p) => ({
-              value: p.id,
-              label: `${p.firstName} ${p.lastName}`,
-            }))}
+          <ParentSearchInput
+            value={formData.parentId}
+            selectedParent={selectedParent}
+            onChange={(parentId, parent) => {
+              setFormData({ ...formData, parentId });
+              setSelectedParent(parent);
+            }}
+            placeholder="Search for parent by name, email, or phone..."
           />
           <Input
             label="Address"
