@@ -244,7 +244,7 @@ io.on('connection', (socket) => {
 
 // REST endpoint for Django backend to trigger trip start notifications
 app.post('/api/notify/trip-start', async (req, res) => {
-  const { busId, tripType, tripId, driverUserId, busNumber } = req.body;
+  const { busId, tripType, tripId, driverUserId, busNumber, routeName, estimatedDuration } = req.body;
 
   if (!busId || !tripType) {
     return res.status(400).json({ error: 'busId and tripType are required' });
@@ -257,9 +257,13 @@ app.post('/api/notify/trip-start', async (req, res) => {
     busNumber,
     tripType,
     tripId,
-    title: 'Trip Started',
-    message: `Your child's bus (${busNumber || 'Bus ' + busId}) has started the ${tripType} trip`,
-    timestamp: new Date().toISOString()
+    routeName,
+    title: '🚌 Bus Trip Started',
+    message: `Your child's bus (${busNumber || 'Bus ' + busId}) has started the ${tripType} trip${routeName ? ` on route ${routeName}` : ''}`,
+    subtitle: estimatedDuration ? `Estimated duration: ${estimatedDuration} minutes` : '',
+    timestamp: new Date().toISOString(),
+    notificationType: 'trip_start',
+    priority: 'high'
   };
 
   // Emit to all parents subscribed to this bus
@@ -273,53 +277,88 @@ app.post('/api/notify/trip-start', async (req, res) => {
 
 // REST endpoint for child pickup/dropoff notifications
 app.post('/api/notify/child-status', async (req, res) => {
-  const { busId, childId, childName, status, timestamp, parentUserIds, busNumber } = req.body;
+  const { busId, childId, childName, status, timestamp, parentUserIds, busNumber, location, eta } = req.body;
 
   if (!busId || !childId || !status) {
     return res.status(400).json({ error: 'busId, childId, and status are required' });
   }
 
-  const statusMessages = {
-    'on_bus': `${childName} has boarded the bus`,
-    'at_school': `${childName} has arrived at school`,
-    'on_way_home': `${childName} is on the way home`,
-    'dropped_off': `${childName} has been dropped off`,
-    'absent': `${childName} is marked absent`
+  const statusConfig = {
+    'on_bus': {
+      emoji: '🚌',
+      title: 'Child Picked Up',
+      message: `${childName} has boarded the bus and is heading to school`,
+      priority: 'high',
+      sound: true
+    },
+    'at_school': {
+      emoji: '🏫',
+      title: 'Arrived at School',
+      message: `${childName} has safely arrived at school`,
+      priority: 'normal',
+      sound: false
+    },
+    'on_way_home': {
+      emoji: '🏠',
+      title: 'Heading Home',
+      message: `${childName} is on the bus and heading home`,
+      priority: 'high',
+      sound: true
+    },
+    'dropped_off': {
+      emoji: '✅',
+      title: 'Dropped Off at Home',
+      message: `${childName} has been safely dropped off at home`,
+      priority: 'high',
+      sound: true
+    },
+    'absent': {
+      emoji: '❌',
+      title: 'Marked Absent',
+      message: `${childName} is marked absent for this trip`,
+      priority: 'normal',
+      sound: false
+    }
   };
 
-  const message = statusMessages[status] || `${childName} status updated to ${status}`;
+  const config = statusConfig[status] || {
+    emoji: 'ℹ️',
+    title: 'Status Update',
+    message: `${childName} status: ${status}`,
+    priority: 'normal',
+    sound: false
+  };
 
   console.log(`👶 Child ${childName} (ID: ${childId}) status: ${status} on bus ${busNumber || busId}`);
+
+  const notificationData = {
+    busId,
+    busNumber,
+    childId,
+    childName,
+    status,
+    title: `${config.emoji} ${config.title}`,
+    message: config.message,
+    subtitle: eta ? `ETA: ${eta} minutes` : '',
+    location,
+    eta,
+    timestamp: timestamp || new Date().toISOString(),
+    notificationType: 'child_status',
+    priority: config.priority,
+    playSound: config.sound
+  };
 
   // If specific parent user IDs provided, notify only those parents
   if (parentUserIds && Array.isArray(parentUserIds)) {
     parentUserIds.forEach(parentId => {
       const parentSocket = connections.parents.get(parentId);
       if (parentSocket) {
-        parentSocket.emit('child_status_update', {
-          busId,
-          busNumber,
-          childId,
-          childName,
-          status,
-          title: 'Child Status Update',
-          message,
-          timestamp: timestamp || new Date().toISOString()
-        });
+        parentSocket.emit('child_status_update', notificationData);
       }
     });
   } else {
     // Otherwise, broadcast to all parents on this bus
-    io.to(`bus_${busId}`).emit('child_status_update', {
-      busId,
-      busNumber,
-      childId,
-      childName,
-      status,
-      title: 'Child Status Update',
-      message,
-      timestamp: timestamp || new Date().toISOString()
-    });
+    io.to(`bus_${busId}`).emit('child_status_update', notificationData);
   }
 
   res.json({ success: true, notified: true });
@@ -327,7 +366,7 @@ app.post('/api/notify/child-status', async (req, res) => {
 
 // REST endpoint for trip completion
 app.post('/api/notify/trip-end', async (req, res) => {
-  const { busId, tripType, tripId, busNumber } = req.body;
+  const { busId, tripType, tripId, busNumber, totalStudents, droppedOff, duration } = req.body;
 
   if (!busId) {
     return res.status(400).json({ error: 'busId is required' });
@@ -340,9 +379,15 @@ app.post('/api/notify/trip-end', async (req, res) => {
     busNumber,
     tripType,
     tripId,
-    title: 'Trip Completed',
-    message: `The ${tripType || ''} trip has been completed`,
-    timestamp: new Date().toISOString()
+    title: '✅ Trip Completed',
+    message: `The ${tripType || ''} trip has been completed successfully`,
+    subtitle: totalStudents ? `${droppedOff || totalStudents}/${totalStudents} students delivered safely` : '',
+    duration,
+    totalStudents,
+    droppedOff,
+    timestamp: new Date().toISOString(),
+    notificationType: 'trip_end',
+    priority: 'normal'
   };
 
   io.to(`bus_${busId}`).emit('trip_ended', tripEndData);
@@ -397,6 +442,6 @@ app.get('/health', (req, res) => {
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Socket.IO server running on port ${PORT}`);
   console.log(`Django API URL: ${DJANGO_API_URL}`);
-  console.log(`Server accessible at: http://192.168.61.114:${PORT}`);
+  console.log(`Server accessible at: http://192.168.100.65:${PORT}`);
   console.log(`Waiting for connections...`);
 });

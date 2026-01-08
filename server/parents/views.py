@@ -313,18 +313,28 @@ class ParentLoginView(APIView):
                 driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
                 minder_assignment = Assignment.get_assignments_to(bus, 'minder_to_bus').first()
 
+                # Safely build driver info
+                driver_info = None
+                if driver_assignment and driver_assignment.assignee:
+                    driver_info = {
+                        "name": f"{driver_assignment.assignee.user.first_name} {driver_assignment.assignee.user.last_name}",
+                        "phone": driver_assignment.assignee.phone_number
+                    }
+
+                # Safely build minder info
+                minder_info = None
+                if minder_assignment and minder_assignment.assignee:
+                    minder_info = {
+                        "name": f"{minder_assignment.assignee.user.first_name} {minder_assignment.assignee.user.last_name}",
+                        "phone": minder_assignment.assignee.phone_number
+                    }
+
                 child_data["assigned_bus"] = {
                     "id": bus.id,
                     "bus_number": bus.bus_number,
                     "number_plate": bus.number_plate,
-                    "driver": {
-                        "name": f"{driver_assignment.assignee.user.first_name} {driver_assignment.assignee.user.last_name}",
-                        "phone": driver_assignment.assignee.user.phone_number
-                    } if driver_assignment else None,
-                    "minder": {
-                        "name": f"{minder_assignment.assignee.user.first_name} {minder_assignment.assignee.user.last_name}",
-                        "phone": minder_assignment.assignee.phone_number
-                    } if minder_assignment else None
+                    "driver": driver_info,
+                    "minder": minder_info
                 }
 
             children_data.append(child_data)
