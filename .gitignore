@@ -40,4 +40,4 @@ yarn-debug.log*
 *.swp
 
 # Documentation
-/docs
+*/docs
