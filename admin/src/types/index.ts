@@ -86,8 +86,11 @@ export interface Minder {
 export interface Trip {
   id: string;
   busId: string;
+  busNumber: string;
   driverId: string;
+  driverName: string;
   minderId?: string;
+  minderName?: string;
   route: string;
   type: 'pickup' | 'dropoff';
   status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
@@ -97,6 +100,10 @@ export interface Trip {
   currentLocation?: Location;
   stops: Stop[];
   childrenIds: string[];
+  totalStudents?: number;
+  studentsCompleted?: number;
+  studentsAbsent?: number;
+  studentsPending?: number;
   createdAt: string;
 }
 

@@ -80,7 +80,12 @@ class Child(models.Model):
     )
 
     parent = models.ForeignKey(
-        "parents.Parent", on_delete=models.CASCADE, related_name="parent_children"
+        "parents.Parent",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="parent_children",
+        help_text="Parent/guardian for this child (optional)"
     )
     assigned_bus = models.ForeignKey(
         "buses.Bus",
@@ -95,3 +100,18 @@ class Child(models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
+
+    def delete(self, *args, **kwargs):
+        """Override delete to clean up assignments before deletion"""
+        from assignments.models import Assignment
+        from django.contrib.contenttypes.models import ContentType
+
+        # Clean up assignments where this child is the assignee
+        child_content_type = ContentType.objects.get_for_model(Child)
+        Assignment.objects.filter(
+            assignee_content_type=child_content_type,
+            assignee_object_id=self.pk
+        ).delete()
+
+        # Now delete the child
+        super().delete(*args, **kwargs)

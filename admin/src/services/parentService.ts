@@ -146,15 +146,34 @@ class ParentService {
   }
 
   /**
-   * Delete parent
+   * Delete parent - returns children info if any exist
+   * @param id Parent ID
+   * @param action 'keep_children' | 'delete_children' | undefined
    */
-  async deleteParent(id: string): Promise<ApiResponse<void>> {
+  async deleteParent(id: string, action?: 'keep_children' | 'delete_children'): Promise<ApiResponse<any>> {
     try {
-      await parentApi.deleteParent(id);
+      const params = action ? { action } : undefined;
+      const response = await parentApi.deleteParent(id, params);
       return {
         success: true,
+        data: response.data,
       };
     } catch (error) {
+      if (error instanceof AxiosError && error.response?.status === 400) {
+        const data = error.response.data;
+        if (data.requiresConfirmation) {
+          // Return children info for confirmation dialog
+          return {
+            success: false,
+            error: {
+              message: data.message,
+              requiresConfirmation: true,
+              children: data.children,
+              childrenCount: data.childrenCount,
+            },
+          };
+        }
+      }
       return {
         success: false,
         error: {

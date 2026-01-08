@@ -1,3 +1,5 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 /// API Configuration for DriversandMinders App
 ///
 /// Centralized configuration for all API keys, URLs, and service endpoints
@@ -12,11 +14,11 @@ class ApiConfig {
   /// Android emulator: 'http://10.0.2.2:8000'
   /// iOS simulator: 'http://localhost:8000'
   /// Production: 'https://yourdomain.com' or 'http://YOUR_VPS_IP'
-  static const String apiBaseUrl = 'http://192.168.100.65:8000';
+  static String get apiBaseUrl => dotenv.env['API_BASE_URL'] ?? '';
 
   /// Socket.IO Server URL for real-time updates
   /// Must be accessible from mobile devices (not localhost!)
-  static const String socketServerUrl = 'http://192.168.100.65:3001';
+  static String get socketServerUrl => dotenv.env['SOCKET_SERVER_URL'] ?? '';
   // ============================================================================
   // Mapbox Configuration
   // ============================================================================
@@ -24,22 +26,23 @@ class ApiConfig {
   /// Mapbox Access Token
   /// Get your token from: https://account.mapbox.com/access-tokens/
   /// Free tier includes: 50,000 map loads per month
-  static const String mapboxAccessToken =
-      '';
+  static String get mapboxAccessToken =>
+      dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '';
 
   /// Mapbox Style ID
   /// Available styles: streets-v12, outdoors-v12, light-v11, dark-v11,
   /// satellite-v9, satellite-streets-v12
-  static const String mapboxStyleId = 'mapbox/streets-v12';
+  static String get mapboxStyleId =>
+      dotenv.env['MAPBOX_STYLE_ID'] ?? 'mapbox/streets-v12';
 
   /// Get the Mapbox tile URL template for flutter_map
   static String getMapboxTileUrl() {
-    return 'https://api.mapbox.com/styles/v1/$mapboxStyleId/tiles/{z}/{x}/{y}?access_token=$mapboxAccessToken';
+    return 'https://api.mapbox.com/styles/v1/${mapboxStyleId}/tiles/{z}/{x}/{y}?access_token=${mapboxAccessToken}';
   }
 
   /// Get Mapbox tile URL for a specific style
   static String getMapboxTileUrlWithStyle(String styleId) {
-    return 'https://api.mapbox.com/styles/v1/$styleId/tiles/{z}/{x}/{y}?access_token=$mapboxAccessToken';
+    return 'https://api.mapbox.com/styles/v1/$styleId/tiles/{z}/{x}/{y}?access_token=${mapboxAccessToken}';
   }
 
   /// Available Mapbox styles
@@ -106,17 +109,14 @@ class ApiConfig {
       print('WARNING: Mapbox token not configured');
       return false;
     }
-
     if (apiBaseUrl.isEmpty) {
       print('ERROR: API Base URL not configured');
       return false;
     }
-
     if (socketServerUrl.isEmpty) {
       print('ERROR: Socket.IO Server URL not configured');
       return false;
     }
-
     return true;
   }
 

@@ -35,6 +35,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'django-insecure-q04vc+va)aw09=9&o#
 const connections = {
   parents: new Map(),  // Map of parent user_id to socket
   drivers: new Map(),  // Map of driver user_id to socket
+  admins: new Map(),   // Map of admin user_id to socket
   buses: new Map(),    // Map of bus_id to array of parent sockets
 };
 
@@ -163,6 +164,62 @@ io.on('connection', (socket) => {
     });
   }
 
+  // Handle admin connection
+  if (socket.userType === 'admin') {
+    connections.admins.set(socket.userId, socket);
+
+    // Admin subscribes to monitor all buses or specific buses
+    socket.on('subscribe_to_bus', (data) => {
+      const busId = data.busId || data;
+
+      if (busId === 'all') {
+        // Subscribe to all buses
+        socket.join('admin_all_buses');
+        console.log(`✅ Admin ${socket.userId} subscribed to ALL buses`);
+        socket.emit('subscribed', { busId: 'all', success: true });
+      } else {
+        // Subscribe to specific bus
+        socket.join(`bus_${busId}`);
+        socket.join(`admin_bus_${busId}`);
+        console.log(`✅ Admin ${socket.userId} subscribed to bus ${busId}`);
+        socket.emit('subscribed', { busId, success: true });
+      }
+    });
+
+    // Admin unsubscribes from a bus
+    socket.on('unsubscribe_from_bus', (data) => {
+      const busId = data.busId || data;
+
+      if (busId === 'all') {
+        socket.leave('admin_all_buses');
+        console.log(`Admin ${socket.userId} unsubscribed from ALL buses`);
+      } else {
+        socket.leave(`bus_${busId}`);
+        socket.leave(`admin_bus_${busId}`);
+        console.log(`Admin ${socket.userId} unsubscribed from bus ${busId}`);
+      }
+
+      socket.emit('unsubscribed', { busId, success: true });
+    });
+
+    // Admin requests current status of all active trips
+    socket.on('request_active_trips', async () => {
+      try {
+        const response = await axios.get(`${DJANGO_API_URL}/api/trips/?status=in-progress`, {
+          headers: { 'Authorization': `Bearer ${socket.handshake.auth.token}` }
+        });
+
+        socket.emit('active_trips', {
+          trips: response.data.results || response.data || [],
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Error fetching active trips:', error.message);
+        socket.emit('error', { message: 'Failed to fetch active trips' });
+      }
+    });
+  }
+
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log(`Client disconnected: ${socket.id}, User ID: ${socket.userId}`);
@@ -179,6 +236,8 @@ io.on('connection', (socket) => {
       });
     } else if (socket.userType === 'driver') {
       connections.drivers.delete(socket.userId);
+    } else if (socket.userType === 'admin') {
+      connections.admins.delete(socket.userId);
     }
   });
 });
@@ -193,8 +252,7 @@ app.post('/api/notify/trip-start', async (req, res) => {
 
   console.log(`📢 Received trip start notification for bus ${busNumber || busId}, type ${tripType}`);
 
-  // Emit to all parents subscribed to this bus
-  io.to(`bus_${busId}`).emit('trip_started', {
+  const tripStartData = {
     busId,
     busNumber,
     tripType,
@@ -202,7 +260,13 @@ app.post('/api/notify/trip-start', async (req, res) => {
     title: 'Trip Started',
     message: `Your child's bus (${busNumber || 'Bus ' + busId}) has started the ${tripType} trip`,
     timestamp: new Date().toISOString()
-  });
+  };
+
+  // Emit to all parents subscribed to this bus
+  io.to(`bus_${busId}`).emit('trip_started', tripStartData);
+
+  // Also emit to admins monitoring all buses
+  io.to('admin_all_buses').emit('trip_started', tripStartData);
 
   res.json({ success: true, notified: true });
 });
@@ -271,7 +335,7 @@ app.post('/api/notify/trip-end', async (req, res) => {
 
   console.log(`✅ Trip ended for bus ${busNumber || busId}`);
 
-  io.to(`bus_${busId}`).emit('trip_ended', {
+  const tripEndData = {
     busId,
     busNumber,
     tripType,
@@ -279,7 +343,12 @@ app.post('/api/notify/trip-end', async (req, res) => {
     title: 'Trip Completed',
     message: `The ${tripType || ''} trip has been completed`,
     timestamp: new Date().toISOString()
-  });
+  };
+
+  io.to(`bus_${busId}`).emit('trip_ended', tripEndData);
+
+  // Also emit to admins monitoring all buses
+  io.to('admin_all_buses').emit('trip_ended', tripEndData);
 
   res.json({ success: true, notified: true });
 });
@@ -292,8 +361,7 @@ app.post('/api/notify/location-update', (req, res) => {
     return res.status(400).json({ error: 'busId, latitude, and longitude are required' });
   }
 
-  // Emit 'location_update' to match Parents app expectations
-  io.to(`bus_${busId}`).emit('location_update', {
+  const locationData = {
     busId,
     bus_number: bus_number || `BUS-${busId}`,
     latitude,
@@ -301,7 +369,13 @@ app.post('/api/notify/location-update', (req, res) => {
     speed: speed || 0,
     heading: heading || 0,
     timestamp: new Date().toISOString()
-  });
+  };
+
+  // Emit to parents subscribed to this specific bus
+  io.to(`bus_${busId}`).emit('location_update', locationData);
+
+  // Also emit to admins monitoring all buses
+  io.to('admin_all_buses').emit('location_update', locationData);
 
   res.json({ success: true });
 });
@@ -313,6 +387,7 @@ app.get('/health', (req, res) => {
     connections: {
       parents: connections.parents.size,
       drivers: connections.drivers.size,
+      admins: connections.admins.size,
       buses: connections.buses.size
     }
   });

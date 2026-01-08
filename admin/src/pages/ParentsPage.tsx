@@ -58,6 +58,9 @@ export default function ParentsPage() {
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAddChildModal, setShowAddChildModal] = useState(false);
+  const [showDeleteOptionsModal, setShowDeleteOptionsModal] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string>('');
+  const [deleteChildren, setDeleteChildren] = useState<any[]>([]);
   const [formData, setFormData] = useState<Partial<Parent>>({});
   const [childFormData, setChildFormData] = useState<Partial<Child>>({});
 
@@ -123,22 +126,36 @@ export default function ParentsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    const confirmed = await confirmDialog({
-      title: 'Delete Parent',
-      message: 'Are you sure you want to delete this parent? This action cannot be undone.',
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
-      variant: 'danger',
-    });
+    // First attempt - check if parent has children
+    const result = await parentService.deleteParent(id);
 
-    if (confirmed) {
-      const result = await parentService.deleteParent(id);
-      if (result.success) {
-        toast.success('Parent deleted successfully');
-        loadParents();
-      } else {
-        toast.error(result.error?.message || 'Failed to delete parent');
-      }
+    if (result.success) {
+      toast.success('Parent deleted successfully');
+      loadParents();
+      return;
+    }
+
+    // If requires confirmation (has children), show options modal
+    if (result.error?.requiresConfirmation) {
+      setDeleteTargetId(id);
+      setDeleteChildren(result.error.children || []);
+      setShowDeleteOptionsModal(true);
+    } else {
+      // Other error
+      toast.error(result.error?.message || 'Failed to delete parent');
+    }
+  };
+
+  const handleDeleteWithAction = async (action: 'keep_children' | 'delete_children') => {
+    const result = await parentService.deleteParent(deleteTargetId, action);
+
+    if (result.success) {
+      const message = result.data?.message || 'Parent deleted successfully';
+      toast.success(message);
+      setShowDeleteOptionsModal(false);
+      loadParents();
+    } else {
+      toast.error(result.error?.message || 'Failed to delete parent');
     }
   };
 
@@ -561,6 +578,72 @@ export default function ParentsPage() {
             <Button type="submit">Add Child</Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Options Modal */}
+      <Modal
+        isOpen={showDeleteOptionsModal}
+        onClose={() => setShowDeleteOptionsModal(false)}
+        title="Delete Parent - Choose Action"
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-800 font-medium mb-2">
+              This parent has {deleteChildren.length} child(ren):
+            </p>
+            <div className="space-y-1">
+              {deleteChildren.map((child: any) => (
+                <p key={child.id} className="text-sm text-yellow-700">
+                  • {child.firstName} {child.lastName} ({child.grade})
+                </p>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-sm text-slate-600">
+            What would you like to do with the children?
+          </p>
+
+          <div className="space-y-3">
+            <button
+              onClick={() => handleDeleteWithAction('keep_children')}
+              className="w-full p-4 text-left border-2 border-blue-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-5 h-5 mt-0.5 rounded-full border-2 border-blue-500"></div>
+                <div>
+                  <p className="font-medium text-slate-900">Keep Children (Recommended)</p>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Delete only the parent. Children will have no parent assigned and can be
+                    reassigned later from the Children page.
+                  </p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleDeleteWithAction('delete_children')}
+              className="w-full p-4 text-left border-2 border-red-200 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-5 h-5 mt-0.5 rounded-full border-2 border-red-500"></div>
+                <div>
+                  <p className="font-medium text-slate-900">Delete All Data</p>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Delete the parent AND all {deleteChildren.length} child(ren). This action
+                    cannot be undone.
+                  </p>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          <div className="flex justify-end pt-4">
+            <Button variant="secondary" onClick={() => setShowDeleteOptionsModal(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

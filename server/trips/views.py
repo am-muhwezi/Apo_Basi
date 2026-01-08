@@ -91,6 +91,7 @@ class TripStartView(APIView):
                 f'{socketio_url}/api/notify/trip-start',
                 json={
                     'busId': trip.bus.id,
+                    'busNumber': trip.bus.bus_number,
                     'tripType': trip.trip_type,
                     'tripId': trip.id,
                     'driverUserId': request.user.id
@@ -229,6 +230,7 @@ class TripUpdateLocationView(APIView):
                 f'{socketio_url}/api/notify/location-update',
                 json={
                     'busId': trip.bus.id,
+                    'bus_number': trip.bus.bus_number,  # Include bus number for display
                     'latitude': float(latitude),
                     'longitude': float(longitude),
                     'speed': speed,

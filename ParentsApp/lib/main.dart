@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 import 'dart:async';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../core/app_export.dart';
 import '../widgets/custom_error_widget.dart';
 import '../services/notification_service.dart';
 import '../services/socket_service.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load();
 
   // Initialize notification service asynchronously (non-blocking)
   NotificationService().initialize().catchError((error) {
@@ -106,4 +108,3 @@ class _MyAppState extends State<MyApp> {
     });
   }
 }
-

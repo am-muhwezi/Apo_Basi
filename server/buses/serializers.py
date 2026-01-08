@@ -41,12 +41,12 @@ class BusSerializer(serializers.ModelSerializer):
     def get_driverId(self, obj):
         """Get driver ID from Assignment API"""
         driver_assignment = Assignment.get_assignments_to(obj, 'driver_to_bus').first()
-        return driver_assignment.assignee.user_id if driver_assignment else None
+        return driver_assignment.assignee.user_id if driver_assignment and driver_assignment.assignee else None
 
     def get_driverName(self, obj):
         """Get driver name from Assignment API"""
         driver_assignment = Assignment.get_assignments_to(obj, 'driver_to_bus').first()
-        if driver_assignment:
+        if driver_assignment and driver_assignment.assignee:
             driver = driver_assignment.assignee
             return f"{driver.user.first_name} {driver.user.last_name}"
         return None
@@ -54,12 +54,12 @@ class BusSerializer(serializers.ModelSerializer):
     def get_minderId(self, obj):
         """Get minder ID from Assignment API"""
         minder_assignment = Assignment.get_assignments_to(obj, 'minder_to_bus').first()
-        return minder_assignment.assignee.user_id if minder_assignment else None
+        return minder_assignment.assignee.user_id if minder_assignment and minder_assignment.assignee else None
 
     def get_minderName(self, obj):
         """Get minder name from Assignment API"""
         minder_assignment = Assignment.get_assignments_to(obj, 'minder_to_bus').first()
-        if minder_assignment:
+        if minder_assignment and minder_assignment.assignee:
             minder = minder_assignment.assignee
             return f"{minder.user.first_name} {minder.user.last_name}"
         return None

@@ -24,7 +24,8 @@ server/.python-version
 **/windows/flutter/ephemeral/
 **/android/local.properties
 **/pubspec.lock
-
+ParentsApp/lib/config/api_config.dart
+DriversandMinders/lib/config/api_config.dart
 # Node / React
 node_modules/
 .env*

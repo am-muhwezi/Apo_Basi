@@ -1,143 +1,55 @@
-import React, { useState } from 'react';
-import { Plus, Search, Eye, MapPin, Navigation, Users, Clock, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Eye, MapPin, Navigation, Users, Clock, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
 import Button from '../components/common/Button';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
+import BusMap from '../components/BusMap';
 import { getTrips } from '../services/tripsApi';
-import { getBuses } from '../services/busApi';
-import { getDrivers } from '../services/driverApi';
-import { getBusMinders } from '../services/busMinderApi';
-import { getChildren } from '../services/childApi';
-import type { Trip, Bus, Driver, Minder, Child } from '../types';
-
-// Dummy route data
-const dummyRoutes = [
-  {
-    id: 'route-a',
-    name: 'Route A',
-    busNumber: 'Bus 101',
-    driver: 'Ethan Carter',
-    startTime: '7:00 AM',
-    students: 32,
-    stops: 12,
-    duration: 45,
-    distance: 15.2,
-    status: 'Active'
-  },
-  {
-    id: 'route-b',
-    name: 'Route B',
-    busNumber: 'Bus 102',
-    driver: 'Olivia Bennett',
-    startTime: '7:05 AM',
-    students: 28,
-    stops: 10,
-    duration: 40,
-    distance: 12.8,
-    status: 'Active'
-  },
-  {
-    id: 'route-c',
-    name: 'Route C',
-    busNumber: 'Bus 103',
-    driver: 'Noah Thompson',
-    startTime: '6:55 AM',
-    students: 35,
-    stops: 14,
-    duration: 50,
-    distance: 18.5,
-    status: 'Active'
-  },
-  {
-    id: 'route-d',
-    name: 'Route D',
-    busNumber: 'Bus 104',
-    driver: 'Ava Harper',
-    startTime: '6:50 AM',
-    students: 40,
-    stops: 16,
-    duration: 55,
-    distance: 20.1,
-    status: 'Active'
-  },
-  {
-    id: 'route-e',
-    name: 'Route E',
-    busNumber: 'Bus 105',
-    driver: 'Liam Foster',
-    startTime: '7:10 AM',
-    students: 30,
-    stops: 11,
-    duration: 42,
-    distance: 14.3,
-    status: 'Active'
-  },
-];
+import { socketService, LocationUpdate, TripStartedEvent, TripEndedEvent } from '../services/socketService';
+import type { Trip } from '../types';
 
 export default function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
-  const [buses, setBuses] = useState<Bus[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [minders, setMinders] = useState<Minder[]>([]);
-  const [children, setChildren] = useState<Child[]>([]);
+  const [filteredTrips, setFilteredTrips] = useState<Trip[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
-  const [selectedRoute, setSelectedRoute] = useState<typeof dummyRoutes[0] | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [recenterTrigger, setRecenterTrigger] = useState(0);
 
-  // Use dummy routes for now
-  // TODO: Replace with real route data from backend when routes API is ready
-  const [routes] = useState(dummyRoutes);
+  // Real-time location tracking
+  const [busLocations, setBusLocations] = useState<Map<string, LocationUpdate>>(new Map());
 
-  // NOTE: Currently using dummy data for routes display
-  // Backend data loading is disabled until routes API is fully implemented
-  // When implementing real routes:
-  // 1. Backend should return route data with all necessary info (driver names, bus numbers, etc.)
-  // 2. Load only routes data, not buses/drivers/minders/children separately
-  // 3. Follow the pattern used in other optimized pages (BusesPage, DriversPage, etc.)
+  useEffect(() => {
+    loadTrips();
+    initializeSocket();
 
-  /* DISABLED: Loading all data unnecessarily
-  React.useEffect(() => {
-    loadAllData();
+    return () => {
+      // Cleanup: disconnect socket on unmount
+      socketService.disconnect();
+    };
   }, []);
 
-  async function loadAllData(append = false) {
+  useEffect(() => {
+    filterTrips();
+  }, [trips, statusFilter]);
+
+  async function loadTrips(append = false) {
     try {
       setLoading(true);
       const offset = append ? trips.length : 0;
-      const [tripsRes, busesRes, driversRes, mindersRes, childrenRes] = await Promise.all([
-        getTrips({ limit: 20, offset }),
-        getBuses({ limit: 100 }),
-        getDrivers({ limit: 100 }),
-        getBusMinders({ limit: 100 }),
-        getChildren({ limit: 100 })
-      ]);
+      const response = await getTrips({ limit: 20, offset });
 
-      // Handle paginated responses
-      const tripsData = tripsRes.data.results || tripsRes.data || [];
-      const busesData = busesRes.data.results || busesRes.data || [];
-      const driversData = driversRes.data.results || driversRes.data || [];
-      const mindersData = mindersRes.data.results || mindersRes.data || [];
-      const childrenData = childrenRes.data.results || childrenRes.data || [];
-
+      const tripsData = response.data.results || response.data || [];
       setTrips(append ? [...trips, ...Array.isArray(tripsData) ? tripsData : []] : (Array.isArray(tripsData) ? tripsData : []));
-      setBuses(Array.isArray(busesData) ? busesData : []);
-      setDrivers(Array.isArray(driversData) ? driversData : []);
-      setMinders(Array.isArray(mindersData) ? mindersData : []);
-      setChildren(Array.isArray(childrenData) ? childrenData : []);
-
       setHasMore(Array.isArray(tripsData) && tripsData.length === 20);
     } catch (error) {
-      console.error('Failed to load data:', error);
+      console.error('Failed to load trips:', error);
       if (!append) {
         setTrips([]);
-        setBuses([]);
-        setDrivers([]);
-        setMinders([]);
-        setChildren([]);
       }
     } finally {
       setLoading(false);
@@ -146,40 +58,104 @@ export default function TripsPage() {
 
   function loadMoreTrips() {
     if (!loading && hasMore) {
-      loadAllData(true);
+      loadTrips(true);
     }
   }
-  */
 
-  const filteredTrips = trips.filter((trip) => {
-    const matchesStatus = statusFilter === 'all' || trip.status === statusFilter;
-    return matchesStatus;
-  });
+  function initializeSocket() {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error('No auth token found');
+      return;
+    }
 
-  const handleView = (trip: Trip) => {
+    // Connect to Socket.IO
+    socketService.connect(token);
+
+    // Listen for connection events
+    socketService.on('connected', () => {
+      console.log('Socket connected');
+      setSocketConnected(true);
+      // Subscribe to all buses for admin monitoring
+      socketService.subscribeToBus('all');
+    });
+
+    socketService.on('disconnected', () => {
+      console.log('Socket disconnected');
+      setSocketConnected(false);
+    });
+
+    // Listen for location updates
+    socketService.on('location_update', (data: LocationUpdate) => {
+      console.log('Location update:', data);
+      setBusLocations(prev => {
+        const updated = new Map(prev);
+        updated.set(data.busId, data);
+        return updated;
+      });
+
+      // Update trip if it's currently being viewed
+      if (selectedTrip && selectedTrip.busId === data.busId) {
+        setSelectedTrip(prev => prev ? {
+          ...prev,
+          currentLocation: {
+            latitude: data.latitude,
+            longitude: data.longitude,
+            timestamp: data.timestamp
+          }
+        } : null);
+      }
+
+      // Update trips list with new location
+      setTrips(prevTrips => prevTrips.map(trip =>
+        trip.busId === data.busId ? {
+          ...trip,
+          currentLocation: {
+            latitude: data.latitude,
+            longitude: data.longitude,
+            timestamp: data.timestamp
+          }
+        } : trip
+      ));
+    });
+
+    // Listen for trip started events
+    socketService.on('trip_started', (data: TripStartedEvent) => {
+      console.log('Trip started:', data);
+      // Reload trips to get updated status
+      loadTrips();
+    });
+
+    // Listen for trip ended events
+    socketService.on('trip_ended', (data: TripEndedEvent) => {
+      console.log('Trip ended:', data);
+      // Reload trips to get updated status
+      loadTrips();
+    });
+  }
+
+  function filterTrips() {
+    let filtered = [...trips];
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((trip) => trip.status === statusFilter);
+    }
+
+    setFilteredTrips(filtered);
+  }
+
+  const handleViewDetails = (trip: Trip) => {
     setSelectedTrip(trip);
     setShowDetailModal(true);
   };
 
-  const handleTrack = (trip: Trip) => {
+  const handleTrackOnMap = (trip: Trip) => {
     setSelectedTrip(trip);
     setShowMapModal(true);
   };
 
-  const getBusNumber = (busId: string) => {
-    const bus = buses.find((b) => b.id === busId);
-    return bus ? bus.busNumber : 'Unknown';
-  };
-
-  const getDriverName = (driverId: string) => {
-    const driver = drivers.find((d) => d.id === driverId);
-    return driver ? `${driver.firstName} ${driver.lastName}` : 'Unknown';
-  };
-
-  const getMinderName = (minderId?: string) => {
-    if (!minderId) return 'Not Assigned';
-    const minder = minders.find((m) => m.id === minderId);
-    return minder ? `${minder.firstName} ${minder.lastName}` : 'Unknown';
+  const handleRecenterMap = () => {
+    setRecenterTrigger(prev => prev + 1);
   };
 
   const formatTime = (timestamp: string) => {
@@ -197,18 +173,53 @@ export default function TripsPage() {
     });
   };
 
-  // Calculate stats from dummy routes
-  const totalRoutes = routes.length;
-  const totalStudents = routes.reduce((sum, route) => sum + route.students, 0);
-  const totalStops = routes.reduce((sum, route) => sum + route.stops, 0);
-  const avgDuration = routes.length > 0 ? Math.round(routes.reduce((sum, route) => sum + route.duration, 0) / routes.length) : 0;
+  // Calculate stats
+  const totalTrips = trips.length;
+  const activeTrips = trips.filter((t) => t.status === 'in-progress').length;
+  const completedTrips = trips.filter((t) => t.status === 'completed').length;
+  const scheduledTrips = trips.filter((t) => t.status === 'scheduled').length;
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'in-progress':
+        return 'bg-blue-100 text-blue-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      case 'scheduled':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-slate-100 text-slate-800';
+    }
+  };
+
+  const statusOptions = [
+    { value: 'all', label: 'All Statuses' },
+    { value: 'scheduled', label: 'Scheduled' },
+    { value: 'in-progress', label: 'In Progress' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'cancelled', label: 'Cancelled' },
+  ];
 
   return (
     <div>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Routes & Tracking</h1>
-          <p className="text-slate-600">Manage and optimize school bus routes for efficient transportation.</p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Trips & Tracking</h1>
+          <p className="text-slate-600">Monitor and track all school bus trips in real-time.</p>
+          <div className="flex items-center gap-2 mt-2">
+            <div className={`w-2 h-2 rounded-full ${socketConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className="text-xs text-slate-600">
+              {socketConnected ? 'Live tracking active' : 'Connecting...'}
+            </span>
+          </div>
+        </div>
+        <div className="flex gap-2 mt-4 md:mt-0">
+          <Button size="sm" variant="secondary" onClick={() => loadTrips()}>
+            <RefreshCw size={18} />
+            <span className="hidden sm:inline ml-1">Refresh</span>
+          </Button>
         </div>
       </div>
 
@@ -220,184 +231,423 @@ export default function TripsPage() {
               <MapPin className="w-5 h-5 text-blue-600" />
             </div>
           </div>
-          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Routes</h3>
-          <p className="text-2xl font-bold text-slate-900">{totalRoutes}</p>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Trips</h3>
+          <p className="text-2xl font-bold text-slate-900">{totalTrips}</p>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <div className="p-2 bg-green-100 rounded-lg">
-              <Users className="w-5 h-5 text-green-600" />
+              <Navigation className="w-5 h-5 text-green-600" />
             </div>
           </div>
-          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Students</h3>
-          <p className="text-2xl font-bold text-slate-900">{totalStudents}</p>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Active Now</h3>
+          <p className="text-2xl font-bold text-green-600">{activeTrips}</p>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <div className="p-2 bg-purple-100 rounded-lg">
-              <Navigation className="w-5 h-5 text-purple-600" />
+              <Clock className="w-5 h-5 text-purple-600" />
             </div>
           </div>
-          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Stops</h3>
-          <p className="text-2xl font-bold text-slate-900">{totalStops}</p>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Scheduled</h3>
+          <p className="text-2xl font-bold text-purple-600">{scheduledTrips}</p>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <Clock className="w-5 h-5 text-orange-600" />
+            <div className="p-2 bg-slate-100 rounded-lg">
+              <TrendingUp className="w-5 h-5 text-slate-600" />
             </div>
           </div>
-          <h3 className="text-sm font-medium text-slate-600 mb-1">Avg Duration</h3>
-          <p className="text-2xl font-bold text-slate-900">{avgDuration} min</p>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Completed</h3>
+          <p className="text-2xl font-bold text-slate-600">{completedTrips}</p>
         </div>
       </div>
 
-      {/* Routes Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {routes.map((route) => (
-          <div
-            key={route.id}
-            className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <MapPin className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">{route.name}</h3>
-                  <p className="text-sm text-slate-600">{route.busNumber}</p>
-                </div>
-              </div>
-              <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                {route.status}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <Users className="w-4 h-4" />
-                <span>{route.students} students</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <Navigation className="w-4 h-4" />
-                <span>{route.stops} stops</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <Clock className="w-4 h-4" />
-                <span>{route.duration} minutes</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <MapPin className="w-4 h-4" />
-                <span>{route.distance} miles</span>
-              </div>
-            </div>
-
-            <div className="border-t border-slate-200 pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-700">Driver: {route.driver}</p>
-                  <p className="text-xs text-slate-600">Starts at {route.startTime}</p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setSelectedRoute(route)}
-                >
-                  <Eye size={16} className="mr-2" />
-                  View Details
-                </Button>
-              </div>
-            </div>
-          </div>
-        ))}
-
-        {routes.length === 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center col-span-2">
-            <MapPin className="mx-auto mb-4 text-slate-400" size={48} />
-            <h3 className="text-lg font-medium text-slate-900 mb-2">No Routes Found</h3>
-            <p className="text-slate-600">There are no routes configured yet.</p>
-          </div>
-        )}
-      </div>
-
-      {/* Loaded Indicator */}
-      <div className="mt-6 p-4 bg-white rounded-xl border border-slate-200">
-        <div className="flex flex-col items-center gap-3">
-          <span className="text-sm text-slate-600">
-            Loaded {filteredTrips.length} of {filteredTrips.length}{hasMore ? '+' : ''} trips
-          </span>
-          {hasMore && (
-            <Button
-              onClick={loadMoreTrips}
-              disabled={loading}
-              variant="secondary"
-              size="sm"
+      {/* Filters */}
+      <div className="bg-white rounded-xl p-4 mb-6 border border-slate-200">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="sm:col-span-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {loading ? 'Loading...' : 'Load More'}
-            </Button>
-          )}
+              {statusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Route Details Modal */}
+      {/* Trips Table */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  Route
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  Bus
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  Driver
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  Type
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  Scheduled Time
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {loading && trips.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                    Loading trips...
+                  </td>
+                </tr>
+              ) : filteredTrips.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                    No trips found
+                  </td>
+                </tr>
+              ) : (
+                filteredTrips.map((trip) => {
+                  const location = busLocations.get(trip.busId);
+                  const hasRecentLocation = location &&
+                    (new Date().getTime() - new Date(location.timestamp).getTime()) < 60000; // Within 1 minute
+
+                  return (
+                    <tr key={trip.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-slate-900">{trip.route}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-slate-900">{trip.busNumber}</div>
+                        {hasRecentLocation && (
+                          <div className="flex items-center gap-1 text-xs text-green-600">
+                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                            Live
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-slate-900">{trip.driverName}</div>
+                        {trip.minderName && (
+                          <div className="text-xs text-slate-500">Minder: {trip.minderName}</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="capitalize text-sm text-slate-900">{trip.type}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(
+                            trip.status
+                          )}`}
+                        >
+                          {trip.status.replace('-', ' ').toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-slate-900">{formatDate(trip.scheduledTime)}</div>
+                        <div className="text-xs text-slate-500">{formatTime(trip.scheduledTime)}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleViewDetails(trip)}
+                            className="text-slate-600 hover:text-slate-800 transition-colors"
+                            title="View Details"
+                          >
+                            <Eye size={18} />
+                          </button>
+                          {trip.status === 'in-progress' && (
+                            <button
+                              onClick={() => handleTrackOnMap(trip)}
+                              className="text-blue-600 hover:text-blue-800 transition-colors"
+                              title="Track on Map"
+                            >
+                              <MapPin size={18} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Load More */}
+        <div className="p-4 border-t border-slate-200">
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-sm text-slate-600">
+              Loaded {filteredTrips.length} of {filteredTrips.length}{hasMore ? '+' : ''} trips
+            </span>
+            {hasMore && (
+              <Button
+                onClick={loadMoreTrips}
+                disabled={loading}
+                variant="secondary"
+                size="sm"
+              >
+                {loading ? 'Loading...' : 'Load More'}
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Trip Details Modal */}
       <Modal
-        isOpen={selectedRoute !== null}
-        onClose={() => setSelectedRoute(null)}
-        title="Route Details"
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        title="Trip Details"
         size="lg"
       >
-        {selectedRoute && (
+        {selectedTrip && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-medium text-slate-700">Route Name</p>
-                <p className="text-base text-slate-900">{selectedRoute.name}</p>
+                <p className="text-sm font-medium text-slate-700">Route</p>
+                <p className="text-base text-slate-900">{selectedTrip.route}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-700">Status</p>
-                <p className="text-base text-slate-900">{selectedRoute.status}</p>
+                <span
+                  className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(
+                    selectedTrip.status
+                  )}`}
+                >
+                  {selectedTrip.status.replace('-', ' ').toUpperCase()}
+                </span>
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-700">Bus</p>
-                <p className="text-base text-slate-900">{selectedRoute.busNumber}</p>
+                <p className="text-base text-slate-900">{selectedTrip.busNumber}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-700">Driver</p>
-                <p className="text-base text-slate-900">{selectedRoute.driver}</p>
+                <p className="text-base text-slate-900">{selectedTrip.driverName}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-700">Start Time</p>
-                <p className="text-base text-slate-900">{selectedRoute.startTime}</p>
+                <p className="text-sm font-medium text-slate-700">Type</p>
+                <p className="text-base text-slate-900 capitalize">{selectedTrip.type}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-700">Students</p>
-                <p className="text-base text-slate-900">{selectedRoute.students}</p>
+                <p className="text-sm font-medium text-slate-700">Scheduled Time</p>
+                <p className="text-base text-slate-900">{formatTime(selectedTrip.scheduledTime)}</p>
               </div>
-              <div>
-                <p className="text-sm font-medium text-slate-700">Total Stops</p>
-                <p className="text-base text-slate-900">{selectedRoute.stops}</p>
+              {selectedTrip.startTime && (
+                <div>
+                  <p className="text-sm font-medium text-slate-700">Start Time</p>
+                  <p className="text-base text-slate-900">{formatTime(selectedTrip.startTime)}</p>
+                </div>
+              )}
+              {selectedTrip.endTime && (
+                <div>
+                  <p className="text-sm font-medium text-slate-700">End Time</p>
+                  <p className="text-base text-slate-900">{formatTime(selectedTrip.endTime)}</p>
+                </div>
+              )}
+            </div>
+
+            {selectedTrip.currentLocation && (
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h4 className="font-medium text-slate-900 mb-2">Current Location</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-slate-600">Latitude:</span>{' '}
+                    <span className="font-medium">{selectedTrip.currentLocation.latitude.toFixed(6)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-600">Longitude:</span>{' '}
+                    <span className="font-medium">{selectedTrip.currentLocation.longitude.toFixed(6)}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-slate-600">Last Update:</span>{' '}
+                    <span className="font-medium">{formatTime(selectedTrip.currentLocation.timestamp)}</span>
+                  </div>
+                </div>
               </div>
+            )}
+
+            {selectedTrip.stops && selectedTrip.stops.length > 0 && (
               <div>
-                <p className="text-sm font-medium text-slate-700">Duration</p>
-                <p className="text-base text-slate-900">{selectedRoute.duration} minutes</p>
+                <h4 className="font-medium text-slate-900 mb-3">Stops ({selectedTrip.stops.length})</h4>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {selectedTrip.stops.map((stop, index) => (
+                    <div key={stop.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-slate-900">{stop.address}</p>
+                        <p className="text-xs text-slate-600">Scheduled: {formatTime(stop.scheduledTime)}</p>
+                        {stop.actualTime && (
+                          <p className="text-xs text-slate-600">Actual: {formatTime(stop.actualTime)}</p>
+                        )}
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-medium ${
+                          stop.status === 'completed'
+                            ? 'bg-green-100 text-green-800'
+                            : stop.status === 'skipped'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}
+                      >
+                        {stop.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-slate-700">Distance</p>
-                <p className="text-base text-slate-900">{selectedRoute.distance} miles</p>
+            )}
+
+            <div className="pt-4">
+              <Button onClick={() => setShowDetailModal(false)} className="w-full">
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Map Tracking Modal */}
+      <Modal
+        isOpen={showMapModal}
+        onClose={() => setShowMapModal(false)}
+        title="Live Bus Tracking"
+        size="xl"
+      >
+        {selectedTrip && (
+          <div className="space-y-4">
+            {/* Trip Info Header */}
+            <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleRecenterMap}
+                    className="bg-blue-600 hover:bg-blue-700 rounded-lg p-3 shadow-md transition-all duration-200 hover:scale-105 active:scale-95"
+                    title="Center map on bus location"
+                  >
+                    <Navigation className="w-6 h-6 text-white" />
+                  </button>
+                  <div>
+                    <h4 className="font-semibold text-lg text-slate-900">{selectedTrip.busNumber}</h4>
+                    <p className="text-sm text-slate-600">{selectedTrip.route}</p>
+                  </div>
+                </div>
+                {busLocations.get(selectedTrip.busId) && (
+                  <div className="flex items-center gap-2 bg-green-100 px-3 py-1.5 rounded-full">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    <span className="text-sm font-medium text-green-700">Live Tracking</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="bg-blue-50 rounded-lg p-4">
-              <h4 className="font-medium text-slate-900 mb-2">Route Information</h4>
-              <p className="text-sm text-slate-600">
-                This route covers {selectedRoute.stops} pickup/drop-off points with an estimated duration of {selectedRoute.duration} minutes.
-                The bus travels approximately {selectedRoute.distance} miles to transport {selectedRoute.students} students.
-              </p>
-            </div>
+            {selectedTrip.currentLocation ? (
+              <div className="space-y-4">
+                {/* Location Stats */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-white border border-slate-200 rounded-lg p-3">
+                    <div className="text-xs text-slate-500 mb-1">Latitude</div>
+                    <div className="text-sm font-mono font-semibold text-slate-900">
+                      {selectedTrip.currentLocation.latitude.toFixed(6)}
+                    </div>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-lg p-3">
+                    <div className="text-xs text-slate-500 mb-1">Longitude</div>
+                    <div className="text-sm font-mono font-semibold text-slate-900">
+                      {selectedTrip.currentLocation.longitude.toFixed(6)}
+                    </div>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-lg p-3">
+                    <div className="text-xs text-slate-500 mb-1">Last Update</div>
+                    <div className="text-sm font-semibold text-slate-900">
+                      {formatTime(selectedTrip.currentLocation.timestamp)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Help Guide */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-blue-900 mb-1">Quick Guide:</p>
+                      <ul className="text-xs text-blue-800 space-y-1">
+                        <li className="flex items-center gap-1">
+                          <span className="inline-flex items-center justify-center w-4 h-4 bg-blue-600 rounded text-white text-[10px]">
+                            <Navigation className="w-2.5 h-2.5" />
+                          </span>
+                          Click the blue arrow button above to recenter map on bus
+                        </li>
+                        <li className="flex items-center gap-1">
+                          <span className="inline-flex items-center justify-center w-4 h-4 bg-blue-600 rounded text-white text-[10px]">+</span>
+                          Use +/- buttons or scroll to zoom in/out
+                        </li>
+                        <li className="flex items-center gap-1">
+                          <span className="inline-flex items-center justify-center w-4 h-4 bg-blue-600 rounded text-white text-[10px]">
+                            <MapPin className="w-2.5 h-2.5" />
+                          </span>
+                          Click the bus marker to see details
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Map Container */}
+                <BusMap
+                  latitude={selectedTrip.currentLocation.latitude}
+                  longitude={selectedTrip.currentLocation.longitude}
+                  busNumber={selectedTrip.busNumber}
+                  route={selectedTrip.route}
+                  lastUpdate={selectedTrip.currentLocation.timestamp}
+                  recenterTrigger={recenterTrigger}
+                />
+              </div>
+            ) : (
+              <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg h-96 flex items-center justify-center">
+                <div className="text-center">
+                  <AlertCircle className="w-16 h-16 text-slate-400 mx-auto mb-3" />
+                  <p className="text-lg font-medium text-slate-700">No location data available</p>
+                  <p className="text-sm text-slate-500 mt-2 max-w-xs mx-auto">
+                    Location tracking will begin when the driver starts the trip
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <Button onClick={() => setShowMapModal(false)} className="w-full">
+              Close
+            </Button>
           </div>
         )}
       </Modal>

@@ -69,6 +69,131 @@ class ParentViewSet(viewsets.ModelViewSet):
             return ParentCreateSerializer
         return ParentSerializer
 
+    def destroy(self, request, *args, **kwargs):
+        """
+        Enhanced delete with children warning and options.
+
+        DELETE /api/parents/{id}/
+            - Returns 400 if children exist, requiring explicit action
+
+        DELETE /api/parents/{id}/?action=keep_children
+            - Deletes parent only, children will have no parent (SET_NULL)
+
+        DELETE /api/parents/{id}/?action=delete_children
+            - Deletes parent AND all their children (CASCADE)
+
+        Returns:
+            400: If children exist and no action specified
+            204: On successful deletion
+        """
+        parent = self.get_object()
+
+        # Check if parent has children
+        children = Child.objects.filter(parent=parent)
+        children_count = children.count()
+
+        if children_count > 0:
+            # Check deletion action
+            action = request.query_params.get('action', '')
+
+            if action not in ['keep_children', 'delete_children']:
+                # Return error with children info for frontend to show options
+                return Response(
+                    {
+                        "error": "Parent has children",
+                        "message": f"This parent has {children_count} child(ren). Please choose what to do with the children.",
+                        "childrenCount": children_count,
+                        "children": [{
+                            "id": child.id,
+                            "firstName": child.first_name,
+                            "lastName": child.last_name,
+                            "grade": child.class_grade
+                        } for child in children],
+                        "requiresConfirmation": True
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if action == 'delete_children':
+                # Delete children first, then parent
+                with transaction.atomic():
+                    children.delete()
+                    parent.delete()
+                return Response(
+                    {
+                        "message": f"Parent and {children_count} child(ren) deleted successfully"
+                    },
+                    status=status.HTTP_200_OK
+                )
+
+            if action == 'keep_children':
+                # Delete parent only, children will have parent set to NULL
+                parent.delete()
+                return Response(
+                    {
+                        "message": f"Parent deleted. {children_count} child(ren) now have no parent assigned."
+                    },
+                    status=status.HTTP_200_OK
+                )
+
+        # No children, delete normally
+        parent.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=False,
+        methods=['get'],
+        permission_classes=[IsAuthenticated],
+        url_path='search'
+    )
+    def search(self, request):
+        """
+        Search for parents by name, email, or phone.
+
+        GET /api/parents/search/?q=john
+
+        Query Parameters:
+            q (str): Search query to filter parents
+            limit (int): Maximum results to return (default: 10, max: 50)
+
+        Returns:
+            200: List of matching parents with basic info
+        """
+        query = request.query_params.get('q', '').strip()
+        limit = min(int(request.query_params.get('limit', 10)), 50)
+
+        if not query:
+            return Response(
+                {"results": []},
+                status=status.HTTP_200_OK
+            )
+
+        # Search by first name, last name, email, or phone
+        parents = Parent.objects.filter(
+            user__first_name__icontains=query
+        ) | Parent.objects.filter(
+            user__last_name__icontains=query
+        ) | Parent.objects.filter(
+            user__email__icontains=query
+        ) | Parent.objects.filter(
+            contact_number__icontains=query
+        )
+
+        parents = parents.select_related('user').distinct()[:limit]
+
+        results = [{
+            "id": parent.user.id,
+            "firstName": parent.user.first_name,
+            "lastName": parent.user.last_name,
+            "email": parent.user.email,
+            "phone": parent.contact_number,
+        } for parent in parents]
+
+        return Response(
+            {"results": results},
+            status=status.HTTP_200_OK
+        )
+
     @action(
         detail=True,
         methods=['get'],
