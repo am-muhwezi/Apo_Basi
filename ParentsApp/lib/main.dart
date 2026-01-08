@@ -11,12 +11,17 @@ import '../services/socket_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load();
+
+  // Load .env file asynchronously in parallel with other initialization
+  final envLoadingFuture = dotenv.load();
 
   // Initialize notification service asynchronously (non-blocking)
   NotificationService().initialize().catchError((error) {
     print('Error initializing notifications: $error');
   });
+
+  // Wait for .env to load before starting app
+  await envLoadingFuture;
 
   bool _hasShownError = false;
 

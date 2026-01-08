@@ -13,6 +13,7 @@ import './widgets/home_marker_widget.dart';
 import '../../widgets/location/bus_marker_3d.dart';
 import '../../models/bus_location_model.dart';
 import '../../services/socket_service.dart';
+import '../../services/mapbox_route_service.dart';
 
 class ChildDetailScreen extends StatefulWidget {
   const ChildDetailScreen({Key? key}) : super(key: key);
@@ -30,9 +31,16 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   // Real-time bus tracking
   final SocketService _socketService = SocketService();
   BusLocation? _busLocation;
+  LatLng? _snappedBusLocation; // Road-snapped bus location
   LocationConnectionState _connectionState = LocationConnectionState.disconnected;
   StreamSubscription? _locationSubscription;
   StreamSubscription? _connectionSubscription;
+
+  // ETA and Route Information
+  int? _etaMinutes;
+  List<LatLng>? _routePoints;
+  String? _distance;
+  bool _isCalculatingETA = false;
 
   @override
   void initState() {
@@ -55,7 +63,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   void dispose() {
     _locationSubscription?.cancel();
     _connectionSubscription?.cancel();
-    _socketService.disconnect();
+    // Don't disconnect socket - it's a singleton shared across the app
+    // The socket should remain connected for real-time notifications
     super.dispose();
   }
 
@@ -85,6 +94,9 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           setState(() {
             _busLocation = location;
           });
+
+          // Snap to road and calculate ETA when bus location updates
+          _updateBusLocationWithSnapping(location);
         }
       }, onError: (error) {
         if (LocationConfig.enableSocketLogging) {
@@ -106,6 +118,52 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     if (_childData != null && _childData!['busId'] != null) {
       final busId = _childData!['busId'] as int;
       _socketService.subscribeToBus(busId);
+    }
+  }
+
+  /// Update bus location with road snapping and ETA calculation
+  Future<void> _updateBusLocationWithSnapping(BusLocation location) async {
+    if (_currentPosition == null) return;
+
+    setState(() {
+      _isCalculatingETA = true;
+    });
+
+    try {
+      final busCoord = LatLng(location.latitude, location.longitude);
+      final homeCoord = LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
+
+      // Snap bus location to nearest road
+      final snappedCoord = await MapboxRouteService.snapSinglePointToRoad(
+        coordinate: busCoord,
+        radius: 25, // Search within 25 meters
+      );
+
+      // Get comprehensive trip information (route, ETA, distance)
+      final tripInfo = await MapboxRouteService.getTripInformation(
+        busLocation: snappedCoord ?? busCoord,
+        homeLocation: homeCoord,
+        profile: 'driving-traffic', // Use real-time traffic data
+      );
+
+      if (mounted && tripInfo != null) {
+        setState(() {
+          _snappedBusLocation = snappedCoord;
+          _etaMinutes = tripInfo['eta'];
+          _distance = tripInfo['distance'];
+          _routePoints = tripInfo['route'];
+          _isCalculatingETA = false;
+        });
+      } else {
+        setState(() {
+          _isCalculatingETA = false;
+        });
+      }
+    } catch (e) {
+      print('Error updating bus location with snapping: $e');
+      setState(() {
+        _isCalculatingETA = false;
+      });
     }
   }
 
@@ -198,6 +256,19 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                           userAgentPackageName: 'com.apobasi.parentsapp',
                           maxZoom: 19,
                         ),
+                        // Route Polyline (from bus to home)
+                        if (_routePoints != null && _routePoints!.isNotEmpty)
+                          PolylineLayer(
+                            polylines: [
+                              Polyline(
+                                points: _routePoints!,
+                                strokeWidth: 4.0,
+                                color: AppTheme.lightTheme.colorScheme.primary.withOpacity(0.7),
+                                borderColor: Colors.white,
+                                borderStrokeWidth: 2.0,
+                              ),
+                            ],
+                          ),
                         // Marker Layer
                         MarkerLayer(
                           markers: [
@@ -212,10 +283,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                                 height: 80,
                                 child: const HomeMarkerWidget(),
                               ),
-                            // Bus marker (3D) - Real-time location with heading
+                            // Bus marker (3D) - Using SNAPPED location for accurate road position
                             if (_busLocation != null)
                               Marker(
-                                point: LatLng(
+                                point: _snappedBusLocation ?? LatLng(
                                   _busLocation!.latitude,
                                   _busLocation!.longitude,
                                 ),
@@ -349,6 +420,101 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // ETA Display Card
+                if (_etaMinutes != null && _busLocation != null)
+                  Container(
+                    margin: EdgeInsets.only(bottom: 1.5.h),
+                    padding: EdgeInsets.all(2.5.w),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.lightTheme.colorScheme.primary,
+                          AppTheme.lightTheme.colorScheme.primary.withOpacity(0.8),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.lightTheme.colorScheme.primary.withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.access_time,
+                          color: Colors.white,
+                          size: 6.w,
+                        ),
+                        SizedBox(width: 3.w),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Arriving in',
+                              style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 9.sp,
+                              ),
+                            ),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
+                              children: [
+                                Text(
+                                  '$_etaMinutes',
+                                  style: AppTheme.lightTheme.textTheme.headlineMedium?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 28.sp,
+                                  ),
+                                ),
+                                SizedBox(width: 1.w),
+                                Text(
+                                  _etaMinutes == 1 ? 'minute' : 'minutes',
+                                  style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        if (_distance != null) ...[
+                          SizedBox(width: 4.w),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 2.w, vertical: 0.5.h),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '$_distance km',
+                              style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (_isCalculatingETA)
+                          Container(
+                            margin: EdgeInsets.only(left: 3.w),
+                            width: 20,
+                            height: 20,
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 // Bus info card
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.5.h),
