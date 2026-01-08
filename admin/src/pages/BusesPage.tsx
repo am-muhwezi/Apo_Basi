@@ -141,19 +141,43 @@ export default function BusesPage() {
     setAssignError(null);
     if (!selectedBus) return;
 
-    const results = await Promise.all([
-      assignData.driverId ? assignDriver(selectedBus.id, assignData.driverId) : null,
-      assignData.minderId ? assignMinder(selectedBus.id, assignData.minderId) : null,
-      assignData.childrenIds.length > 0 ? assignChildren(selectedBus.id, assignData.childrenIds) : null,
-    ]);
+    // Execute assignments sequentially to avoid database locking issues with SQLite
+    // For production with PostgreSQL, Promise.all would be faster, but sequential is safer
+    const results: (any | null)[] = [];
 
-    const failedResult = results.find(r => r && !r.success);
-    if (!failedResult) {
-      toast.success('Assignments saved successfully');
-      setShowAssignModal(false);
-    } else {
-      setAssignError(failedResult.error?.message || 'Failed to save some assignments');
+    // Assign driver first
+    if (assignData.driverId) {
+      const result = await assignDriver(selectedBus.id, assignData.driverId);
+      results.push(result);
+      if (!result.success) {
+        setAssignError(result.error?.message || 'Failed to assign driver');
+        return;
+      }
     }
+
+    // Then assign minder
+    if (assignData.minderId) {
+      const result = await assignMinder(selectedBus.id, assignData.minderId);
+      results.push(result);
+      if (!result.success) {
+        setAssignError(result.error?.message || 'Failed to assign minder');
+        return;
+      }
+    }
+
+    // Finally assign children
+    if (assignData.childrenIds.length > 0) {
+      const result = await assignChildren(selectedBus.id, assignData.childrenIds);
+      results.push(result);
+      if (!result.success) {
+        setAssignError(result.error?.message || 'Failed to assign children');
+        return;
+      }
+    }
+
+    // All assignments succeeded
+    toast.success('Assignments saved successfully');
+    setShowAssignModal(false);
   };
 
   const toggleChildAssignment = (childId: string) => {
