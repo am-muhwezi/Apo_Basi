@@ -27,13 +27,9 @@ class ApiConfig {
   /// Mapbox Access Token
   /// Get your token from: https://account.mapbox.com/access-tokens/
   /// Free tier includes: 50,000 map loads per month
-<<<<<<< HEAD
-  static const String mapboxAccessToken =
-      '';
-=======
+
   static String get mapboxAccessToken =>
       dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '';
->>>>>>> 888fdff (feat(assignments): Implement automatic cleanup of orphaned assignments and enhance serializers for null safety)
 
   /// Mapbox Style ID
   /// Available styles: streets-v12, outdoors-v12, light-v11, dark-v11,
@@ -43,7 +39,7 @@ class ApiConfig {
 
   /// Get the Mapbox tile URL template for flutter_map
   static String getMapboxTileUrl() {
-    return 'https://api.mapbox.com/styles/v1/[200C${mapboxStyleId}/tiles/{z}/{x}/{y}?access_token=${mapboxAccessToken}';
+    return 'https://api.mapbox.com/styles/v1/${mapboxStyleId}/tiles/{z}/{x}/{y}?access_token=${mapboxAccessToken}';
   }
 
   // ============================================================================

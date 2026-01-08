@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:sizer/sizer.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/app_export.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 import './widgets/empty_notifications_widget.dart';
 import './widgets/notification_card_widget.dart';
 import './widgets/notification_filter_sheet_widget.dart';
@@ -22,6 +25,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   final ApiService _apiService = ApiService();
+  final SocketService _socketService = SocketService();
   bool _isSearchVisible = false;
   String _searchQuery = '';
   List<String> _selectedFilters = [];
@@ -29,80 +33,178 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   bool _isLoading = true;
   String? _errorMessage;
 
-  // Notifications list - will be populated from API
+  // Notifications list - will be populated from Socket.IO
   List<Map<String, dynamic>> _allNotifications = [];
 
-  // Auto-refresh timer
+  // Socket.IO subscription
+  StreamSubscription? _tripStartedSubscription;
+  StreamSubscription? _childStatusSubscription;
+  StreamSubscription? _tripEndedSubscription;
+
+  // Auto-refresh timer (for future API integration)
   Timer? _refreshTimer;
   static const _refreshInterval = Duration(seconds: 30);
+
+  // Local storage key for notifications
+  static const _notificationsKey = 'cached_notifications';
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    _loadNotifications();
-    _startAutoRefresh();
+    _loadCachedNotifications();
+    _setupSocketListeners();
+    _connectToSocket();
   }
 
-  // Load notifications from API
-  Future<void> _loadNotifications({bool silent = false}) async {
-    if (!silent) {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
-    }
+  // Load cached notifications from local storage
+  Future<void> _loadCachedNotifications() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     try {
-      final response = await _apiService.getNotifications();
-      final notifications = response['notifications'] as List<dynamic>;
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString(_notificationsKey);
 
-      setState(() {
-        _allNotifications = notifications.map((notification) {
-          return {
-            'id': notification['id'],
-            'type': notification['type'] ?? 'general',
-            'title': notification['title'] ?? '',
-            'message': notification['message'] ?? '',
-            'isRead': notification['is_read'] ?? false,
-            'timestamp': DateTime.parse(notification['created_at']),
-            'expanded': false,
-          };
-        }).toList();
-
-        _groupNotificationsByDate();
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (!silent) {
+      if (cachedData != null) {
+        final List<dynamic> notifications = jsonDecode(cachedData);
         setState(() {
-          _errorMessage = e.toString();
+          _allNotifications = notifications.map((notification) {
+            return {
+              'id': notification['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+              'type': notification['type'] ?? 'general',
+              'title': notification['title'] ?? '',
+              'message': notification['message'] ?? '',
+              'isRead': notification['isRead'] ?? false,
+              'timestamp': DateTime.parse(notification['timestamp']),
+              'expanded': false,
+            };
+          }).toList();
+
+          _groupNotificationsByDate();
+          _isLoading = false;
+        });
+      } else {
+        // No cached notifications
+        setState(() {
           _isLoading = false;
         });
       }
-      print('Error loading notifications: $e');
+    } catch (e) {
+      print('Error loading cached notifications: $e');
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
-  // Start auto-refresh timer
-  void _startAutoRefresh() {
-    _refreshTimer = Timer.periodic(_refreshInterval, (timer) {
-      if (mounted) {
-        _loadNotifications(silent: true);
-      }
+  // Connect to Socket.IO
+  Future<void> _connectToSocket() async {
+    try {
+      await _socketService.connect();
+      print('✅ Connected to Socket.IO for notifications');
+    } catch (e) {
+      print('❌ Failed to connect to Socket.IO: $e');
+      setState(() {
+        _errorMessage = 'Failed to connect to notification service';
+      });
+    }
+  }
+
+  // Setup Socket.IO event listeners
+  void _setupSocketListeners() {
+    // Listen for trip started events
+    _tripStartedSubscription = _socketService.tripStartedStream.listen((data) {
+      _addNotification({
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'type': 'trip_started',
+        'title': data['title'] ?? '🚌 Trip Started',
+        'message': data['message'] ?? 'Your child\'s bus has started the trip',
+        'isRead': false,
+        'timestamp': DateTime.now(),
+        'expanded': false,
+      });
+    });
+
+    // Listen for child status updates (pickup/dropoff)
+    _childStatusSubscription = _socketService.childStatusUpdateStream.listen((data) {
+      _addNotification({
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'type': data['status'] ?? 'general',
+        'title': data['title'] ?? 'Child Status Update',
+        'message': data['message'] ?? '',
+        'isRead': false,
+        'timestamp': DateTime.now(),
+        'expanded': false,
+      });
+    });
+
+    // Listen for trip ended events
+    _tripEndedSubscription = _socketService.tripEndedStream.listen((data) {
+      _addNotification({
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'type': 'trip_ended',
+        'title': data['title'] ?? '✅ Trip Completed',
+        'message': data['message'] ?? 'The trip has been completed',
+        'isRead': false,
+        'timestamp': DateTime.now(),
+        'expanded': false,
+      });
     });
   }
 
-  // Stop auto-refresh timer
-  void _stopAutoRefresh() {
-    _refreshTimer?.cancel();
-    _refreshTimer = null;
+  // Add a new notification
+  void _addNotification(Map<String, dynamic> notification) {
+    setState(() {
+      _allNotifications.insert(0, notification); // Add to beginning (newest first)
+      _groupNotificationsByDate();
+    });
+
+    // Save to local storage
+    _saveNotifications();
+
+    // Show a snackbar for new notification
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(notification['title']),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  // Save notifications to local storage
+  Future<void> _saveNotifications() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final notificationsJson = _allNotifications.map((notification) {
+        return {
+          'id': notification['id'],
+          'type': notification['type'],
+          'title': notification['title'],
+          'message': notification['message'],
+          'isRead': notification['isRead'],
+          'timestamp': (notification['timestamp'] as DateTime).toIso8601String(),
+        };
+      }).toList();
+
+      await prefs.setString(_notificationsKey, jsonEncode(notificationsJson));
+    } catch (e) {
+      print('Error saving notifications: $e');
+    }
   }
 
   @override
   void dispose() {
-    _stopAutoRefresh();
     _scrollController.dispose();
+    _tripStartedSubscription?.cancel();
+    _childStatusSubscription?.cancel();
+    _tripEndedSubscription?.cancel();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
@@ -189,29 +291,20 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   }
 
   void _markAllAsRead() async {
-    try {
-      await _apiService.markNotificationsAsRead();
+    setState(() {
+      for (var notification in _allNotifications) {
+        notification['isRead'] = true;
+      }
+    });
+    _groupNotificationsByDate();
+    await _saveNotifications();
 
-      setState(() {
-        for (var notification in _allNotifications) {
-          notification['isRead'] = true;
-        }
-      });
-      _groupNotificationsByDate();
-
-      HapticFeedback.lightImpact();
+    HapticFeedback.lightImpact();
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('All notifications marked as read'),
           duration: const Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to mark as read: $e'),
-          duration: const Duration(seconds: 2),
-          backgroundColor: Colors.red,
         ),
       );
     }
@@ -262,19 +355,12 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   }
 
   void _markAsRead(Map<String, dynamic> notification) async {
-    try {
-      await _apiService.markNotificationsAsRead(
-        notificationIds: [notification['id']],
-      );
-
-      setState(() {
-        notification['isRead'] = true;
-        _groupNotificationsByDate();
-      });
-      HapticFeedback.lightImpact();
-    } catch (e) {
-      print('Failed to mark notification as read: $e');
-    }
+    setState(() {
+      notification['isRead'] = true;
+      _groupNotificationsByDate();
+    });
+    await _saveNotifications();
+    HapticFeedback.lightImpact();
   }
 
   void _shareNotification(Map<String, dynamic> notification) {
@@ -289,38 +375,19 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   }
 
   void _deleteNotification(Map<String, dynamic> notification) async {
-    // Save the notification for undo functionality
-    final deletedNotification = Map<String, dynamic>.from(notification);
-
     setState(() {
       _allNotifications.removeWhere((n) => n['id'] == notification['id']);
       _groupNotificationsByDate();
     });
     HapticFeedback.mediumImpact();
 
-    try {
-      await _apiService.deleteNotification(notification['id']);
+    await _saveNotifications();
 
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Notification deleted'),
           duration: const Duration(seconds: 3),
-        ),
-      );
-    } catch (e) {
-      // Restore notification on error
-      setState(() {
-        _allNotifications.add(deletedNotification);
-        _allNotifications.sort((a, b) => (b['timestamp'] as DateTime)
-            .compareTo(a['timestamp'] as DateTime));
-        _groupNotificationsByDate();
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to delete notification: $e'),
-          duration: const Duration(seconds: 3),
-          backgroundColor: Colors.red,
         ),
       );
     }
@@ -343,7 +410,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
 
   Future<void> _onRefresh() async {
     HapticFeedback.lightImpact();
-    await _loadNotifications();
+    await _loadCachedNotifications();
   }
 
   @override
@@ -379,7 +446,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
               Text('Failed to load notifications'),
               SizedBox(height: 8),
               ElevatedButton(
-                onPressed: _loadNotifications,
+                onPressed: _loadCachedNotifications,
                 child: Text('Retry'),
               ),
             ],

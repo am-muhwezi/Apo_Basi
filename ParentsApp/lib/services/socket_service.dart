@@ -30,6 +30,8 @@ class SocketService {
   final _tripStartedController = StreamController<Map<String, dynamic>>.broadcast();
   final _locationUpdateController = StreamController<BusLocation>.broadcast();
   final _tripCompletedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _childStatusUpdateController = StreamController<Map<String, dynamic>>.broadcast();
+  final _tripEndedController = StreamController<Map<String, dynamic>>.broadcast();
   final _connectionStateController = StreamController<LocationConnectionState>.broadcast();
   final _errorController = StreamController<String>.broadcast();
 
@@ -37,6 +39,8 @@ class SocketService {
   Stream<Map<String, dynamic>> get tripStartedStream => _tripStartedController.stream;
   Stream<BusLocation> get locationUpdateStream => _locationUpdateController.stream;
   Stream<Map<String, dynamic>> get tripCompletedStream => _tripCompletedController.stream;
+  Stream<Map<String, dynamic>> get childStatusUpdateStream => _childStatusUpdateController.stream;
+  Stream<Map<String, dynamic>> get tripEndedStream => _tripEndedController.stream;
   Stream<LocationConnectionState> get connectionStateStream => _connectionStateController.stream;
   Stream<String> get errorStream => _errorController.stream;
 
@@ -181,7 +185,7 @@ class SocketService {
       _errorController.add(data['message'] ?? 'Unknown error');
     });
 
-    // Legacy events (for backward compatibility)
+    // Trip and notification events
     _socket!.on('trip_started', (data) {
       if (LocationConfig.enableSocketLogging) {
         print('🚌 Trip started event: $data');
@@ -194,6 +198,21 @@ class SocketService {
         print('🏁 Trip completed event: $data');
       }
       _tripCompletedController.add(Map<String, dynamic>.from(data));
+    });
+
+    _socket!.on('trip_ended', (data) {
+      if (LocationConfig.enableSocketLogging) {
+        print('🏁 Trip ended event: $data');
+      }
+      _tripEndedController.add(Map<String, dynamic>.from(data));
+    });
+
+    // Child status updates (pickup/dropoff notifications)
+    _socket!.on('child_status_update', (data) {
+      if (LocationConfig.enableSocketLogging) {
+        print('👶 Child status update: $data');
+      }
+      _childStatusUpdateController.add(Map<String, dynamic>.from(data));
     });
   }
 
@@ -276,6 +295,8 @@ class SocketService {
     _tripStartedController.close();
     _locationUpdateController.close();
     _tripCompletedController.close();
+    _childStatusUpdateController.close();
+    _tripEndedController.close();
     _connectionStateController.close();
     _errorController.close();
   }
