@@ -8,6 +8,14 @@ db.sqlite3
 server/.python-version
 
 
+.vite/
+diagnose_startup.sh
+test_live_location_tracking.sh
+docs/
+server/assignments/management/
+server/send_terms_*.py
+
+
 # Django
 *migrations/
 

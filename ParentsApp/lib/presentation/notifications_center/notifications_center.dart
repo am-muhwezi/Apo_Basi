@@ -51,6 +51,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   @override
   void initState() {
     super.initState();
+    print('🔵 NotificationsCenter: initState called');
     _scrollController.addListener(_onScroll);
     _loadCachedNotifications();
     _setupSocketListeners();
@@ -100,11 +101,14 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     }
   }
 
-  // Connect to Socket.IO
+  // Connect to Socket.IO and subscribe to all buses
   Future<void> _connectToSocket() async {
     try {
       await _socketService.connect();
       print('✅ Connected to Socket.IO for notifications');
+
+      // Subscribe to all buses that this parent's children are assigned to
+      await _subscribeToChildrenBuses();
     } catch (e) {
       print('❌ Failed to connect to Socket.IO: $e');
       setState(() {
@@ -113,10 +117,44 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     }
   }
 
+  // Subscribe to all buses for parent's children
+  Future<void> _subscribeToChildrenBuses() async {
+    try {
+      // Fetch children from API instead of relying on cached data
+      print('🔍 Fetching children to subscribe to buses...');
+      final children = await _apiService.getMyChildren();
+
+      if (children.isNotEmpty) {
+        print('✅ Found ${children.length} children');
+
+        // Subscribe to each child's bus
+        for (var child in children) {
+          final busId = child.assignedBus?.id;
+          if (busId != null) {
+            print('📡 Subscribing to bus $busId for child ${child.firstName}');
+            _socketService.subscribeToBus(busId);
+            // Add a small delay to ensure subscription completes
+            await Future.delayed(Duration(milliseconds: 100));
+          } else {
+            print('⚠️  Child ${child.firstName} has no bus assigned');
+          }
+        }
+        print('✅ Finished subscribing to all buses');
+      } else {
+        print('⚠️  No children found for this parent');
+      }
+    } catch (e) {
+      print('❌ Error subscribing to children buses: $e');
+    }
+  }
+
   // Setup Socket.IO event listeners
   void _setupSocketListeners() {
+    print('🔧 NotificationsCenter: Setting up socket listeners');
+
     // Listen for trip started events
     _tripStartedSubscription = _socketService.tripStartedStream.listen((data) {
+      print('🚌 NotificationsCenter: Received trip_started event: $data');
       _addNotification({
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'type': 'trip_started',
@@ -130,6 +168,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
 
     // Listen for child status updates (pickup/dropoff)
     _childStatusSubscription = _socketService.childStatusUpdateStream.listen((data) {
+      print('👶 NotificationsCenter: Received child_status_update event: $data');
       _addNotification({
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'type': data['status'] ?? 'general',
@@ -143,6 +182,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
 
     // Listen for trip ended events
     _tripEndedSubscription = _socketService.tripEndedStream.listen((data) {
+      print('🏁 NotificationsCenter: Received trip_ended event: $data');
       _addNotification({
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'type': 'trip_ended',
@@ -157,16 +197,25 @@ class _NotificationsCenterState extends State<NotificationsCenter>
 
   // Add a new notification
   void _addNotification(Map<String, dynamic> notification) {
-    setState(() {
-      _allNotifications.insert(0, notification); // Add to beginning (newest first)
-      _groupNotificationsByDate();
-    });
+    print('➕ NotificationsCenter: Adding notification: ${notification['title']}');
 
-    // Save to local storage
-    _saveNotifications();
+    // Use post-frame callback to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        print('⚠️  NotificationsCenter: Widget not mounted, skipping notification');
+        return;
+      }
 
-    // Show a snackbar for new notification
-    if (mounted) {
+      print('✅ NotificationsCenter: Adding notification to UI');
+      setState(() {
+        _allNotifications.insert(0, notification); // Add to beginning (newest first)
+        _groupNotificationsByDate();
+      });
+
+      // Save to local storage
+      _saveNotifications();
+
+      // Show a snackbar for new notification
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(notification['title']),
@@ -174,7 +223,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
           behavior: SnackBarBehavior.floating,
         ),
       );
-    }
+    });
   }
 
   // Save notifications to local storage
@@ -200,6 +249,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
 
   @override
   void dispose() {
+    print('🔴 NotificationsCenter: dispose called');
     _scrollController.dispose();
     _tripStartedSubscription?.cancel();
     _childStatusSubscription?.cancel();
