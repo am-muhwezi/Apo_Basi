@@ -12,42 +12,39 @@ import '../services/socket_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load .env file asynchronously in parallel with other initialization
-  final envLoadingFuture = dotenv.load();
+  // Start the app IMMEDIATELY to avoid splash freeze
+  runApp(MyApp());
 
-  // Initialize notification service asynchronously (non-blocking)
-  NotificationService().initialize().catchError((error) {
-    print('Error initializing notifications: $error');
-  });
+  // Load .env in background (non-blocking)
+  unawaited(dotenv.load());
 
-  // Wait for .env to load before starting app
-  await envLoadingFuture;
+  // Initialize notifications (non-blocking)
+  unawaited(NotificationService().initialize());
 
+  // Lock orientation (non-blocking)
+  unawaited(
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
+  );
+
+  // Custom error widget (non-blocking)
+  _setupErrorWidget();
+}
+
+void _setupErrorWidget() {
   bool _hasShownError = false;
 
-  // 🚨 CRITICAL: Custom error handling - DO NOT REMOVE
   ErrorWidget.builder = (FlutterErrorDetails details) {
     if (!_hasShownError) {
       _hasShownError = true;
 
-      // Reset flag after 3 seconds to allow error widget on new screens
       Future.delayed(Duration(seconds: 5), () {
         _hasShownError = false;
       });
 
-      return CustomErrorWidget(
-        errorDetails: details,
-      );
+      return CustomErrorWidget(errorDetails: details);
     }
     return SizedBox.shrink();
   };
-
-  // 🚨 CRITICAL: Device orientation lock - DO NOT REMOVE
-  Future.wait([
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp])
-  ]).then((value) {
-    runApp(MyApp());
-  });
 }
 
 class MyApp extends StatefulWidget {
@@ -63,21 +60,24 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    // Setup notifications asynchronously to avoid blocking UI
-    Future.microtask(() => _setupTripNotifications());
+
+    // Delay socket + listeners until the first frame renders
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _socketService.connect();
+      _setupTripNotifications();
+    });
   }
 
-  /// Setup listener for trip start notifications
   void _setupTripNotifications() {
     _tripStartSubscription = _socketService.tripStartedStream.listen((data) {
-      final busId = data['busId'] as int?;
+      final busId = data['busId'] as int? ?? 0;
       final busNumber = data['busNumber'] as String? ?? 'Unknown';
       final tripType = data['tripType'] as String? ?? 'Trip';
 
       _notificationService.showTripStartNotification(
         busNumber: busNumber,
         tripType: tripType,
-        busId: busId ?? 0,
+        busId: busId,
       );
     });
   }
@@ -96,7 +96,6 @@ class _MyAppState extends State<MyApp> {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.light,
-        // 🚨 CRITICAL: NEVER REMOVE OR MODIFY
         builder: (context, child) {
           return MediaQuery(
             data: MediaQuery.of(context).copyWith(
@@ -105,7 +104,6 @@ class _MyAppState extends State<MyApp> {
             child: child!,
           );
         },
-        // 🚨 END CRITICAL SECTION
         debugShowCheckedModeBanner: false,
         routes: AppRoutes.routes,
         initialRoute: AppRoutes.initial,

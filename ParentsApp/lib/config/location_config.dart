@@ -134,7 +134,7 @@ class LocationConfig {
   static const bool enableLocationLogging = false;
 
   /// Enable Socket.IO event logging
-  static const bool enableSocketLogging = false;
+  static const bool enableSocketLogging = true;
 
   /// Show debug overlay on map (connection status, update count, etc.)
   static const bool showDebugOverlay = false;
