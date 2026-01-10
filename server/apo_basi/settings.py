@@ -39,6 +39,9 @@ INSTALLED_APPS = [
     "assignments.apps.AssignmentsConfig",
     "analytics.apps.AnalyticsConfig",
 
+    # Channels for WebSocket support(Bus location tracking)
+    "channels",
+
     # Third-party apps
     "rest_framework",
     "django_extensions",
@@ -76,6 +79,8 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "apo_basi.wsgi.application"
+
+ASGI_APPLICATION = "apo_basi.asgi.application"
 
 
 # Database
@@ -212,3 +217,13 @@ CACHES = {
 REDIS_LOCATION_UPDATES_CHANNEL = "location_updates"
 REDIS_BUS_LOCATION_KEY_PATTERN = "bus:{bus_id}:location"
 REDIS_LOCATION_TTL = 60  # seconds
+
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [(REDIS_HOST, REDIS_PORT)],
+        },
+    },
+}

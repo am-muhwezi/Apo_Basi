@@ -869,23 +869,10 @@ def push_location(request):
             json.dumps(location_data)
         )
 
-        # 4. Send to Socket.IO server via HTTP (fallback if Redis pub/sub fails)
-        try:
-            import requests
-            requests.post(
-                f'{settings.SOCKETIO_SERVER_URL}/api/notify/location-update',
-                json={
-                    'busId': bus.id,
-                    'latitude': float(lat),
-                    'longitude': float(lng),
-                    'speed': speed,
-                    'heading': heading
-                },
-                timeout=1  # Don't block if Socket.IO is down
-            )
-        except Exception as e:
-            # Log but don't fail the request if Socket.IO is unreachable
-            print(f"Warning: Could not notify Socket.IO server: {str(e)}")
+        # 4. Broadcast via Django Channels WebSocket (replaces Socket.IO)
+        # Socket.IO notification removed - now using Django Channels
+        # Location updates are automatically sent to connected WebSocket clients
+        # via the BusLocationConsumer in buses/consumers.py
 
         return Response(
             {
