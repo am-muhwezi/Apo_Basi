@@ -4,10 +4,10 @@ import 'package:sizer/sizer.dart';
 import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-import '../core/app_export.dart';
-import '../widgets/custom_error_widget.dart';
-import '../services/notification_service.dart';
-import '../services/socket_service.dart';
+import 'core/app_export.dart';
+import 'widgets/custom_error_widget.dart';
+import 'services/notification_service.dart';
+import 'services/bus_websocket_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,7 +53,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final SocketService _socketService = SocketService();
+  final BusWebSocketService _webSocketService = BusWebSocketService();
   final NotificationService _notificationService = NotificationService();
   StreamSubscription? _tripStartSubscription;
 
@@ -61,24 +61,11 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
 
-    // Delay socket + listeners until the first frame renders
+    // Delay WebSocket initialization until the first frame renders
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _socketService.connect();
-      _setupTripNotifications();
-    });
-  }
-
-  void _setupTripNotifications() {
-    _tripStartSubscription = _socketService.tripStartedStream.listen((data) {
-      final busId = data['busId'] as int? ?? 0;
-      final busNumber = data['busNumber'] as String? ?? 'Unknown';
-      final tripType = data['tripType'] as String? ?? 'Trip';
-
-      _notificationService.showTripStartNotification(
-        busNumber: busNumber,
-        tripType: tripType,
-        busId: busId,
-      );
+      _webSocketService.connect();
+      // Note: Trip notifications will be handled via Django Channels in the future
+      // For now, the connection is initialized for location tracking
     });
   }
 
