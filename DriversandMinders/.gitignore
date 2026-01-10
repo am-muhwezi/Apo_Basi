@@ -46,3 +46,31 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.packages
+build/
+*.log
+
+# iOS
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Pods/
+ios/Podfile.lock
+ios/Runner.xcworkspace/
+*.xcuserstate
+
+# macOS
+macos/Flutter/ephemeral/
+macos/Flutter/GeneratedPluginRegistrant.swift
+
+# Android
+android/local.properties
+.android/
+*.iml
+
+# Shorebird (if contains secrets)
+*/shorebird.yaml

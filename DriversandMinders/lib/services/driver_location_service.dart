@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import '../config/api_config.dart';
 import '../config/location_config.dart';
+import 'bus_websocket_service.dart';
 
 /// Driver Location Service
 ///
@@ -35,8 +36,11 @@ class DriverLocationService {
   DateTime? _lastUpdateTime;
   int? _currentBusId;
 
-  // Dio HTTP client
+  // Dio HTTP client (fallback for failed WebSocket)
   late Dio _dio;
+
+  // WebSocket service for real-time location updates
+  final _wsService = BusWebSocketService();
 
   // Retry queue for failed updates
   final List<Map<String, dynamic>> _retryQueue = [];
@@ -140,6 +144,9 @@ class DriverLocationService {
       print('✅ Location tracking started for bus $_currentBusId');
     }
 
+    // Connect to WebSocket for real-time updates
+    await _connectWebSocket();
+
     // Start periodic location updates
     _startPeriodicUpdates();
 
@@ -168,6 +175,9 @@ class DriverLocationService {
     _isTracking = false;
     _trackingStateController.add(false);
 
+    // Disconnect WebSocket
+    _wsService.disconnect();
+
     // Cancel timers
     _locationTimer?.cancel();
     _locationTimer = null;
@@ -190,6 +200,58 @@ class DriverLocationService {
       return false;
     } else {
       return await startTracking();
+    }
+  }
+
+  /// Connect to WebSocket for real-time location updates
+  Future<void> _connectWebSocket() async {
+    if (_currentBusId == null) {
+      if (LocationConfig.enableLocationLogging) {
+        print('❌ Cannot connect to WebSocket: No bus ID');
+      }
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final accessToken = prefs.getString('access_token');
+
+      if (accessToken == null) {
+        if (LocationConfig.enableLocationLogging) {
+          print('❌ Cannot connect to WebSocket: No access token');
+        }
+        return;
+      }
+
+      if (LocationConfig.enableLocationLogging) {
+        print('🔌 Connecting to WebSocket for bus $_currentBusId...');
+      }
+
+      await _wsService.connectToBus(
+        busId: _currentBusId!,
+        accessToken: accessToken,
+      );
+
+      // Listen for connection state
+      _wsService.connectionStateStream.listen((isConnected) {
+        if (LocationConfig.enableLocationLogging) {
+          print(isConnected
+            ? '✅ WebSocket connected successfully'
+            : '❌ WebSocket disconnected');
+        }
+      });
+
+      // Listen for errors
+      _wsService.errorStream.listen((error) {
+        if (LocationConfig.enableLocationLogging) {
+          print('❌ WebSocket error: $error');
+        }
+      });
+
+    } catch (e) {
+      if (LocationConfig.enableLocationLogging) {
+        print('❌ Failed to connect to WebSocket: $e');
+      }
     }
   }
 
@@ -260,21 +322,10 @@ class DriverLocationService {
         return;
       }
 
-      // Prepare payload (only send fields expected by API)
-      final payload = {
-        'lat': position.latitude,
-        'lng': position.longitude,
-        'speed': position.speed, // m/s
-        'heading': position.heading,
-      };
+      // Send via WebSocket if connected
+      if (_wsService.isConnected) {
+        _wsService.sendLocationUpdate(position);
 
-      // Send to backend
-      final response = await _dio.post(
-        '/api/buses/push-location/',
-        data: payload,
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
         // Success
         _lastSentPosition = position;
         _lastUpdateTime = DateTime.now();
@@ -284,7 +335,7 @@ class DriverLocationService {
         _updateStats();
 
         if (LocationConfig.enableLocationLogging) {
-          print('✅ Location sent: ${position.latitude}, ${position.longitude}');
+          print('✅ Location sent via WebSocket: ${position.latitude}, ${position.longitude}');
         }
 
         // Process retry queue on successful update
@@ -292,7 +343,36 @@ class DriverLocationService {
           _processRetryQueue();
         }
       } else {
-        throw Exception('Invalid response: ${response.statusCode}');
+        // Fallback to HTTP if WebSocket not connected
+        if (LocationConfig.enableLocationLogging) {
+          print('⚠️ WebSocket not connected, using HTTP fallback');
+        }
+
+        final payload = {
+          'lat': position.latitude,
+          'lng': position.longitude,
+          'speed': position.speed,
+          'heading': position.heading,
+        };
+
+        final response = await _dio.post(
+          '/api/buses/push-location/',
+          data: payload,
+        );
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          _lastSentPosition = position;
+          _lastUpdateTime = DateTime.now();
+          _totalUpdatesSent++;
+          _locationUpdateController.add(position);
+          _updateStats();
+
+          if (LocationConfig.enableLocationLogging) {
+            print('✅ Location sent via HTTP: ${position.latitude}, ${position.longitude}');
+          }
+        } else {
+          throw Exception('Invalid response: ${response.statusCode}');
+        }
       }
     } catch (e) {
       _handleLocationUpdateError(e);
