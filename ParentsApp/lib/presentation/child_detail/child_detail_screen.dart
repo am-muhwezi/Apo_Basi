@@ -12,7 +12,7 @@ import '../../config/location_config.dart';
 import './widgets/home_marker_widget.dart';
 import '../../widgets/location/bus_marker_3d.dart';
 import '../../models/bus_location_model.dart';
-import '../../services/socket_service.dart';
+import '../../services/bus_websocket_service.dart';
 import '../../services/mapbox_route_service.dart';
 
 class ChildDetailScreen extends StatefulWidget {
@@ -29,10 +29,11 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   bool _isLoadingLocation = true;
 
   // Real-time bus tracking
-  final SocketService _socketService = SocketService();
+  final BusWebSocketService _webSocketService = BusWebSocketService();
   BusLocation? _busLocation;
   LatLng? _snappedBusLocation; // Road-snapped bus location
-  LocationConnectionState _connectionState = LocationConnectionState.disconnected;
+  LocationConnectionState _connectionState =
+      LocationConnectionState.disconnected;
   StreamSubscription? _locationSubscription;
   StreamSubscription? _connectionSubscription;
 
@@ -54,7 +55,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args != null && args is Map<String, dynamic>) {
       _childData = args;
-      // Don't subscribe immediately - wait for socket connection in initState
     }
     _getCurrentLocation();
   }
@@ -63,19 +63,20 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   void dispose() {
     _locationSubscription?.cancel();
     _connectionSubscription?.cancel();
-    // Don't disconnect socket - it's a singleton shared across the app
-    // The socket should remain connected for real-time notifications
+    // Don't disconnect WebSocket - it's a singleton shared across the app
+    // The WebSocket should remain connected for real-time notifications
     super.dispose();
   }
 
-  /// Initialize Socket.IO connection for real-time bus tracking
+  /// Initialize WebSocket connection for real-time bus tracking
   Future<void> _initializeSocketConnection() async {
     try {
-      // Connect to Socket.IO
-      await _socketService.connect();
+      // Connect to WebSocket service (initialize)
+      await _webSocketService.connect();
 
       // Listen to connection state FIRST
-      _connectionSubscription = _socketService.connectionStateStream.listen((state) {
+      _connectionSubscription =
+          _webSocketService.connectionStateStream.listen((state) {
         if (mounted) {
           setState(() {
             _connectionState = state;
@@ -89,7 +90,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       });
 
       // Listen to location updates
-      _locationSubscription = _socketService.locationUpdateStream.listen((location) {
+      _locationSubscription =
+          _webSocketService.locationUpdateStream.listen((location) {
         if (mounted) {
           setState(() {
             _busLocation = location;
@@ -105,11 +107,14 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       });
 
       // If already connected, subscribe immediately
-      if (_socketService.isConnected) {
+      if (_webSocketService.isConnected) {
+        _subscribeToBus();
+      } else {
+        // Subscribe anyway - this will trigger the actual WebSocket connection
         _subscribeToBus();
       }
     } catch (e) {
-      print('ERROR: Failed to initialize socket connection: $e');
+      // Failed to initialize WebSocket
     }
   }
 
@@ -117,7 +122,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   void _subscribeToBus() {
     if (_childData != null && _childData!['busId'] != null) {
       final busId = _childData!['busId'] as int;
-      _socketService.subscribeToBus(busId);
+      _webSocketService.subscribeToBus(busId);
     }
   }
 
@@ -131,7 +136,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
     try {
       final busCoord = LatLng(location.latitude, location.longitude);
-      final homeCoord = LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
+      final homeCoord =
+          LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
 
       // Snap bus location to nearest road
       final snappedCoord = await MapboxRouteService.snapSinglePointToRoad(
@@ -205,7 +211,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     }
   }
 
-
   Future<void> _makePhoneCall(String phoneNumber) async {
     final Uri launchUri = Uri(
       scheme: 'tel',
@@ -263,7 +268,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                               Polyline(
                                 points: _routePoints!,
                                 strokeWidth: 4.0,
-                                color: AppTheme.lightTheme.colorScheme.primary.withOpacity(0.7),
+                                color: AppTheme.lightTheme.colorScheme.primary
+                                    .withOpacity(0.7),
                                 borderColor: Colors.white,
                                 borderStrokeWidth: 2.0,
                               ),
@@ -286,10 +292,11 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                             // Bus marker (3D) - Using SNAPPED location for accurate road position
                             if (_busLocation != null)
                               Marker(
-                                point: _snappedBusLocation ?? LatLng(
-                                  _busLocation!.latitude,
-                                  _busLocation!.longitude,
-                                ),
+                                point: _snappedBusLocation ??
+                                    LatLng(
+                                      _busLocation!.latitude,
+                                      _busLocation!.longitude,
+                                    ),
                                 width: 100,
                                 height: 100,
                                 child: BusMarker3D(
@@ -362,7 +369,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                   // Small floating child info card
                   Center(
                     child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
@@ -429,13 +437,15 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                       gradient: LinearGradient(
                         colors: [
                           AppTheme.lightTheme.colorScheme.primary,
-                          AppTheme.lightTheme.colorScheme.primary.withOpacity(0.8),
+                          AppTheme.lightTheme.colorScheme.primary
+                              .withOpacity(0.8),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.lightTheme.colorScheme.primary.withOpacity(0.3),
+                          color: AppTheme.lightTheme.colorScheme.primary
+                              .withOpacity(0.3),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -456,7 +466,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                           children: [
                             Text(
                               'Arriving in',
-                              style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+                              style: AppTheme.lightTheme.textTheme.bodySmall
+                                  ?.copyWith(
                                 color: Colors.white.withOpacity(0.9),
                                 fontSize: 9.sp,
                               ),
@@ -467,7 +478,9 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                               children: [
                                 Text(
                                   '$_etaMinutes',
-                                  style: AppTheme.lightTheme.textTheme.headlineMedium?.copyWith(
+                                  style: AppTheme
+                                      .lightTheme.textTheme.headlineMedium
+                                      ?.copyWith(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w800,
                                     fontSize: 28.sp,
@@ -476,7 +489,9 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                                 SizedBox(width: 1.w),
                                 Text(
                                   _etaMinutes == 1 ? 'minute' : 'minutes',
-                                  style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
+                                  style: AppTheme
+                                      .lightTheme.textTheme.bodyMedium
+                                      ?.copyWith(
                                     color: Colors.white.withOpacity(0.9),
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -488,14 +503,16 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                         if (_distance != null) ...[
                           SizedBox(width: 4.w),
                           Container(
-                            padding: EdgeInsets.symmetric(horizontal: 2.w, vertical: 0.5.h),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 2.w, vertical: 0.5.h),
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               '$_distance km',
-                              style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+                              style: AppTheme.lightTheme.textTheme.bodySmall
+                                  ?.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -509,7 +526,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                             height: 20,
                             child: const CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           ),
                       ],
@@ -517,7 +535,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                   ),
                 // Bus info card
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.5.h),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.5.h),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -566,7 +585,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                                 style: AppTheme.lightTheme.textTheme.titleMedium
                                     ?.copyWith(
                                   fontWeight: FontWeight.w700,
-                                  color: AppTheme.lightTheme.colorScheme.primary,
+                                  color:
+                                      AppTheme.lightTheme.colorScheme.primary,
                                 ),
                               ),
                             ],
@@ -588,7 +608,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: AppTheme.lightTheme.colorScheme.primary
+                                    color: AppTheme
+                                        .lightTheme.colorScheme.primary
                                         .withValues(alpha: 0.3),
                                     width: 1.5,
                                   ),
@@ -598,15 +619,18 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                                   children: [
                                     Icon(
                                       Icons.school,
-                                      color: AppTheme.lightTheme.colorScheme.primary,
+                                      color: AppTheme
+                                          .lightTheme.colorScheme.primary,
                                       size: 5.w,
                                     ),
                                     SizedBox(width: 2.w),
                                     Text(
                                       'School',
-                                      style: AppTheme.lightTheme.textTheme.bodySmall
+                                      style: AppTheme
+                                          .lightTheme.textTheme.bodySmall
                                           ?.copyWith(
-                                        color: AppTheme.lightTheme.colorScheme.primary,
+                                        color: AppTheme
+                                            .lightTheme.colorScheme.primary,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -624,7 +648,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                               child: Container(
                                 padding: EdgeInsets.symmetric(vertical: 1.2.h),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.lightTheme.colorScheme.primary,
+                                  color:
+                                      AppTheme.lightTheme.colorScheme.primary,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Row(
@@ -638,7 +663,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                                     SizedBox(width: 2.w),
                                     Text(
                                       'Assistant',
-                                      style: AppTheme.lightTheme.textTheme.bodySmall
+                                      style: AppTheme
+                                          .lightTheme.textTheme.bodySmall
                                           ?.copyWith(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w600,
