@@ -5,6 +5,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.conf import settings
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 import requests
 from .models import Trip, Stop
 from .serializers import TripSerializer, TripCreateSerializer, StopSerializer, StopCreateSerializer
@@ -84,24 +86,9 @@ class TripStartView(APIView):
         trip.start_time = timezone.now()
         trip.save()
 
-        # Notify Socket.IO server about trip start
-        try:
-            socketio_url = getattr(settings, 'SOCKETIO_SERVER_URL', 'http://localhost:3000')
-            response = requests.post(
-                f'{socketio_url}/api/notify/trip-start',
-                json={
-                    'busId': trip.bus.id,
-                    'busNumber': trip.bus.bus_number,
-                    'tripType': trip.trip_type,
-                    'tripId': trip.id,
-                    'driverUserId': request.user.id
-                },
-                timeout=2
-            )
-            print(f"Notified Socket.IO server: {response.status_code}")
-        except Exception as e:
-            # Don't fail the request if Socket.IO notification fails
-            print(f"Failed to notify Socket.IO server: {e}")
+        # Trip start notifications now handled by Django Channels WebSocket
+        # Socket.IO notification removed - clients receive updates via WebSocket
+        print(f"✅ Trip started: {trip.id} for bus {trip.bus.bus_number}")
 
         # Create notifications for all parents with children on this bus
         try:
@@ -223,24 +210,23 @@ class TripUpdateLocationView(APIView):
         trip.location_timestamp = timezone.now()
         trip.save()
 
-        # Notify Socket.IO server about location update
-        try:
-            socketio_url = getattr(settings, 'SOCKETIO_SERVER_URL', 'http://localhost:3000')
-            requests.post(
-                f'{socketio_url}/api/notify/location-update',
-                json={
-                    'busId': trip.bus.id,
-                    'bus_number': trip.bus.bus_number,  # Include bus number for display
-                    'latitude': float(latitude),
-                    'longitude': float(longitude),
-                    'speed': speed,
-                    'heading': heading
-                },
-                timeout=1
+        # Broadcast location update via Django Channels WebSocket
+        if trip.bus_id:
+            channel_layer = get_channel_layer()
+            group_name = f"bus_{trip.bus_id}"
+            
+            async_to_sync(channel_layer.group_send)(
+                group_name,
+                {
+                    "type": "bus.location",
+                    "bus_id": trip.bus_id,
+                    "latitude": float(latitude),
+                    "longitude": float(longitude),
+                    "speed": float(speed),
+                    "heading": float(heading),
+                    "timestamp": trip.location_timestamp.isoformat(),
+                }
             )
-        except Exception as e:
-            # Don't fail the request if Socket.IO notification fails
-            print(f"Failed to notify Socket.IO server of location: {e}")
 
         serializer = TripSerializer(trip)
         return Response(serializer.data)
