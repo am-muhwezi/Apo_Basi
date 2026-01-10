@@ -1,7 +1,7 @@
 name: apo_basi
 description: ApoBasi - School Bus Tracking App for Parents
 publish_to: none
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: ^3.6.0
@@ -35,9 +35,12 @@ dependencies:
   url_launcher: ^6.3.1
   # Real-time tracking with Socket.IO
   socket_io_client: ^2.0.3+1
+  # Native WebSocket support for Django Channels
+  web_socket_channel: ^3.0.1
   flutter_local_notifications: ^18.0.1
   geocoding: ^3.0.0
   http: ^1.1.0
+  shorebird_code_push: ^2.0.5
 
 dev_dependencies:
   flutter_test:    # CRITICAL: Required for Flutter project testing - DO NOT REMOVE
@@ -50,6 +53,7 @@ flutter:
     - assets/
     - assets/images/
     - .env
+    - shorebird.yaml
   # CRITICAL ASSET MANAGEMENT RULES:
   # - DO NOT ADD NEW ASSET DIRECTORIES (assets/svg/, assets/icons/, etc.)
   # - ONLY USE EXISTING AND ITEMS AVAILABLE IN THE DIRECTORIES LISTED ABOVE (assets/, assets/images/)
