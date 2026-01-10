@@ -5,7 +5,7 @@ import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
 import BusMap from '../components/BusMap';
 import { getTrips } from '../services/tripsApi';
-import { socketService, LocationUpdate, TripStartedEvent, TripEndedEvent } from '../services/socketService';
+import { busWebSocketService, LocationUpdate } from '../services/busWebSocketService';
 import type { Trip } from '../types';
 
 export default function TripsPage() {
@@ -17,19 +17,18 @@ export default function TripsPage() {
   const [showMapModal, setShowMapModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [socketConnected, setSocketConnected] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
   const [recenterTrigger, setRecenterTrigger] = useState(0);
 
   // Real-time location tracking
-  const [busLocations, setBusLocations] = useState<Map<string, LocationUpdate>>(new Map());
+  const [busLocations, setBusLocations] = useState<Map<string, { latitude: number; longitude: number; timestamp: string }>>(new Map());
 
   useEffect(() => {
     loadTrips();
-    initializeSocket();
 
     return () => {
-      // Cleanup: disconnect socket on unmount
-      socketService.disconnect();
+      // Cleanup: disconnect WebSocket on unmount
+      busWebSocketService.disconnect();
     };
   }, []);
 
@@ -62,77 +61,88 @@ export default function TripsPage() {
     }
   }
 
-  function initializeSocket() {
-    const token = localStorage.getItem('token');
+  function initializeWebSocket() {
+    const token = localStorage.getItem('adminToken');
     if (!token) {
-      console.error('No auth token found');
+      console.error('❌ No auth token found in localStorage');
+      setWsConnected(false);
       return;
     }
 
-    // Connect to Socket.IO
-    socketService.connect(token);
+    // Get all unique bus IDs from trips
+    const busIds = [...new Set(trips.map(trip => trip.busId))].filter(Boolean);
 
-    // Listen for connection events
-    socketService.on('connected', () => {
-      console.log('Socket connected');
-      setSocketConnected(true);
-      // Subscribe to all buses for admin monitoring
-      socketService.subscribeToBus('all');
-    });
+    if (busIds.length === 0) {
+      console.log('⚠️ No bus IDs found in trips');
+      return;
+    }
 
-    socketService.on('disconnected', () => {
-      console.log('Socket disconnected');
-      setSocketConnected(false);
-    });
+    console.log('🔌 Initializing WebSocket for buses:', busIds);
 
-    // Listen for location updates
-    socketService.on('location_update', (data: LocationUpdate) => {
-      console.log('Location update:', data);
-      setBusLocations(prev => {
-        const updated = new Map(prev);
-        updated.set(data.busId, data);
-        return updated;
+    // Set authentication token
+    busWebSocketService.setToken(token);
+
+    // Subscribe to all buses
+    busIds.forEach(busId => {
+      console.log(`📡 Subscribing to bus ${busId}...`);
+      busWebSocketService.subscribeToBus(busId);
+
+      // Listen for location updates for this bus
+      busWebSocketService.on(busId, (data) => {
+        if (data.type === 'location_update') {
+          console.log('📍 Location update:', data);
+
+          // Update bus locations map
+          setBusLocations(prev => {
+            const updated = new Map(prev);
+            updated.set(data.bus_id, {
+              latitude: data.latitude,
+              longitude: data.longitude,
+              timestamp: data.timestamp
+            });
+            return updated;
+          });
+
+          // Update trip if it's currently being viewed
+          if (selectedTrip && selectedTrip.busId === data.bus_id) {
+            setSelectedTrip(prev => prev ? {
+              ...prev,
+              currentLocation: {
+                latitude: data.latitude,
+                longitude: data.longitude,
+                timestamp: data.timestamp
+              }
+            } : null);
+          }
+
+          // Update trips list with new location
+          setTrips(prevTrips => prevTrips.map(trip =>
+            trip.busId === data.bus_id ? {
+              ...trip,
+              currentLocation: {
+                latitude: data.latitude,
+                longitude: data.longitude,
+                timestamp: data.timestamp
+              }
+            } : trip
+          ));
+        } else if (data.type === 'connected') {
+          console.log('✅ Connected to bus:', data.bus_id);
+          setWsConnected(true);
+        } else if (data.type === 'error') {
+          console.error('❌ WebSocket error:', data.message);
+        }
       });
-
-      // Update trip if it's currently being viewed
-      if (selectedTrip && selectedTrip.busId === data.busId) {
-        setSelectedTrip(prev => prev ? {
-          ...prev,
-          currentLocation: {
-            latitude: data.latitude,
-            longitude: data.longitude,
-            timestamp: data.timestamp
-          }
-        } : null);
-      }
-
-      // Update trips list with new location
-      setTrips(prevTrips => prevTrips.map(trip =>
-        trip.busId === data.busId ? {
-          ...trip,
-          currentLocation: {
-            latitude: data.latitude,
-            longitude: data.longitude,
-            timestamp: data.timestamp
-          }
-        } : trip
-      ));
-    });
-
-    // Listen for trip started events
-    socketService.on('trip_started', (data: TripStartedEvent) => {
-      console.log('Trip started:', data);
-      // Reload trips to get updated status
-      loadTrips();
-    });
-
-    // Listen for trip ended events
-    socketService.on('trip_ended', (data: TripEndedEvent) => {
-      console.log('Trip ended:', data);
-      // Reload trips to get updated status
-      loadTrips();
     });
   }
+
+  // Initialize WebSocket when trips are loaded
+  useEffect(() => {
+    if (trips.length > 0) {
+      console.log('🚌 Trips loaded, initializing WebSocket...');
+      initializeWebSocket();
+    }
+  }, [trips.length]);
 
   function filterTrips() {
     let filtered = [...trips];
@@ -209,9 +219,9 @@ export default function TripsPage() {
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Trips & Tracking</h1>
           <p className="text-slate-600">Monitor and track all school bus trips in real-time.</p>
           <div className="flex items-center gap-2 mt-2">
-            <div className={`w-2 h-2 rounded-full ${socketConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+            <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-yellow-500'}`} />
             <span className="text-xs text-slate-600">
-              {socketConnected ? 'Live tracking active' : 'Connecting...'}
+              {wsConnected ? 'Live tracking active' : 'Connecting...'}
             </span>
           </div>
         </div>
