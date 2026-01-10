@@ -8,7 +8,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/app_export.dart';
 import '../../services/api_service.dart';
-import '../../services/socket_service.dart';
+// Note: BusWebSocketService currently only supports location updates
+// Trip notifications will be added to Django Channels in the future
+// import '../../services/bus_websocket_service.dart';
 import './widgets/empty_notifications_widget.dart';
 import './widgets/notification_card_widget.dart';
 import './widgets/notification_filter_sheet_widget.dart';
@@ -25,7 +27,8 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   final ApiService _apiService = ApiService();
-  final SocketService _socketService = SocketService();
+  // TODO: Re-enable WebSocket notifications when Django Channels supports trip events
+  // final BusWebSocketService _webSocketService = BusWebSocketService();
   bool _isSearchVisible = false;
   String _searchQuery = '';
   List<String> _selectedFilters = [];
@@ -33,13 +36,13 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   bool _isLoading = true;
   String? _errorMessage;
 
-  // Notifications list - will be populated from Socket.IO
+  // Notifications list - will be populated from API/WebSocket in future
   List<Map<String, dynamic>> _allNotifications = [];
 
-  // Socket.IO subscription
-  StreamSubscription? _tripStartedSubscription;
-  StreamSubscription? _childStatusSubscription;
-  StreamSubscription? _tripEndedSubscription;
+  // WebSocket subscription (disabled for now)
+  // StreamSubscription? _tripStartedSubscription;
+  // StreamSubscription? _childStatusSubscription;
+  // StreamSubscription? _tripEndedSubscription;
 
   // Auto-refresh timer (for future API integration)
   Timer? _refreshTimer;
@@ -54,8 +57,9 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     print('🔵 NotificationsCenter: initState called');
     _scrollController.addListener(_onScroll);
     _loadCachedNotifications();
-    _setupSocketListeners();
-    _connectToSocket();
+    // TODO: Re-enable when Django Channels supports trip notification events
+    // _setupSocketListeners();
+    // _connectToSocket();
   }
 
   // Load cached notifications from local storage
@@ -101,6 +105,8 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     }
   }
 
+  // TODO: Re-enable when Django Channels supports trip notification events
+  /*
   // Connect to Socket.IO and subscribe to all buses
   Future<void> _connectToSocket() async {
     try {
@@ -194,6 +200,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
       });
     });
   }
+  */
 
   // Add a new notification
   void _addNotification(Map<String, dynamic> notification) {
@@ -251,9 +258,10 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   void dispose() {
     print('🔴 NotificationsCenter: dispose called');
     _scrollController.dispose();
-    _tripStartedSubscription?.cancel();
-    _childStatusSubscription?.cancel();
-    _tripEndedSubscription?.cancel();
+    // TODO: Re-enable when Django Channels supports trip notification events
+    // _tripStartedSubscription?.cancel();
+    // _childStatusSubscription?.cancel();
+    // _tripEndedSubscription?.cancel();
     _refreshTimer?.cancel();
     super.dispose();
   }
