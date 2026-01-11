@@ -21,6 +21,8 @@ import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
 import SearchableSelect from '../components/common/SearchableSelect';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { useBuses } from '../hooks/useBuses';
 import { useDrivers } from '../hooks/useDrivers';
 import { useMinders } from '../hooks/useMinders';
@@ -41,6 +43,9 @@ import type {
 type TabType = 'assignments' | 'routes';
 
 export default function AssignmentsPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
+  
   // Use hooks for data (loaded lazily when needed)
   const { buses, loadBuses } = useBuses();
   const { drivers, loadDrivers } = useDrivers();
@@ -153,7 +158,20 @@ export default function AssignmentsPage() {
     try {
       const offset = append ? assignments.length : 0;
       const data = await assignmentService.loadAssignments({ limit: 20, offset });
-      setAssignments(append ? [...assignments, ...data] : data);
+      
+      // Use functional update to ensure we work with latest state
+      setAssignments(prevAssignments => {
+        if (append) {
+          // Filter out any duplicates by ID before appending
+          const existingIds = new Set(prevAssignments.map(a => a.id));
+          const newAssignments = data.filter(a => !existingIds.has(a.id));
+          return [...prevAssignments, ...newAssignments];
+        }
+        return data;
+      });
+      
+      // Only show "Load More" if we got a full page (20 items)
+      // If we got less than 20, we've reached the end
       setHasMoreAssignments(data.length === 20);
     } catch (error) {
       console.error('Failed to load assignments:', error);
@@ -264,26 +282,41 @@ export default function AssignmentsPage() {
   }
 
   async function handleDeleteAssignment(id: string) {
-    if (window.confirm('Are you sure you want to delete this assignment?')) {
+    const confirmed = await confirm({
+      title: 'Delete Assignment',
+      message: 'Are you sure you want to delete this assignment? This action cannot be undone.',
+      confirmText: 'Delete',
+      variant: 'danger'
+    });
+    
+    if (confirmed) {
       try {
         await assignmentService.deleteAssignment(id);
+        toast.success('Assignment deleted successfully');
         await loadAssignments();
       } catch (error) {
         console.error('Failed to delete assignment:', error);
-        alert('Failed to delete assignment');
+        toast.error('Failed to delete assignment. Please try again.');
       }
     }
   }
 
   async function handleCancelAssignment(id: string) {
-    const reason = prompt('Please provide a reason for cancellation:');
-    if (reason) {
+    const confirmed = await confirm({
+      title: 'Cancel Assignment',
+      message: 'Are you sure you want to cancel this assignment? Please note the reason for cancellation.',
+      confirmText: 'Cancel Assignment',
+      variant: 'danger'
+    });
+    
+    if (confirmed) {
       try {
-        await assignmentService.cancelAssignment(id, reason);
+        await assignmentService.cancelAssignment(id, 'Cancelled by admin');
+        toast.success('Assignment cancelled successfully');
         await loadAssignments();
       } catch (error) {
         console.error('Failed to cancel assignment:', error);
-        alert('Failed to cancel assignment');
+        toast.error('Failed to cancel assignment. Please try again.');
       }
     }
   }
@@ -294,14 +327,16 @@ export default function AssignmentsPage() {
     try {
       if (isEditMode && currentAssignment) {
         await assignmentService.updateAssignment(currentAssignment.id, assignmentFormData);
+        toast.success('Assignment updated successfully');
       } else {
         await assignmentService.createAssignment(assignmentFormData);
+        toast.success('Assignment created successfully');
       }
       await loadAssignments();
       setShowAssignmentModal(false);
     } catch (error) {
       console.error('Failed to save assignment:', error);
-      alert('Failed to save assignment. Please check all fields.');
+      toast.error('Failed to save assignment. Please check all fields and try again.');
     }
   }
 
@@ -342,13 +377,21 @@ export default function AssignmentsPage() {
   }
 
   async function handleDeleteRoute(id: string) {
-    if (window.confirm('Are you sure you want to delete this route?')) {
+    const confirmed = await confirm({
+      title: 'Delete Route',
+      message: 'Are you sure you want to delete this route? This action cannot be undone.',
+      confirmText: 'Delete',
+      variant: 'danger'
+    });
+    
+    if (confirmed) {
       try {
         await assignmentService.deleteRoute(id);
+        toast.success('Route deleted successfully');
         await loadRoutes();
       } catch (error) {
         console.error('Failed to delete route:', error);
-        alert('Failed to delete route');
+        toast.error('Failed to delete route. Please try again.');
       }
     }
   }
@@ -359,14 +402,16 @@ export default function AssignmentsPage() {
     try {
       if (isEditMode && currentRoute) {
         await assignmentService.updateRoute(currentRoute.id, routeFormData);
+        toast.success('Route updated successfully');
       } else {
         await assignmentService.createRoute(routeFormData);
+        toast.success('Route created successfully');
       }
       await loadRoutes();
       setShowRouteModal(false);
     } catch (error) {
       console.error('Failed to save route:', error);
-      alert('Failed to save route. Please check all fields.');
+      toast.error('Failed to save route. Please check all fields and try again.');
     }
   }
 
@@ -379,13 +424,13 @@ export default function AssignmentsPage() {
         Number(bulkAssignData.busId),
         bulkAssignData.childrenIds
       );
+      toast.success(`${bulkAssignData.childrenIds.length} children assigned successfully!`);
       await loadAssignments();
       setShowBulkAssignModal(false);
       setBulkAssignData({ busId: '', childrenIds: [] });
-      alert('Children assigned successfully!');
     } catch (error) {
       console.error('Failed to bulk assign:', error);
-      alert('Failed to assign children. Please check capacity and existing assignments.');
+      toast.error('Failed to assign children. Please check bus capacity and existing assignments.');
     }
   }
 
