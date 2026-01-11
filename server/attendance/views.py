@@ -342,13 +342,26 @@ def mark_attendance(request):
     child_bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
     assigned_bus = child_bus_assignment.assigned_to if child_bus_assignment else child.assigned_bus
 
+    # Ensure we always have a valid trip_type so pickup and dropoff
+    # remain separate records and do not overwrite each other.
+    if trip_type not in ['pickup', 'dropoff']:
+        # Fallback: infer from status when possible
+        # - dropped_off => dropoff trip
+        # - everything else => pickup trip
+        if new_status == 'dropped_off':
+            trip_type = 'dropoff'
+        else:
+            trip_type = 'pickup'
+
+    # Get or create today's attendance record for this specific trip type
+    # CRITICAL: Must include trip_type in lookup to allow separate pickup/dropoff records
     attendance, created = Attendance.objects.get_or_create(
         child=child,
         date=today,
+        trip_type=trip_type,  # Include trip_type in lookup to prevent overwriting
         defaults={
             'bus': assigned_bus,
             'status': new_status,
-            'trip_type': trip_type,
             'marked_by': request.user,
             'notes': notes or '',
         }
@@ -357,8 +370,6 @@ def mark_attendance(request):
     # If attendance already exists, update it
     if not created:
         attendance.status = new_status
-        if trip_type:
-            attendance.trip_type = trip_type
         attendance.marked_by = request.user
         attendance.notes = notes or ''
         attendance.save()

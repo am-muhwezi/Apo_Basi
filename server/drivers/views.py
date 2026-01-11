@@ -93,25 +93,26 @@ class MyBusView(APIView):
         for child_assignment in child_assignments:
             child = child_assignment.assignee  # Use the assignee from Assignment
 
-            # Get today's attendance status
-            try:
-                attendance = Attendance.objects.get(child=child, date=today)
-                attendance_status = attendance.get_status_display()
-            except Attendance.DoesNotExist:
-                attendance_status = "Not marked"
+            # Get today's attendance status for both pickup and dropoff
+            pickup_attendance = Attendance.objects.filter(child=child, date=today, trip_type='pickup').first()
+            dropoff_attendance = Attendance.objects.filter(child=child, date=today, trip_type='dropoff').first()
 
             children_data.append({
                 "id": child.id,
                 "name": f"{child.first_name} {child.last_name}",
                 "class_grade": child.class_grade,
                 "parent_name": child.parent.user.get_full_name() if child.parent else "N/A",
-                "attendance_status": attendance_status,
+                "pickup_status": pickup_attendance.status if pickup_attendance else None,
+                "pickup_status_display": pickup_attendance.get_status_display() if pickup_attendance else "Not marked",
+                "dropoff_status": dropoff_attendance.status if dropoff_attendance else None,
+                "dropoff_status_display": dropoff_attendance.get_status_display() if dropoff_attendance else "Not marked",
             })
 
         bus_data = {
             "id": bus.id,
             "bus_number": bus.bus_number,
             "number_plate": bus.number_plate,
+            "capacity": bus.capacity,
             "is_active": bus.is_active,
             "current_location": bus.current_location,
             "latitude": str(bus.latitude) if bus.latitude else None,
@@ -174,14 +175,9 @@ class MyRouteView(APIView):
         for child_assignment in child_assignments:
             child = child_assignment.assignee  # Use the assignee from Assignment
 
-            # Get today's attendance
-            try:
-                attendance = Attendance.objects.get(child=child, date=today)
-                attendance_status = attendance.get_status_display()
-                attendance_timestamp = attendance.timestamp
-            except Attendance.DoesNotExist:
-                attendance_status = "Not marked"
-                attendance_timestamp = None
+            # Get today's attendance for both pickup and dropoff
+            pickup_attendance = Attendance.objects.filter(child=child, date=today, trip_type='pickup').first()
+            dropoff_attendance = Attendance.objects.filter(child=child, date=today, trip_type='dropoff').first()
 
             route_data.append({
                 "id": child.id,
@@ -192,10 +188,14 @@ class MyRouteView(APIView):
                 "class_grade": child.class_grade,
                 "address": child.address if hasattr(child, 'address') else "N/A",
                 "parent_name": child.parent.user.get_full_name() if child.parent else "N/A",
+                "pickup_status": pickup_attendance.status if pickup_attendance else None,
+                "pickup_status_display": pickup_attendance.get_status_display() if pickup_attendance else "Not marked",
+                "pickup_timestamp": pickup_attendance.timestamp if pickup_attendance else None,
+                "dropoff_status": dropoff_attendance.status if dropoff_attendance else None,
+                "dropoff_status_display": dropoff_attendance.get_status_display() if dropoff_attendance else "Not marked",
+                "dropoff_timestamp": dropoff_attendance.timestamp if dropoff_attendance else None,
                 "parent_contact": child.parent.contact_number if child.parent else "N/A",
                 "emergency_contact": child.parent.emergency_contact if child.parent else "N/A",
-                "attendance_status": attendance_status,
-                "last_updated": attendance_timestamp,
             })
 
         return Response({
@@ -267,14 +267,9 @@ def driver_phone_login(request):
             for child_assignment in child_assignments:
                 child = child_assignment.assignee
 
-                # Get today's attendance status
-                try:
-                    attendance = Attendance.objects.get(child=child, date=today)
-                    attendance_status = attendance.get_status_display()
-                    attendance_timestamp = attendance.timestamp
-                except Attendance.DoesNotExist:
-                    attendance_status = "Not marked"
-                    attendance_timestamp = None
+                # Get today's attendance for both pickup and dropoff
+                pickup_attendance = Attendance.objects.filter(child=child, date=today, trip_type='pickup').first()
+                dropoff_attendance = Attendance.objects.filter(child=child, date=today, trip_type='dropoff').first()
 
                 children_data.append({
                     "id": child.id,
@@ -288,14 +283,19 @@ def driver_phone_login(request):
                     "parent_name": child.parent.user.get_full_name() if child.parent else "N/A",
                     "parent_contact": child.parent.contact_number if child.parent else "N/A",
                     "emergency_contact": child.parent.emergency_contact if child.parent else "N/A",
-                    "attendance_status": attendance_status,
-                    "last_updated": attendance_timestamp,
+                    "pickup_status": pickup_attendance.status if pickup_attendance else None,
+                    "pickup_status_display": pickup_attendance.get_status_display() if pickup_attendance else "Not marked",
+                    "pickup_timestamp": pickup_attendance.timestamp if pickup_attendance else None,
+                    "dropoff_status": dropoff_attendance.status if dropoff_attendance else None,
+                    "dropoff_status_display": dropoff_attendance.get_status_display() if dropoff_attendance else "Not marked",
+                    "dropoff_timestamp": dropoff_attendance.timestamp if dropoff_attendance else None,
                 })
 
             bus_data = {
                 "id": bus.id,
                 "bus_number": bus.bus_number,
                 "number_plate": bus.number_plate,
+                "capacity": bus.capacity,
                 "is_active": bus.is_active,
                 "current_location": bus.current_location,
                 "latitude": str(bus.latitude) if bus.latitude else None,
@@ -326,6 +326,9 @@ def driver_phone_login(request):
             "user_id": user.id,
             "name": user.get_full_name() or "Driver",
             "phone": phone_number,
+            "email": user.email,
+            "license_number": driver.license_number,
+            "license_expiry": driver.license_expiry.isoformat() if driver.license_expiry else None,
             "tokens": {
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),

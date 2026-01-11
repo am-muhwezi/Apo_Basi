@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "trips.apps.TripsConfig",
     "assignments.apps.AssignmentsConfig",
     "analytics.apps.AnalyticsConfig",
+    "notifications.apps.NotificationsConfig",
 
     # Channels for WebSocket support(Bus location tracking)
     "channels",
