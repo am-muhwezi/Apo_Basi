@@ -62,7 +62,33 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadShiftData();
+    _checkActiveTrip();
+  }
+
+  Future<void> _checkActiveTrip() async {
+    final prefs = await SharedPreferences.getInstance();
+    final busId = prefs.getInt('current_bus_id');
+    final tripType = prefs.getString('current_trip_type');
+
+    if (busId == null || tripType == null) {
+      // No active trip, redirect to home
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text('No active trip found. Please start a shift first.'),
+              backgroundColor: AppTheme.criticalAlert,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          Navigator.pushReplacementNamed(
+              context, '/busminder-start-shift-screen');
+        });
+      }
+    } else {
+      _loadShiftData();
+    }
   }
 
   Future<void> _loadShiftData() async {
@@ -82,17 +108,28 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
         throw Exception('No bus selected. Please start shift again.');
       }
 
-      // Fetch children for this bus
-      final childrenData = await _apiService.getBusChildren(_busId!);
+      // Fetch children for this bus with trip_type filter
+      final childrenData =
+          await _apiService.getBusChildren(_busId!, tripType: _tripType);
 
-      // Transform API data to match UI format
-      _allStudents = childrenData.map((child) {
-        return {
+      // Transform API data to match UI format and restore saved statuses
+      final List<Map<String, dynamic>> students = [];
+      for (final child in childrenData) {
+        final studentId = child['id'].toString();
+        final savedStatus = await _loadAttendanceStatus(studentId);
+        final backendStatus = child['attendance_status'];
+
+        students.add({
           'id': child['id'],
           'name': '${child['first_name']} ${child['last_name']}',
-          'grade': child['grade']?.toString() ?? 'N/A',
+          'grade': child['class_grade']?.toString() ??
+              child['grade']?.toString() ??
+              'N/A',
           'photo': child['photo_url'],
-          'status': 'pending',
+          // Prefer locally saved status (if any), otherwise use backend
+          // attendance_status so admin/driver marks are reflected, and
+          // fall back to pending if nothing exists yet.
+          'status': savedStatus ?? (backendStatus?.toString() ?? 'pending'),
           'hasSpecialNeeds': child['has_special_needs'] ?? false,
           'parentContact': child['parent_phone'] ?? 'N/A',
           'emergencyContact': child['emergency_contact'] ?? 'N/A',
@@ -100,8 +137,9 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
           'notes': child['notes'] ?? '',
           'pickupTime': child['pickup_time'] ?? 'N/A',
           'dropoffTime': child['dropoff_time'] ?? 'N/A',
-        };
-      }).toList();
+        });
+      }
+      _allStudents = students;
 
       _filteredStudents = List.from(_allStudents);
 
@@ -112,14 +150,14 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
           'routeName': 'Bus $_busId - ${_tripType?.toUpperCase()}',
           'status': 'active',
           'startTime': DateTime.now().toString().substring(11, 16),
-          'tripType': _tripType == 'pickup' ? 'Morning Pickup' : 'Afternoon Dropoff',
+          'tripType':
+              _tripType == 'pickup' ? 'Morning Pickup' : 'Afternoon Dropoff',
           'busminderName': userName,
           'busNumber': 'BUS-${_busId.toString().padLeft(3, '0')}',
         };
         _isLoadingData = false;
       });
     } catch (e) {
-      print('Error loading shift data: $e');
       setState(() {
         _errorMessage = e.toString();
         _isLoadingData = false;
@@ -202,6 +240,32 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
     });
   }
 
+  // Save attendance status to SharedPreferences
+  Future<void> _saveAttendanceStatus(String studentId, String status) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'attendance_${_busId}_${_tripType}_$studentId';
+    await prefs.setString(key, status);
+  }
+
+  // Load saved attendance status from SharedPreferences
+  Future<String?> _loadAttendanceStatus(String studentId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'attendance_${_busId}_${_tripType}_$studentId';
+    return prefs.getString(key);
+  }
+
+  // Clear all attendance statuses for current trip
+  Future<void> _clearAttendanceStatuses() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys();
+    final prefix = 'attendance_${_busId}_${_tripType}_';
+    for (final key in keys) {
+      if (key.startsWith(prefix)) {
+        await prefs.remove(key);
+      }
+    }
+  }
+
   // Handle student status changes
   Future<void> _handleStatusChange(String studentId, String newStatus) async {
     // Update local state immediately for responsiveness
@@ -220,6 +284,9 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
         }
       }
     });
+
+    // Save to SharedPreferences for persistence
+    await _saveAttendanceStatus(studentId, newStatus);
 
     // Send update to API
     try {
@@ -573,7 +640,8 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
             onTap: (index) {
               if (index == 1) {
                 // Navigate to Trip Progress screen - use pushReplacementNamed to avoid stack buildup
-                Navigator.pushReplacementNamed(context, '/busminder-trip-progress-screen');
+                Navigator.pushReplacementNamed(
+                    context, '/busminder-trip-progress-screen');
               }
             },
           ),
@@ -651,4 +719,3 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
     );
   }
 }
-

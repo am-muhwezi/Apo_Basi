@@ -9,13 +9,15 @@ class LocationConfig {
 
   /// How often drivers send location updates to backend (HTTP POST)
   /// Balance between accuracy and battery/data usage
-  /// Recommended: 5-10 seconds for active tracking
-  static const Duration locationUpdateInterval = Duration(seconds: 5);
+  /// Recommended: 3-5 seconds for active tracking
+  static const Duration locationUpdateInterval = Duration(seconds: 3);
 
   /// Minimum distance (in meters) before sending location update
   /// Helps save battery and data when bus is stationary
+  /// Optimized: Bus must move ≥20m before update is sent
+  /// This prevents excessive updates when bus is stopped/slow traffic
   /// Set to 0 to disable distance filtering
-  static const double locationDistanceFilter = 10.0; // meters
+  static const double locationDistanceFilter = 20.0; // meters
 
   /// How often to check for location changes in background
   /// This is different from update interval - this is how often we READ location
@@ -92,10 +94,12 @@ class LocationConfig {
   static const int batterySavingThreshold = 20;
 
   /// Location update interval when in battery-saving mode
-  static const Duration batterySavingUpdateInterval = Duration(seconds: 15);
+  /// Less frequent checks when battery is low
+  static const Duration batterySavingUpdateInterval = Duration(seconds: 10);
 
   /// Distance filter when in battery-saving mode
-  static const double batterySavingDistanceFilter = 20.0; // meters
+  /// Require more movement before sending update to save battery
+  static const double batterySavingDistanceFilter = 30.0; // meters
 
   // ============================================================================
   // Development/Debug
@@ -156,22 +160,18 @@ class LocationConfig {
   /// Validate all configuration values
   static bool validateConfig() {
     if (locationUpdateInterval.inSeconds < 1) {
-      print('ERROR: locationUpdateInterval must be at least 1 second');
       return false;
     }
 
     if (locationDistanceFilter < 0) {
-      print('ERROR: locationDistanceFilter cannot be negative');
       return false;
     }
 
     if (batterySavingUpdateInterval <= locationUpdateInterval) {
-      print(
-          'WARNING: batterySavingUpdateInterval should be greater than locationUpdateInterval');
+      return false;
     }
 
     if (minimumAccuracy <= 0) {
-      print('ERROR: minimumAccuracy must be positive');
       return false;
     }
 
@@ -179,17 +179,5 @@ class LocationConfig {
   }
 
   /// Print configuration summary (for debugging)
-  static void printConfigSummary() {
-    print('=== Driver Location Tracking Configuration ===');
-    print('Update Interval: ${locationUpdateInterval.inSeconds}s');
-    print('Distance Filter: ${locationDistanceFilter}m');
-    print('Background Check: ${backgroundLocationCheckInterval.inSeconds}s');
-    print('Foreground Service: $useForegroundService');
-    print('Cache Failed Updates: $cacheFailedUpdates');
-    print('Battery Saving: $enableBatterySaving');
-    print('Validate Location: $validateLocation');
-    print('Max Allowed Speed: $maxAllowedSpeed km/h');
-    print('Minimum Accuracy: $minimumAccuracy m');
-    print('=============================================');
-  }
+  static void printConfigSummary() {}
 }

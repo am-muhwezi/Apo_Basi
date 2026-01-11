@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/app_export.dart';
 
@@ -24,7 +25,25 @@ class _PreTripChecklistWidgetState extends State<PreTripChecklistWidget> {
   @override
   void initState() {
     super.initState();
-    _checkedItems = List.filled(widget.checklistItems.length, false);
+    _loadChecklistState();
+  }
+
+  Future<void> _loadChecklistState() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _checkedItems = List.generate(
+        widget.checklistItems.length,
+        (index) => prefs.getBool('checklist_$index') ?? false,
+      );
+    });
+    _updateChecklistStatus();
+  }
+
+  Future<void> _saveChecklistState() async {
+    final prefs = await SharedPreferences.getInstance();
+    for (int i = 0; i < _checkedItems.length; i++) {
+      await prefs.setBool('checklist_$i', _checkedItems[i]);
+    }
   }
 
   void _updateChecklistStatus() {
@@ -131,6 +150,7 @@ class _PreTripChecklistWidgetState extends State<PreTripChecklistWidget> {
                         setState(() {
                           _checkedItems[index] = !_checkedItems[index];
                         });
+                        _saveChecklistState();
                         _updateChecklistStatus();
                       },
                       borderRadius: BorderRadius.circular(8),
@@ -215,4 +235,3 @@ class _PreTripChecklistWidgetState extends State<PreTripChecklistWidget> {
     );
   }
 }
-

@@ -47,7 +47,6 @@ class BusWebSocketService {
     required String accessToken,
   }) async {
     if (_isConnected && _connectedBusId == busId) {
-      print('Already connected to bus $busId');
       return;
     }
 
@@ -63,7 +62,6 @@ class BusWebSocketService {
       // Build WebSocket URL with bus ID and token
       final wsUrl = _buildWebSocketUrl(busId, accessToken);
 
-      print('🔌 Connecting to WebSocket: $wsUrl');
 
       // Create WebSocket channel
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
@@ -80,7 +78,6 @@ class BusWebSocketService {
       _reconnectionAttempts = 0;
       _connectionStateController.add(true);
     } catch (e) {
-      print('❌ ERROR: Failed to connect to WebSocket: $e');
       _isConnected = false;
       _connectionStateController.add(false);
       _errorController.add('Connection failed: ${e.toString()}');
@@ -93,7 +90,6 @@ class BusWebSocketService {
   /// This is called by the driver location service to send real-time updates.
   void sendLocationUpdate(Position position) {
     if (!_isConnected || _channel == null) {
-      print('⚠️ Cannot send location - Not connected');
       return;
     }
 
@@ -109,10 +105,8 @@ class BusWebSocketService {
 
       _channel!.sink.add(json.encode(locationData));
 
-      print('📍 Location sent → Lat: ${position.latitude.toStringAsFixed(4)}, '
           'Lng: ${position.longitude.toStringAsFixed(4)}');
     } catch (e) {
-      print('❌ ERROR: Failed to send location: $e');
       _errorController.add('Failed to send location');
     }
   }
@@ -124,25 +118,20 @@ class BusWebSocketService {
       final messageType = data['type'];
 
       if (messageType == 'connected') {
-        print('✅ WebSocket connected to bus ${data['bus_id']}');
         _isConnected = true;
         _connectionStateController.add(true);
       } else if (messageType == 'error') {
-        print('❌ WebSocket error: ${data['message']}');
         _errorController.add(data['message']);
       } else if (messageType == 'location_update') {
         // This is an acknowledgment that location was received
-        print('✅ Location update acknowledged');
       }
     } catch (e) {
-      print('ERROR: Failed to parse WebSocket message: $e');
       _errorController.add('Failed to parse message');
     }
   }
 
   /// Handle WebSocket errors
   void _handleError(error) {
-    print('❌ WebSocket error: $error');
     _isConnected = false;
     _connectionStateController.add(false);
     _errorController.add('Connection error: ${error.toString()}');
@@ -151,7 +140,6 @@ class BusWebSocketService {
 
   /// Handle WebSocket disconnect
   void _handleDisconnect() {
-    print('🔌 WebSocket disconnected');
     _isConnected = false;
     _connectionStateController.add(false);
     _scheduleReconnect();
@@ -162,7 +150,6 @@ class BusWebSocketService {
     const maxAttempts = 10;
 
     if (_reconnectionAttempts >= maxAttempts) {
-      print('❌ Max reconnection attempts reached');
       _errorController.add('Failed to reconnect after maximum attempts');
       return;
     }
@@ -174,7 +161,6 @@ class BusWebSocketService {
     _reconnectionAttempts++;
     const delay = Duration(seconds: 3);
 
-    print(
         '🔄 Reconnecting in ${delay.inSeconds}s (attempt $_reconnectionAttempts/$maxAttempts)');
 
     _reconnectTimer = Timer(delay, () {
@@ -195,7 +181,6 @@ class BusWebSocketService {
     }
 
     if (_channel != null) {
-      print('🔌 Disconnecting from WebSocket');
 
       _channel!.sink.close();
       _channel = null;

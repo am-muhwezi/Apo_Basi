@@ -255,4 +255,3 @@ class _StudentListWidgetState extends State<StudentListWidget> {
     );
   }
 }
-

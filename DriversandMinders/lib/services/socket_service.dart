@@ -46,17 +46,17 @@ class SocketService {
     socket = IO.io(
       serverUrl,
       IO.OptionBuilder()
-        .setTransports(['websocket'])        // Use WebSocket (faster than polling)
-        .enableAutoConnect()                 // Connect automatically
-        .enableReconnection()                // Auto-reconnect on disconnect
-        .setReconnectionDelay(1000)          // Wait 1 second before reconnect
-        .setReconnectionDelayMax(5000)       // Max 5 seconds between retries
-        .setReconnectionAttempts(10)         // Try 10 times before giving up
-        .setExtraHeaders({
-          'driver_id': driverId.toString(),
-          'bus_id': busId,
-        })
-        .build(),
+          .setTransports(['websocket']) // Use WebSocket (faster than polling)
+          .enableAutoConnect() // Connect automatically
+          .enableReconnection() // Auto-reconnect on disconnect
+          .setReconnectionDelay(1000) // Wait 1 second before reconnect
+          .setReconnectionDelayMax(5000) // Max 5 seconds between retries
+          .setReconnectionAttempts(10) // Try 10 times before giving up
+          .setExtraHeaders({
+            'driver_id': driverId.toString(),
+            'bus_id': busId,
+          })
+          .build(),
     );
 
     _setupSocketListeners();
@@ -69,37 +69,31 @@ class SocketService {
   void _setupSocketListeners() {
     // Connection successful
     socket?.on('connect', (_) {
-      print('✅ Socket.IO: Connected to server (ID: ${socket?.id})');
       _isConnected = true;
 
       // Join specific bus room for targeted broadcasts
       if (_currentBusId != null) {
         socket?.emit('join_bus_room', _currentBusId);
-        print('🚌 Socket.IO: Joined bus room: $_currentBusId');
       }
     });
 
     // Connection error
     socket?.on('connect_error', (error) {
-      print('⚠️ Socket.IO: Connection error: $error');
       _isConnected = false;
     });
 
     // Connection timeout
     socket?.on('connect_timeout', (_) {
-      print('⏱️ Socket.IO: Connection timeout');
       _isConnected = false;
     });
 
     // Disconnected from server
     socket?.on('disconnect', (reason) {
-      print('❌ Socket.IO: Disconnected (reason: $reason)');
       _isConnected = false;
     });
 
     // Reconnecting
     socket?.on('reconnect', (attempt) {
-      print('🔄 Socket.IO: Reconnected (attempt: $attempt)');
       _isConnected = true;
 
       // Rejoin bus room after reconnection
@@ -109,13 +103,10 @@ class SocketService {
     });
 
     // Reconnecting attempt
-    socket?.on('reconnect_attempt', (attempt) {
-      print('🔄 Socket.IO: Reconnecting... (attempt: $attempt)');
-    });
+    socket?.on('reconnect_attempt', (attempt) {});
 
     // Failed to reconnect
     socket?.on('reconnect_failed', (_) {
-      print('❌ Socket.IO: Failed to reconnect after all attempts');
       _isConnected = false;
     });
   }
@@ -137,12 +128,10 @@ class SocketService {
   /// ```
   void emitDriverLocation(Position position) {
     if (!_isConnected) {
-      print('⚠️ Socket.IO: Cannot emit location - Not connected to server');
       return;
     }
 
     if (_currentBusId == null) {
-      print('⚠️ Socket.IO: Cannot emit location - No bus ID set');
       return;
     }
 
@@ -160,11 +149,6 @@ class SocketService {
 
     // Emit to server using room-based event
     socket?.emit('driver_location_room', locationData);
-
-    print('📍 Socket.IO: Location emitted → Lat: ${position.latitude.toStringAsFixed(4)}, '
-          'Lng: ${position.longitude.toStringAsFixed(4)}, '
-          'Accuracy: ±${position.accuracy.toInt()}m, '
-          'Speed: ${position.speed.toStringAsFixed(1)} m/s');
   }
 
   /// Start real-time location tracking and emission
@@ -177,28 +161,21 @@ class SocketService {
   /// Make sure location permissions are granted before calling this!
   void startLocationTracking() {
     if (_locationStream != null) {
-      print('⚠️ Location tracking already active');
       return;
     }
-
-    print('🎯 Starting location tracking (updates every 10m)...');
 
     _locationStream = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 10,  // Only emit when driver moves 10+ meters
+        distanceFilter: 10, // Only emit when driver moves 10+ meters
       ),
     ).listen(
       (Position position) {
         // Emit location to Socket.IO server
         emitDriverLocation(position);
       },
-      onError: (error) {
-        print('❌ Location tracking error: $error');
-      },
-      onDone: () {
-        print('✅ Location tracking stream closed');
-      },
+      onError: (error) {},
+      onDone: () {},
     );
   }
 
@@ -206,7 +183,6 @@ class SocketService {
   void stopLocationTracking() {
     _locationStream?.cancel();
     _locationStream = null;
-    print('🛑 Location tracking stopped');
   }
 
   /// Disconnect from Socket.IO server
@@ -215,7 +191,6 @@ class SocketService {
     socket?.disconnect();
     socket?.dispose();
     _isConnected = false;
-    print('🔌 Socket.IO: Disconnected and disposed');
   }
 
   /// Check if socket is connected

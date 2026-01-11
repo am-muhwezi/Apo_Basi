@@ -76,29 +76,6 @@ class AppLogoWidget extends StatelessWidget {
           ),
 
           SizedBox(height: 1.h),
-
-          // Version Badge
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: 3.w,
-              vertical: 0.5.h,
-            ),
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: colorScheme.primary.withValues(alpha: 0.2),
-                width: 1,
-              ),
-            ),
-            child: Text(
-              'v2.1.0',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
         ],
       ),
     );

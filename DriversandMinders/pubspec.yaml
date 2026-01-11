@@ -1,7 +1,7 @@
 name: Basi_driver
-description: A new Flutter project.
+description: ApoBasi Drivers & Bus Minders - Real-time school bus tracking and student attendance management for drivers and bus minders across African schools.
 publish_to: none
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: ^3.6.0

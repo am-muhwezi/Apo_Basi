@@ -106,15 +106,12 @@ class ApiConfig {
   /// Validate all required configurations
   static bool validateConfig() {
     if (mapboxAccessToken.isEmpty) {
-      print('WARNING: Mapbox token not configured');
       return false;
     }
     if (apiBaseUrl.isEmpty) {
-      print('ERROR: API Base URL not configured');
       return false;
     }
     if (socketServerUrl.isEmpty) {
-      print('ERROR: Socket.IO Server URL not configured');
       return false;
     }
     return true;
@@ -122,12 +119,5 @@ class ApiConfig {
 
   /// Print configuration summary (for debugging)
   static void printConfigSummary() {
-    print('=== DriversandMinders API Configuration ===');
-    print('Environment: ${getEnvironmentName()}');
-    print('API Base URL: $apiBaseUrl');
-    print('Socket Server: $socketServerUrl');
-    print('Mapbox Configured: ${mapboxAccessToken.isNotEmpty}');
-    print('Mapbox Style: $mapboxStyleId');
-    print('===========================================');
   }
 }

@@ -88,6 +88,49 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
     }
   }
 
+  String _getInitials(String? name) {
+    if (name == null || name.isEmpty) return '?';
+
+    final parts = name.trim().split(' ');
+    if (parts.isEmpty) return '?';
+
+    if (parts.length == 1) {
+      return parts[0].substring(0, 1).toUpperCase();
+    }
+
+    return '${parts[0].substring(0, 1)}${parts[parts.length - 1].substring(0, 1)}'
+        .toUpperCase();
+  }
+
+  String _formatGrade(dynamic grade) {
+    if (grade == null) return 'Grade N/A';
+
+    final gradeStr = grade.toString();
+    // If it already starts with "Grade", return as is
+    if (gradeStr.toLowerCase().startsWith('grade')) {
+      return gradeStr;
+    }
+    // Otherwise, add "Grade" prefix
+    return 'Grade $gradeStr';
+  }
+
+  Color _getInitialsBgColor() {
+    // Generate consistent color based on student name
+    final name = widget.student['name'] as String? ?? '';
+    final colors = [
+      AppTheme.primaryBusminder,
+      const Color(0xFF6366F1), // Indigo
+      const Color(0xFF8B5CF6), // Purple
+      const Color(0xFFEC4899), // Pink
+      const Color(0xFF10B981), // Emerald
+      const Color(0xFF06B6D4), // Cyan
+      const Color(0xFFF59E0B), // Amber
+    ];
+
+    final index = name.hashCode % colors.length;
+    return colors[index.abs()];
+  }
+
   void _handleStatusToggle() {
     HapticFeedback.selectionClick();
     String newStatus;
@@ -126,292 +169,370 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
           widget.onLongPress(widget.student['id'].toString());
         },
         child: Container(
-        margin: EdgeInsets.symmetric(vertical: 0.6.h, horizontal: 4.w),
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(16.0),
-          border: Border.all(
-            color: _currentStatus != 'pending'
-                ? _getStatusColor().withValues(alpha: 0.3)
-                : AppTheme.borderLight,
-            width: _currentStatus != 'pending' ? 2 : 1,
-          ),
-          boxShadow: [
-            BoxShadow(
+          margin: EdgeInsets.symmetric(vertical: 0.8.h, horizontal: 4.w),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(20.0),
+            border: Border.all(
               color: _currentStatus != 'pending'
-                  ? _getStatusColor().withValues(alpha: 0.1)
-                  : AppTheme.shadowLight,
-              offset: const Offset(0, 2),
-              blurRadius: 8,
-              spreadRadius: 0,
+                  ? _getStatusColor().withValues(alpha: 0.3)
+                  : AppTheme.borderLight,
+              width: _currentStatus != 'pending' ? 2 : 1,
             ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: EdgeInsets.all(3.5.w),
-              child: Row(
-                children: [
-                  // Student Photo with Status Indicator
-                  Stack(
-                    children: [
-                      Container(
-                        width: 16.w,
-                        height: 16.w,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppTheme.backgroundSecondary,
-                          border: Border.all(
-                            color: _getStatusColor().withValues(alpha: 0.3),
-                            width: 2.5,
-                          ),
-                        ),
-                        child: widget.student['photo'] != null
-                            ? ClipOval(
-                                child: CustomImageWidget(
-                                  imageUrl: widget.student['photo'] as String,
-                                  width: 16.w,
-                                  height: 16.w,
-                                  fit: BoxFit.cover,
-                                ),
-                              )
-                            : Center(
-                                child: Icon(
-                                  Icons.person,
-                                  color: AppTheme.textSecondary,
-                                  size: 24,
-                                ),
-                              ),
-                      ),
-                      if (_currentStatus != 'pending')
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            padding: EdgeInsets.all(1.w),
-                            decoration: BoxDecoration(
-                              color: _getStatusColor(),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 2,
-                              ),
-                            ),
-                            child: Icon(
-                              _getStatusIcon(),
-                              color: Colors.white,
-                              size: 12,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-
-                  SizedBox(width: 4.w),
-
-                  // Student Info
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+            boxShadow: [
+              BoxShadow(
+                color: _currentStatus != 'pending'
+                    ? _getStatusColor().withValues(alpha: 0.15)
+                    : Colors.black.withValues(alpha: 0.08),
+                offset: const Offset(0, 4),
+                blurRadius: 12,
+                spreadRadius: 0,
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.all(3.5.w),
+                child: Row(
+                  children: [
+                    // Student Photo with Status Indicator
+                    Stack(
                       children: [
-                        Text(
-                          widget.student['name'] as String? ?? 'Unknown Student',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                            color: AppTheme.textPrimary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-
-                        SizedBox(height: 0.8.h),
-
-                        // Tags Row
-                        Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 2.5.w,
-                                vertical: 0.6.h,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryBusminder.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6.0),
-                              ),
-                              child: Text(
-                                'Grade ${widget.student['grade'] ?? 'N/A'}',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: AppTheme.primaryBusminder,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 11,
-                                ),
-                              ),
+                        Container(
+                          width: 18.w,
+                          height: 18.w,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                _getInitialsBgColor(),
+                                _getInitialsBgColor().withValues(alpha: 0.7),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                            if (widget.student['hasSpecialNeeds'] == true) ...[
-                              SizedBox(width: 2.w),
-                              Flexible(
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 2.5.w,
-                                    vertical: 0.6.h,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.warningState.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(6.0),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.medical_services,
-                                        color: AppTheme.warningState,
-                                        size: 11,
-                                      ),
-                                      SizedBox(width: 1.w),
-                                      Flexible(
-                                        child: Text(
-                                          'Special',
-                                          style: theme.textTheme.labelSmall?.copyWith(
-                                            color: AppTheme.warningState,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 11,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                            border: Border.all(
+                              color: _currentStatus != 'pending'
+                                  ? _getStatusColor().withValues(alpha: 0.4)
+                                  : _getInitialsBgColor()
+                                      .withValues(alpha: 0.2),
+                              width: 3,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _getInitialsBgColor()
+                                    .withValues(alpha: 0.3),
+                                offset: const Offset(0, 4),
+                                blurRadius: 8,
                               ),
                             ],
-                          ],
+                          ),
+                          child: widget.student['photo'] != null
+                              ? ClipOval(
+                                  child: CustomImageWidget(
+                                    imageUrl: widget.student['photo'] as String,
+                                    width: 18.w,
+                                    height: 18.w,
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    _getInitials(
+                                        widget.student['name'] as String?),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
                         ),
+                        if (_currentStatus != 'pending')
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: EdgeInsets.all(1.5.w),
+                              decoration: BoxDecoration(
+                                color: _getStatusColor(),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: _getStatusColor()
+                                        .withValues(alpha: 0.4),
+                                    offset: const Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                _getStatusIcon(),
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ),
 
-            // Action Buttons Section
-            if (isPending)
-              Container(
-                decoration: BoxDecoration(
-                  color: AppTheme.backgroundSecondary.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(16.0),
-                    bottomRight: Radius.circular(16.0),
-                  ),
-                ),
-                padding: EdgeInsets.all(3.w),
-                child: Row(
-                  children: [
-                    // Picked Up Button (for pickup) / Dropped Off Button (for dropoff)
+                    SizedBox(width: 4.w),
+
+                    // Student Info
                     Expanded(
-                      child: _buildActionButton(
-                        context,
-                        label: widget.tripType == 'pickup' ? 'Pick Up' : 'Drop Off',
-                        icon: widget.tripType == 'pickup'
-                            ? Icons.person_add_alt_1
-                            : Icons.home_filled,
-                        color: AppTheme.successAction,
-                        onTap: () {
-                          _handleStatusChange(
-                            widget.tripType == 'pickup' ? 'picked_up' : 'dropped_off'
-                          );
-                        },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.student['name'] as String? ??
+                                'Unknown Student',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 17,
+                              color: AppTheme.textPrimary,
+                              letterSpacing: 0.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+
+                          SizedBox(height: 1.h),
+
+                          // Tags Row
+                          Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 3.w,
+                                  vertical: 0.8.h,
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppTheme.primaryBusminder
+                                          .withValues(alpha: 0.15),
+                                      AppTheme.primaryBusminder
+                                          .withValues(alpha: 0.08),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(8.0),
+                                  border: Border.all(
+                                    color: AppTheme.primaryBusminder
+                                        .withValues(alpha: 0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  _formatGrade(widget.student['grade']),
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: AppTheme.primaryBusminder,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 11.5,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ),
+                              if (widget.student['hasSpecialNeeds'] ==
+                                  true) ...[
+                                SizedBox(width: 2.w),
+                                Flexible(
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 3.w,
+                                      vertical: 0.8.h,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          AppTheme.warningState
+                                              .withValues(alpha: 0.15),
+                                          AppTheme.warningState
+                                              .withValues(alpha: 0.08),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(8.0),
+                                      border: Border.all(
+                                        color: AppTheme.warningState
+                                            .withValues(alpha: 0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.medical_services,
+                                          color: AppTheme.warningState,
+                                          size: 12,
+                                        ),
+                                        SizedBox(width: 1.5.w),
+                                        Flexible(
+                                          child: Text(
+                                            'Special',
+                                            style: theme.textTheme.labelSmall
+                                                ?.copyWith(
+                                              color: AppTheme.warningState,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 11.5,
+                                              letterSpacing: 0.3,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
                       ),
-                    ),
-                    SizedBox(width: 2.w),
-                    // Absent Button
-                    Expanded(
-                      child: _buildActionButton(
-                        context,
-                        label: 'Absent',
-                        icon: Icons.person_off,
-                        color: AppTheme.criticalAlert,
-                        onTap: () {
-                          _handleStatusChange('absent');
-                        },
-                      ),
-                    ),
-                    SizedBox(width: 2.w),
-                    // More Options Button
-                    _buildIconButton(
-                      context,
-                      icon: Icons.more_horiz,
-                      color: AppTheme.textSecondary,
-                      onTap: () {
-                        widget.onLongPress(widget.student['id'].toString());
-                      },
                     ),
                   ],
                 ),
-              )
-            else
-              // Status Display for marked students
-              Container(
-                decoration: BoxDecoration(
-                  color: _getStatusColor().withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(16.0),
-                    bottomRight: Radius.circular(16.0),
+              ),
+
+              // Action Buttons Section
+              if (isPending)
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.backgroundSecondary.withValues(alpha: 0.4),
+                        AppTheme.backgroundSecondary.withValues(alpha: 0.2),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(20.0),
+                      bottomRight: Radius.circular(20.0),
+                    ),
                   ),
-                ),
-                padding: EdgeInsets.symmetric(vertical: 2.h, horizontal: 4.w),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          _getStatusIcon(),
-                          color: _getStatusColor(),
-                          size: 20,
+                  padding: EdgeInsets.all(3.5.w),
+                  child: Row(
+                    children: [
+                      // Picked Up Button (for pickup) / Dropped Off Button (for dropoff)
+                      Expanded(
+                        child: _buildActionButton(
+                          context,
+                          label: widget.tripType == 'pickup'
+                              ? 'Pick Up'
+                              : 'Drop Off',
+                          icon: widget.tripType == 'pickup'
+                              ? Icons.person_add_alt_1
+                              : Icons.home_filled,
+                          color: AppTheme.successAction,
+                          onTap: () {
+                            _handleStatusChange(widget.tripType == 'pickup'
+                                ? 'picked_up'
+                                : 'dropped_off');
+                          },
                         ),
-                        SizedBox(width: 3.w),
-                        Text(
-                          _getStatusText(),
-                          style: theme.textTheme.titleSmall?.copyWith(
+                      ),
+                      SizedBox(width: 2.w),
+                      // Absent Button
+                      Expanded(
+                        child: _buildActionButton(
+                          context,
+                          label: 'Absent',
+                          icon: Icons.person_off,
+                          color: AppTheme.criticalAlert,
+                          onTap: () {
+                            _handleStatusChange('absent');
+                          },
+                        ),
+                      ),
+                      SizedBox(width: 2.w),
+                      // More Options Button
+                      _buildIconButton(
+                        context,
+                        icon: Icons.more_horiz,
+                        color: AppTheme.textSecondary,
+                        onTap: () {
+                          widget.onLongPress(widget.student['id'].toString());
+                        },
+                      ),
+                    ],
+                  ),
+                )
+              else
+                // Status Display for marked students
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        _getStatusColor().withValues(alpha: 0.15),
+                        _getStatusColor().withValues(alpha: 0.08),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(20.0),
+                      bottomRight: Radius.circular(20.0),
+                    ),
+                  ),
+                  padding:
+                      EdgeInsets.symmetric(vertical: 2.2.h, horizontal: 4.w),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            _getStatusIcon(),
                             color: _getStatusColor(),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
+                            size: 20,
+                          ),
+                          SizedBox(width: 3.w),
+                          Text(
+                            _getStatusText(),
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: _getStatusColor(),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          _handleStatusChange('pending');
+                        },
+                        icon: Icon(
+                          Icons.undo,
+                          size: 16,
+                          color: _getStatusColor(),
+                        ),
+                        label: Text(
+                          'Undo',
+                          style: TextStyle(
+                            color: _getStatusColor(),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ],
-                    ),
-                    TextButton.icon(
-                      onPressed: () {
-                        _handleStatusChange('pending');
-                      },
-                      icon: Icon(
-                        Icons.undo,
-                        size: 16,
-                        color: _getStatusColor(),
-                      ),
-                      label: Text(
-                        'Undo',
-                        style: TextStyle(
-                          color: _getStatusColor(),
-                          fontWeight: FontWeight.w600,
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 3.w,
+                            vertical: 0.5.h,
+                          ),
                         ),
                       ),
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 3.w,
-                          vertical: 0.5.h,
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -423,33 +544,46 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
     required Color color,
     required VoidCallback onTap,
   }) {
-    final borderRadius = BorderRadius.circular(12.0);
-    return Material(
-      color: color,
-      borderRadius: borderRadius,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.mediumImpact();
-          onTap();
-        },
+    final borderRadius = BorderRadius.circular(14.0);
+    return Container(
+      decoration: BoxDecoration(
         borderRadius: borderRadius,
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 1.8.h),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: Colors.white, size: 18),
-              SizedBox(width: 2.w),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.3),
+            offset: const Offset(0, 3),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      child: Material(
+        color: color,
+        borderRadius: borderRadius,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            onTap();
+          },
+          borderRadius: borderRadius,
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 2.h),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: Colors.white, size: 19),
+                SizedBox(width: 2.w),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                    letterSpacing: 0.3,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -462,9 +596,9 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
     required Color color,
     required VoidCallback onTap,
   }) {
-    final borderRadius = BorderRadius.circular(12.0);
+    final borderRadius = BorderRadius.circular(14.0);
     return Material(
-      color: color.withValues(alpha: 0.1),
+      color: color.withValues(alpha: 0.12),
       borderRadius: borderRadius,
       child: InkWell(
         onTap: () {
@@ -473,8 +607,8 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
         },
         borderRadius: borderRadius,
         child: Padding(
-          padding: EdgeInsets.all(3.w),
-          child: Icon(icon, color: color, size: 20),
+          padding: EdgeInsets.all(3.2.w),
+          child: Icon(icon, color: color, size: 21),
         ),
       ),
     );

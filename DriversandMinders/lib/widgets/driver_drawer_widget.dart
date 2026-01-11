@@ -1,33 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 
 import '../core/app_export.dart';
 import '../services/api_service.dart';
 
-class BusminderDrawerWidget extends StatelessWidget {
+class DriverDrawerWidget extends StatelessWidget {
   final String currentRoute;
+  final Map<String, dynamic>? driverData;
+  final bool hasActiveTrip;
+  final VoidCallback? onResetTrip;
 
-  const BusminderDrawerWidget({
+  const DriverDrawerWidget({
     super.key,
     required this.currentRoute,
+    this.driverData,
+    this.hasActiveTrip = false,
+    this.onResetTrip,
   });
-
-  Future<Map<String, String>> _getUserInfo() async {
-    final prefs = await SharedPreferences.getInstance();
-    return {
-      'name': prefs.getString('user_name') ?? 'Busminder',
-      'id': prefs.getInt('user_id')?.toString() ?? 'N/A',
-    };
-  }
 
   String _getInitials(String name) {
     final parts = name.split(' ');
     if (parts.length >= 2) {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
-    return name.isNotEmpty ? name[0].toUpperCase() : 'B';
+    return name.isNotEmpty ? name[0].toUpperCase() : 'D';
   }
 
   void _showLogoutConfirmation(BuildContext context) {
@@ -132,107 +129,99 @@ class BusminderDrawerWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final name = driverData?['driverName'] as String? ?? 'Driver';
+
     return Drawer(
       backgroundColor: Color(0xFFFAFAFC),
       child: SafeArea(
         child: Column(
           children: [
             // Minimal Header
-            FutureBuilder<Map<String, String>>(
-              future: _getUserInfo(),
-              builder: (context, snapshot) {
-                final userInfo =
-                    snapshot.data ?? {'name': 'Busminder', 'id': 'N/A'};
-                final name = userInfo['name']!;
-
-                return Container(
-                  padding: EdgeInsets.fromLTRB(5.w, 3.h, 5.w, 4.h),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              AppTheme.primaryBusminder,
-                              AppTheme.primaryBusminderLight
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primaryBusminder.withOpacity(0.3),
-                              blurRadius: 12,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
+            Container(
+              padding: EdgeInsets.fromLTRB(5.w, 3.h, 5.w, 4.h),
+              child: Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.primaryDriver,
+                          AppTheme.primaryDriver.withOpacity(0.7)
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryDriver.withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
                         ),
-                        child: Center(
-                          child: Text(
-                            _getInitials(name),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 18,
-                            ),
-                          ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        _getInitials(name),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
                         ),
                       ),
-                      SizedBox(width: 4.w),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name,
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textPrimary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            SizedBox(height: 4),
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color:
-                                    AppTheme.primaryBusminder.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'Bus Assistant',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.primaryBusminder,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(Icons.close,
-                              size: 20, color: AppTheme.textSecondary),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                );
-              },
+                  SizedBox(width: 4.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 4),
+                        Container(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryDriver.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Driver',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primaryDriver,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.close,
+                          size: 20, color: AppTheme.textSecondary),
+                    ),
+                  ),
+                ],
+              ),
             ),
 
             // Divider
@@ -254,35 +243,74 @@ class BusminderDrawerWidget extends StatelessWidget {
                     context,
                     icon: Icons.home_rounded,
                     title: 'Home',
-                    route: '/busminder-start-shift-screen',
+                    onTap: () {
+                      Navigator.pop(context);
+                      if (currentRoute != '/driver-start-shift-screen') {
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          '/driver-start-shift-screen',
+                          (route) => false,
+                        );
+                      }
+                    },
+                    isActive: currentRoute == '/driver-start-shift-screen',
                   ),
                   _buildMenuItem(
                     context,
-                    icon: Icons.play_circle_rounded,
+                    icon: Icons.directions_bus_rounded,
                     title: 'Active Trip',
-                    route: '/busminder-active-trip-screen',
-                    requiresActiveTrip: true,
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(
+                          context, '/driver-active-trip-screen');
+                    },
                   ),
+
                   SizedBox(height: 2.h),
                   _buildSectionLabel('ACCOUNT'),
                   _buildMenuItem(
                     context,
                     icon: Icons.person_outline_rounded,
                     title: 'Profile',
-                    route: '/busminder-profile',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, '/driver-profile-screen');
+                    },
                   ),
                   _buildMenuItem(
                     context,
                     icon: Icons.settings_outlined,
                     title: 'Settings',
-                    route: '/busminder-settings',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, '/driver-settings-screen');
+                    },
                   ),
                   _buildMenuItem(
                     context,
                     icon: Icons.chat_bubble_outline_rounded,
                     title: 'Communications',
-                    route: '/busminder-communications',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, '/driver-comms-screen');
+                    },
                   ),
+
+                  // Reset trip option when active
+                  if (hasActiveTrip && onResetTrip != null) ...[
+                    SizedBox(height: 2.h),
+                    _buildSectionLabel('TRIP'),
+                    _buildMenuItem(
+                      context,
+                      icon: Icons.refresh_rounded,
+                      title: 'Reset Trip State',
+                      onTap: () {
+                        Navigator.pop(context);
+                        onResetTrip!();
+                      },
+                      isDestructive: true,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -348,54 +376,36 @@ class BusminderDrawerWidget extends StatelessWidget {
     BuildContext context, {
     required IconData icon,
     required String title,
-    required String route,
-    bool requiresActiveTrip = false,
+    required VoidCallback onTap,
+    bool isActive = false,
+    bool isDestructive = false,
   }) {
-    final isActive = currentRoute == route;
+    final color = isDestructive
+        ? AppTheme.criticalAlert
+        : (isActive ? Colors.white : AppTheme.textSecondary);
+    final textColor = isDestructive
+        ? AppTheme.criticalAlert
+        : (isActive ? Colors.white : AppTheme.textPrimary);
+    final bgColor = isDestructive
+        ? AppTheme.criticalAlert.withOpacity(0.08)
+        : (isActive ? AppTheme.primaryDriver : Colors.transparent);
 
     return GestureDetector(
-      onTap: () async {
+      onTap: () {
         HapticFeedback.selectionClick();
-        Navigator.pop(context);
-
-        if (!isActive) {
-          if (requiresActiveTrip) {
-            final prefs = await SharedPreferences.getInstance();
-            final busId = prefs.getInt('current_bus_id');
-            final tripType = prefs.getString('current_trip_type');
-
-            if (busId == null || tripType == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Please start a shift first'),
-                  backgroundColor: AppTheme.criticalAlert,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-              );
-              Navigator.pushReplacementNamed(
-                  context, '/busminder-start-shift-screen');
-              return;
-            }
-          }
-          Navigator.pushReplacementNamed(context, route);
-        }
+        onTap();
       },
       child: AnimatedContainer(
         duration: Duration(milliseconds: 200),
         margin: EdgeInsets.only(bottom: 6),
         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: isActive ? AppTheme.primaryBusminder : Colors.transparent,
+          color: bgColor,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 22,
-              color: isActive ? Colors.white : AppTheme.textSecondary,
-            ),
+            Icon(icon, size: 22, color: color),
             SizedBox(width: 14),
             Expanded(
               child: Text(
@@ -403,7 +413,7 @@ class BusminderDrawerWidget extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                  color: isActive ? Colors.white : AppTheme.textPrimary,
+                  color: textColor,
                 ),
               ),
             ),

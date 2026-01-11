@@ -11,16 +11,10 @@ import 'package:sizer/sizer.dart';
 import '../../core/app_export.dart';
 import '../../services/api_service.dart';
 import '../../services/native_location_service.dart';
+import '../../widgets/driver_drawer_widget.dart';
 import '../../services/trip_state_service.dart';
 import '../../theme/app_theme.dart';
 import '../../config/api_config.dart';
-import './widgets/begin_route_button_widget.dart';
-import './widgets/driver_header_widget.dart';
-import './widgets/gps_status_widget.dart';
-import './widgets/location_services_widget.dart';
-import './widgets/pre_trip_checklist_widget.dart';
-import './widgets/route_assignment_card_widget.dart';
-import './widgets/route_details_modal_widget.dart';
 import '../driver_active_trip_screen/driver_active_trip_screen.dart';
 
 class DriverStartShiftScreen extends StatefulWidget {
@@ -30,7 +24,8 @@ class DriverStartShiftScreen extends StatefulWidget {
   State<DriverStartShiftScreen> createState() => _DriverStartShiftScreenState();
 }
 
-class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
+class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
+    with SingleTickerProviderStateMixin {
   bool _isGpsConnected = false;
   bool _isLocationEnabled = false;
   bool _isChecklistComplete = false;
@@ -44,123 +39,118 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
   final TripStateService _tripStateService = TripStateService();
   final NativeLocationService _nativeLocationService = NativeLocationService();
 
-  // Driver data fetched from API
+  late AnimationController _pulseController;
+
   Map<String, dynamic>? _driverData;
   Map<String, dynamic>? _busData;
   Map<String, dynamic>? _routeDetails;
   List<Map<String, dynamic>> _assignedChildren = [];
   String? _errorMessage;
 
-  // Trip state
+  String _selectedTripType = 'pickup';
+
   bool _hasActiveTrip = false;
   Map<String, dynamic>? _activeTripInfo;
 
+  final Map<int, bool> _checklistStates = {};
+
   final List<Map<String, dynamic>> _checklistItems = [
-    {
-      "title": "Vehicle Exterior Inspection",
-      "description": "Check tires, lights, mirrors, and body damage"
-    },
-    {
-      "title": "Interior Safety Check",
-      "description":
-          "Verify emergency exits, first aid kit, and fire extinguisher"
-    },
-    {
-      "title": "Engine and Fluids",
-      "description": "Check oil, coolant, brake fluid levels"
-    },
-    {
-      "title": "Communication Equipment",
-      "description": "Test radio and emergency communication devices"
-    },
-    {
-      "title": "Student Safety Equipment",
-      "description": "Verify seat belts, safety barriers, and stop sign arm"
-    },
+    {"title": "Vehicle Exterior", "icon": "directions_bus_outlined"},
+    {"title": "Interior Safety", "icon": "health_and_safety_outlined"},
+    {"title": "Engine & Fluids", "icon": "oil_barrel_outlined"},
+    {"title": "Communication", "icon": "wifi_tethering"},
+    {"title": "Safety Equipment", "icon": "security_outlined"},
   ];
 
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    for (int i = 0; i < _checklistItems.length; i++) {
+      _checklistStates[i] = false;
+    }
+
     _startTimeUpdates();
-    _checkLocationPermission();
-    _loadDriverData();
-    _checkForActiveTrip();
+
+    // Quick synchronous check for active trip from local storage
+    _checkForActiveTripSync();
+
+    // Defer heavy operations until after first frame is rendered
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeAsync();
+    });
+  }
+
+  /// Run all async initialization in parallel after first frame
+  Future<void> _initializeAsync() async {
+    // Run all independent async operations in parallel
+    await Future.wait([
+      _checkLocationPermission(),
+      _loadDriverData(),
+      _checkForActiveTrip(),
+    ], eagerError: false); // Continue even if one fails
+  }
+
+  void _checkForActiveTripSync() {
+    SharedPreferences.getInstance().then((prefs) {
+      final tripInProgress = prefs.getBool('trip_in_progress') ?? false;
+      final tripActive = prefs.getBool('trip_active') ?? false;
+      final tripId = prefs.getInt('current_trip_id') ?? prefs.getInt('trip_id');
+      final tripType =
+          prefs.getString('current_trip_type') ?? prefs.getString('trip_type');
+
+      // Check either flag for active trip
+      if (tripInProgress || tripActive) {
+        setState(() {
+          _hasActiveTrip = true;
+          _activeTripInfo = {
+            'tripId': tripId,
+            'tripType': tripType ?? 'unknown'
+          };
+        });
+      }
+    });
   }
 
   Future<void> _checkForActiveTrip() async {
     try {
-      // First check local state
       final hasLocalTrip = await _tripStateService.hasActiveTrip();
       final localTripInfo = await _tripStateService.getActiveTripInfo();
 
-      print('📱 Local storage says trip active: $hasLocalTrip');
-
       if (hasLocalTrip) {
-        // Local storage thinks there's an active trip
-        // Verify with backend to ensure it's actually still in-progress
-        print('🔍 Verifying trip state with backend...');
-
         try {
           final backendTrip = await _apiService.getActiveTrip();
-
           if (backendTrip != null && backendTrip['status'] == 'in-progress') {
-            // Backend confirms trip is active
-            print('✅ Backend confirms active trip (ID: ${backendTrip['id']})');
-
             setState(() {
               _hasActiveTrip = true;
               _activeTripInfo = localTripInfo;
             });
-
-            // Update local storage with backend trip ID in case it's out of sync
             final prefs = await SharedPreferences.getInstance();
             await prefs.setInt('current_trip_id', backendTrip['id']);
           } else {
-            // Backend says no active trip - local state is stale
-            print('⚠️ Backend says no active trip - clearing stale local state');
-
             await _clearStaleLocalTripState();
-
             setState(() {
               _hasActiveTrip = false;
               _activeTripInfo = null;
             });
           }
         } catch (e) {
-          print('⚠️ Could not verify with backend: $e');
-
-          // Network error - trust local state for now but warn user
           setState(() {
             _hasActiveTrip = true;
             _activeTripInfo = localTripInfo;
           });
-
-          // Show warning that we're in offline mode
-          if (mounted) {
-            Future.delayed(Duration(seconds: 1), () {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Cannot verify trip state with server. Using local data.'),
-                    backgroundColor: AppTheme.warningState,
-                    duration: Duration(seconds: 3),
-                  ),
-                );
-              }
-            });
-          }
         }
       } else {
-        // No local trip state
-        print('✅ No local trip state found');
         setState(() {
           _hasActiveTrip = false;
           _activeTripInfo = null;
         });
       }
     } catch (e) {
-      print('❌ Error checking for active trip: $e');
       setState(() {
         _hasActiveTrip = false;
         _activeTripInfo = null;
@@ -168,52 +158,24 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
     }
   }
 
-  /// Clear stale local trip state when backend says there's no active trip
   Future<void> _clearStaleLocalTripState() async {
-    print('🧹 Clearing stale local trip state...');
-
     try {
       await _tripStateService.clearTripState();
-    } catch (e) {
-      print('⚠️ Error clearing TripStateService: $e');
-    }
-
+    } catch (_) {}
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('current_trip_id');
       await prefs.remove('current_trip_type');
       await prefs.remove('trip_start_time');
       await prefs.setBool('trip_in_progress', false);
-    } catch (e) {
-      print('⚠️ Error clearing SharedPreferences: $e');
-    }
-
-    print('✅ Stale local trip state cleared');
+    } catch (_) {}
   }
 
   Future<void> _continueTrip() async {
-    // Navigate directly to active trip screen
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(
-        builder: (context) => const DriverActiveTripScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const DriverActiveTripScreen()),
     );
-  }
-
-  String _formatTripDuration() {
-    if (_activeTripInfo == null || _activeTripInfo!['startTime'] == null) {
-      return '0 min';
-    }
-
-    final startTime = _activeTripInfo!['startTime'] as DateTime;
-    final duration = DateTime.now().difference(startTime);
-
-    if (duration.inHours > 0) {
-      return '${duration.inHours}h ${duration.inMinutes % 60}min';
-    } else {
-      return '${duration.inMinutes} min';
-    }
   }
 
   Future<void> _loadDriverData() async {
@@ -223,66 +185,54 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
     });
 
     try {
-      // Get user info and cached login data from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       final userName = prefs.getString('user_name') ?? 'Driver';
       final userId = prefs.getInt('user_id')?.toString() ?? 'N/A';
 
-      // Check if we have cached bus and route data from login
       final cachedBusData = prefs.getString('cached_bus_data');
       final cachedRouteData = prefs.getString('cached_route_data');
 
       if (cachedBusData != null && cachedRouteData != null) {
-        // Use cached data from login response
         try {
           final busDataJson = jsonDecode(cachedBusData);
           final routeDataJson = jsonDecode(cachedRouteData);
-
           _busData = busDataJson is Map<String, dynamic> ? busDataJson : null;
-          _routeDetails = routeDataJson is Map<String, dynamic> ? routeDataJson : null;
+          _routeDetails =
+              routeDataJson is Map<String, dynamic> ? routeDataJson : null;
 
-          // Extract assigned children list
-          if (_routeDetails?['children'] != null && _routeDetails!['children'] is List) {
+          if (_routeDetails?['children'] != null &&
+              _routeDetails!['children'] is List) {
             _assignedChildren = [];
             for (var child in _routeDetails!['children']) {
               _assignedChildren.add({
                 'id': child['id']?.toString() ?? '',
-                'name': '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}',
-                'grade': child['grade']?.toString() ?? child['class_grade']?.toString() ?? 'N/A',
-                'address': child['address']?.toString() ?? 'No address',
-                'phone': child['emergency_contact']?.toString() ?? child['parent_contact']?.toString() ?? '',
+                'name':
+                    '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}',
+                'grade': child['grade']?.toString() ??
+                    child['class_grade']?.toString() ??
+                    'N/A',
               });
             }
           }
 
-          // Build driver data object
           _driverData = {
             "driverId": userId,
             "driverName": userName,
             "busNumber": _busData?['bus_number'] ?? 'No Bus',
             "busPlate": _busData?['number_plate'] ?? 'N/A',
             "routeName": _routeDetails?['route_name'] ?? 'No Route',
-            "routeAssignment": '${_busData?['bus_number'] ?? 'No Bus'}${_routeDetails?['route_name'] != null ? ' - ${_routeDetails!['route_name']}' : ''}',
             "estimatedDuration": _routeDetails?['estimated_duration'] ?? "N/A",
             "studentCount": _routeDetails?['total_children'] ?? 0,
           };
-
-          setState(() {
-            _isLoadingData = false;
-          });
+          setState(() => _isLoadingData = false);
           return;
-        } catch (e) {
-          print('Error parsing cached data: $e');
-          // Fall through to fetch fresh data
-        }
+        } catch (_) {}
       }
 
-      // No cached data or parsing failed - fetch from API
       try {
         final busResponse = await _apiService.getDriverBus();
         final routeResponse = await _apiService.getDriverRoute();
 
-        // Extract bus data
         _busData = busResponse['buses'] is Map
             ? busResponse['buses'] as Map<String, dynamic>
             : (busResponse['buses'] is List &&
@@ -290,70 +240,52 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
                 ? busResponse['buses'][0] as Map<String, dynamic>
                 : null);
 
-        // Extract route data
         _routeDetails = routeResponse;
-
-        // Cache the data for faster future loads
         await prefs.setString('cached_bus_data', jsonEncode(_busData));
         await prefs.setString('cached_route_data', jsonEncode(_routeDetails));
 
-        // Extract assigned children list
-        if (routeResponse['children'] != null && routeResponse['children'] is List) {
+        if (routeResponse['children'] != null &&
+            routeResponse['children'] is List) {
           _assignedChildren = [];
           for (var child in routeResponse['children']) {
             _assignedChildren.add({
               'id': child['id']?.toString() ?? '',
-              'name': '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}',
-              'grade': child['grade']?.toString() ?? child['class_grade']?.toString() ?? 'N/A',
-              'address': child['address']?.toString() ?? 'No address',
-              'phone': child['emergency_contact']?.toString() ?? child['parent_contact']?.toString() ?? '',
+              'name':
+                  '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}',
+              'grade': child['grade']?.toString() ??
+                  child['class_grade']?.toString() ??
+                  'N/A',
             });
           }
         }
 
-        // Build driver data object
         _driverData = {
           "driverId": userId,
           "driverName": userName,
           "busNumber": _busData?['bus_number'] ?? 'No Bus',
           "busPlate": _busData?['number_plate'] ?? 'N/A',
           "routeName": routeResponse['route_name'] ?? 'No Route',
-          "routeAssignment": '${_busData?['bus_number'] ?? 'No Bus'}${routeResponse['route_name'] != null ? ' - ${routeResponse['route_name']}' : ''}',
+          "routeAssignment":
+              '${_busData?['bus_number'] ?? 'No Bus'}${routeResponse['route_name'] != null ? ' - ${routeResponse['route_name']}' : ''}',
           "estimatedDuration": routeResponse['estimated_duration'] ?? "N/A",
           "studentCount": routeResponse['total_children'] ?? 0,
         };
       } catch (apiError) {
-        // API call failed, use fallback data
-        print('API Error: $apiError');
         await _initializeFallbackData();
-
-        // Check if this is a "not assigned" error vs a connection error
         final errorString = apiError.toString();
-        if (errorString.contains('not assigned') || errorString.contains('404')) {
-          // Driver is not assigned to a bus - this is a valid state, not an error
-          setState(() {
-            _errorMessage = null; // Don't show error, just show not assigned state
-          });
-        } else {
-          // Real connection error
-          setState(() {
-            _errorMessage =
-                'Could not connect to server. Using offline mode.\n${errorString}';
-          });
+        if (!errorString.contains('not assigned') &&
+            !errorString.contains('404')) {
+          setState(() => _errorMessage = 'Offline mode - Using cached data');
         }
       }
 
-      setState(() {
-        _isLoadingData = false;
-      });
+      setState(() => _isLoadingData = false);
     } catch (e) {
       setState(() {
-        _errorMessage = 'Failed to load driver data: ${e.toString()}';
+        _errorMessage = 'Failed to load data';
         _isLoadingData = false;
-
-        // Fallback to minimal data from SharedPreferences
-        _initializeFallbackData();
       });
+      _initializeFallbackData();
     }
   }
 
@@ -373,16 +305,6 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
         "estimatedDuration": "N/A",
         "studentCount": 0,
       };
-
-      _routeDetails = {
-        "routeName": "Awaiting Assignment",
-        "totalDistance": "N/A",
-        "estimatedTime": "N/A",
-        "totalStops": 0,
-        "totalStudents": 0,
-        "keyStops": [],
-      };
-
       _assignedChildren = [];
     });
   }
@@ -391,14 +313,14 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
   void dispose() {
     _timeTimer?.cancel();
     _positionStream?.cancel();
+    _pulseController.dispose();
     super.dispose();
   }
 
   void _startTimeUpdates() {
     _updateCurrentTime();
-    _timeTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      _updateCurrentTime();
-    });
+    _timeTimer =
+        Timer.periodic(const Duration(seconds: 1), (_) => _updateCurrentTime());
   }
 
   void _updateCurrentTime() {
@@ -412,12 +334,8 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
   Future<void> _checkLocationPermission() async {
     try {
       final permission = await Permission.location.status;
-      if (permission.isGranted) {
-        await _enableLocationServices();
-      }
-    } catch (e) {
-      // Handle permission check error silently
-    }
+      if (permission.isGranted) await _enableLocationServices();
+    } catch (_) {}
   }
 
   Future<void> _toggleLocationServices() async {
@@ -431,27 +349,17 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
   Future<void> _enableLocationServices() async {
     try {
       final permission = await Permission.location.request();
-      if (!permission.isGranted) {
-        _showPermissionDialog();
-        return;
-      }
 
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        _showLocationServiceDialog();
-        return;
-      }
 
       setState(() {
         _isLocationEnabled = true;
-        _accuracyText = 'Acquiring GPS...';
+        _accuracyText = 'Acquiring...';
       });
 
       _positionStream = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 10,
-        ),
+            accuracy: LocationAccuracy.high, distanceFilter: 10),
       ).listen(
         (Position position) {
           setState(() {
@@ -459,18 +367,17 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
             _accuracyText = '±${position.accuracy.toInt()}m';
           });
         },
-        onError: (error) {
+        onError: (_) {
           setState(() {
             _isGpsConnected = false;
-            _accuracyText = 'GPS Error';
+            _accuracyText = 'Error';
           });
         },
       );
-    } catch (e) {
+    } catch (_) {
       setState(() {
         _isLocationEnabled = false;
         _isGpsConnected = false;
-        _accuracyText = 'Location Error';
       });
     }
   }
@@ -488,21 +395,18 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Location Permission Required'),
-        content: const Text(
-            'Location access is required to track the bus route and ensure student safety. Please enable location permission in settings.'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Location Required'),
+        content: Text('Location access is needed to track the bus route.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+              onPressed: () => Navigator.pop(context), child: Text('Cancel')),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              openAppSettings();
-            },
-            child: const Text('Open Settings'),
-          ),
+              onPressed: () {
+                Navigator.pop(context);
+                openAppSettings();
+              },
+              child: Text('Settings')),
         ],
       ),
     );
@@ -512,690 +416,878 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Location Services Disabled'),
-        content: const Text(
-            'Please enable location services in your device settings to use GPS tracking.'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Enable Location'),
+        content: Text('Please enable location services.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+              onPressed: () => Navigator.pop(context), child: Text('Cancel')),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Geolocator.openLocationSettings();
-            },
-            child: const Text('Open Settings'),
-          ),
+              onPressed: () {
+                Navigator.pop(context);
+                Geolocator.openLocationSettings();
+              },
+              child: Text('Settings')),
         ],
       ),
     );
   }
 
-  void _onChecklistComplete(bool isComplete) {
+  void _toggleChecklistItem(int index) {
     setState(() {
-      _isChecklistComplete = isComplete;
+      _checklistStates[index] = !(_checklistStates[index] ?? false);
+      _isChecklistComplete = _checklistStates.values.every((v) => v);
     });
-  }
-
-  void _showRouteDetailsModal() {
-    if (_routeDetails == null) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => RouteDetailsModalWidget(
-        routeData: _routeDetails!,
-        onClose: () => Navigator.pop(context),
-      ),
-    );
+    HapticFeedback.selectionClick();
   }
 
   Future<void> _beginRoute() async {
-    // Show trip type selector dialog
-    final tripType = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Select Trip Type'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(Icons.wb_sunny, color: AppTheme.primaryDriver),
-              title: Text('Morning Pickup'),
-              subtitle: Text('Pick up students from home'),
-              onTap: () => Navigator.pop(context, 'pickup'),
-            ),
-            SizedBox(height: 2.h),
-            ListTile(
-              leading: Icon(Icons.nights_stay, color: AppTheme.primaryDriver),
-              title: Text('Afternoon Dropoff'),
-              subtitle: Text('Drop off students at home'),
-              onTap: () => Navigator.pop(context, 'dropoff'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-
-    // User cancelled
-    if (tripType == null) return;
-
-    setState(() {
-      _isLoading = true;
-    });
+    final tripType = _selectedTripType;
+    setState(() => _isLoading = true);
 
     try {
-      // Call backend to start trip
       final response = await _apiService.startTrip(tripType: tripType);
       final trip = response['trip'];
 
       if (trip != null && trip['id'] != null) {
-        // Save trip ID and state to SharedPreferences for persistence
         final prefs = await SharedPreferences.getInstance();
+        final tripId =
+            trip['id'] is int ? trip['id'] : int.parse(trip['id'].toString());
+        final busId = _busData?['id'];
+        final busNumber = _busData?['bus_number'] ?? 'Bus';
 
-        // Ensure trip ID is an integer
-        final tripId = trip['id'] is int ? trip['id'] : int.parse(trip['id'].toString());
-
+        // Save using both key sets for compatibility
         await prefs.setInt('current_trip_id', tripId);
-        await prefs.setString('current_trip_type', trip['trip_type'] ?? tripType);
-        await prefs.setString('trip_start_time', DateTime.now().toIso8601String());
+        await prefs.setInt('trip_id', tripId);
+        await prefs.setString(
+            'current_trip_type', trip['trip_type'] ?? tripType);
+        await prefs.setString('trip_type', trip['trip_type'] ?? tripType);
+        await prefs.setString(
+            'trip_start_time', DateTime.now().toIso8601String());
         await prefs.setBool('trip_in_progress', true);
+        await prefs.setBool('trip_active', true);
+        if (busId != null) {
+          await prefs.setInt(
+              'bus_id', busId is int ? busId : int.parse(busId.toString()));
+          await prefs.setInt('current_bus_id',
+              busId is int ? busId : int.parse(busId.toString()));
+        }
+        await prefs.setString('bus_number', busNumber.toString());
 
-        // Start native background location service
         try {
           final accessToken = prefs.getString('access_token') ?? '';
-          final busId = _busData?['id'];
-
           if (accessToken.isNotEmpty && busId != null) {
-            final serviceStarted = await _nativeLocationService.startLocationTracking(
+            await _nativeLocationService.startLocationTracking(
               token: accessToken,
               busId: busId is int ? busId : int.parse(busId.toString()),
               apiUrl: ApiConfig.apiBaseUrl,
             );
-
-            if (!serviceStarted && mounted) {
-              // Show warning but don't block trip start
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Warning: Background location tracking may not work'),
-                  backgroundColor: Colors.orange,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            }
           }
-        } catch (e) {
-          // Don't block trip start even if native service fails
-        }
+        } catch (_) {}
 
-        setState(() {
-          _isLoading = false;
-        });
-
+        setState(() => _isLoading = false);
         HapticFeedback.heavyImpact();
-
-        // Navigate to active trip screen
         if (mounted) {
-          Navigator.pushNamed(context, '/driver-active-trip-screen');
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const DriverActiveTripScreen()),
+          );
         }
       } else {
-        throw Exception('Failed to create trip - no trip ID returned');
+        throw Exception('Failed to create trip');
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-
+      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to start trip: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
+              content: Text('Failed to start trip'),
+              backgroundColor: AppTheme.criticalAlert),
         );
       }
     }
   }
 
-  void _showLogoutConfirmation() {
-    showDialog(
+  void _showResetTripStateDialog() {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Logout'),
-        content: const Text(
-            'Are you sure you want to logout? Any unsaved data will be lost.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/shared-login-screen',
-                (route) => false,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.criticalAlert,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.all(6.w),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2))),
+            SizedBox(height: 3.h),
+            Icon(Icons.warning_amber_rounded,
+                size: 48, color: AppTheme.warningState),
+            SizedBox(height: 2.h),
+            Text('Reset Trip State?',
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary)),
+            SizedBox(height: 1.h),
+            Text(
+                'This will clear local trip data. Only use if the app is stuck.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppTheme.textSecondary)),
+            SizedBox(height: 3.h),
+            Row(
+              children: [
+                Expanded(
+                    child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12))),
+                        child: Text('Cancel',
+                            style: TextStyle(color: AppTheme.textPrimary)))),
+                SizedBox(width: 4.w),
+                Expanded(
+                    child: ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await _clearStaleLocalTripState();
+                    setState(() {
+                      _hasActiveTrip = false;
+                      _activeTripInfo = null;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Trip state reset'),
+                        backgroundColor: AppTheme.successAction));
+                  },
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.warningState,
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      elevation: 0),
+                  child: Text('Reset',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.w600)),
+                )),
+              ],
             ),
-            child: const Text('Logout'),
-          ),
-        ],
+            SizedBox(height: 2.h),
+          ],
+        ),
       ),
     );
   }
 
-  void _showResetTripStateDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.warning, color: AppTheme.warningState),
-            SizedBox(width: 2.w),
-            Expanded(child: Text('Reset Trip State')),
-          ],
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }
+
+  String _getInitials(String name) {
+    final parts = name.split(' ');
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    return name.isNotEmpty ? name[0].toUpperCase() : 'D';
+  }
+
+  Widget _buildTripTypeSelector() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildTripTypeChip(
+            type: 'pickup',
+            label: 'Pickup',
+            subtitle: 'Morning',
+            icon: Icons.wb_sunny_outlined,
+            color: AppTheme.primaryDriver,
+          ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        SizedBox(width: 3.w),
+        Expanded(
+          child: _buildTripTypeChip(
+            type: 'dropoff',
+            label: 'Dropoff',
+            subtitle: 'Afternoon',
+            icon: Icons.nights_stay_outlined,
+            color: const Color(0xFF10B981),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTripTypeChip({
+    required String type,
+    required String label,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+  }) {
+    final isSelected = _selectedTripType == type;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedTripType = type;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: EdgeInsets.all(3.5.w),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.08) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? color : AppTheme.borderLight,
+            width: 1.5,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.12),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
           children: [
-            Text(
-              'This will clear your local trip state and stop all location tracking.',
-              style: TextStyle(fontSize: 14),
-            ),
-            SizedBox(height: 2.h),
             Container(
-              padding: EdgeInsets.all(2.w),
+              padding: EdgeInsets.all(2.5.w),
               decoration: BoxDecoration(
-                color: AppTheme.warningState.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.warningState),
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
               ),
+              child: Icon(icon, size: 22, color: color),
+            ),
+            SizedBox(width: 3.w),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Warning:',
+                    label,
                     style: TextStyle(
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: AppTheme.warningState,
+                      color: AppTheme.textPrimary,
                     ),
                   ),
-                  SizedBox(height: 0.5.h),
+                  SizedBox(height: 0.3.h),
                   Text(
-                    'If you have an active trip, make sure to end it properly from the Active Trip screen first. Only use this option if the app is stuck.',
-                    style: TextStyle(fontSize: 12),
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                 ],
               ),
             ),
+            if (isSelected) Icon(Icons.check_circle, size: 20, color: color),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-
-              // Clear the stale state
-              await _clearStaleLocalTripState();
-
-              // Refresh the screen
-              setState(() {
-                _hasActiveTrip = false;
-                _activeTripInfo = null;
-              });
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Trip state reset successfully'),
-                  backgroundColor: AppTheme.successAction,
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.warningState,
-            ),
-            child: Text('Reset'),
-          ),
-        ],
       ),
     );
+  }
+
+  IconData _getChecklistIcon(String iconName) {
+    switch (iconName) {
+      case 'directions_bus_outlined':
+        return Icons.directions_bus_outlined;
+      case 'health_and_safety_outlined':
+        return Icons.health_and_safety_outlined;
+      case 'oil_barrel_outlined':
+        return Icons.oil_barrel_outlined;
+      case 'wifi_tethering':
+        return Icons.wifi_tethering;
+      case 'security_outlined':
+        return Icons.security_outlined;
+      default:
+        return Icons.check_circle_outline;
+    }
   }
 
   bool get _canBeginRoute =>
       _isLocationEnabled &&
       _isGpsConnected &&
-      _isChecklistComplete &&
       _driverData?['routeAssignment'] != 'Not Assigned Yet';
-
-  Widget _buildDrawer(BuildContext context) {
-    return Drawer(
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppTheme.primaryDriver.withValues(alpha: 0.05),
-              AppTheme.backgroundPrimary,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Profile Header
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(5.w),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.primaryDriver,
-                      AppTheme.primaryDriver.withValues(alpha: 0.8),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(24),
-                    bottomRight: Radius.circular(24),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primaryDriver.withValues(alpha: 0.3),
-                      offset: Offset(0, 4),
-                      blurRadius: 12,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                        border: Border.all(color: Colors.white, width: 3),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            offset: Offset(0, 4),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          (_driverData?['driverName'] as String? ?? 'D')
-                              .substring(0, 1)
-                              .toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.primaryDriver,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 2.h),
-                    Text(
-                      _driverData?['driverName'] as String? ?? 'Driver',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 0.5.h),
-                    Text(
-                      'ID: ${_driverData?['driverId'] as String? ?? 'N/A'}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withValues(alpha: 0.9),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 3.h),
-
-              // Menu Items
-              Expanded(
-                child: ListView(
-                  padding: EdgeInsets.symmetric(horizontal: 2.w),
-                  children: [
-                    _buildDrawerItem(
-                      context,
-                      icon: 'home',
-                      title: 'Start Shift',
-                      onTap: () {
-                        Navigator.pop(context);
-                      },
-                    ),
-                    _buildDrawerItem(
-                      context,
-                      icon: 'directions_bus',
-                      title: 'Active Trip',
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.pushNamed(context, '/driver-active-trip-screen');
-                      },
-                    ),
-                    _buildDrawerItem(
-                      context,
-                      icon: 'history',
-                      title: 'Trip History',
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.pushNamed(context, '/driver-trip-history-screen');
-                      },
-                    ),
-                    Divider(height: 3.h),
-                    _buildDrawerItem(
-                      context,
-                      icon: 'person',
-                      title: 'Profile',
-                      onTap: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Profile page coming soon')),
-                        );
-                      },
-                    ),
-                    _buildDrawerItem(
-                      context,
-                      icon: 'settings',
-                      title: 'Settings',
-                      onTap: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Settings page coming soon')),
-                        );
-                      },
-                    ),
-                    _buildDrawerItem(
-                      context,
-                      icon: 'help',
-                      title: 'Help & Support',
-                      onTap: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Help page coming soon')),
-                        );
-                      },
-                    ),
-                    if (_hasActiveTrip)
-                      _buildDrawerItem(
-                        context,
-                        icon: 'refresh',
-                        title: 'Reset Trip State',
-                        onTap: () {
-                          Navigator.pop(context);
-                          _showResetTripStateDialog();
-                        },
-                      ),
-                  ],
-                ),
-              ),
-
-              // Logout button at bottom
-              Container(
-                padding: EdgeInsets.all(4.w),
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _showLogoutConfirmation();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.criticalAlert,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 2.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CustomIconWidget(
-                        iconName: 'logout',
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      SizedBox(width: 2.w),
-                      Text(
-                        'Logout',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDrawerItem(
-    BuildContext context, {
-    required String icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      leading: Container(
-        padding: EdgeInsets.all(2.w),
-        decoration: BoxDecoration(
-          color: AppTheme.primaryDriver.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: CustomIconWidget(
-          iconName: icon,
-          color: AppTheme.primaryDriver,
-          size: 22,
-        ),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: AppTheme.textPrimary,
-        ),
-      ),
-      trailing: Icon(
-        Icons.chevron_right,
-        color: AppTheme.textSecondary,
-      ),
-      onTap: onTap,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     return Theme(
       data: AppTheme.lightDriverTheme,
       child: Scaffold(
-        backgroundColor: AppTheme.backgroundPrimary,
-        drawer: _buildDrawer(context),
-        body: SafeArea(
-          child: _isLoadingData
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 2.h),
-                      Text('Loading driver information...'),
-                    ],
+        backgroundColor: Color(0xFFF8F9FB),
+        drawer: DriverDrawerWidget(
+            currentRoute: '/driver-start-shift-screen',
+            driverData: _driverData,
+            hasActiveTrip: _hasActiveTrip,
+            onResetTrip: _showResetTripStateDialog),
+        body: _isLoadingData ? _buildLoadingState() : _buildMainContent(),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Container(
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      CircularProgressIndicator(color: AppTheme.primaryDriver, strokeWidth: 3),
+      SizedBox(height: 2.h),
+      Text('Loading...', style: TextStyle(color: AppTheme.textSecondary)),
+    ]));
+  }
+
+  Widget _buildMainContent() {
+    final name = _driverData?['driverName'] as String? ?? 'Driver';
+
+    return SafeArea(
+        child: Column(children: [
+      _buildTopBar(name),
+      Expanded(
+          child: SingleChildScrollView(
+        physics: BouncingScrollPhysics(),
+        padding: EdgeInsets.symmetric(horizontal: 5.w),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(height: 2.h),
+          _buildGreetingCard(name),
+          SizedBox(height: 3.h),
+          if (_driverData?['routeAssignment'] == 'Not Assigned Yet')
+            _buildNotAssignedCard()
+          else ...[_buildAssignmentCard(), SizedBox(height: 3.h)],
+          _buildSectionTitle('Location Status', Icons.location_on_outlined),
+          SizedBox(height: 1.5.h),
+          _buildLocationCard(),
+          SizedBox(height: 3.h),
+          _buildSectionTitle('Trip Type', Icons.swap_vert_rounded),
+          SizedBox(height: 1.5.h),
+          _buildTripTypeSelector(),
+          SizedBox(height: 3.h),
+          _buildSectionTitle('Pre-Trip Checklist', Icons.checklist_rounded),
+          SizedBox(height: 1.5.h),
+          _buildChecklistCard(),
+          SizedBox(height: 4.h),
+        ]),
+      )),
+      _buildBottomButton(),
+    ]));
+  }
+
+  Widget _buildTopBar(String name) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.h),
+      child: Row(children: [
+        Builder(
+            builder: (context) => GestureDetector(
+                  onTap: () => Scaffold.of(context).openDrawer(),
+                  child: Container(
+                    padding: EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: Offset(0, 2))
+                        ]),
+                    child: Icon(Icons.menu_rounded,
+                        color: AppTheme.textPrimary, size: 22),
                   ),
-                )
-              : _errorMessage != null
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.error_outline, size: 48, color: Colors.red),
-                          SizedBox(height: 2.h),
-                          Text(
-                            _errorMessage!,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.red),
-                          ),
-                          SizedBox(height: 2.h),
-                          ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                _errorMessage = null;
-                              });
-                            },
-                            child: Text('Continue Anyway'),
-                          ),
-                        ],
-                      ),
-                    )
-                  : Column(
-                      children: [
-                        // GPS Status Bar
-                        GpsStatusWidget(
-                          isGpsConnected: _isGpsConnected,
-                          currentTime: _currentTime,
-                        ),
+                )),
+        Spacer(),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+              color: _isGpsConnected
+                  ? AppTheme.successAction.withOpacity(0.1)
+                  : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(20)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                    color:
+                        _isGpsConnected ? AppTheme.successAction : Colors.grey,
+                    shape: BoxShape.circle)),
+            SizedBox(width: 8),
+            Text(_currentTime,
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _isGpsConnected
+                        ? AppTheme.successAction
+                        : AppTheme.textSecondary)),
+          ]),
+        ),
+        Spacer(),
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [
+              AppTheme.primaryDriver,
+              AppTheme.primaryDriver.withOpacity(0.7)
+            ], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                  color: AppTheme.primaryDriver.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: Offset(0, 3))
+            ],
+          ),
+          child: Center(
+              child: Text(_getInitials(name),
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14))),
+        ),
+      ]),
+    );
+  }
 
-                        Expanded(
-                          child: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Driver Header
-                                Builder(
-                                  builder: (context) => DriverHeaderWidget(
-                                    driverName: _driverData?['driverName'] as String? ?? 'Driver',
-                                    driverId: _driverData?['driverId'] as String? ?? 'N/A',
-                                    onLogout: _showLogoutConfirmation,
-                                    onMenuTap: () => Scaffold.of(context).openDrawer(),
-                                  ),
-                                ),
+  Widget _buildGreetingCard(String name) {
+    return Container(
+      padding: EdgeInsets.all(5.w),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 20,
+                offset: Offset(0, 4))
+          ]),
+      child: Row(children: [
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(_getGreeting(),
+              style: TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.w500)),
+          SizedBox(height: 4),
+          Text(name.split(' ').first,
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                  letterSpacing: -0.5)),
+          SizedBox(height: 8),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+                color: _hasActiveTrip
+                    ? AppTheme.successAction.withOpacity(0.1)
+                    : AppTheme.primaryDriver.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                      color: _hasActiveTrip
+                          ? AppTheme.successAction
+                          : AppTheme.primaryDriver,
+                      shape: BoxShape.circle)),
+              SizedBox(width: 6),
+              Text(_hasActiveTrip ? 'Trip Active' : 'Ready to Start',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _hasActiveTrip
+                          ? AppTheme.successAction
+                          : AppTheme.primaryDriver)),
+            ]),
+          ),
+        ])),
+        // Avatar/photo beside the name (replace truck icon)
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: AppTheme.primaryDriver,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                  color: AppTheme.primaryDriver.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: Offset(0, 3))
+            ],
+          ),
+          child: Center(
+              child: Text(_getInitials(name),
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 20))),
+        ),
+      ]),
+    );
+  }
 
-                                // Not Assigned Info Banner
-                                if (_driverData?['routeAssignment'] == 'Not Assigned Yet')
-                                  Container(
-                                    margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
-                                    padding: EdgeInsets.all(4.w),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.warningState.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: AppTheme.warningState.withValues(alpha: 0.3),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.info_outline,
-                                          color: AppTheme.warningState,
-                                          size: 24,
-                                        ),
-                                        SizedBox(width: 3.w),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                'Not Assigned Yet',
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: AppTheme.warningState,
-                                                ),
-                                              ),
-                                              SizedBox(height: 0.5.h),
-                                              Text(
-                                                'You are not assigned to any bus yet. Please contact your administrator to get a bus assignment.',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: AppTheme.textSecondary,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+  Widget _buildSectionTitle(String title, IconData icon) {
+    return Row(children: [
+      Icon(icon, size: 18, color: AppTheme.textSecondary),
+      SizedBox(width: 8),
+      Text(title,
+          style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSecondary,
+              letterSpacing: 0.5)),
+    ]);
+  }
 
-                                // Route Assignment Card
-                                RouteAssignmentCardWidget(
-                                  routeName: _driverData?['routeAssignment'] as String? ?? 'No Assignment',
-                                  estimatedDuration:
-                                      _driverData?['estimatedDuration'] as String? ?? 'N/A',
-                                  studentCount: _driverData?['studentCount'] as int? ?? 0,
-                                  assignedChildren: _assignedChildren,
-                                  busNumber: _driverData?['busNumber'] as String?,
-                                  routeNameOnly: _driverData?['routeName'] as String?,
-                                  onTap: _showRouteDetailsModal,
-                                ),
+  Widget _buildNotAssignedCard() {
+    return Container(
+      padding: EdgeInsets.all(5.w),
+      decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.orange.shade200)),
+      child: Row(children: [
+        Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(12)),
+            child: Icon(Icons.warning_amber_rounded,
+                color: Colors.orange.shade700, size: 28)),
+        SizedBox(width: 4.w),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Not Assigned Yet',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange.shade800)),
+          SizedBox(height: 4),
+          Text('Contact your administrator for a bus assignment',
+              style: TextStyle(fontSize: 13, color: Colors.orange.shade700)),
+        ])),
+      ]),
+    );
+  }
 
-                                // Location Services Toggle
-                                LocationServicesWidget(
-                                  isLocationEnabled: _isLocationEnabled,
-                                  accuracyText: _accuracyText,
-                                  onToggle: _toggleLocationServices,
-                                ),
+  Widget _buildAssignmentCard() {
+    return Container(
+      padding: EdgeInsets.all(5.w),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 20,
+                offset: Offset(0, 4))
+          ]),
+      child: Column(children: [
+        Row(children: [
+          Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [
+                    AppTheme.primaryDriver,
+                    AppTheme.primaryDriver.withOpacity(0.7)
+                  ]),
+                  borderRadius: BorderRadius.circular(12)),
+              child: Icon(Icons.directions_bus_rounded,
+                  size: 24, color: Colors.white)),
+          SizedBox(width: 4.w),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(_driverData?['busNumber'] ?? 'Bus',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary)),
+                Text(_driverData?['routeName'] ?? 'Route',
+                    style:
+                        TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
+              ])),
+        ]),
+        SizedBox(height: 3.h),
+        Row(children: [
+          Expanded(
+            child: _buildInfoPill(Icons.people_outline,
+                '${_driverData?['studentCount'] ?? 0}', 'Students'),
+          ),
+          SizedBox(width: 3.w),
+          Expanded(
+            child: _buildInfoPill(Icons.timer_outlined,
+                _driverData?['estimatedDuration'] ?? 'N/A', 'Duration'),
+          ),
+        ]),
+      ]),
+    );
+  }
 
-                                // Pre-Trip Checklist
-                                PreTripChecklistWidget(
-                                  checklistItems: _checklistItems,
-                                  onChecklistComplete: _onChecklistComplete,
-                                ),
+  Widget _buildInfoPill(IconData icon, String value, String label) {
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+          color: AppTheme.primaryDriver.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12)),
+      child: Row(children: [
+        Icon(icon, size: 20, color: AppTheme.primaryDriver),
+        SizedBox(width: 10),
+        Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary)),
+            Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+          ]),
+        ),
+      ]),
+    );
+  }
 
-                                SizedBox(height: 2.h),
-                              ],
-                            ),
-                          ),
-                        ),
+  Widget _buildLocationCard() {
+    return GestureDetector(
+      onTap: _toggleLocationServices,
+      child: Container(
+        padding: EdgeInsets.all(5.w),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+                color: _isLocationEnabled
+                    ? AppTheme.successAction.withOpacity(0.3)
+                    : Colors.grey.shade200,
+                width: 2),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 12,
+                  offset: Offset(0, 4))
+            ]),
+        child: Row(children: [
+          Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: _isLocationEnabled
+                      ? AppTheme.successAction.withOpacity(0.1)
+                      : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12)),
+              child: Icon(
+                  _isGpsConnected
+                      ? Icons.gps_fixed
+                      : (_isLocationEnabled
+                          ? Icons.gps_not_fixed
+                          : Icons.gps_off),
+                  size: 24,
+                  color: _isGpsConnected
+                      ? AppTheme.successAction
+                      : (_isLocationEnabled ? Colors.orange : Colors.grey))),
+          SizedBox(width: 4.w),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(
+                    _isGpsConnected
+                        ? 'GPS Connected'
+                        : (_isLocationEnabled
+                            ? 'Acquiring GPS...'
+                            : 'Location Off'),
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary)),
+                Text(_accuracyText,
+                    style:
+                        TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+              ])),
+          Switch(
+              value: _isLocationEnabled,
+              onChanged: (_) => _toggleLocationServices(),
+              activeThumbColor: AppTheme.successAction),
+        ]),
+      ),
+    );
+  }
 
-                        // Begin Route Button
-                        BeginRouteButtonWidget(
-                          isEnabled: _canBeginRoute,
-                          isLoading: _isLoading,
-                          onPressed: _hasActiveTrip ? _continueTrip : _beginRoute,
-                          onLongPress: _showRouteDetailsModal,
-                          isContinueTrip: _hasActiveTrip,
-                          tripDuration: _hasActiveTrip ? _formatTripDuration() : null,
-                        ),
-                      ],
-                    ),
+  Widget _buildChecklistCard() {
+    return Container(
+      padding: EdgeInsets.all(4.w),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: Offset(0, 4))
+          ]),
+      child: Column(children: [
+        for (int i = 0; i < _checklistItems.length; i++) ...[
+          _buildChecklistItem(i),
+          if (i < _checklistItems.length - 1)
+            Divider(height: 1, color: Colors.grey.shade100),
+        ],
+      ]),
+    );
+  }
+
+  Widget _buildChecklistItem(int index) {
+    final item = _checklistItems[index];
+    final isChecked = _checklistStates[index] ?? false;
+
+    return GestureDetector(
+      onTap: () => _toggleChecklistItem(index),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        child: Row(children: [
+          AnimatedContainer(
+            duration: Duration(milliseconds: 200),
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+                color: isChecked ? AppTheme.successAction : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                    color: isChecked
+                        ? AppTheme.successAction
+                        : Colors.grey.shade300,
+                    width: 2)),
+            child: isChecked
+                ? Icon(Icons.check, size: 16, color: Colors.white)
+                : null,
+          ),
+          SizedBox(width: 14),
+          Icon(_getChecklistIcon(item['icon'] as String),
+              size: 20,
+              color:
+                  isChecked ? AppTheme.successAction : AppTheme.textSecondary),
+          SizedBox(width: 12),
+          Expanded(
+              child: Text(item['title'] as String,
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: isChecked
+                          ? AppTheme.textSecondary
+                          : AppTheme.textPrimary,
+                      decoration:
+                          isChecked ? TextDecoration.lineThrough : null))),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildBottomButton() {
+    return Container(
+      padding: EdgeInsets.all(5.w),
+      decoration: BoxDecoration(color: Colors.white, boxShadow: [
+        BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, -5))
+      ]),
+      child: SafeArea(
+        top: false,
+        child: AnimatedBuilder(
+          animation: _pulseController,
+          builder: (context, child) {
+            // Enable button when GPS is connected AND checklist is complete, or there's an active trip
+            final canStart =
+                (_isGpsConnected && _isChecklistComplete) || _hasActiveTrip;
+            return GestureDetector(
+              onTap: canStart
+                  ? () {
+                      if (_hasActiveTrip) {
+                        _continueTrip();
+                      } else {
+                        _beginRoute();
+                      }
+                    }
+                  : null,
+              child: AnimatedContainer(
+                duration: Duration(milliseconds: 200),
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: canStart
+                      ? LinearGradient(colors: [
+                          _hasActiveTrip
+                              ? AppTheme.successAction
+                              : AppTheme.primaryDriver,
+                          _hasActiveTrip
+                              ? AppTheme.successAction.withOpacity(0.8)
+                              : AppTheme.primaryDriver.withOpacity(0.8)
+                        ])
+                      : null,
+                  color: canStart ? null : Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: canStart
+                      ? [
+                          BoxShadow(
+                              color: (_hasActiveTrip
+                                      ? AppTheme.successAction
+                                      : AppTheme.primaryDriver)
+                                  .withOpacity(0.4),
+                              blurRadius: 12,
+                              offset: Offset(0, 4))
+                        ]
+                      : null,
+                ),
+                child: Center(
+                  child: _isLoading
+                      ? SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2.5))
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                              Icon(
+                                  _hasActiveTrip
+                                      ? Icons.play_circle_outline
+                                      : Icons.play_arrow_rounded,
+                                  color: Colors.white,
+                                  size: 24),
+                              SizedBox(width: 10),
+                              Text(
+                                  _hasActiveTrip
+                                      ? 'Continue Trip'
+                                      : 'Begin Route',
+                                  style: TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                      letterSpacing: 0.3)),
+                            ]),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

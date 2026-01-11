@@ -61,7 +61,6 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Map initialization error: $e');
       setState(() {
         _isLoading = false;
       });
@@ -96,7 +95,6 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
         16.0,
       );
     } catch (e) {
-      print('Error getting location: $e');
     }
   }
 

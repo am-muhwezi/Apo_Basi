@@ -13,6 +13,7 @@ import '../../services/driver_location_service.dart';
 import '../../services/native_location_service.dart';
 import '../../services/trip_state_service.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../../widgets/driver_drawer_widget.dart';
 import './widgets/route_map_widget.dart';
 import './widgets/socket_status_widget.dart';
 import './widgets/student_list_widget.dart';
@@ -57,9 +58,116 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
-    _loadTripData();
+    _checkForActiveTripAndLoad();
     _startElapsedTimeTimer();
-    _initializeLocationTracking();
+  }
+
+  /// Check if there's actually an active trip before loading data
+  Future<void> _checkForActiveTripAndLoad() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final tripInProgress = prefs.getBool('trip_in_progress') ?? false;
+      final currentTripId = prefs.getInt('current_trip_id');
+
+      if (!tripInProgress || currentTripId == null) {
+        // No active trip in local storage
+
+        if (mounted) {
+          // Show message and redirect
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content:
+                    Text('No active trip found. Please start a trip first.'),
+                backgroundColor: AppTheme.warningState,
+                behavior: SnackBarBehavior.fixed,
+                duration: Duration(seconds: 3),
+              ),
+            );
+
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/driver-start-shift-screen',
+              (route) => false,
+            );
+          });
+        }
+        return;
+      }
+
+      // Try to verify with backend
+      try {
+        final backendTrip = await _apiService.getActiveTrip();
+
+        if (backendTrip == null || backendTrip['status'] != 'in-progress') {
+          // Backend says no active trip - clear stale local state
+
+          await _clearTripStateLocally();
+
+          if (mounted) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content:
+                      Text('Trip has already ended. Returning to start shift.'),
+                  backgroundColor: AppTheme.warningState,
+                  behavior: SnackBarBehavior.fixed,
+                  duration: Duration(seconds: 3),
+                ),
+              );
+
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/driver-start-shift-screen',
+                (route) => false,
+              );
+            });
+          }
+          return;
+        }
+
+        // Backend confirms trip is active - proceed with loading
+        await _loadTripData();
+        await _initializeLocationTracking();
+      } catch (e) {
+        // Network error - trust local state but warn user
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Cannot verify trip status with server. Using local data.'),
+              backgroundColor: AppTheme.warningState,
+              behavior: SnackBarBehavior.fixed,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+
+        await _loadTripData();
+        await _initializeLocationTracking();
+      }
+    } catch (e) {
+      // Error checking trip state - redirect to be safe
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error loading trip. Please try again.'),
+              backgroundColor: AppTheme.criticalAlert,
+              behavior: SnackBarBehavior.fixed,
+              duration: Duration(seconds: 3),
+            ),
+          );
+
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/driver-start-shift-screen',
+            (route) => false,
+          );
+        });
+      }
+    }
   }
 
   Future<void> _initializeLocationTracking() async {
@@ -93,6 +201,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       // Also start Flutter location service for map display
       await _locationService.initialize();
       await _locationService.setBusId(busId);
+      if (_currentTripId != null) {
+        await _locationService.setTripId(_currentTripId);
+      }
       await _locationService.startTracking();
 
       // Start periodic location updates to trip API
@@ -103,25 +214,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   }
 
   void _startLocationUpdateTimer() {
-    // Send location to trip API every 5 seconds
-    _locationUpdateTimer = Timer.periodic(Duration(seconds: 5), (_) async {
-      if (_currentTripId != null) {
-        final position = _locationService.lastPosition;
-        if (position != null) {
-          try {
-            await _apiService.pushLocation(
-              tripId: _currentTripId!,
-              latitude: position.latitude,
-              longitude: position.longitude,
-              speed: position.speed,
-              heading: position.heading,
-            );
-          } catch (e) {
-            // Silently handle error
-          }
-        }
-      }
-    });
+    // Trip-level HTTP updates are now handled inside DriverLocationService
+    // via a background timer keyed by current_trip_id.
+    // This method is kept for backwards compatibility/no-op.
   }
 
   Future<void> _loadTripData() async {
@@ -163,28 +258,40 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
       // Build trip data object
       _tripData = {
-        "tripId": "TRP_${DateTime.now().toString().substring(0, 10).replaceAll('-', '')}_${_busData?['id'] ?? '001'}",
+        "tripId":
+            "TRP_${DateTime.now().toString().substring(0, 10).replaceAll('-', '')}_${_busData?['id'] ?? '001'}",
         "trip_type": tripType,
         "routeNumber": routeResponse['route_name']?.toString() ?? "N/A",
         "routeName": routeResponse['route_name'] ?? 'No Route',
         "driverName": userName,
         "busNumber": _busData?['bus_number'] ?? 'N/A',
-        "startTime": "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}",
+        "startTime":
+            "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}",
         "estimatedEndTime": routeResponse['estimated_duration'] ?? 'N/A',
         "totalDistance": routeResponse['total_distance']?.toString() ?? 'N/A',
         "stops": [], // Populate from route if available
       };
 
       // Extract and convert children data to students list
-      if (routeResponse['children'] != null && routeResponse['children'] is List) {
+      if (routeResponse['children'] != null &&
+          routeResponse['children'] is List) {
         _students = [];
         for (var child in routeResponse['children']) {
+          // Extract grade and strip 'Grade' prefix if already present
+          String gradeValue = child['grade']?.toString() ??
+              child['class_grade']?.toString() ??
+              'N/A';
+          if (gradeValue.toLowerCase().startsWith('grade')) {
+            gradeValue = gradeValue.substring(5).trim();
+          }
           _students.add({
             "id": child['id'] ?? 0,
             "name": '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}',
-            "grade": child['grade']?.toString() ?? child['class_grade']?.toString() ?? 'N/A',
+            "grade": gradeValue,
             "stopName": child['address']?.toString() ?? 'No address',
-            "parentContact": child['emergency_contact']?.toString() ?? child['parent_contact']?.toString() ?? 'N/A',
+            "parentContact": child['emergency_contact']?.toString() ??
+                child['parent_contact']?.toString() ??
+                'N/A',
             "specialNotes": child['special_needs']?.toString() ?? '',
             "isPickedUp": false,
           });
@@ -214,7 +321,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
           "routeName": "No Route",
           "driverName": "Driver",
           "busNumber": "N/A",
-          "startTime": "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}",
+          "startTime":
+              "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}",
           "estimatedEndTime": "N/A",
           "totalDistance": "N/A",
           "stops": [],
@@ -313,8 +421,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
               ],
             ),
             duration: Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
             backgroundColor: AppTheme.successAction,
+            behavior: SnackBarBehavior.fixed,
           ),
         );
       }
@@ -333,8 +441,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
               ],
             ),
             duration: Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
             backgroundColor: AppTheme.warningState,
+            behavior: SnackBarBehavior.fixed,
           ),
         );
       }
@@ -406,7 +514,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
     // Calculate statistics
     final totalStudents = _students.length;
-    final studentsCompleted = _students.where((s) => s["isPickedUp"] as bool? ?? false).length;
+    final studentsCompleted =
+        _students.where((s) => s["isPickedUp"] as bool? ?? false).length;
     final studentsAbsent = totalStudents - studentsCompleted;
 
     try {
@@ -428,6 +537,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
           SnackBar(
             content: Text('Trip ended successfully'),
             backgroundColor: AppTheme.successAction,
+            behavior: SnackBarBehavior.fixed,
             duration: Duration(seconds: 3),
           ),
         );
@@ -518,6 +628,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
               SnackBar(
                 content: Text('Trip ended locally. Location tracking stopped.'),
                 backgroundColor: AppTheme.warningState,
+                behavior: SnackBarBehavior.fixed,
                 duration: Duration(seconds: 3),
               ),
             );
@@ -633,7 +744,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   int get _studentsPickedUp =>
       _students.where((s) => s["isPickedUp"] as bool? ?? false).length;
   int get _remainingStops => _tripData["stops"] != null
-      ? (_tripData["stops"] as List).where((s) => !(s["isCompleted"] as bool? ?? false)).length
+      ? (_tripData["stops"] as List)
+          .where((s) => !(s["isCompleted"] as bool? ?? false))
+          .length
       : _students.length - _studentsPickedUp;
 
   /// Get the next student to pick up (first not-picked-up student)
@@ -649,9 +762,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
   /// Get upcoming students (all not-picked-up students after the next one)
   List<Map<String, dynamic>> get _upcomingStudents {
-    final notPickedUp = _students
-        .where((s) => !(s["isPickedUp"] as bool? ?? false))
-        .toList();
+    final notPickedUp =
+        _students.where((s) => !(s["isPickedUp"] as bool? ?? false)).toList();
 
     if (notPickedUp.length <= 1) {
       return [];
@@ -678,18 +790,38 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       data: AppTheme.lightDriverTheme,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundPrimary,
+        drawer: DriverDrawerWidget(
+          currentRoute: '/driver-active-trip-screen',
+          driverData: {
+            'name': _tripData['driver_name'] ?? 'Driver',
+            'bus_number':
+                _busData?['bus_number'] ?? _busData?['number_plate'] ?? 'N/A',
+          },
+          hasActiveTrip: true,
+        ),
         appBar: CustomAppBar(
-          title: _tripData["trip_type"] == 'pickup' ? 'Pickup Trip' : 'Dropoff Trip',
+          title: _tripData["trip_type"] == 'pickup'
+              ? 'Pickup Trip'
+              : 'Dropoff Trip',
           subtitle: '${_studentsPickedUp}/${_students.length} • $_elapsedTime',
+          leading: Builder(
+            builder: (context) => IconButton(
+              icon: Icon(Icons.menu, color: AppTheme.textOnPrimary),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+              tooltip: 'Menu',
+            ),
+          ),
           actions: [
             IconButton(
-              onPressed: () =>
-                  Navigator.pushNamed(context, '/driver-trip-history-screen'),
-              icon: CustomIconWidget(
-                iconName: 'history',
-                color: AppTheme.textOnPrimary,
-                size: 24,
-              ),
+              icon: Icon(Icons.home_outlined, color: AppTheme.textOnPrimary),
+              onPressed: () {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/driver-start-shift-screen',
+                  (route) => false,
+                );
+              },
+              tooltip: 'Back to Start',
             ),
           ],
         ),
@@ -737,7 +869,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
                                 Expanded(
                                   child: Text(
                                     'Running in offline mode',
-                                    style: TextStyle(color: Colors.orange.shade900),
+                                    style: TextStyle(
+                                        color: Colors.orange.shade900),
                                   ),
                                 ),
                               ],
