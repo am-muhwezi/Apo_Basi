@@ -26,14 +26,13 @@ class SignInButtonWidget extends StatelessWidget {
         onPressed: isEnabled && !isLoading ? onPressed : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: isEnabled
-              ? AppTheme.lightTheme.colorScheme.primary
+              ? Color(0xFF10B981) // Bright emerald green
               : AppTheme.lightTheme.colorScheme.outline,
           foregroundColor: Colors.white,
-          elevation: isEnabled ? 2 : 0,
-          shadowColor:
-              AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.3),
+          elevation: isEnabled ? 4 : 0,
+          shadowColor: Color(0xFF10B981).withValues(alpha: 0.5),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
         child: isLoading
@@ -55,7 +54,7 @@ class SignInButtonWidget extends StatelessWidget {
                   ),
                   SizedBox(width: 3.w),
                   Text(
-                    buttonText ?? 'Sign In',
+                    buttonText ?? 'Sign In to ApoBasi',
                     style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w600,

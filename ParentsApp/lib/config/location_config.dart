@@ -162,22 +162,18 @@ class LocationConfig {
   /// Validate all configuration values
   static bool validateConfig() {
     if (locationUpdateInterval.inSeconds < 1) {
-      print('ERROR: locationUpdateInterval must be at least 1 second');
       return false;
     }
 
     if (locationDistanceFilter < 0) {
-      print('ERROR: locationDistanceFilter cannot be negative');
       return false;
     }
 
     if (staleThreshold.inSeconds < 1) {
-      print('ERROR: staleThreshold must be at least 1 second');
       return false;
     }
 
     if (offlineThreshold <= staleThreshold) {
-      print('ERROR: offlineThreshold must be greater than staleThreshold');
       return false;
     }
 
@@ -186,14 +182,5 @@ class LocationConfig {
 
   /// Print configuration summary (for debugging)
   static void printConfigSummary() {
-    print('=== Location Tracking Configuration ===');
-    print('Update Interval: ${locationUpdateInterval.inSeconds}s');
-    print('Distance Filter: ${locationDistanceFilter}m');
-    print('Stale Threshold: ${staleThreshold.inSeconds}s');
-    print('Offline Threshold: ${offlineThreshold.inMinutes}min');
-    print('Socket URL: $socketUrl');
-    print('Cache Failed Updates: $cacheFailedUpdates');
-    print('Battery Saving: $enableBatterySaving');
-    print('======================================');
   }
 }

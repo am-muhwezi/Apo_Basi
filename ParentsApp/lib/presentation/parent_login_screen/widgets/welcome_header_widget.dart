@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/app_export.dart';
 
@@ -11,48 +10,64 @@ class WelcomeHeaderWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 4.h),
+      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 6.h),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppTheme.lightTheme.colorScheme.primary,
-            AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.8),
+            Color(0xFF6366F1), // Modern indigo
+            Color(0xFF8B5CF6), // Purple
+            Color(0xFFEC4899), // Pink accent
           ],
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(8.w),
-          bottomRight: Radius.circular(8.w),
         ),
       ),
       child: SafeArea(
         child: Column(
           children: [
-            SizedBox(height: 2.h),
-            SvgPicture.asset(
-              'assets/images/splash_logo.svg',
-              width: 45.w,
-              height: 45.w,
-            ),
-            SizedBox(height: 2.h),
-            Text(
-              'Welcome Back',
-              style: AppTheme.lightTheme.textTheme.headlineMedium?.copyWith(
+            SizedBox(height: 4.h),
+            // Modern icon instead of image
+            Container(
+              width: 24.w,
+              height: 24.w,
+              decoration: BoxDecoration(
                 color: Colors.white,
-                fontWeight: FontWeight.w700,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 20,
+                    offset: Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.directions_bus_rounded,
+                size: 12.w,
+                color: Color(0xFF6366F1),
+              ),
+            ),
+            SizedBox(height: 3.h),
+            Text(
+              'ApoBasi',
+              style: AppTheme.lightTheme.textTheme.headlineLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 32.sp,
+                letterSpacing: -0.5,
               ),
             ),
             SizedBox(height: 1.h),
             Text(
-              'Sign in to track your child\'s bus journey safely',
+              'Track Your Child\'s Journey',
               textAlign: TextAlign.center,
-              style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                color: Colors.white.withValues(alpha: 0.9),
-                height: 1.4,
+              style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.95),
+                fontWeight: FontWeight.w400,
+                letterSpacing: 0.2,
               ),
             ),
-            SizedBox(height: 2.h),
+            SizedBox(height: 4.h),
           ],
         ),
       ),

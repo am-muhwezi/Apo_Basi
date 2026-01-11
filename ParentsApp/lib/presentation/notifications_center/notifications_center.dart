@@ -8,9 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/app_export.dart';
 import '../../services/api_service.dart';
-// Note: BusWebSocketService currently only supports location updates
-// Trip notifications will be added to Django Channels in the future
-// import '../../services/bus_websocket_service.dart';
+import '../../services/parent_notifications_service.dart';
 import './widgets/empty_notifications_widget.dart';
 import './widgets/notification_card_widget.dart';
 import './widgets/notification_filter_sheet_widget.dart';
@@ -27,8 +25,8 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   final ApiService _apiService = ApiService();
-  // TODO: Re-enable WebSocket notifications when Django Channels supports trip events
-  // final BusWebSocketService _webSocketService = BusWebSocketService();
+  final ParentNotificationsService _notificationsService =
+      ParentNotificationsService();
   bool _isSearchVisible = false;
   String _searchQuery = '';
   List<String> _selectedFilters = [];
@@ -36,13 +34,11 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   bool _isLoading = true;
   String? _errorMessage;
 
-  // Notifications list - will be populated from API/WebSocket in future
+  // Notifications list
   List<Map<String, dynamic>> _allNotifications = [];
 
-  // WebSocket subscription (disabled for now)
-  // StreamSubscription? _tripStartedSubscription;
-  // StreamSubscription? _childStatusSubscription;
-  // StreamSubscription? _tripEndedSubscription;
+  // WebSocket subscriptions
+  StreamSubscription? _notificationsSubscription;
 
   // Auto-refresh timer (for future API integration)
   Timer? _refreshTimer;
@@ -54,15 +50,76 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   @override
   void initState() {
     super.initState();
-    print('🔵 NotificationsCenter: initState called');
     _scrollController.addListener(_onScroll);
-    _loadCachedNotifications();
-    // TODO: Re-enable when Django Channels supports trip notification events
-    // _setupSocketListeners();
-    // _connectToSocket();
+    _loadNotificationsFromAPI(); // Load from API first
+    _setupNotificationListeners();
+    _startAutoRefresh(); // Auto-refresh every 30 seconds
   }
 
-  // Load cached notifications from local storage
+  // Load notifications from API
+  Future<void> _loadNotificationsFromAPI() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await _apiService.getNotifications();
+
+      // Handle response - could be List or Map with results
+      List<dynamic> notificationsList;
+      if (response is List) {
+        notificationsList = response;
+      } else if (response is Map && response.containsKey('results')) {
+        notificationsList = response['results'] as List;
+      } else if (response is Map) {
+        // Response is a map but might be the direct list
+        notificationsList = [response];
+      } else {
+        notificationsList = [];
+      }
+
+      setState(() {
+        _allNotifications = notificationsList.map((notification) {
+          return {
+            'id': notification['id'].toString(),
+            'type': notification['notification_type'] ?? 'general',
+            'title': notification['title'] ?? '',
+            'message': notification['message'] ?? '',
+            'fullMessage': notification['full_message'],
+            'isRead': notification['is_read'] ?? false,
+            'timestamp': DateTime.parse(notification['created_at']),
+            'expanded': false,
+            // Additional data
+            'child_name': notification['child_name'],
+            'bus_number': notification['bus_number'],
+            'additional_data': notification['additional_data'],
+          };
+        }).toList();
+
+        _groupNotificationsByDate();
+        _isLoading = false;
+      });
+
+      // Cache the notifications
+      await _saveNotifications();
+    } catch (e) {
+      // Fall back to cached notifications
+      await _loadCachedNotifications();
+      setState(() {
+        _errorMessage = 'Failed to load notifications. Showing cached data.';
+      });
+    }
+  }
+
+  // Start auto-refresh timer
+  void _startAutoRefresh() {
+    _refreshTimer = Timer.periodic(_refreshInterval, (_) {
+      _loadNotificationsFromAPI();
+    });
+  }
+
+  // Load cached notifications from local storage (fallback)
   Future<void> _loadCachedNotifications() async {
     setState(() {
       _isLoading = true;
@@ -78,7 +135,8 @@ class _NotificationsCenterState extends State<NotificationsCenter>
         setState(() {
           _allNotifications = notifications.map((notification) {
             return {
-              'id': notification['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+              'id': notification['id'] ??
+                  DateTime.now().millisecondsSinceEpoch.toString(),
               'type': notification['type'] ?? 'general',
               'title': notification['title'] ?? '',
               'message': notification['message'] ?? '',
@@ -98,124 +156,49 @@ class _NotificationsCenterState extends State<NotificationsCenter>
         });
       }
     } catch (e) {
-      print('Error loading cached notifications: $e');
       setState(() {
         _isLoading = false;
       });
     }
   }
 
-  // TODO: Re-enable when Django Channels supports trip notification events
-  /*
-  // Connect to Socket.IO and subscribe to all buses
-  Future<void> _connectToSocket() async {
-    try {
-      await _socketService.connect();
-      print('✅ Connected to Socket.IO for notifications');
-
-      // Subscribe to all buses that this parent's children are assigned to
-      await _subscribeToChildrenBuses();
-    } catch (e) {
-      print('❌ Failed to connect to Socket.IO: $e');
-      setState(() {
-        _errorMessage = 'Failed to connect to notification service';
-      });
-    }
-  }
-
-  // Subscribe to all buses for parent's children
-  Future<void> _subscribeToChildrenBuses() async {
-    try {
-      // Fetch children from API instead of relying on cached data
-      print('🔍 Fetching children to subscribe to buses...');
-      final children = await _apiService.getMyChildren();
-
-      if (children.isNotEmpty) {
-        print('✅ Found ${children.length} children');
-
-        // Subscribe to each child's bus
-        for (var child in children) {
-          final busId = child.assignedBus?.id;
-          if (busId != null) {
-            print('📡 Subscribing to bus $busId for child ${child.firstName}');
-            _socketService.subscribeToBus(busId);
-            // Add a small delay to ensure subscription completes
-            await Future.delayed(Duration(milliseconds: 100));
-          } else {
-            print('⚠️  Child ${child.firstName} has no bus assigned');
-          }
-        }
-        print('✅ Finished subscribing to all buses');
-      } else {
-        print('⚠️  No children found for this parent');
-      }
-    } catch (e) {
-      print('❌ Error subscribing to children buses: $e');
-    }
-  }
-
-  // Setup Socket.IO event listeners
-  void _setupSocketListeners() {
-    print('🔧 NotificationsCenter: Setting up socket listeners');
-
-    // Listen for trip started events
-    _tripStartedSubscription = _socketService.tripStartedStream.listen((data) {
-      print('🚌 NotificationsCenter: Received trip_started event: $data');
+  // Setup real-time notification listeners
+  void _setupNotificationListeners() {
+    // Listen for all incoming notifications from WebSocket
+    _notificationsSubscription =
+        _notificationsService.allNotificationsStream.listen((data) {
       _addNotification({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'type': 'trip_started',
-        'title': data['title'] ?? '🚌 Trip Started',
-        'message': data['message'] ?? 'Your child\'s bus has started the trip',
-        'isRead': false,
-        'timestamp': DateTime.now(),
-        'expanded': false,
-      });
-    });
-
-    // Listen for child status updates (pickup/dropoff)
-    _childStatusSubscription = _socketService.childStatusUpdateStream.listen((data) {
-      print('👶 NotificationsCenter: Received child_status_update event: $data');
-      _addNotification({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'type': data['status'] ?? 'general',
-        'title': data['title'] ?? 'Child Status Update',
+        'id': data['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        'type': data['notification_type'] ?? 'general',
+        'title': data['title'] ?? 'Notification',
         'message': data['message'] ?? '',
+        'fullMessage': data['full_message'],
         'isRead': false,
-        'timestamp': DateTime.now(),
+        'timestamp': data['timestamp'] != null
+            ? DateTime.parse(data['timestamp'])
+            : DateTime.now(),
         'expanded': false,
+        // Store additional data
+        'bus_id': data['bus_id'],
+        'bus_number': data['bus_number'],
+        'child_id': data['child_id'],
+        'child_name': data['child_name'],
+        'trip_id': data['trip_id'],
       });
-    });
-
-    // Listen for trip ended events
-    _tripEndedSubscription = _socketService.tripEndedStream.listen((data) {
-      print('🏁 NotificationsCenter: Received trip_ended event: $data');
-      _addNotification({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'type': 'trip_ended',
-        'title': data['title'] ?? '✅ Trip Completed',
-        'message': data['message'] ?? 'The trip has been completed',
-        'isRead': false,
-        'timestamp': DateTime.now(),
-        'expanded': false,
-      });
-    });
+    }, onError: (error) {});
   }
-  */
 
   // Add a new notification
   void _addNotification(Map<String, dynamic> notification) {
-    print('➕ NotificationsCenter: Adding notification: ${notification['title']}');
-
     // Use post-frame callback to avoid setState during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
-        print('⚠️  NotificationsCenter: Widget not mounted, skipping notification');
         return;
       }
 
-      print('✅ NotificationsCenter: Adding notification to UI');
       setState(() {
-        _allNotifications.insert(0, notification); // Add to beginning (newest first)
+        _allNotifications.insert(
+            0, notification); // Add to beginning (newest first)
         _groupNotificationsByDate();
       });
 
@@ -244,26 +227,13 @@ class _NotificationsCenterState extends State<NotificationsCenter>
           'title': notification['title'],
           'message': notification['message'],
           'isRead': notification['isRead'],
-          'timestamp': (notification['timestamp'] as DateTime).toIso8601String(),
+          'timestamp':
+              (notification['timestamp'] as DateTime).toIso8601String(),
         };
       }).toList();
 
       await prefs.setString(_notificationsKey, jsonEncode(notificationsJson));
-    } catch (e) {
-      print('Error saving notifications: $e');
-    }
-  }
-
-  @override
-  void dispose() {
-    print('🔴 NotificationsCenter: dispose called');
-    _scrollController.dispose();
-    // TODO: Re-enable when Django Channels supports trip notification events
-    // _tripStartedSubscription?.cancel();
-    // _childStatusSubscription?.cancel();
-    // _tripEndedSubscription?.cancel();
-    _refreshTimer?.cancel();
-    super.dispose();
+    } catch (e) {}
   }
 
   void _onScroll() {
@@ -349,6 +319,11 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   }
 
   void _markAllAsRead() async {
+    // Call API to mark all as read
+    try {
+      await _apiService.markNotificationsAsRead();
+    } catch (e) {}
+
     setState(() {
       for (var notification in _allNotifications) {
         notification['isRead'] = true;
@@ -417,6 +392,25 @@ class _NotificationsCenterState extends State<NotificationsCenter>
       notification['isRead'] = true;
       _groupNotificationsByDate();
     });
+
+    // Call API to mark as read
+    try {
+      // Handle both int and string ID types
+      final dynamic idValue = notification['id'];
+      final int notificationId;
+
+      if (idValue is int) {
+        notificationId = idValue;
+      } else if (idValue is String) {
+        notificationId = int.parse(idValue);
+      } else {
+        throw Exception('Invalid notification ID type: ${idValue.runtimeType}');
+      }
+
+      await _apiService
+          .markNotificationsAsRead(notificationIds: [notificationId]);
+    } catch (e) {}
+
     await _saveNotifications();
     HapticFeedback.lightImpact();
   }
@@ -433,6 +427,13 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   }
 
   void _deleteNotification(Map<String, dynamic> notification) async {
+    // Call API to mark as deleted/read
+    try {
+      final notificationId = int.parse(notification['id']);
+      await _apiService
+          .markNotificationsAsRead(notificationIds: [notificationId]);
+    } catch (e) {}
+
     setState(() {
       _allNotifications.removeWhere((n) => n['id'] == notification['id']);
       _groupNotificationsByDate();
@@ -468,7 +469,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
 
   Future<void> _onRefresh() async {
     HapticFeedback.lightImpact();
-    await _loadCachedNotifications();
+    await _loadNotificationsFromAPI();
   }
 
   @override
@@ -732,5 +733,13 @@ class _NotificationsCenterState extends State<NotificationsCenter>
       default:
         return filterType;
     }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _notificationsSubscription?.cancel();
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 }
