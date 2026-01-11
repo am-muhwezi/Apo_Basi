@@ -8,6 +8,8 @@ import '../widgets/custom_error_widget.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables (cached after first load)
   await dotenv.load();
 
   bool _hasShownError = false;
@@ -42,7 +44,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return Sizer(builder: (context, orientation, screenType) {
       return MaterialApp(
-        title: 'bustracker_pro',
+        title: 'Basi Driver',
         theme: AppTheme.lightDriverTheme,
         darkTheme: AppTheme.darkDriverTheme,
         themeMode: ThemeMode.light,

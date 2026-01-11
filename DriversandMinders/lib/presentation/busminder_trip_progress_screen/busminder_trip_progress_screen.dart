@@ -33,6 +33,8 @@ class _BusminderTripProgressScreenState
 
   int? _busId;
   String? _tripType;
+  String? _tripStartTime;
+  String? _busNumber;
   List<Map<String, dynamic>> _allStudents = [];
 
   // Mock data for trip progress
@@ -154,7 +156,47 @@ class _BusminderTripProgressScreenState
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this, initialIndex: 1);
-    _loadTripData();
+    _checkActiveTrip();
+  }
+
+  // Clear all attendance statuses for a specific trip
+  Future<void> _clearAttendanceStatuses(
+      SharedPreferences prefs, int? busId, String? tripType) async {
+    if (busId == null || tripType == null) return;
+
+    final keys = prefs.getKeys();
+    final prefix = 'attendance_${busId}_${tripType}_';
+    for (final key in keys) {
+      if (key.startsWith(prefix)) {
+        await prefs.remove(key);
+      }
+    }
+  }
+
+  Future<void> _checkActiveTrip() async {
+    final prefs = await SharedPreferences.getInstance();
+    final busId = prefs.getInt('current_bus_id');
+    final tripType = prefs.getString('current_trip_type');
+
+    if (busId == null || tripType == null) {
+      // No active trip, redirect to home
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text('No active trip found. Please start a shift first.'),
+              backgroundColor: AppTheme.criticalAlert,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          Navigator.pushReplacementNamed(
+              context, '/busminder-start-shift-screen');
+        });
+      }
+    } else {
+      _loadTripData();
+    }
   }
 
   Future<void> _loadTripData() async {
@@ -162,6 +204,32 @@ class _BusminderTripProgressScreenState
       final prefs = await SharedPreferences.getInstance();
       _tripType = prefs.getString('current_trip_type');
       _busId = prefs.getInt('current_bus_id');
+
+      // Get trip start time (use current time if not stored)
+      _tripStartTime = prefs.getString('trip_start_time');
+      if (_tripStartTime == null) {
+        _tripStartTime = DateTime.now().toString().substring(11, 16);
+        await prefs.setString('trip_start_time', _tripStartTime!);
+      }
+
+      // Try to get bus number from API
+      try {
+        final busesData = await _apiService.getBusMinderBuses();
+        final buses = busesData['buses'] as List<dynamic>?;
+        if (buses != null && _busId != null) {
+          final bus = buses.firstWhere(
+            (b) => (b as Map<String, dynamic>)['id'] == _busId,
+            orElse: () => null,
+          );
+          if (bus != null) {
+            _busNumber =
+                (bus as Map<String, dynamic>)['number_plate'] as String?;
+          }
+        }
+      } catch (e) {
+      }
+
+      _busNumber ??= 'BUS-${_busId?.toString().padLeft(3, '0')}';
 
       if (_busId != null) {
         // Fetch children for this bus
@@ -177,19 +245,23 @@ class _BusminderTripProgressScreenState
 
           // Calculate real statistics
           int totalStudents = _allStudents.length;
-          int pickedUp = _allStudents.where((s) => s['status'] == 'picked_up').length;
-          int droppedOff = _allStudents.where((s) => s['status'] == 'dropped_off').length;
-          int absent = _allStudents.where((s) => s['status'] == 'absent').length;
-          int completed = (_tripType == 'pickup' ? pickedUp : droppedOff) + absent;
+          int pickedUp =
+              _allStudents.where((s) => s['status'] == 'picked_up').length;
+          int droppedOff =
+              _allStudents.where((s) => s['status'] == 'dropped_off').length;
+          int absent =
+              _allStudents.where((s) => s['status'] == 'absent').length;
+          int completed =
+              (_tripType == 'pickup' ? pickedUp : droppedOff) + absent;
 
           _statisticsData['totalStudents'] = totalStudents;
           _statisticsData['attendanceRate'] = totalStudents > 0
-            ? double.parse(((completed / totalStudents) * 100).toStringAsFixed(1))
-            : 0.0;
+              ? double.parse(
+                  ((completed / totalStudents) * 100).toStringAsFixed(1))
+              : 0.0;
         });
       }
     } catch (e) {
-      print('Error loading trip data: $e');
     }
   }
 
@@ -348,14 +420,27 @@ class _BusminderTripProgressScreenState
   }
 
   void _showToast(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: AppTheme.primaryBusminder,
-      textColor: Colors.white,
-      fontSize: 14.0,
-    );
+    try {
+      Fluttertoast.showToast(
+        msg: message,
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppTheme.primaryBusminder,
+        textColor: Colors.white,
+        fontSize: 14.0,
+      );
+    } catch (e) {
+      // Fallback for platforms that don't support fluttertoast (like Linux)
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: AppTheme.primaryBusminder,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   void _handleCompleteTripConfirmation() {
@@ -370,8 +455,10 @@ class _BusminderTripProgressScreenState
     try {
       // Calculate attendance summary
       int totalStudents = _allStudents.length;
-      int pickedUp = _allStudents.where((s) => s['status'] == 'picked_up').length;
-      int droppedOff = _allStudents.where((s) => s['status'] == 'dropped_off').length;
+      int pickedUp =
+          _allStudents.where((s) => s['status'] == 'picked_up').length;
+      int droppedOff =
+          _allStudents.where((s) => s['status'] == 'dropped_off').length;
       int absent = _allStudents.where((s) => s['status'] == 'absent').length;
       int pending = _allStudents.where((s) => s['status'] == 'pending').length;
 
@@ -396,6 +483,9 @@ class _BusminderTripProgressScreenState
       await prefs.remove('current_trip_type');
       await prefs.remove('current_bus_id');
       await prefs.remove('current_trip_id');
+
+      // Clear attendance statuses for this completed trip
+      await _clearAttendanceStatuses(prefs, _busId, _tripType);
 
       _showToast('Trip completed successfully!');
 
@@ -423,9 +513,67 @@ class _BusminderTripProgressScreenState
         );
       });
     } catch (e) {
-      print('Error completing trip: $e');
       _showToast('Error completing trip. Please try again.');
     }
+  }
+
+  Widget _buildModernStatCard(
+      String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: EdgeInsets.all(4.w),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.12),
+            color.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.all(2.w),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 22,
+            ),
+          ),
+          SizedBox(height: 1.5.h),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: color,
+              letterSpacing: -0.5,
+            ),
+          ),
+          SizedBox(height: 0.3.h),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSecondary,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildSummaryRow(String label, String value, IconData icon) {
@@ -449,7 +597,8 @@ class _BusminderTripProgressScreenState
           Expanded(
             child: Text(
               label,
-              style: AppTheme.lightBusminderTheme.textTheme.bodyMedium?.copyWith(
+              style:
+                  AppTheme.lightBusminderTheme.textTheme.bodyMedium?.copyWith(
                 color: AppTheme.textSecondary,
               ),
             ),
@@ -477,7 +626,9 @@ class _BusminderTripProgressScreenState
         ),
         appBar: CustomAppBar(
           title: 'Trip Progress',
-          subtitle: _tripData['routeName'] as String,
+          subtitle: _busNumber != null && _tripType != null
+              ? '$_busNumber - ${_tripType == 'pickup' ? 'Morning' : 'Afternoon'} (Started ${_tripStartTime ?? 'N/A'})'
+              : 'Loading trip info...',
           actions: [
             IconButton(
               onPressed: _handleRefresh,
@@ -515,7 +666,8 @@ class _BusminderTripProgressScreenState
             onTap: (index) {
               if (index == 0) {
                 // Use pushReplacementNamed to avoid stack buildup
-                Navigator.pushReplacementNamed(context, '/busminder-attendance-screen');
+                Navigator.pushReplacementNamed(
+                    context, '/busminder-attendance-screen');
               }
             },
           ),
@@ -534,58 +686,221 @@ class _BusminderTripProgressScreenState
 
                   // Trip Info Card
                   Container(
-                    padding: EdgeInsets.all(4.w),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppTheme.borderLight),
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.white,
+                          AppTheme.backgroundSecondary.withValues(alpha: 0.3),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppTheme.primaryBusminder.withValues(alpha: 0.1),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              AppTheme.primaryBusminder.withValues(alpha: 0.08),
+                          offset: const Offset(0, 4),
+                          blurRadius: 12,
+                          spreadRadius: 0,
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Icon(Icons.directions_bus, color: AppTheme.primaryBusminder, size: 24),
-                            SizedBox(width: 2.w),
-                            Expanded(
-                              child: Text(
-                                _tripType == 'pickup' ? 'Morning Pickup Trip' : 'Afternoon Dropoff Trip',
-                                style: AppTheme.lightBusminderTheme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w700,
+                        // Header Section with Gradient
+                        Container(
+                          padding: EdgeInsets.all(4.5.w),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.primaryBusminder,
+                                AppTheme.primaryBusminder
+                                    .withValues(alpha: 0.85),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(20),
+                              topRight: Radius.circular(20),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(2.5.w),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.directions_bus,
+                                  color: Colors.white,
+                                  size: 28,
                                 ),
                               ),
-                            ),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
-                              decoration: BoxDecoration(
-                                color: AppTheme.successAction.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
+                              SizedBox(width: 3.w),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _tripType == 'pickup'
+                                          ? 'Morning Pickup Trip'
+                                          : 'Afternoon Dropoff Trip',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                    SizedBox(height: 0.5.h),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.access_time,
+                                          color: Colors.white
+                                              .withValues(alpha: 0.9),
+                                          size: 14,
+                                        ),
+                                        SizedBox(width: 1.w),
+                                        Text(
+                                          'Started at ${_tripStartTime ?? 'N/A'}',
+                                          style: TextStyle(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.9),
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
-                              child: Text(
-                                'ACTIVE',
-                                style: TextStyle(
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 3.5.w,
+                                  vertical: 1.2.h,
+                                ),
+                                decoration: BoxDecoration(
                                   color: AppTheme.successAction,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.2),
+                                      offset: const Offset(0, 2),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.circle,
+                                      color: Colors.white,
+                                      size: 8,
+                                    ),
+                                    SizedBox(width: 1.5.w),
+                                    Text(
+                                      'ACTIVE',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 12,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 2.h),
-                        Divider(),
-                        SizedBox(height: 2.h),
-                        Text(
-                          'Trip Summary',
-                          style: AppTheme.lightBusminderTheme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
+                            ],
                           ),
                         ),
-                        SizedBox(height: 2.h),
-                        _buildSummaryRow('Total Students', '${_statisticsData['totalStudents']}', Icons.people),
-                        _buildSummaryRow('Completed', '${_allStudents.where((s) => s['status'] == (_tripType == 'pickup' ? 'picked_up' : 'dropped_off')).length}', Icons.check_circle),
-                        _buildSummaryRow('Absent', '${_allStudents.where((s) => s['status'] == 'absent').length}', Icons.person_off),
-                        _buildSummaryRow('Pending', '${_allStudents.where((s) => s['status'] == 'pending').length}', Icons.schedule),
+                        // Summary Section
+                        Padding(
+                          padding: EdgeInsets.all(4.5.w),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 4,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryBusminder,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  SizedBox(width: 2.w),
+                                  Text(
+                                    'Trip Summary',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textPrimary,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 2.5.h),
+                              // Stats Grid
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildModernStatCard(
+                                      'Total',
+                                      '${_statisticsData['totalStudents']}',
+                                      Icons.people,
+                                      AppTheme.primaryBusminder,
+                                    ),
+                                  ),
+                                  SizedBox(width: 3.w),
+                                  Expanded(
+                                    child: _buildModernStatCard(
+                                      'Completed',
+                                      '${_allStudents.where((s) => s['status'] == (_tripType == 'pickup' ? 'picked_up' : 'dropped_off')).length}',
+                                      Icons.check_circle,
+                                      AppTheme.successAction,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 2.h),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildModernStatCard(
+                                      'Absent',
+                                      '${_allStudents.where((s) => s['status'] == 'absent').length}',
+                                      Icons.person_off,
+                                      AppTheme.criticalAlert,
+                                    ),
+                                  ),
+                                  SizedBox(width: 3.w),
+                                  Expanded(
+                                    child: _buildModernStatCard(
+                                      'Pending',
+                                      '${_allStudents.where((s) => s['status'] == 'pending').length}',
+                                      Icons.schedule,
+                                      AppTheme.warningState,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -593,29 +908,51 @@ class _BusminderTripProgressScreenState
                   SizedBox(height: 3.h),
 
                   // Complete Trip Button
-                  SizedBox(
+                  Container(
                     width: double.infinity,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.successAction,
+                          AppTheme.successAction.withValues(alpha: 0.85),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.successAction.withValues(alpha: 0.3),
+                          offset: const Offset(0, 4),
+                          blurRadius: 12,
+                          spreadRadius: 0,
+                        ),
+                      ],
+                    ),
                     child: ElevatedButton(
                       onPressed: _handleCompleteTripConfirmation,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.successAction,
+                        backgroundColor: Colors.transparent,
                         foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 2.h),
+                        shadowColor: Colors.transparent,
+                        padding: EdgeInsets.symmetric(vertical: 2.2.h),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        elevation: 2,
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.check_circle, color: Colors.white, size: 24),
-                          SizedBox(width: 2.w),
+                          Icon(Icons.check_circle,
+                              color: Colors.white, size: 26),
+                          SizedBox(width: 3.w),
                           Text(
                             'Complete Trip & End Shift',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              letterSpacing: 0.3,
                             ),
                           ),
                         ],

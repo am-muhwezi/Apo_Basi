@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import '../config/api_config.dart';
 import '../config/location_config.dart';
-import 'bus_websocket_service.dart';
 
 /// Driver Location Service
 ///
@@ -25,7 +24,8 @@ import 'bus_websocket_service.dart';
 /// - Battery-saving mode when low battery
 /// - Configurable update intervals
 class DriverLocationService {
-  static final DriverLocationService _instance = DriverLocationService._internal();
+  static final DriverLocationService _instance =
+      DriverLocationService._internal();
   factory DriverLocationService() => _instance;
   DriverLocationService._internal();
 
@@ -35,16 +35,15 @@ class DriverLocationService {
   Position? _lastSentPosition;
   DateTime? _lastUpdateTime;
   int? _currentBusId;
+  int? _currentTripId;
 
-  // Dio HTTP client (fallback for failed WebSocket)
+  // Dio HTTP client for location HTTP endpoints
   late Dio _dio;
-
-  // WebSocket service for real-time location updates
-  final _wsService = BusWebSocketService();
 
   // Retry queue for failed updates
   final List<Map<String, dynamic>> _retryQueue = [];
   Timer? _retryTimer;
+  Timer? _tripUpdateTimer;
 
   // Stream controllers
   final _trackingStateController = StreamController<bool>.broadcast();
@@ -92,10 +91,9 @@ class DriverLocationService {
     // Load saved bus ID
     final prefs = await SharedPreferences.getInstance();
     _currentBusId = prefs.getInt('current_bus_id');
+    _currentTripId = prefs.getInt('current_trip_id');
 
-    if (LocationConfig.enableLocationLogging) {
-      print('📍 DriverLocationService initialized (foreground only)');
-    }
+    if (LocationConfig.enableLocationLogging) {}
   }
 
   /// Set the current bus ID for tracking
@@ -104,17 +102,13 @@ class DriverLocationService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('current_bus_id', busId);
 
-    if (LocationConfig.enableLocationLogging) {
-      print('🚌 Bus ID set to: $busId');
-    }
+    if (LocationConfig.enableLocationLogging) {}
   }
 
   /// Start location tracking
   Future<bool> startTracking() async {
     if (_isTracking) {
-      if (LocationConfig.enableLocationLogging) {
-        print('⚠️ Location tracking already active');
-      }
+      if (LocationConfig.enableLocationLogging) {}
       return true;
     }
 
@@ -140,15 +134,13 @@ class DriverLocationService {
     _isTracking = true;
     _trackingStateController.add(true);
 
-    if (LocationConfig.enableLocationLogging) {
-      print('✅ Location tracking started for bus $_currentBusId');
-    }
-
-    // Connect to WebSocket for real-time updates
-    await _connectWebSocket();
+    if (LocationConfig.enableLocationLogging) {}
 
     // Start periodic location updates
     _startPeriodicUpdates();
+
+    // Start trip-level updates if a trip is active
+    _startTripUpdateTimer();
 
     // Start retry timer for failed updates
     if (LocationConfig.cacheFailedUpdates) {
@@ -175,22 +167,28 @@ class DriverLocationService {
     _isTracking = false;
     _trackingStateController.add(false);
 
-    // Disconnect WebSocket
-    _wsService.disconnect();
-
     // Cancel timers
     _locationTimer?.cancel();
     _locationTimer = null;
     _retryTimer?.cancel();
     _retryTimer = null;
+    _tripUpdateTimer?.cancel();
+    _tripUpdateTimer = null;
 
-    if (LocationConfig.enableLocationLogging) {
-      print('🛑 Location tracking stopped (foreground only)');
-    }
+    if (LocationConfig.enableLocationLogging) {}
 
     // Save tracking state
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('is_tracking', false);
+  }
+
+  /// Set the current trip ID for trip-level updates
+  Future<void> setTripId(int? tripId) async {
+    _currentTripId = tripId;
+    final prefs = await SharedPreferences.getInstance();
+    if (tripId != null) {
+      await prefs.setInt('current_trip_id', tripId);
+    }
   }
 
   /// Toggle tracking on/off
@@ -200,58 +198,6 @@ class DriverLocationService {
       return false;
     } else {
       return await startTracking();
-    }
-  }
-
-  /// Connect to WebSocket for real-time location updates
-  Future<void> _connectWebSocket() async {
-    if (_currentBusId == null) {
-      if (LocationConfig.enableLocationLogging) {
-        print('❌ Cannot connect to WebSocket: No bus ID');
-      }
-      return;
-    }
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final accessToken = prefs.getString('access_token');
-
-      if (accessToken == null) {
-        if (LocationConfig.enableLocationLogging) {
-          print('❌ Cannot connect to WebSocket: No access token');
-        }
-        return;
-      }
-
-      if (LocationConfig.enableLocationLogging) {
-        print('🔌 Connecting to WebSocket for bus $_currentBusId...');
-      }
-
-      await _wsService.connectToBus(
-        busId: _currentBusId!,
-        accessToken: accessToken,
-      );
-
-      // Listen for connection state
-      _wsService.connectionStateStream.listen((isConnected) {
-        if (LocationConfig.enableLocationLogging) {
-          print(isConnected
-            ? '✅ WebSocket connected successfully'
-            : '❌ WebSocket disconnected');
-        }
-      });
-
-      // Listen for errors
-      _wsService.errorStream.listen((error) {
-        if (LocationConfig.enableLocationLogging) {
-          print('❌ WebSocket error: $error');
-        }
-      });
-
-    } catch (e) {
-      if (LocationConfig.enableLocationLogging) {
-        print('❌ Failed to connect to WebSocket: $e');
-      }
     }
   }
 
@@ -273,9 +219,7 @@ class DriverLocationService {
     // Request background location on Android
     if (LocationConfig.requestBackgroundLocation) {
       // Background permission handled by platform-specific code
-      if (LocationConfig.enableLocationLogging) {
-        print('📱 Background location permission requested');
-      }
+      if (LocationConfig.enableLocationLogging) {}
     }
 
     return true;
@@ -316,63 +260,38 @@ class DriverLocationService {
 
       // Check distance filter
       if (_shouldFilterByDistance(position)) {
-        if (LocationConfig.enableLocationLogging) {
-          print('⏭️ Skipping update - distance filter');
-        }
+        if (LocationConfig.enableLocationLogging) {}
         return;
       }
 
-      // Send via WebSocket if connected
-      if (_wsService.isConnected) {
-        _wsService.sendLocationUpdate(position);
+      // Always send via HTTP to the bus push-location endpoint
+      final payload = {
+        'lat': position.latitude,
+        'lng': position.longitude,
+        'speed': position.speed,
+        'heading': position.heading,
+      };
 
-        // Success
+      final response = await _dio.post(
+        '/api/buses/push-location/',
+        data: payload,
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
         _lastSentPosition = position;
         _lastUpdateTime = DateTime.now();
         _totalUpdatesSent++;
-
         _locationUpdateController.add(position);
         _updateStats();
 
-        if (LocationConfig.enableLocationLogging) {
-          print('✅ Location sent via WebSocket: ${position.latitude}, ${position.longitude}');
-        }
+        if (LocationConfig.enableLocationLogging) {}
 
         // Process retry queue on successful update
         if (_retryQueue.isNotEmpty) {
           _processRetryQueue();
         }
       } else {
-        // Fallback to HTTP if WebSocket not connected
-        if (LocationConfig.enableLocationLogging) {
-          print('⚠️ WebSocket not connected, using HTTP fallback');
-        }
-
-        final payload = {
-          'lat': position.latitude,
-          'lng': position.longitude,
-          'speed': position.speed,
-          'heading': position.heading,
-        };
-
-        final response = await _dio.post(
-          '/api/buses/push-location/',
-          data: payload,
-        );
-
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          _lastSentPosition = position;
-          _lastUpdateTime = DateTime.now();
-          _totalUpdatesSent++;
-          _locationUpdateController.add(position);
-          _updateStats();
-
-          if (LocationConfig.enableLocationLogging) {
-            print('✅ Location sent via HTTP: ${position.latitude}, ${position.longitude}');
-          }
-        } else {
-          throw Exception('Invalid response: ${response.statusCode}');
-        }
+        throw Exception('Invalid response: ${response.statusCode}');
       }
     } catch (e) {
       _handleLocationUpdateError(e);
@@ -381,9 +300,7 @@ class DriverLocationService {
 
   /// Handle location update errors
   void _handleLocationUpdateError(dynamic error) {
-    if (LocationConfig.enableLocationLogging) {
-      print('❌ Failed to send location: $error');
-    }
+    if (LocationConfig.enableLocationLogging) {}
 
     _failedUpdates++;
 
@@ -402,9 +319,7 @@ class DriverLocationService {
         _retryQueue.add(payload);
         _queuedUpdates++;
       } catch (e) {
-        if (LocationConfig.enableLocationLogging) {
-          print('❌ Failed to queue location: $e');
-        }
+        if (LocationConfig.enableLocationLogging) {}
       }
     }
 
@@ -460,6 +375,33 @@ class DriverLocationService {
     });
   }
 
+  /// Start periodic HTTP updates to the trip update-location endpoint
+  void _startTripUpdateTimer() {
+    if (_tripUpdateTimer != null) return;
+
+    _tripUpdateTimer = Timer.periodic(
+      LocationConfig.locationUpdateInterval,
+      (_) async {
+        if (!_isTracking || _currentTripId == null) return;
+        if (_lastSentPosition == null) return;
+
+        try {
+          await _dio.post(
+            '/api/trips/${_currentTripId!}/update-location/',
+            data: {
+              'latitude': _lastSentPosition!.latitude,
+              'longitude': _lastSentPosition!.longitude,
+              'speed': _lastSentPosition!.speed,
+              'heading': _lastSentPosition!.heading,
+            },
+          );
+        } catch (_) {
+          // Silent failure; bus-level updates still continue
+        }
+      },
+    );
+  }
+
   /// Process retry queue
   Future<void> _processRetryQueue() async {
     if (_retryQueue.isEmpty || !_isTracking) return;
@@ -478,9 +420,7 @@ class DriverLocationService {
           _retryQueue.remove(payload);
           _queuedUpdates--;
 
-          if (LocationConfig.enableLocationLogging) {
-            print('✅ Retry successful for queued location');
-          }
+          if (LocationConfig.enableLocationLogging) {}
         } else {
           // Increment retry count
           payload['retry_count'] = (payload['retry_count'] ?? 0) + 1;
@@ -489,16 +429,12 @@ class DriverLocationService {
           if (payload['retry_count'] > LocationConfig.locationUpdateRetries) {
             _retryQueue.remove(payload);
             _queuedUpdates--;
-            if (LocationConfig.enableLocationLogging) {
-              print('❌ Max retries reached, dropping location');
-            }
+            if (LocationConfig.enableLocationLogging) {}
           }
         }
       } catch (e) {
         // Keep in queue for next retry
-        if (LocationConfig.enableLocationLogging) {
-          print('❌ Retry failed: $e');
-        }
+        if (LocationConfig.enableLocationLogging) {}
       }
     }
 

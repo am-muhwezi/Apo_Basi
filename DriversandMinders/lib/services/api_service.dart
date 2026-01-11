@@ -33,10 +33,7 @@ class ApiService {
         return handler.next(options);
       },
       onError: (error, handler) {
-        print('API Error: ${error.message}');
-        if (error.response != null) {
-          print('Error Response: ${error.response?.data}');
-        }
+        if (error.response != null) {}
         return handler.next(error);
       },
     ));
@@ -101,10 +98,27 @@ class ApiService {
 
         // Save user data
         await _saveUserId(data['user_id']);
+
         await prefs.setString('user_role', 'driver');
         await prefs.setString('user_name', data['name']);
         await prefs.setString('user_phone', data['phone']);
         await prefs.setBool('is_logged_in', true);
+
+        // Store license number and expiry if present
+        if (data.containsKey('license_number') &&
+            data['license_number'] != null) {
+          await prefs.setString(
+              'license_number', data['license_number'].toString());
+        }
+        if (data.containsKey('license_expiry') &&
+            data['license_expiry'] != null) {
+          await prefs.setString(
+              'license_expiry', data['license_expiry'].toString());
+        }
+        if (data.containsKey('email') && data['email'] != null) {
+          // Store under user_email to match profile screens
+          await prefs.setString('user_email', data['email'].toString());
+        }
 
         // Save bus ID if available
         if (data['bus'] != null && data['bus']['id'] != null) {
@@ -233,10 +247,15 @@ class ApiService {
   }
 
   // Get children for a specific bus (for bus minders)
-  // Backend endpoint: GET /api/busminders/buses/{bus_id}/children/
-  Future<List<dynamic>> getBusChildren(int busId) async {
+  // Backend endpoint: GET /api/busminders/buses/{bus_id}/children/?trip_type=pickup|dropoff
+  Future<List<dynamic>> getBusChildren(int busId, {String? tripType}) async {
     try {
-      final response = await _dio.get('/api/busminders/buses/$busId/children/');
+      final Map<String, dynamic> queryParams =
+          tripType != null ? {'trip_type': tripType} : {};
+      final response = await _dio.get(
+        '/api/busminders/buses/$busId/children/',
+        queryParameters: queryParams,
+      );
 
       if (response.statusCode == 200) {
         return response.data['children'] ?? [];
@@ -324,7 +343,6 @@ class ApiService {
       );
       return response.data;
     } catch (e) {
-      print('Error completing trip: $e');
       rethrow;
     }
   }
@@ -351,12 +369,9 @@ class ApiService {
         return response.data as List<dynamic>;
       } else {
         // If it's not a list, return empty list
-        print(
-            'Warning: getTripHistory expected a list but got: ${response.data.runtimeType}');
         return [];
       }
     } catch (e) {
-      print('Error getting trip history: $e');
       return []; // Return empty list instead of rethrowing
     }
   }
@@ -367,7 +382,6 @@ class ApiService {
       final response = await _dio.get('/api/trips/$tripId/');
       return response.data;
     } catch (e) {
-      print('Error getting trip details: $e');
       rethrow;
     }
   }
@@ -385,7 +399,6 @@ class ApiService {
       );
       return response.data;
     } catch (e) {
-      print('Error starting trip: $e');
       rethrow;
     }
   }
@@ -410,7 +423,6 @@ class ApiService {
       );
       return response.data;
     } catch (e) {
-      print('Error ending trip: $e');
       rethrow;
     }
   }
@@ -424,7 +436,6 @@ class ApiService {
       }
       return null;
     } catch (e) {
-      print('Error getting active trip: $e');
       return null;
     }
   }
@@ -450,7 +461,6 @@ class ApiService {
         },
       );
     } catch (e) {
-      print('Error pushing location: $e');
       rethrow;
     }
   }

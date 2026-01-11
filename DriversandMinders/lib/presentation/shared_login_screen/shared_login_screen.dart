@@ -122,8 +122,7 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
           route = '/busminder-start-shift-screen';
         } catch (busMinderError) {
           // Neither worked
-          throw Exception(
-              'Phone number not registered. Please contact admin.');
+          throw Exception('Phone number not registered. Please contact admin.');
         }
       }
 
@@ -140,7 +139,8 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
           await prefs.setString('cached_bus_data', jsonEncode(response['bus']));
         }
         if (response['route'] != null) {
-          await prefs.setString('cached_route_data', jsonEncode(response['route']));
+          await prefs.setString(
+              'cached_route_data', jsonEncode(response['route']));
         }
       }
 
@@ -246,7 +246,7 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
                           children: [
                             // Copyright
                             Text(
-                              '© 2024 ApoBasi. All rights reserved.',
+                              '© 2026 ApoBasi - Powered by SoG',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: colorScheme.onSurface
                                     .withValues(alpha: 0.5),

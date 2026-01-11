@@ -180,10 +180,10 @@ class CustomBottomBar extends StatelessWidget {
             route: '/driver-active-trip-screen',
           ),
           _NavigationItem(
-            icon: Icons.history_outlined,
-            selectedIcon: Icons.history,
-            label: 'History',
-            route: '/driver-trip-history-screen',
+            icon: Icons.person_outline,
+            selectedIcon: Icons.person,
+            label: 'Profile',
+            route: '/driver-profile-screen',
           ),
         ];
 

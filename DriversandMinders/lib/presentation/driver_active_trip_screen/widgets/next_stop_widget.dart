@@ -199,7 +199,9 @@ class NextStopWidget extends StatelessWidget {
                   ),
                   child: Center(
                     child: Text(
-                      studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
+                      studentName.isNotEmpty
+                          ? studentName[0].toUpperCase()
+                          : 'S',
                       style: theme.textTheme.headlineMedium?.copyWith(
                         color: AppTheme.primaryDriver,
                         fontWeight: FontWeight.w700,

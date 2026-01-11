@@ -251,14 +251,17 @@ class QuickActionsWidget extends StatelessWidget {
   }
 
   void _showToast(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: AppTheme.primaryBusminder,
-      textColor: Colors.white,
-      fontSize: 14.0,
-    );
+    try {
+      Fluttertoast.showToast(
+        msg: message,
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppTheme.primaryBusminder,
+        textColor: Colors.white,
+        fontSize: 14.0,
+      );
+    } catch (e) {
+      // Silently fail on unsupported platforms
+    }
   }
 }
-

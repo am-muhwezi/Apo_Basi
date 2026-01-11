@@ -30,7 +30,8 @@ class _BusMinderTripHistoryScreenState
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Get arguments passed from previous screen
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     if (args != null && args['showSummary'] == true) {
       setState(() {
         _showSummary = true;
@@ -52,7 +53,6 @@ class _BusMinderTripHistoryScreenState
         });
       }
     } catch (e) {
-      print('Error loading trip history: $e');
       if (mounted) {
         setState(() {
           _trips = [];
@@ -85,256 +85,261 @@ class _BusMinderTripHistoryScreenState
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false, // Prevent default back behavior
-      onPopInvoked: (didPop) async {
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
         if (!didPop) {
           _handleBackPress();
         }
       },
       child: Scaffold(
-        backgroundColor: AppTheme.backgroundPrimary,
-        appBar: AppBar(
-          backgroundColor: AppTheme.primaryBusminder,
-          elevation: 0,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: _handleBackPress,
-          ),
-          title: Text(
-            _showSummary ? 'Trip Completed' : 'Trip History',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18.sp,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        body: Column(
-          children: [
-            // Trip Summary (if just completed)
-            if (_showSummary && _tripSummary != null) _buildTripSummaryCard(),
+        backgroundColor: Color(0xFFF8FAFB),
+        body: _showSummary && _tripSummary != null
+            ? _buildModernSummaryView()
+            : _buildLoadingView(),
+      ),
+    );
+  }
 
-            // Filter tabs
-            Container(
-              color: Colors.white,
-              padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
-              child: Row(
+  Widget _buildLoadingView() {
+    return Center(
+      child: CircularProgressIndicator(color: AppTheme.primaryBusminder),
+    );
+  }
+
+  Widget _buildModernSummaryView() {
+    final totalStudents = _tripSummary!['totalStudents'] ?? 0;
+    final studentsCompleted = _tripSummary!['studentsCompleted'] ?? 0;
+    final studentsAbsent = _tripSummary!['studentsAbsent'] ?? 0;
+    final tripType = _tripSummary!['tripType'] ?? 'pickup';
+    final completionRate = totalStudents > 0
+        ? ((studentsCompleted / totalStudents) * 100).round()
+        : 0;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 6.w),
+        child: Column(
+          children: [
+            SizedBox(height: 4.h),
+
+            // Success animation area
+            Expanded(
+              flex: 2,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Expanded(
-                    child: _buildFilterButton(
-                      'Completed',
-                      'completed',
-                      Icons.check_circle,
+                  // Animated check icon
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.successAction,
+                          AppTheme.successAction.withOpacity(0.8),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.successAction.withOpacity(0.3),
+                          blurRadius: 20,
+                          offset: Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.check_rounded,
+                      color: Colors.white,
+                      size: 56,
                     ),
                   ),
-                  SizedBox(width: 2.w),
-                  Expanded(
-                    child: _buildFilterButton(
-                      'All Trips',
-                      'all',
-                      Icons.list,
+                  SizedBox(height: 3.h),
+                  Text(
+                    'Shift Complete!',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.textPrimary,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  SizedBox(height: 1.h),
+                  Text(
+                    tripType == 'pickup'
+                        ? 'Morning Pickup'
+                        : 'Afternoon Dropoff',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
             ),
 
-          // Trip list
-          Expanded(
-            child: _isLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                      color: AppTheme.primaryBusminder,
+            // Stats cards
+            Expanded(
+              flex: 3,
+              child: Column(
+                children: [
+                  // Completion rate card
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(5.w),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 16,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
                     ),
-                  )
-                : _trips.isEmpty
-                    ? Center(
-                        child: Column(
+                    child: Column(
+                      children: [
+                        Row(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Icon(
-                              Icons.history,
-                              size: 60.sp,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 2.h),
                             Text(
-                              'No trips found',
+                              '$completionRate',
                               style: TextStyle(
-                                fontSize: 16.sp,
-                                color: Colors.grey,
+                                fontSize: 48,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.successAction,
+                                height: 1,
+                              ),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.only(bottom: 0.8.h),
+                              child: Text(
+                                '%',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.successAction,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      )
-                    : RefreshIndicator(
-                        color: AppTheme.primaryBusminder,
-                        onRefresh: _loadTripHistory,
-                        child: ListView.builder(
-                          padding: EdgeInsets.all(4.w),
-                          itemCount: _trips.length,
-                          itemBuilder: (context, index) {
-                            final trip = _trips[index];
-                            return _buildTripCard(trip);
-                          },
+                        SizedBox(height: 0.5.h),
+                        Text(
+                          'Attendance Rate',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-          ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 2.h),
+
+                  // Stats row
+                  Row(
+                    children: [
+                      Expanded(
+                          child: _buildStatCard('$totalStudents', 'Total',
+                              Icons.people_outline, AppTheme.primaryBusminder)),
+                      SizedBox(width: 3.w),
+                      Expanded(
+                          child: _buildStatCard(
+                              '$studentsCompleted',
+                              'Done',
+                              Icons.check_circle_outline,
+                              AppTheme.successAction)),
+                      SizedBox(width: 3.w),
+                      Expanded(
+                          child: _buildStatCard('$studentsAbsent', 'Absent',
+                              Icons.cancel_outlined, AppTheme.criticalAlert)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Done button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    '/busminder-start-shift-screen',
+                    (route) => false,
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryBusminder,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 2.h),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 0,
+                ),
+                child: Text(
+                  'Done',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 3.h),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTripSummaryCard() {
-    final totalStudents = _tripSummary!['totalStudents'] ?? 0;
-    final studentsCompleted = _tripSummary!['studentsCompleted'] ?? 0;
-    final studentsAbsent = _tripSummary!['studentsAbsent'] ?? 0;
-    final studentsPending = _tripSummary!['studentsPending'] ?? 0;
-    final tripType = _tripSummary!['tripType'] ?? 'pickup';
-
+  Widget _buildStatCard(
+      String value, String label, IconData icon, Color color) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
-      padding: EdgeInsets.all(3.w),
+      padding: EdgeInsets.symmetric(vertical: 2.h, horizontal: 3.w),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primaryBusminder,
-            AppTheme.primaryBusminderLight,
-          ],
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryBusminder.withValues(alpha: 0.3),
-            offset: Offset(0, 4),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 12,
+            offset: Offset(0, 3),
           ),
         ],
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          // Success icon and message
-          Icon(
-            Icons.check_circle,
-            color: Colors.white,
-            size: 40.sp,
-          ),
+          Icon(icon, color: color, size: 24),
           SizedBox(height: 1.h),
           Text(
-            'Trip Completed Successfully!',
+            value,
             style: TextStyle(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textPrimary,
             ),
-            textAlign: TextAlign.center,
           ),
-          SizedBox(height: 0.5.h),
           Text(
-            tripType == 'pickup' ? 'Morning Pickup' : 'Afternoon Dropoff',
+            label,
             style: TextStyle(
-              fontSize: 12.sp,
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
-          ),
-          SizedBox(height: 2.h),
-
-          // Summary stats
-          Container(
-            padding: EdgeInsets.all(2.w),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Trip Summary',
-                  style: TextStyle(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                SizedBox(height: 1.h),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildSummaryStatItem(
-                      'Total',
-                      totalStudents.toString(),
-                      Icons.people,
-                    ),
-                    _buildSummaryStatItem(
-                      'Completed',
-                      studentsCompleted.toString(),
-                      Icons.check_circle,
-                    ),
-                    _buildSummaryStatItem(
-                      'Absent',
-                      studentsAbsent.toString(),
-                      Icons.person_off,
-                    ),
-                    _buildSummaryStatItem(
-                      'Pending',
-                      studentsPending.toString(),
-                      Icons.schedule,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 1.h),
-
-          // Dismiss button
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _showSummary = false;
-                _tripSummary = null;
-              });
-            },
-            child: Text(
-              'Dismiss',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w600,
-              ),
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSummaryStatItem(String label, String value, IconData icon) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: Colors.white, size: 18.sp),
-        SizedBox(height: 0.3.h),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 15.sp,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 9.sp,
-            color: Colors.white.withValues(alpha: 0.9),
-          ),
-        ),
-      ],
     );
   }
 
@@ -432,9 +437,7 @@ class _BusMinderTripHistoryScreenState
                     tripType == 'pickup'
                         ? Icons.wb_sunny_outlined
                         : Icons.nights_stay_outlined,
-                    color: tripType == 'pickup'
-                        ? Colors.orange
-                        : Colors.indigo,
+                    color: tripType == 'pickup' ? Colors.orange : Colors.indigo,
                     size: 20.sp,
                   ),
                   SizedBox(width: 2.w),
