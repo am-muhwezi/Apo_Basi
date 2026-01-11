@@ -299,6 +299,38 @@ class Assignment(models.Model):
         self.status = 'expired'
         self.save()
 
+    def save(self, *args, **kwargs):
+        """Override save to enforce single active assignment rule"""
+        # If this is a new active assignment or status is being changed to active
+        if self.status == 'active':
+            # For driver_to_bus and minder_to_bus, ensure only ONE active assignment per bus
+            if self.assignment_type in ['driver_to_bus', 'minder_to_bus']:
+                # Cancel/expire any other active assignments of the same type for this bus
+                Assignment.objects.filter(
+                    assignment_type=self.assignment_type,
+                    assigned_to_content_type=self.assigned_to_content_type,
+                    assigned_to_object_id=self.assigned_to_object_id,
+                    status='active'
+                ).exclude(pk=self.pk if self.pk else None).update(
+                    status='expired',
+                    notes=models.F('notes') + '\nAuto-expired: New assignment created'
+                )
+
+            # For minder_to_bus, also ensure one busminder isn't assigned to multiple buses
+            if self.assignment_type == 'minder_to_bus':
+                # Cancel any other active bus assignments for this busminder
+                Assignment.objects.filter(
+                    assignment_type='minder_to_bus',
+                    assignee_content_type=self.assignee_content_type,
+                    assignee_object_id=self.assignee_object_id,
+                    status='active'
+                ).exclude(pk=self.pk if self.pk else None).update(
+                    status='expired',
+                    notes=models.F('notes') + '\nAuto-expired: Busminder reassigned to different bus'
+                )
+
+        super().save(*args, **kwargs)
+
     @classmethod
     def get_active_assignments_for(cls, entity, assignment_type=None):
         """

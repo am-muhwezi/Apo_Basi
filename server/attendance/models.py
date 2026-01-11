@@ -26,7 +26,7 @@ class Attendance(models.Model):
     - "absent" → Student was marked absent for this trip
 
     Assumptions:
-    - Each child has one attendance record per day
+    - Each child has TWO attendance records per day (one for pickup, one for dropoff)
     - Bus minders are responsible for marking attendance
     - Attendance is tied to a specific bus for tracking purposes
 
@@ -80,8 +80,7 @@ class Attendance(models.Model):
     trip_type = models.CharField(
         max_length=10,
         choices=TRIP_TYPE_CHOICES,
-        null=True,
-        blank=True,
+        default='pickup',
         help_text="Which trip type this attendance record is for (pickup or dropoff)"
     )
     date = models.DateField(auto_now_add=True)
@@ -99,7 +98,7 @@ class Attendance(models.Model):
 
     class Meta:
         ordering = ['-date', '-timestamp']
-        unique_together = ['child', 'date']  # One attendance record per child per day
+        unique_together = ['child', 'date', 'trip_type']  # One pickup and one dropoff record per child per day
         verbose_name_plural = "Attendance Records"
 
     def __str__(self):

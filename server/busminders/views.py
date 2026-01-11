@@ -106,6 +106,13 @@ class MyBusesView(APIView):
         for bus_assignment in bus_assignments:
             bus = bus_assignment.assigned_to
 
+            # Get driver assigned to this bus using Assignment API
+            driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+            driver_name = None
+            if driver_assignment and driver_assignment.assignee:
+                driver = driver_assignment.assignee
+                driver_name = f"{driver.user.first_name} {driver.user.last_name}"
+
             # Get children assigned to this bus using Assignment API
             child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
             children_data = [{
@@ -118,6 +125,7 @@ class MyBusesView(APIView):
                 "id": bus.id,
                 "bus_number": bus.bus_number,
                 "number_plate": bus.number_plate,
+                "driver_name": driver_name,
                 "is_active": bus.is_active,
                 "current_location": bus.current_location,
                 "latitude": str(bus.latitude) if bus.latitude else None,
@@ -136,8 +144,11 @@ class BusChildrenView(APIView):
     """
     Allows a bus minder to view all children assigned to a specific bus.
 
-    Endpoint: GET /api/busminders/buses/{bus_id}/children/
-    Returns: List of children with their today's attendance status
+    Endpoint: GET /api/busminders/buses/{bus_id}/children/?trip_type=pickup|dropoff
+    Returns: List of children with their today's attendance status for the specified trip
+
+    Query Parameters:
+    - trip_type (optional): 'pickup' or 'dropoff'. If not provided, returns both statuses.
 
     Security:
     - Bus minders can only view children for buses they manage
@@ -171,32 +182,46 @@ class BusChildrenView(APIView):
         # Get all children assigned to this bus using Assignment API
         child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
 
-        # Get today's date
+        # Get today's date and optional trip_type filter
         today = date.today()
+        trip_type = request.query_params.get('trip_type', None)
 
         children_data = []
         for child_assignment in child_assignments:
             child = child_assignment.assignee  # Use assignee from Assignment
 
-            # Get today's attendance if it exists
-            try:
-                attendance = Attendance.objects.get(child=child, date=today)
-                attendance_status = attendance.status
-                attendance_status_display = attendance.get_status_display()
-            except Attendance.DoesNotExist:
-                attendance_status = None
-                attendance_status_display = "Not marked"
-
-            children_data.append({
+            # Get today's attendance for the specific trip type
+            child_data = {
                 "id": child.id,
                 "first_name": child.first_name,
                 "last_name": child.last_name,
                 "class_grade": child.class_grade,
                 "parent_name": child.parent.user.get_full_name() if child.parent else "N/A",
                 "parent_phone": child.parent.contact_number if child.parent else "N/A",
-                "attendance_status": attendance_status,
-                "attendance_status_display": attendance_status_display,
-            })
+            }
+
+            if trip_type:
+                # Return attendance for specific trip type
+                try:
+                    attendance = Attendance.objects.get(child=child, date=today, trip_type=trip_type)
+                    child_data["attendance_status"] = attendance.status
+                    child_data["attendance_status_display"] = attendance.get_status_display()
+                    child_data["trip_type"] = trip_type
+                except Attendance.DoesNotExist:
+                    child_data["attendance_status"] = None
+                    child_data["attendance_status_display"] = "Not marked"
+                    child_data["trip_type"] = trip_type
+            else:
+                # Return both pickup and dropoff status
+                pickup_attendance = Attendance.objects.filter(child=child, date=today, trip_type='pickup').first()
+                dropoff_attendance = Attendance.objects.filter(child=child, date=today, trip_type='dropoff').first()
+
+                child_data["pickup_status"] = pickup_attendance.status if pickup_attendance else None
+                child_data["pickup_status_display"] = pickup_attendance.get_status_display() if pickup_attendance else "Not marked"
+                child_data["dropoff_status"] = dropoff_attendance.status if dropoff_attendance else None
+                child_data["dropoff_status_display"] = dropoff_attendance.get_status_display() if dropoff_attendance else "Not marked"
+
+            children_data.append(child_data)
 
         return Response({
             "bus": {
@@ -204,7 +229,8 @@ class BusChildrenView(APIView):
                 "number_plate": bus.number_plate,
             },
             "children": children_data,
-            "total_children": len(children_data)
+            "total_children": len(children_data),
+            "trip_type": trip_type
         })
 
 
@@ -294,15 +320,16 @@ class MarkAttendanceView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Get or create today's attendance record
+        # Get or create today's attendance record for this specific trip type
+        # CRITICAL: Must include trip_type in lookup to allow separate pickup/dropoff records
         today = date.today()
         attendance, created = Attendance.objects.get_or_create(
             child=child,
             date=today,
+            trip_type=trip_type,  # Include trip_type in lookup to prevent overwriting
             defaults={
                 'bus': bus,
                 'status': new_status,
-                'trip_type': trip_type,
                 'marked_by': request.user,
                 'notes': notes or '',  # Ensure notes is never None
             }
@@ -311,7 +338,6 @@ class MarkAttendanceView(APIView):
         # If attendance already exists, update it
         if not created:
             attendance.status = new_status
-            attendance.trip_type = trip_type
             attendance.marked_by = request.user
             attendance.notes = notes or ''  # Ensure notes is never None
             attendance.save()
