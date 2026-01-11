@@ -1,8 +1,13 @@
 import json
+import logging
+
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.exceptions import TokenError
+
+
+logger = logging.getLogger(__name__)
 
 
 class ParentNotificationsConsumer(AsyncWebsocketConsumer):
@@ -25,14 +30,14 @@ class ParentNotificationsConsumer(AsyncWebsocketConsumer):
         Handle WebSocket connection.
         Authenticate parent user via JWT token.
         """
-        print("📥 ParentNotificationsConsumer: Connection attempt")
+        logger.debug("ParentNotificationsConsumer: connection attempt")
         self.user = None
         self.parent_id = None
         self.group_name = None
 
         # Extract token from query string
         query_string = self.scope.get("query_string", b"").decode()
-        print(f"🔍 Query string: {query_string}")
+        logger.debug("ParentNotificationsConsumer: query string=%s", query_string)
         token = None
 
         for param in query_string.split("&"):
@@ -48,42 +53,47 @@ class ParentNotificationsConsumer(AsyncWebsocketConsumer):
                 token = auth_header[7:]
 
         if not token:
-            print("❌ No token found in request")
+            logger.warning("ParentNotificationsConsumer: no token found in request")
             await self.close(code=4001)  # Unauthorized
             return
 
-        print(f"🔑 Token found: {token[:20]}...")
+        logger.debug("ParentNotificationsConsumer: token found (first 20 chars)=%s", token[:20])
 
         # Authenticate user
         try:
-            print("🔐 Authenticating token...")
+            logger.debug("ParentNotificationsConsumer: authenticating token")
             self.user = await self.authenticate_token(token)
             if not self.user:
-                print("❌ Token authentication failed")
+                logger.warning("ParentNotificationsConsumer: token authentication failed")
                 await self.close(code=4001)
                 return
 
-            print(f"✅ User authenticated: {self.user.email}, type: {self.user.user_type}")
+            logger.debug(
+                "ParentNotificationsConsumer: user authenticated email=%s type=%s",
+                getattr(self.user, "email", None),
+                getattr(self.user, "user_type", None),
+            )
 
             # Verify user is a parent
             if self.user.user_type != "parent":
-                print(f"❌ User is not a parent: {self.user.user_type}")
+                logger.warning(
+                    "ParentNotificationsConsumer: user is not a parent user_type=%s",
+                    self.user.user_type,
+                )
                 await self.close(code=4003)  # Forbidden
                 return
 
             # Get parent_id
             self.parent_id = await self.get_parent_id(self.user)
             if not self.parent_id:
-                print("❌ Parent record not found for user")
+                logger.warning("ParentNotificationsConsumer: parent record not found for user id=%s", self.user.id)
                 await self.close(code=4003)
                 return
 
-            print(f"✅ Parent ID: {self.parent_id}")
+            logger.debug("ParentNotificationsConsumer: parent_id=%s", self.parent_id)
 
         except Exception as e:
-            print(f"❌ Authentication error: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.exception("ParentNotificationsConsumer: authentication error: %s", e)
             await self.close(code=4001)
             return
 
@@ -97,7 +107,7 @@ class ParentNotificationsConsumer(AsyncWebsocketConsumer):
         )
 
         await self.accept()
-        print(f"✅ WebSocket accepted for parent {self.parent_id}")
+        logger.debug("ParentNotificationsConsumer: websocket accepted for parent_id=%s", self.parent_id)
 
         # Send connection confirmation
         await self.send(text_data=json.dumps({
@@ -105,7 +115,7 @@ class ParentNotificationsConsumer(AsyncWebsocketConsumer):
             "message": "Connected to notification stream",
             "parent_id": self.parent_id
         }))
-        print(f"✅ Connection confirmation sent to parent {self.parent_id}")
+        logger.debug("ParentNotificationsConsumer: connection confirmation sent parent_id=%s", self.parent_id)
 
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection."""
@@ -272,26 +282,21 @@ class ParentNotificationsConsumer(AsyncWebsocketConsumer):
             access_token = AccessToken(token)
             user_id = access_token.payload.get("user_id")
             if not user_id:
-                print(f"❌ No user_id in token payload")
+                logger.warning("ParentNotificationsConsumer: no user_id in token payload")
                 return None
 
             user = User.objects.get(id=user_id)
-            print(f"✅ User authenticated: {user.email}")
+            logger.debug("ParentNotificationsConsumer: user loaded from DB id=%s email=%s", user.id, user.email)
             return user
 
         except TokenError as e:
-            print(f"❌ JWT token error: {e}")
+            logger.warning("ParentNotificationsConsumer: JWT token error: %s", e)
             return None
         except User.DoesNotExist:
-            print(f"❌ User with id {user_id} does not exist")
+            logger.warning("ParentNotificationsConsumer: user with id %s does not exist", user_id)
             return None
         except Exception as e:
-            print(f"❌ Unexpected authentication error: {e}")
-            return None
-        except Exception as e:
-            print(f"❌ Unexpected authentication error: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.exception("ParentNotificationsConsumer: unexpected authentication error: %s", e)
             return None
 
     @database_sync_to_async
