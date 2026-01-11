@@ -28,7 +28,6 @@ class ApiService {
         return handler.next(options);
       },
       onError: (error, handler) {
-        print('API Error: ${error.message}');
         return handler.next(error);
       },
     ));
@@ -236,7 +235,7 @@ class ApiService {
   }
 
   // Get all notifications for the logged-in parent
-  Future<Map<String, dynamic>> getNotifications({
+  Future<dynamic> getNotifications({
     bool? isRead,
     String? type,
     int limit = 50,
@@ -262,7 +261,7 @@ class ApiService {
       );
 
       if (response.statusCode == 200) {
-        return response.data;
+        return response.data; // Can be List or Map
       } else {
         throw Exception('Failed to load notifications');
       }
@@ -283,20 +282,25 @@ class ApiService {
     try {
       await loadToken();
 
-      final data = <String, dynamic>{};
+      // If specific IDs provided, mark those
       if (notificationIds != null && notificationIds.isNotEmpty) {
-        data['notification_ids'] = notificationIds;
-      }
-
-      final response = await _dio.post(
-        '/api/notifications/mark-as-read/',
-        data: data,
-      );
-
-      if (response.statusCode == 200) {
-        return response.data;
+        // Mark individual notifications
+        for (final id in notificationIds) {
+          await _dio.post('/api/notifications/$id/mark-read/');
+        }
+        return {
+          'message': 'Notifications marked as read',
+          'count': notificationIds.length
+        };
       } else {
-        throw Exception('Failed to mark notifications as read');
+        // Mark all as read
+        final response = await _dio.post('/api/notifications/mark-all-read/');
+
+        if (response.statusCode == 200) {
+          return response.data;
+        } else {
+          throw Exception('Failed to mark notifications as read');
+        }
       }
     } on DioException catch (e) {
       if (e.response != null) {
