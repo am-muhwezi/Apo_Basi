@@ -35,13 +35,11 @@ class NotificationService {
     await _flutterLocalNotificationsPlugin.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        print('Notification tapped: ${response.payload}');
         // Handle notification tap
       },
     );
 
     _isInitialized = true;
-    print('Notification service initialized');
   }
 
   Future<void> showTripStartNotification({

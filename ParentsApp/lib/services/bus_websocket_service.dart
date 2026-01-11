@@ -54,15 +54,12 @@ class BusWebSocketService {
     _accessToken = prefs.getString('access_token');
 
     if (_accessToken == null) {
-      print('ERROR: No access token found. Cannot connect to WebSocket');
       _connectionStateController.add(LocationConnectionState.error);
       _errorController.add('Authentication required');
       return;
     }
 
-    if (LocationConfig.enableSocketLogging) {
-      print('✅ WebSocket service initialized');
-    }
+    if (LocationConfig.enableSocketLogging) {}
   }
 
   /// Subscribe to a specific bus for real-time location updates
@@ -71,9 +68,7 @@ class BusWebSocketService {
   /// Automatically handles reconnection.
   void subscribeToBus(int busId) {
     if (_isConnected && _subscribedBusId == busId) {
-      if (LocationConfig.enableSocketLogging) {
-        print('Already subscribed to bus $busId');
-      }
+      if (LocationConfig.enableSocketLogging) {}
       return;
     }
 
@@ -100,7 +95,6 @@ class BusWebSocketService {
       _accessToken = prefs.getString('access_token');
 
       if (_accessToken == null) {
-        print('ERROR: No access token found. Cannot connect to WebSocket');
         _connectionStateController.add(LocationConnectionState.error);
         _errorController.add('Authentication required');
         return;
@@ -116,9 +110,7 @@ class BusWebSocketService {
       final wsUrl =
           '${_getWebSocketBaseUrl()}/ws/bus/$busId/?token=$_accessToken';
 
-      if (LocationConfig.enableSocketLogging) {
-        print('📡 Subscribing to bus $busId');
-      }
+      if (LocationConfig.enableSocketLogging) {}
 
       // Create WebSocket channel
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
@@ -134,7 +126,6 @@ class BusWebSocketService {
       _isConnected = true;
       _reconnectionAttempts = 0;
     } catch (e) {
-      print('ERROR: Failed to connect to WebSocket: $e');
       _isConnected = false;
       _connectionStateController.add(LocationConnectionState.error);
       _errorController.add('Connection failed: ${e.toString()}');
@@ -149,9 +140,7 @@ class BusWebSocketService {
       final messageType = data['type'];
 
       if (messageType == 'connected') {
-        if (LocationConfig.enableSocketLogging) {
-          print('✅ WebSocket connected to bus ${data['bus_id']}');
-        }
+        if (LocationConfig.enableSocketLogging) {}
         _connectionStateController.add(LocationConnectionState.connected);
 
         // Request current location
@@ -169,27 +158,20 @@ class BusWebSocketService {
           timestamp: DateTime.parse(data['timestamp']),
         );
 
-        if (LocationConfig.enableSocketLogging) {
-          print(
-              '📍 Location update: ${location.latitude}, ${location.longitude}');
-        }
+        if (LocationConfig.enableSocketLogging) {}
 
         _locationUpdateController.add(location);
       } else if (messageType == 'error') {
-        print('❌ WebSocket error: ${data['message']}');
         _errorController.add(data['message']);
       }
     } catch (e) {
-      if (LocationConfig.enableSocketLogging) {
-        print('ERROR: Failed to parse WebSocket message: $e');
-      }
+      if (LocationConfig.enableSocketLogging) {}
       _errorController.add('Failed to parse message');
     }
   }
 
   /// Handle WebSocket errors
   void _handleError(error) {
-    print('❌ WebSocket error: $error');
     _isConnected = false;
     _connectionStateController.add(LocationConnectionState.error);
     _errorController.add('Connection error: ${error.toString()}');
@@ -198,9 +180,7 @@ class BusWebSocketService {
 
   /// Handle WebSocket disconnect
   void _handleDisconnect() {
-    if (LocationConfig.enableSocketLogging) {
-      print('🔌 WebSocket disconnected');
-    }
+    if (LocationConfig.enableSocketLogging) {}
     _isConnected = false;
     _connectionStateController.add(LocationConnectionState.disconnected);
     _scheduleReconnect();
@@ -209,7 +189,6 @@ class BusWebSocketService {
   /// Schedule automatic reconnection
   void _scheduleReconnect() {
     if (_reconnectionAttempts >= LocationConfig.maxReconnectionAttempts) {
-      print('❌ Max reconnection attempts reached');
       _connectionStateController.add(LocationConnectionState.error);
       _errorController.add('Failed to reconnect after maximum attempts');
       return;
@@ -222,10 +201,7 @@ class BusWebSocketService {
     _reconnectionAttempts++;
     final delay = LocationConfig.socketReconnectionDelay;
 
-    if (LocationConfig.enableSocketLogging) {
-      print(
-          '🔄 Reconnecting in ${delay.inSeconds}s (attempt $_reconnectionAttempts/${LocationConfig.maxReconnectionAttempts})');
-    }
+    if (LocationConfig.enableSocketLogging) {}
 
     _reconnectTimer = Timer(delay, () {
       if (_subscribedBusId != null) {
@@ -253,9 +229,7 @@ class BusWebSocketService {
     }
 
     if (_channel != null) {
-      if (LocationConfig.enableSocketLogging) {
-        print('🔌 Disconnecting from WebSocket');
-      }
+      if (LocationConfig.enableSocketLogging) {}
 
       _channel!.sink.close();
       _channel = null;

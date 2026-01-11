@@ -40,7 +40,6 @@ class MapboxRouteService {
 
       return [];
     } catch (e) {
-      print('Error fetching route from Mapbox: $e');
       return [];
     }
   }
@@ -73,7 +72,6 @@ class MapboxRouteService {
 
       return null;
     } catch (e) {
-      print('Error fetching route info from Mapbox: $e');
       return null;
     }
   }
@@ -130,7 +128,6 @@ class MapboxRouteService {
 
       return null;
     } catch (e) {
-      print('Error snapping to roads: $e');
       return null;
     }
   }
@@ -160,7 +157,6 @@ class MapboxRouteService {
       // If snapping fails, return original coordinate
       return coordinate;
     } catch (e) {
-      print('Error snapping single point: $e');
       return coordinate;
     }
   }
@@ -188,7 +184,6 @@ class MapboxRouteService {
 
       return null;
     } catch (e) {
-      print('Error calculating ETA: $e');
       return null;
     }
   }
@@ -214,7 +209,6 @@ class MapboxRouteService {
 
       return null;
     } catch (e) {
-      print('Error calculating distance: $e');
       return null;
     }
   }
@@ -260,7 +254,6 @@ class MapboxRouteService {
 
       return null;
     } catch (e) {
-      print('Error getting trip information: $e');
       return null;
     }
   }
