@@ -79,7 +79,9 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
       // Get parent name from response
       String parentName = 'Parent';
       if (response['user'] != null) {
-        parentName = response['user']['first_name'] ?? response['user']['username'] ?? 'Parent';
+        parentName = response['user']['first_name'] ??
+            response['user']['username'] ??
+            'Parent';
       }
 
       // Show success message
@@ -108,75 +110,73 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          // Background pattern
-          Positioned.fill(
-            child: Opacity(
-              opacity: 0.15,
-              child: SvgPicture.asset(
-                'assets/images/bg_pattern.svg',
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-          // Main content
-          GestureDetector(
-            onTap: () => FocusScope.of(context).unfocus(),
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Welcome Header
-                  WelcomeHeaderWidget(),
+      backgroundColor: Color(0xFFF8FAFC),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // Welcome Header (sleek gradient design)
+              WelcomeHeaderWidget(),
 
-                  // Login Form
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6.w),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(height: 4.h),
+              // Login Form
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 3.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: 2.h),
 
-                        // Phone Number Input
-                        Text(
-                          'Phone Number',
-                          style: AppTheme.lightTheme.textTheme.titleMedium
-                              ?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        SizedBox(height: 1.h),
-                        PhoneNumberInputWidget(
-                          controller: _phoneController,
-                          onChanged: (_) => _validatePhone(),
-                          errorText: _phoneError,
-                          isValid: _isPhoneValid,
-                        ),
-
-                        SizedBox(height: 3.h),
-
-                        // Login Button
-                        SignInButtonWidget(
-                          isEnabled: _isPhoneValid,
-                          isLoading: _isLoading,
-                          onPressed: _handleLogin,
-                          buttonText: 'Sign In',
-                        ),
-
-                        SizedBox(height: 4.h),
-                      ],
+                    // Phone Number Input
+                    Text(
+                      'Phone Number',
+                      style:
+                          AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                ],
+                    SizedBox(height: 1.h),
+                    PhoneNumberInputWidget(
+                      controller: _phoneController,
+                      onChanged: (_) => _validatePhone(),
+                      errorText: _phoneError,
+                      isValid: _isPhoneValid,
+                    ),
+
+                    SizedBox(height: 3.h),
+
+                    // Login Button
+                    SignInButtonWidget(
+                      isEnabled: _isPhoneValid,
+                      isLoading: _isLoading,
+                      onPressed: _handleLogin,
+                      buttonText: 'Sign In',
+                    ),
+
+                    SizedBox(height: 4.h),
+
+                    // Footer
+                    Center(
+                      child: Text(
+                        '© 2026 ApoBasi - Powered by SoG',
+                        style:
+                            AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+                          color: AppTheme.lightTheme.colorScheme.onSurface
+                              .withValues(alpha: 0.5),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    SizedBox(height: 2.h),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

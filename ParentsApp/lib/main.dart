@@ -8,6 +8,7 @@ import 'core/app_export.dart';
 import 'widgets/custom_error_widget.dart';
 import 'services/notification_service.dart';
 import 'services/bus_websocket_service.dart';
+import 'services/parent_notifications_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,8 +55,8 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final BusWebSocketService _webSocketService = BusWebSocketService();
+  final ParentNotificationsService _notificationsService = ParentNotificationsService();
   final NotificationService _notificationService = NotificationService();
-  StreamSubscription? _tripStartSubscription;
 
   @override
   void initState() {
@@ -64,14 +65,13 @@ class _MyAppState extends State<MyApp> {
     // Delay WebSocket initialization until the first frame renders
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _webSocketService.connect();
-      // Note: Trip notifications will be handled via Django Channels in the future
-      // For now, the connection is initialized for location tracking
+      _notificationsService.connect();
     });
   }
 
   @override
   void dispose() {
-    _tripStartSubscription?.cancel();
+    _notificationsService.dispose();
     super.dispose();
   }
 

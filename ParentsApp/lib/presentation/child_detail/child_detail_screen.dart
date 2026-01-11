@@ -11,6 +11,7 @@ import '../../config/mapbox_config.dart';
 import '../../config/location_config.dart';
 import './widgets/home_marker_widget.dart';
 import '../../widgets/location/bus_marker_3d.dart';
+import '../../widgets/location/animated_bus_marker.dart';
 import '../../models/bus_location_model.dart';
 import '../../services/bus_websocket_service.dart';
 import '../../services/mapbox_route_service.dart';
@@ -102,7 +103,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         }
       }, onError: (error) {
         if (LocationConfig.enableSocketLogging) {
-          print('CHILD DETAIL: Error in location stream: $error');
         }
       });
 
@@ -166,7 +166,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         });
       }
     } catch (e) {
-      print('Error updating bus location with snapping: $e');
       setState(() {
         _isCalculatingETA = false;
       });
@@ -289,7 +288,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                                 height: 80,
                                 child: const HomeMarkerWidget(),
                               ),
-                            // Bus marker (3D) - Using SNAPPED location for accurate road position
+                            // Bus marker (3D Animated) - Using SNAPPED location for accurate road position
                             if (_busLocation != null)
                               Marker(
                                 point: _snappedBusLocation ??
@@ -299,7 +298,12 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                                     ),
                                 width: 100,
                                 height: 100,
-                                child: BusMarker3D(
+                                child: AnimatedBusMarker(
+                                  position: _snappedBusLocation ??
+                                      LatLng(
+                                        _busLocation!.latitude,
+                                        _busLocation!.longitude,
+                                      ),
                                   size: 50,
                                   heading: _busLocation!.heading ?? 0,
                                   isMoving: (_busLocation!.speed ?? 0) > 0.5,
@@ -363,6 +367,42 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                         ),
                       ),
                       const Spacer(),
+                      // Recenter button
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.my_location,
+                            color: AppTheme.lightTheme.colorScheme.primary,
+                          ),
+                          onPressed: () {
+                            if (_busLocation != null) {
+                              // Center on bus location
+                              _mapController.move(
+                                LatLng(_busLocation!.latitude, _busLocation!.longitude),
+                                15.0,
+                              );
+                            } else if (_currentPosition != null) {
+                              // Center on user location
+                              _mapController.move(
+                                LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                                14.0,
+                              );
+                            }
+                          },
+                          tooltip: 'Recenter map',
+                        ),
+                      ),
                     ],
                   ),
                   SizedBox(height: 2.h),
@@ -428,122 +468,16 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ETA Display Card
-                if (_etaMinutes != null && _busLocation != null)
-                  Container(
-                    margin: EdgeInsets.only(bottom: 1.5.h),
-                    padding: EdgeInsets.all(2.5.w),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.lightTheme.colorScheme.primary,
-                          AppTheme.lightTheme.colorScheme.primary
-                              .withOpacity(0.8),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.lightTheme.colorScheme.primary
-                              .withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.access_time,
-                          color: Colors.white,
-                          size: 6.w,
-                        ),
-                        SizedBox(width: 3.w),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Arriving in',
-                              style: AppTheme.lightTheme.textTheme.bodySmall
-                                  ?.copyWith(
-                                color: Colors.white.withOpacity(0.9),
-                                fontSize: 9.sp,
-                              ),
-                            ),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
-                              children: [
-                                Text(
-                                  '$_etaMinutes',
-                                  style: AppTheme
-                                      .lightTheme.textTheme.headlineMedium
-                                      ?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 28.sp,
-                                  ),
-                                ),
-                                SizedBox(width: 1.w),
-                                Text(
-                                  _etaMinutes == 1 ? 'minute' : 'minutes',
-                                  style: AppTheme
-                                      .lightTheme.textTheme.bodyMedium
-                                      ?.copyWith(
-                                    color: Colors.white.withOpacity(0.9),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        if (_distance != null) ...[
-                          SizedBox(width: 4.w),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 2.w, vertical: 0.5.h),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '$_distance km',
-                              style: AppTheme.lightTheme.textTheme.bodySmall
-                                  ?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                        if (_isCalculatingETA)
-                          Container(
-                            margin: EdgeInsets.only(left: 3.w),
-                            width: 20,
-                            height: 20,
-                            child: const CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                // Bus info card
+                // Compact info card with ETA, distance, and call buttons
                 Container(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.5.h),
+                  padding: EdgeInsets.all(3.w),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 10,
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 12,
                         offset: const Offset(0, 3),
                       ),
                     ],
@@ -551,49 +485,82 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Top row: Bus info + ETA + Distance
                       Row(
                         children: [
+                          // Bus icon and number
                           Container(
                             padding: EdgeInsets.all(2.w),
                             decoration: BoxDecoration(
                               color: AppTheme.lightTheme.colorScheme.primary
                                   .withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Icon(
                               Icons.directions_bus,
                               color: AppTheme.lightTheme.colorScheme.primary,
-                              size: 6.w,
+                              size: 5.w,
                             ),
                           ),
-                          SizedBox(width: 3.w),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'School Bus',
-                                style: AppTheme.lightTheme.textTheme.bodySmall
-                                    ?.copyWith(
-                                  color: AppTheme
-                                      .lightTheme.colorScheme.onSurfaceVariant,
-                                  fontSize: 9.sp,
-                                ),
-                              ),
-                              Text(
-                                _childData?['busNumber'] ?? 'YD',
-                                style: AppTheme.lightTheme.textTheme.titleMedium
-                                    ?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color:
-                                      AppTheme.lightTheme.colorScheme.primary,
-                                ),
-                              ),
-                            ],
+                          SizedBox(width: 2.w),
+                          // Bus number
+                          Text(
+                            _childData?['busNumber'] ?? 'YD',
+                            style: AppTheme.lightTheme.textTheme.titleMedium
+                                ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.lightTheme.colorScheme.primary,
+                            ),
                           ),
+                          const Spacer(),
+                          // ETA and Distance
+                          if (_etaMinutes != null || _distance != null)
+                            Row(
+                              children: [
+                                if (_etaMinutes != null) ...[
+                                  Icon(
+                                    Icons.access_time,
+                                    color: AppTheme.lightTheme.colorScheme.primary,
+                                    size: 4.w,
+                                  ),
+                                  SizedBox(width: 1.w),
+                                  Text(
+                                    '$_etaMinutes min',
+                                    style: AppTheme.lightTheme.textTheme.bodyMedium
+                                        ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.lightTheme.colorScheme.primary,
+                                    ),
+                                  ),
+                                ],
+                                if (_etaMinutes != null && _distance != null)
+                                  Container(
+                                    margin: EdgeInsets.symmetric(horizontal: 2.w),
+                                    width: 1,
+                                    height: 3.h,
+                                    color: Colors.grey.shade300,
+                                  ),
+                                if (_distance != null) ...[
+                                  Icon(
+                                    Icons.straighten,
+                                    color: Colors.grey.shade600,
+                                    size: 4.w,
+                                  ),
+                                  SizedBox(width: 1.w),
+                                  Text(
+                                    '$_distance km',
+                                    style: AppTheme.lightTheme.textTheme.bodyMedium
+                                        ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                         ],
                       ),
-                      SizedBox(height: 1.5.h),
+                      SizedBox(height: 2.h),
                       // Action buttons row
                       Row(
                         children: [
