@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { getAttendanceStats, getDailyAttendanceReport } from '../services/api';
 
+type AttendanceStatus = 'picked_up' | 'dropped_off' | 'absent' | 'pending';
+
 interface AttendanceRecord {
   id: string;
   childName: string;
@@ -23,7 +25,8 @@ interface AttendanceRecord {
   route: string;
   pickupTime: string;
   dropoffTime: string;
-  status: 'picked_up' | 'dropped_off' | 'absent' | 'pending';
+  pickupStatus: AttendanceStatus;
+  dropoffStatus: AttendanceStatus;
   parentNotified: boolean;
 }
 
@@ -71,24 +74,78 @@ export default function AttendancePage() {
       // Fetch daily report
       const reportResponse = await getDailyAttendanceReport(dateStr);
 
+      // Helper function to format timestamp
+      const formatTime = (timestamp: string | null) => {
+        if (!timestamp) return '-';
+        try {
+          const date = new Date(timestamp);
+          const hours = date.getHours();
+          const minutes = date.getMinutes();
+          const period = hours >= 12 ? 'PM' : 'AM';
+          const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+          const displayMinutes = minutes.toString().padStart(2, '0');
+          return `${displayHours}:${displayMinutes} ${period}`;
+        } catch (error) {
+          return '-';
+        }
+      };
+
       // Transform report data to match AttendanceRecord interface
-      const records: AttendanceRecord[] = [];
+      // Backend returns individual records per trip, we need to group by child
+      const childRecordsMap = new Map<string, any>();
+      
       reportResponse.data.buses.forEach((bus: any) => {
         bus.children.forEach((child: any) => {
-          records.push({
-            id: child.id.toString(),
-            childName: child.name,
-            class: child.grade || 'N/A',
-            busNumber: bus.bus_number,
-            route: bus.bus_number,
-            pickupTime: '-',
-            dropoffTime: '-',
-            status: child.status,
-            parentNotified: true,
-            trip_type: child.trip_type, // Include trip_type from API
-          } as any);
+          const childKey = `${bus.bus_number}-${child.id}`;
+          const time = formatTime(child.timestamp);
+          const tripType = child.trip_type;
+          
+          // Get or create child record
+          if (!childRecordsMap.has(childKey)) {
+            childRecordsMap.set(childKey, {
+              id: child.id,
+              childName: child.name,
+              class: child.grade || 'N/A',
+              busNumber: bus.bus_number,
+              route: bus.bus_number,
+              pickupTime: '-',
+              dropoffTime: '-',
+              pickupStatus: 'pending' as AttendanceStatus,
+              dropoffStatus: 'pending' as AttendanceStatus,
+              parentNotified: true,
+              records: [], // Store both trip records
+            });
+          }
+          
+          const record = childRecordsMap.get(childKey);
+          
+          // Add time and status based on trip type
+          if (tripType === 'pickup') {
+            record.pickupTime = time;
+            record.pickupStatus = child.status as AttendanceStatus;
+            record.records.push({ type: 'pickup', status: child.status, time });
+          } else if (tripType === 'dropoff') {
+            record.dropoffTime = time;
+            record.dropoffStatus = child.status as AttendanceStatus;
+            record.records.push({ type: 'dropoff', status: child.status, time });
+          }
         });
       });
+      
+      // Convert map to array
+      const records: AttendanceRecord[] = Array.from(childRecordsMap.values()).map(record => ({
+        id: record.id,
+        childName: record.childName,
+        class: record.class,
+        busNumber: record.busNumber,
+        route: record.route,
+        pickupTime: record.pickupTime,
+        dropoffTime: record.dropoffTime,
+        pickupStatus: record.pickupStatus,
+        dropoffStatus: record.dropoffStatus,
+        parentNotified: record.parentNotified,
+      }));
+      
       setAttendanceRecords(records);
     } catch (error) {
       console.error('Error fetching attendance data:', error);
@@ -97,65 +154,7 @@ export default function AttendancePage() {
     }
   };
 
-  const mockAttendanceRecords: AttendanceRecord[] = [
-    {
-      id: '1',
-      childName: 'Sarah Johnson',
-      class: 'Grade 5A',
-      busNumber: 'BUS-001',
-      route: 'Route A - North',
-      pickupTime: '07:15 AM',
-      dropoffTime: '03:45 PM',
-      status: 'present',
-      parentNotified: true,
-    },
-    {
-      id: '2',
-      childName: 'Michael Chen',
-      class: 'Grade 4B',
-      busNumber: 'BUS-002',
-      route: 'Route B - East',
-      pickupTime: '07:30 AM',
-      dropoffTime: '04:00 PM',
-      status: 'present',
-      parentNotified: true,
-    },
-    {
-      id: '3',
-      childName: 'Emily Rodriguez',
-      class: 'Grade 6A',
-      busNumber: 'BUS-001',
-      route: 'Route A - North',
-      pickupTime: '07:45 AM',
-      dropoffTime: '-',
-      status: 'late',
-      parentNotified: true,
-    },
-    {
-      id: '4',
-      childName: 'James Williams',
-      class: 'Grade 3C',
-      busNumber: 'BUS-003',
-      route: 'Route C - South',
-      pickupTime: '-',
-      dropoffTime: '-',
-      status: 'absent',
-      parentNotified: true,
-    },
-    {
-      id: '5',
-      childName: 'Olivia Brown',
-      class: 'Grade 5B',
-      busNumber: 'BUS-002',
-      route: 'Route B - East',
-      pickupTime: '07:20 AM',
-      dropoffTime: '02:30 PM',
-      status: 'early_dismissal',
-      parentNotified: true,
-    },
-  ];
-
-  const getStatusBadge = (status: AttendanceRecord['status']) => {
+  const getStatusBadge = (status: AttendanceStatus) => {
     const badges = {
       picked_up: {
         icon: <CheckCircle size={16} />,
@@ -203,32 +202,17 @@ export default function AttendancePage() {
     setSelectedDate(newDate);
   };
 
-  const filteredRecords = attendanceRecords.filter((record) => {
+  const filteredRecords = attendanceRecords.filter((record: AttendanceRecord) => {
     const matchesSearch =
       record.childName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       record.busNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       record.route.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesStatus = statusFilter === 'all' || record.status === statusFilter;
+    // Get status for current trip type
+    const currentStatus: AttendanceStatus = tripType === 'pickup' ? record.pickupStatus : record.dropoffStatus;
+    const matchesStatus = statusFilter === 'all' || currentStatus === statusFilter;
 
-    // Filter by trip type
-    const recordTripType = (record as any).trip_type;
-
-    // If trip_type is set, use it directly
-    if (recordTripType) {
-      return matchesSearch && matchesStatus && recordTripType === tripType;
-    }
-
-    // If trip_type is not set, infer from status
-    if (record.status === 'picked_up') {
-      return matchesSearch && matchesStatus && tripType === 'pickup';
-    } else if (record.status === 'dropped_off') {
-      return matchesSearch && matchesStatus && tripType === 'dropoff';
-    }
-
-    // For pending and absent without trip_type, don't show them
-    // (they need to be marked with proper trip_type going forward)
-    return false;
+    return matchesSearch && matchesStatus;
   });
 
   return (
@@ -446,7 +430,7 @@ export default function AttendancePage() {
                       {tripType === 'pickup' ? record.pickupTime : record.dropoffTime}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(record.status)}
+                      {getStatusBadge(tripType === 'pickup' ? record.pickupStatus : record.dropoffStatus)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {record.parentNotified ? (

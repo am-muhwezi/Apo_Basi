@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Eye, MapPin, Navigation, Users, Clock, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, Search, Eye, MapPin, Navigation, Users, Clock, TrendingUp, AlertCircle, RefreshCw, StopCircle } from 'lucide-react';
 import Button from '../components/common/Button';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
 import BusMap from '../components/BusMap';
-import { getTrips } from '../services/tripsApi';
+import { getTrips, cancelTrip } from '../services/tripsApi';
 import { busWebSocketService, LocationUpdate } from '../services/busWebSocketService';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import type { Trip } from '../types';
 
 export default function TripsPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [filteredTrips, setFilteredTrips] = useState<Trip[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -43,8 +47,28 @@ export default function TripsPage() {
       const response = await getTrips({ limit: 20, offset });
 
       const tripsData = response.data.results || response.data || [];
-      setTrips(append ? [...trips, ...Array.isArray(tripsData) ? tripsData : []] : (Array.isArray(tripsData) ? tripsData : []));
-      setHasMore(Array.isArray(tripsData) && tripsData.length === 20);
+      const totalCount = response.data.count; // Django pagination includes total count
+      
+      // Use functional update to ensure we work with latest state
+      setTrips(prevTrips => {
+        if (append) {
+          // Filter out any duplicates by ID before appending
+          const existingIds = new Set(prevTrips.map(t => t.id));
+          const newTrips = (Array.isArray(tripsData) ? tripsData : []).filter(t => !existingIds.has(t.id));
+          return [...prevTrips, ...newTrips];
+        }
+        return Array.isArray(tripsData) ? tripsData : [];
+      });
+      
+      // Check if there are more items: either use total count or check if we got full page
+      if (totalCount !== undefined) {
+        // If backend provides count, check if we have loaded all items
+        const currentTotal = append ? trips.length + tripsData.length : tripsData.length;
+        setHasMore(currentTotal < totalCount);
+      } else {
+        // Fallback: if we got less than requested, we've reached the end
+        setHasMore(Array.isArray(tripsData) && tripsData.length === 20);
+      }
     } catch (error) {
       console.error('Failed to load trips:', error);
       if (!append) {
@@ -166,6 +190,39 @@ export default function TripsPage() {
 
   const handleRecenterMap = () => {
     setRecenterTrigger(prev => prev + 1);
+  };
+
+  const handleStopTrip = async (trip: Trip) => {
+    const confirmed = await confirm({
+      title: `Stop Trip - Bus ${trip.busNumber}`,
+      message: `This will immediately cancel the ${trip.type} trip on ${trip.route}. All parents and staff will be notified.`,
+      confirmText: 'Stop Trip',
+      variant: 'danger'
+    });
+    
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await cancelTrip(trip.id);
+      
+      // Update trip status in local state
+      setTrips(prevTrips => prevTrips.map(t =>
+        t.id === trip.id ? { ...t, status: 'cancelled' } : t
+      ));
+
+      // Update selected trip if it's the one being stopped
+      if (selectedTrip && selectedTrip.id === trip.id) {
+        setSelectedTrip({ ...selectedTrip, status: 'cancelled' });
+      }
+
+      toast.success(`✅ Trip Cancelled - Bus ${trip.busNumber} ${trip.type} route has been stopped. Parents and driver have been notified.`, 6000);
+      loadTrips(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to stop trip:', error);
+      toast.error('❌ Failed to cancel trip. The trip may already be completed or cancelled. Please refresh and try again.');
+    }
   };
 
   const formatTime = (timestamp: string) => {
@@ -389,13 +446,22 @@ export default function TripsPage() {
                             <Eye size={18} />
                           </button>
                           {trip.status === 'in-progress' && (
-                            <button
-                              onClick={() => handleTrackOnMap(trip)}
-                              className="text-blue-600 hover:text-blue-800 transition-colors"
-                              title="Track on Map"
-                            >
-                              <MapPin size={18} />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleTrackOnMap(trip)}
+                                className="text-blue-600 hover:text-blue-800 transition-colors"
+                                title="Track on Map"
+                              >
+                                <MapPin size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleStopTrip(trip)}
+                                className="text-red-600 hover:text-red-800 transition-colors"
+                                title="Stop Trip"
+                              >
+                                <StopCircle size={18} />
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
