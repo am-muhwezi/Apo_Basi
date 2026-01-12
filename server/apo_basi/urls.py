@@ -2,9 +2,13 @@ from django.contrib import admin
 from django.urls import path
 from django.urls import include
 from users.views import health_check
+from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # Backwards-compatible alias for JWT refresh token endpoint
+    # Primary endpoint lives at /api/users/token/refresh/
+    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh_compat"),
     path("api/users/", include("users.urls")),
     path("api/buses/", include("buses.urls")),
     path("api/children/", include("children.urls")),
