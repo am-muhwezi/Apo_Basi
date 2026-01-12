@@ -56,3 +56,17 @@ DriversandMinders/flutter_02.png
 ParentsApp/fast_run.sh
 ParentsApp/flutter_01.png
 ParentsApp/flutter_02.png
+server/scripts/check_assignments.py
+server/scripts/check_test_data.py
+server/scripts/create_test_notifications.py
+server/scripts/create_test_parent.py
+server/scripts/quick_test.sh
+server/scripts/send_terms_email.py
+server/scripts/send_terms_simple.py
+server/scripts/SETUP.md
+server/scripts/test_bus_location_websocket.py
+server/scripts/test_notifications.py
+server/scripts/test_trip_start_notification.py
+tools/remove_flutter_comments.py
+tools/remove_flutter_debug_prints.py
+admin/MAP_TRACKING_GUIDE.md
