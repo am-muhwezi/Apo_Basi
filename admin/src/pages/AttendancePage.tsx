@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Calendar,
   Users,
@@ -10,8 +10,6 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  TrendingUp,
-  AlertTriangle,
 } from 'lucide-react';
 import { getAttendanceStats, getDailyAttendanceReport } from '../services/api';
 

@@ -14,7 +14,6 @@ import '../../services/native_location_service.dart';
 import '../../services/trip_state_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/driver_drawer_widget.dart';
-import './widgets/route_map_widget.dart';
 import './widgets/socket_status_widget.dart';
 import './widgets/student_list_widget.dart';
 import './widgets/trip_statistics_widget.dart';
@@ -449,26 +448,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     }
   }
 
-  void _onFullScreenMapTap() {
-    // Navigate to full screen map view
-    showDialog(
-      context: context,
-      builder: (context) => Dialog.fullscreen(
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text('Route Map'),
-            backgroundColor: AppTheme.primaryDriver,
-            foregroundColor: AppTheme.textOnPrimary,
-          ),
-          body: RouteMapWidget(
-            tripData: _tripData,
-            onFullScreenTap: () => Navigator.pop(context),
-          ),
-        ),
-      ),
-    );
-  }
-
   void _onEndTripPressed() {
     showDialog(
       context: context,
@@ -685,62 +664,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
   // Socket info dialog removed - drivers use REST API for location push, not Socket.IO
 
-  void _onEmergencyPressed() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            CustomIconWidget(
-              iconName: 'warning',
-              color: AppTheme.criticalAlert,
-              size: 24,
-            ),
-            SizedBox(width: 2.w),
-            Text('Emergency Contacts'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: CustomIconWidget(
-                iconName: 'local_police',
-                color: AppTheme.criticalAlert,
-                size: 20,
-              ),
-              title: Text('Emergency Services'),
-              subtitle: Text('911'),
-              onTap: () {
-                // Handle emergency call
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: CustomIconWidget(
-                iconName: 'support_agent',
-                color: AppTheme.primaryDriver,
-                size: 20,
-              ),
-              title: Text('Dispatch Support'),
-              subtitle: Text('(555) 999-0000'),
-              onTap: () {
-                // Handle support call
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
   int get _studentsPickedUp =>
       _students.where((s) => s["isPickedUp"] as bool? ?? false).length;
   int get _remainingStops => _tripData["stops"] != null
@@ -911,34 +834,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
                   ),
                 ),
               ),
-        floatingActionButton: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            // Map button
-            FloatingActionButton(
-              heroTag: 'map',
-              onPressed: _onFullScreenMapTap,
-              backgroundColor: AppTheme.primaryDriver,
-              child: CustomIconWidget(
-                iconName: 'map',
-                color: AppTheme.textOnPrimary,
-                size: 24,
-              ),
-            ),
-            SizedBox(height: 2.h),
-            // Emergency button
-            FloatingActionButton(
-              heroTag: 'emergency',
-              onPressed: _onEmergencyPressed,
-              backgroundColor: AppTheme.criticalAlert,
-              child: CustomIconWidget(
-                iconName: 'emergency',
-                color: AppTheme.textOnPrimary,
-                size: 24,
-              ),
-            ),
-          ],
-        ),
+        // No floating action buttons on the active trip screen
         bottomSheet: Container(
           width: double.infinity,
           padding: EdgeInsets.all(4.w),
