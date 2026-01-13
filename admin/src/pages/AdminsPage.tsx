@@ -33,7 +33,6 @@ export default function AdminsPage() {
       setAdmins(append ? [...admins, ...Array.isArray(data) ? data : []] : (Array.isArray(data) ? data : []));
       setHasMore(Array.isArray(data) && data.length === 20);
     } catch (error) {
-      console.error('Failed to load admins:', error);
       if (!append) setAdmins([]);
     } finally {
       setLoading(false);
@@ -124,7 +123,6 @@ export default function AdminsPage() {
         toast.success('Admin deleted successfully');
         await loadAdmins();
       } catch (error) {
-        console.error('Failed to delete admin:', error);
         toast.error('Failed to delete admin');
       }
     }
@@ -151,7 +149,6 @@ export default function AdminsPage() {
       await loadAdmins();
       setShowModal(false);
     } catch (error: any) {
-      console.error('Failed to save admin:', error);
       const message = error?.response?.data?.detail ||
                       error?.response?.data?.email?.[0] ||
                       error?.message ||
@@ -182,7 +179,6 @@ export default function AdminsPage() {
       setShowPasswordModal(false);
       setPasswordData({ newPassword: '', confirmPassword: '' });
     } catch (error: any) {
-      console.error('Failed to change password:', error);
       const message = error?.response?.data?.confirmPassword?.[0] ||
                       error?.response?.data?.detail ||
                       error?.message ||

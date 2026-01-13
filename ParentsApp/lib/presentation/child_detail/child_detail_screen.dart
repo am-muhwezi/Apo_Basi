@@ -102,8 +102,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           _updateBusLocationWithSnapping(location);
         }
       }, onError: (error) {
-        if (LocationConfig.enableSocketLogging) {
-        }
+        if (LocationConfig.enableSocketLogging) {}
       });
 
       // If already connected, subscribe immediately
@@ -120,10 +119,25 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   /// Subscribe to bus location updates
   void _subscribeToBus() {
-    if (_childData != null && _childData!['busId'] != null) {
-      final busId = _childData!['busId'] as int;
-      _webSocketService.subscribeToBus(busId);
+    if (_childData == null || _childData!['busId'] == null) {
+      return;
     }
+
+    // Only subscribe when the child is actually on the bus.
+    final rawStatus = (_childData!['status'] ?? '').toString().toLowerCase();
+    const trackableStatuses = {
+      'on-bus',
+      'on_bus',
+      'on-way-home',
+      'on_way_home',
+    };
+
+    if (!trackableStatuses.contains(rawStatus)) {
+      return;
+    }
+
+    final busId = _childData!['busId'] as int;
+    _webSocketService.subscribeToBus(busId);
   }
 
   /// Update bus location with road snapping and ETA calculation
@@ -233,6 +247,15 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
     final String name = _childData!['name'] ?? 'Child Name';
     final String grade = _childData!['grade'] ?? 'N/A';
+    final String rawStatus =
+        (_childData!['status'] ?? '').toString().toLowerCase();
+    const trackableStatuses = {
+      'on-bus',
+      'on_bus',
+      'on-way-home',
+      'on_way_home',
+    };
+    final bool isTrackable = trackableStatuses.contains(rawStatus);
 
     return Scaffold(
       backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
@@ -261,7 +284,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                           maxZoom: 19,
                         ),
                         // Route Polyline (from bus to home)
-                        if (_routePoints != null && _routePoints!.isNotEmpty)
+                        // Only show when we are actively tracking the bus.
+                        if (isTrackable &&
+                            _routePoints != null &&
+                            _routePoints!.isNotEmpty)
                           PolylineLayer(
                             polylines: [
                               Polyline(
@@ -289,7 +315,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                                 child: const HomeMarkerWidget(),
                               ),
                             // Bus marker (3D Animated) - Using SNAPPED location for accurate road position
-                            if (_busLocation != null)
+                            // Only show when we are actively tracking the bus.
+                            if (isTrackable && _busLocation != null)
                               Marker(
                                 point: _snappedBusLocation ??
                                     LatLng(
@@ -389,13 +416,15 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                             if (_busLocation != null) {
                               // Center on bus location
                               _mapController.move(
-                                LatLng(_busLocation!.latitude, _busLocation!.longitude),
+                                LatLng(_busLocation!.latitude,
+                                    _busLocation!.longitude),
                                 15.0,
                               );
                             } else if (_currentPosition != null) {
                               // Center on user location
                               _mapController.move(
-                                LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                                LatLng(_currentPosition!.latitude,
+                                    _currentPosition!.longitude),
                                 14.0,
                               );
                             }
@@ -505,7 +534,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                           SizedBox(width: 2.w),
                           // Bus number
                           Text(
-                            _childData?['busNumber'] ?? 'YD',
+                            _childData?['busNumber'] ?? 'Unknown',
                             style: AppTheme.lightTheme.textTheme.titleMedium
                                 ?.copyWith(
                               fontWeight: FontWeight.w700,
@@ -520,22 +549,26 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                                 if (_etaMinutes != null) ...[
                                   Icon(
                                     Icons.access_time,
-                                    color: AppTheme.lightTheme.colorScheme.primary,
+                                    color:
+                                        AppTheme.lightTheme.colorScheme.primary,
                                     size: 4.w,
                                   ),
                                   SizedBox(width: 1.w),
                                   Text(
                                     '$_etaMinutes min',
-                                    style: AppTheme.lightTheme.textTheme.bodyMedium
+                                    style: AppTheme
+                                        .lightTheme.textTheme.bodyMedium
                                         ?.copyWith(
                                       fontWeight: FontWeight.w600,
-                                      color: AppTheme.lightTheme.colorScheme.primary,
+                                      color: AppTheme
+                                          .lightTheme.colorScheme.primary,
                                     ),
                                   ),
                                 ],
                                 if (_etaMinutes != null && _distance != null)
                                   Container(
-                                    margin: EdgeInsets.symmetric(horizontal: 2.w),
+                                    margin:
+                                        EdgeInsets.symmetric(horizontal: 2.w),
                                     width: 1,
                                     height: 3.h,
                                     color: Colors.grey.shade300,
@@ -549,7 +582,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                                   SizedBox(width: 1.w),
                                   Text(
                                     '$_distance km',
-                                    style: AppTheme.lightTheme.textTheme.bodyMedium
+                                    style: AppTheme
+                                        .lightTheme.textTheme.bodyMedium
                                         ?.copyWith(
                                       fontWeight: FontWeight.w600,
                                       color: Colors.grey.shade700,

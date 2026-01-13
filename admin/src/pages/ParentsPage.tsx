@@ -41,7 +41,6 @@ export default function ParentsPage() {
         setHasMore(result.data.hasNext || false);
       }
     } catch (error) {
-      console.error('Failed to load parents:', error);
     } finally {
       setLoading(false);
     }
@@ -118,7 +117,6 @@ export default function ParentsPage() {
 
       setParentChildren(loadedChildren);
     } catch (error) {
-      console.error('Failed to load children:', error);
       setParentChildren([]);
     } finally {
       setLoadingChildren(false);

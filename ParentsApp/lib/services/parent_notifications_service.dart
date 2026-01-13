@@ -164,15 +164,19 @@ class ParentNotificationsService {
 
     // Show local notification
     final notificationType = data['notification_type'];
+    final childName = data['child_name'] ?? 'Your child';
     if (notificationType == 'trip_started') {
       NotificationService().showTripStartNotification(
+        childName: childName,
         busNumber: data['bus_number'] ?? 'Unknown',
         tripType: data['trip_type'] ?? 'Unknown',
         busId: data['bus_id'] ?? 0,
       );
     } else if (notificationType == 'trip_ended') {
       NotificationService().showTripCompletedNotification(
+        childName: childName,
         busNumber: data['bus_number'] ?? 'Unknown',
+        tripType: data['trip_type'] ?? 'Unknown',
         busId: data['bus_id'] ?? 0,
       );
     }

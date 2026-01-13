@@ -33,7 +33,6 @@ export async function snapToRoad(
 
     const response = await fetch(url);
     if (!response.ok) {
-      console.warn('Mapbox snap-to-road failed, using original coordinates');
       return location;
     }
 
@@ -48,7 +47,6 @@ export async function snapToRoad(
 
     return location;
   } catch (error) {
-    console.error('Error snapping to road:', error);
     return location;
   }
 }
@@ -66,7 +64,6 @@ export async function getRoute(
 
     const response = await fetch(url);
     if (!response.ok) {
-      console.error('Mapbox directions API failed');
       return null;
     }
 
@@ -82,7 +79,6 @@ export async function getRoute(
 
     return null;
   } catch (error) {
-    console.error('Error fetching route:', error);
     return null;
   }
 }
@@ -105,7 +101,6 @@ export async function getMultiStopRoute(
 
     const response = await fetch(url);
     if (!response.ok) {
-      console.error('Mapbox directions API failed');
       return null;
     }
 
@@ -121,7 +116,6 @@ export async function getMultiStopRoute(
 
     return null;
   } catch (error) {
-    console.error('Error fetching multi-stop route:', error);
     return null;
   }
 }

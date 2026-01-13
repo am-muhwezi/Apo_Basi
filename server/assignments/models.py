@@ -329,6 +329,30 @@ class Assignment(models.Model):
                     notes=models.F('notes') + '\nAuto-expired: Busminder reassigned to different bus'
                 )
 
+            # For driver_to_bus, ensure a driver isn't assigned to multiple buses
+            if self.assignment_type == 'driver_to_bus':
+                Assignment.objects.filter(
+                    assignment_type='driver_to_bus',
+                    assignee_content_type=self.assignee_content_type,
+                    assignee_object_id=self.assignee_object_id,
+                    status='active'
+                ).exclude(pk=self.pk if self.pk else None).update(
+                    status='expired',
+                    notes=models.F('notes') + '\nAuto-expired: Driver reassigned to different bus'
+                )
+
+            # For child_to_bus, ensure a child isn't assigned to multiple buses
+            if self.assignment_type == 'child_to_bus':
+                Assignment.objects.filter(
+                    assignment_type='child_to_bus',
+                    assignee_content_type=self.assignee_content_type,
+                    assignee_object_id=self.assignee_object_id,
+                    status='active'
+                ).exclude(pk=self.pk if self.pk else None).update(
+                    status='expired',
+                    notes=models.F('notes') + '\nAuto-expired: Child reassigned to different bus'
+                )
+
         super().save(*args, **kwargs)
 
     @classmethod

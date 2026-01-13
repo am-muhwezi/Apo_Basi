@@ -23,6 +23,7 @@ import Modal from '../components/common/Modal';
 import SearchableSelect from '../components/common/SearchableSelect';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
+import { exportService } from '../services/exportService';
 import { useBuses } from '../hooks/useBuses';
 import { useDrivers } from '../hooks/useDrivers';
 import { useMinders } from '../hooks/useMinders';
@@ -148,7 +149,6 @@ export default function AssignmentsPage() {
         loadRoutes(),
       ]);
     } catch (error) {
-      console.error('Error loading data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -174,7 +174,6 @@ export default function AssignmentsPage() {
       // If we got less than 20, we've reached the end
       setHasMoreAssignments(data.length === 20);
     } catch (error) {
-      console.error('Failed to load assignments:', error);
     }
   }
 
@@ -189,7 +188,6 @@ export default function AssignmentsPage() {
       const data = await assignmentService.loadRoutes();
       setRoutes(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Failed to load routes:', error);
       setRoutes([]);
     }
   }
@@ -202,7 +200,6 @@ export default function AssignmentsPage() {
       setBusUtilization(data);
       setShowUtilizationModal(true);
     } catch (error) {
-      console.error('Failed to load bus utilization:', error);
     }
   }
 
@@ -295,7 +292,6 @@ export default function AssignmentsPage() {
         toast.success('Assignment deleted successfully');
         await loadAssignments();
       } catch (error) {
-        console.error('Failed to delete assignment:', error);
         toast.error('Failed to delete assignment. Please try again.');
       }
     }
@@ -315,7 +311,6 @@ export default function AssignmentsPage() {
         toast.success('Assignment cancelled successfully');
         await loadAssignments();
       } catch (error) {
-        console.error('Failed to cancel assignment:', error);
         toast.error('Failed to cancel assignment. Please try again.');
       }
     }
@@ -335,7 +330,6 @@ export default function AssignmentsPage() {
       await loadAssignments();
       setShowAssignmentModal(false);
     } catch (error) {
-      console.error('Failed to save assignment:', error);
       toast.error('Failed to save assignment. Please check all fields and try again.');
     }
   }
@@ -390,7 +384,6 @@ export default function AssignmentsPage() {
         toast.success('Route deleted successfully');
         await loadRoutes();
       } catch (error) {
-        console.error('Failed to delete route:', error);
         toast.error('Failed to delete route. Please try again.');
       }
     }
@@ -410,7 +403,6 @@ export default function AssignmentsPage() {
       await loadRoutes();
       setShowRouteModal(false);
     } catch (error) {
-      console.error('Failed to save route:', error);
       toast.error('Failed to save route. Please check all fields and try again.');
     }
   }
@@ -429,7 +421,6 @@ export default function AssignmentsPage() {
       setShowBulkAssignModal(false);
       setBulkAssignData({ busId: '', childrenIds: [] });
     } catch (error) {
-      console.error('Failed to bulk assign:', error);
       toast.error('Failed to assign children. Please check bus capacity and existing assignments.');
     }
   }
@@ -584,7 +575,7 @@ export default function AssignmentsPage() {
 
           {/* Search and Filters */}
           <div className="bg-white rounded-xl p-4 mb-6 border border-slate-200">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="sm:col-span-2 lg:col-span-1">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
@@ -622,6 +613,28 @@ export default function AssignmentsPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    try {
+                      if (filteredAssignments.length === 0) {
+                        toast.error('No assignments to export');
+                        return;
+                      }
+                      exportService.exportAssignmentsReport(filteredAssignments);
+                      toast.success(`Exported ${filteredAssignments.length} assignments successfully`);
+                    } catch (error) {
+                      toast.error('Failed to export assignments. Please try again.');
+                    }
+                  }}
+                  className="w-full"
+                  disabled={filteredAssignments.length === 0}
+                >
+                  <FileText size={20} />
+                  <span className="ml-1">Export</span>
+                </Button>
               </div>
               <div>
                 <Button onClick={handleCreateAssignment} className="w-full">
@@ -1226,8 +1239,11 @@ export default function AssignmentsPage() {
       >
         <form onSubmit={handleBulkAssign} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Select Bus</label>
+            <label htmlFor="bulk-assign-bus" className="block text-sm font-medium text-slate-700 mb-2">
+              Select Bus
+            </label>
             <select
+              id="bulk-assign-bus"
               value={bulkAssignData.busId}
               onChange={(e) => setBulkAssignData({ ...bulkAssignData, busId: e.target.value })}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1243,10 +1259,11 @@ export default function AssignmentsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor="bulk-assign-children" className="block text-sm font-medium text-slate-700 mb-2">
               Select Children (Hold Ctrl/Cmd to select multiple)
             </label>
             <select
+              id="bulk-assign-children"
               multiple
               value={bulkAssignData.childrenIds.map(String)}
               onChange={(e) => {
@@ -1279,56 +1296,252 @@ export default function AssignmentsPage() {
         </form>
       </Modal>
 
-      {/* Bus Utilization Modal */}
+      {/* Bus Utilization Modal - Modern Design */}
       <Modal
         isOpen={showUtilizationModal}
         onClose={() => setShowUtilizationModal(false)}
-        title="Bus Utilization Report"
-        size="lg"
+        title="🚌 Bus Utilization Overview"
+        size="xl"
       >
-        <div className="space-y-4">
+        {/* Header with Export Button */}
+        <div className="mb-6 flex items-center justify-between">
+          <p className="text-slate-600">Real-time bus capacity and assignment details</p>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              try {
+                if (busUtilization.length === 0) {
+                  toast.error('No data to export');
+                  return;
+                }
+                exportService.exportBusUtilizationReport(busUtilization);
+                toast.success('Bus utilization report exported successfully');
+              } catch (error) {
+                toast.error('Failed to export report. Please try again.');
+              }
+            }}
+            className="shadow-sm hover:shadow-md transition-shadow"
+          >
+            <FileText size={18} />
+            <span className="ml-2">Export</span>
+          </Button>
+        </div>
+
+        <div className="space-y-5">
           {busUtilization.length === 0 ? (
-            <p className="text-center text-slate-500 py-8">No utilization data available</p>
+            <div className="text-center py-16">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 mb-4">
+                <TrendingUp className="w-8 h-8 text-slate-400" />
+              </div>
+              <p className="text-slate-500 text-lg">No utilization data available</p>
+              <p className="text-slate-400 text-sm mt-1">Bus assignments will appear here</p>
+            </div>
           ) : (
             busUtilization.map((item) => (
-              <div key={item.bus_id} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h4 className="font-semibold text-slate-900">{item.bus_number}</h4>
-                    <p className="text-sm text-slate-600">
-                      {item.driver || 'No driver'} • {item.minder || 'No minder'}
-                    </p>
+              <div key={item.bus_id} className="group bg-gradient-to-br from-white to-slate-50 rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+                {/* Modern Bus Header with Gradient */}
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm border border-white/30">
+                          <Users className="w-7 h-7" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-2xl tracking-tight">{item.bus_number}</h4>
+                          <p className="text-blue-100 text-sm flex items-center gap-1.5 mt-0.5">
+                            <FileText size={14} />
+                            {item.license_plate}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span
+                        className={`inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg backdrop-blur-sm ${
+                          item.utilization_percentage >= 90
+                            ? 'bg-red-500 text-white ring-2 ring-red-300'
+                            : item.utilization_percentage >= 70
+                            ? 'bg-amber-500 text-white ring-2 ring-amber-300'
+                            : 'bg-emerald-500 text-white ring-2 ring-emerald-300'
+                        }`}
+                      >
+                        {item.utilization_percentage}%
+                      </span>
+                      <p className="text-blue-100 text-xs mt-1.5 font-medium">Capacity</p>
+                    </div>
                   </div>
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      item.utilization_percentage >= 90
-                        ? 'bg-red-100 text-red-800'
-                        : item.utilization_percentage >= 70
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-green-100 text-green-800'
-                    }`}
-                  >
-                    {item.utilization_percentage}%
-                  </span>
+
+                  {/* Capacity Stats */}
+                  <div className="flex items-center gap-6 mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-white shadow-lg"></div>
+                      <span className="text-sm font-semibold">
+                        {item.assigned_children}/{item.capacity} Seats
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full shadow-lg ${item.available_seats > 0 ? 'bg-green-300' : 'bg-red-300'}`}></div>
+                      <span className="text-sm font-medium">
+                        {item.available_seats} Available
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Modern Progress Bar with Glow */}
+                  <div className="relative h-3 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm shadow-inner">
+                    <div
+                      className={`absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out ${
+                        item.utilization_percentage >= 90
+                          ? 'bg-gradient-to-r from-red-400 via-red-500 to-red-600'
+                          : item.utilization_percentage >= 70
+                          ? 'bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600'
+                          : 'bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600'
+                      }`}
+                      style={{ width: `${item.utilization_percentage}%` }}
+                    >
+                      <div className="absolute inset-0 bg-white/30 animate-pulse"></div>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4 text-sm text-slate-600">
-                  <span>
-                    {item.assigned_children}/{item.capacity} seats
-                  </span>
-                  <span>•</span>
-                  <span>{item.available_seats} available</span>
+
+                {/* Bus Team Cards - Modern Grid */}
+                <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Driver Card */}
+                  <div className="group/card relative bg-white p-5 rounded-xl border-2 border-slate-200 hover:border-blue-400 hover:shadow-lg transition-all duration-200">
+                    <div className="absolute top-4 right-4">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center group-hover/card:from-blue-100 group-hover/card:to-blue-200 transition-colors shadow-sm">
+                        <Users className="w-5 h-5 text-blue-600" />
+                      </div>
+                    </div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Driver</p>
+                    {item.driver ? (
+                      <div>
+                        <p className="font-bold text-slate-900 mb-2 text-base">
+                          {item.driver.first_name} {item.driver.last_name}
+                        </p>
+                        <p className="text-sm text-slate-600 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm"></span>
+                          {item.driver.phone || 'No contact'}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-400 italic font-medium">Not assigned</p>
+                    )}
+                  </div>
+
+                  {/* Bus Assistant Card */}
+                  <div className="group/card relative bg-white p-5 rounded-xl border-2 border-slate-200 hover:border-purple-400 hover:shadow-lg transition-all duration-200">
+                    <div className="absolute top-4 right-4">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-50 to-purple-100 flex items-center justify-center group-hover/card:from-purple-100 group-hover/card:to-purple-200 transition-colors shadow-sm">
+                        <Users className="w-5 h-5 text-purple-600" />
+                      </div>
+                    </div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Assistant</p>
+                    {item.minder ? (
+                      <div>
+                        <p className="font-bold text-slate-900 mb-2 text-base">
+                          {item.minder.first_name} {item.minder.last_name}
+                        </p>
+                        <p className="text-sm text-slate-600 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm"></span>
+                          {item.minder.phone || 'No contact'}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-400 italic font-medium">Not assigned</p>
+                    )}
+                  </div>
+
+                  {/* Route Card */}
+                  <div className="group/card relative bg-white p-5 rounded-xl border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all duration-200">
+                    <div className="absolute top-4 right-4">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center group-hover/card:from-emerald-100 group-hover/card:to-emerald-200 transition-colors shadow-sm">
+                        <TrendingUp className="w-5 h-5 text-emerald-600" />
+                      </div>
+                    </div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Route</p>
+                    {item.route ? (
+                      <div>
+                        <p className="font-bold text-slate-900 mb-2 text-base">{item.route.name}</p>
+                        <p className="text-sm text-slate-600 font-mono bg-slate-50 px-2 py-1 rounded inline-block">{item.route.route_code}</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-400 italic font-medium">Not assigned</p>
+                    )}
+                  </div>
                 </div>
-                <div className="mt-2 bg-slate-200 rounded-full h-2 overflow-hidden">
-                  <div
-                    className={`h-full transition-all ${
-                      item.utilization_percentage >= 90
-                        ? 'bg-red-600'
-                        : item.utilization_percentage >= 70
-                        ? 'bg-yellow-600'
-                        : 'bg-green-600'
-                    }`}
-                    style={{ width: `${item.utilization_percentage}%` }}
-                  />
+
+                {/* Children List - Modern Table */}
+                <div className="px-6 pb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h5 className="font-bold text-lg text-slate-900 flex items-center gap-2">
+                      <div className="w-1 h-6 bg-gradient-to-b from-blue-600 to-indigo-600 rounded-full"></div>
+                      Children on Board
+                      <span className="ml-2 px-3 py-1 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-bold rounded-full shadow-sm">
+                        {item.children?.length || 0}
+                      </span>
+                    </h5>
+                  </div>
+
+                  {item.children && item.children.length > 0 ? (
+                    <div className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden shadow-sm">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100">
+                              <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider border-b-2 border-slate-200">
+                                Student
+                              </th>
+                              <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider border-b-2 border-slate-200">
+                                Grade
+                              </th>
+                              <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider border-b-2 border-slate-200">
+                                Parent
+                              </th>
+                              <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider border-b-2 border-slate-200">
+                                Contact
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {item.children.map((child) => (
+                              <tr key={child.id} className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-colors group/row">
+                                <td className="px-5 py-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center text-white text-sm font-bold shadow-md group-hover/row:shadow-lg transition-shadow">
+                                      {child.first_name.charAt(0)}{child.last_name.charAt(0)}
+                                    </div>
+                                    <span className="font-bold text-slate-900 text-base">
+                                      {child.first_name} {child.last_name}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-5 py-4">
+                                  <span className="inline-flex px-3 py-1.5 bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 text-xs font-bold rounded-lg shadow-sm">
+                                    {child.grade || 'N/A'}
+                                  </span>
+                                </td>
+                                <td className="px-5 py-4 font-semibold text-slate-900">{child.parent_name}</td>
+                                <td className="px-5 py-4 font-mono text-sm text-slate-600 bg-slate-50 group-hover/row:bg-white transition-colors">
+                                  {child.parent_phone}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border-2 border-dashed border-slate-300 p-12 text-center">
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white shadow-md mb-4">
+                        <Users className="w-8 h-8 text-slate-400" />
+                      </div>
+                      <p className="text-slate-600 font-bold text-base">No children assigned</p>
+                      <p className="text-slate-400 text-sm mt-2">This bus has no active child assignments</p>
+                    </div>
+                  )}
                 </div>
               </div>
             ))

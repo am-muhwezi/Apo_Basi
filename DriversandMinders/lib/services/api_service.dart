@@ -39,6 +39,34 @@ class ApiService {
     ));
   }
 
+  String _extractErrorMessage(DioException e, String fallback) {
+    final response = e.response;
+    final data = response?.data;
+
+    if (data is Map<String, dynamic>) {
+      if (data['detail'] is String) return data['detail'] as String;
+
+      final error = data['error'];
+      if (error is String) return error;
+      if (error is Map) {
+        if (error['message'] is String) return error['message'] as String;
+        final first = error.values.firstWhere(
+          (v) => v is String,
+          orElse: () => null,
+        );
+        if (first is String) return first;
+      }
+
+      if (data['message'] is String) return data['message'] as String;
+    }
+
+    if (e.message != null && e.message!.isNotEmpty) {
+      return e.message!;
+    }
+
+    return fallback;
+  }
+
   // Save token to shared preferences
   Future<void> _saveToken(String token) async {
     _accessToken = token;
@@ -130,11 +158,9 @@ class ApiService {
         throw Exception('Login failed');
       }
     } on DioException catch (e) {
-      if (e.response != null) {
-        throw Exception(e.response?.data['error'] ?? 'Phone number not found.');
-      } else {
-        throw Exception('Network error. Please check your connection.');
-      }
+      throw Exception(
+        _extractErrorMessage(e, 'Phone number not found.'),
+      );
     }
   }
 
@@ -172,11 +198,9 @@ class ApiService {
         throw Exception('Login failed');
       }
     } on DioException catch (e) {
-      if (e.response != null) {
-        throw Exception(e.response?.data['error'] ?? 'Phone number not found.');
-      } else {
-        throw Exception('Network error. Please check your connection.');
-      }
+      throw Exception(
+        _extractErrorMessage(e, 'Phone number not found.'),
+      );
     }
   }
 
@@ -192,13 +216,9 @@ class ApiService {
         throw Exception('Failed to load bus information');
       }
     } on DioException catch (e) {
-      if (e.response != null) {
-        throw Exception(e.response?.data['message'] ??
-            e.response?.data['error'] ??
-            'Failed to load bus information');
-      } else {
-        throw Exception('Network error. Please check your connection.');
-      }
+      throw Exception(
+        _extractErrorMessage(e, 'Failed to load bus information'),
+      );
     }
   }
 
@@ -214,13 +234,9 @@ class ApiService {
         throw Exception('Failed to load route information');
       }
     } on DioException catch (e) {
-      if (e.response != null) {
-        throw Exception(e.response?.data['message'] ??
-            e.response?.data['error'] ??
-            'Failed to load route information');
-      } else {
-        throw Exception('Network error. Please check your connection.');
-      }
+      throw Exception(
+        _extractErrorMessage(e, 'Failed to load route information'),
+      );
     }
   }
 
@@ -236,13 +252,9 @@ class ApiService {
         throw Exception('Failed to load buses information');
       }
     } on DioException catch (e) {
-      if (e.response != null) {
-        throw Exception(e.response?.data['message'] ??
-            e.response?.data['error'] ??
-            'Failed to load buses information');
-      } else {
-        throw Exception('Network error. Please check your connection.');
-      }
+      throw Exception(
+        _extractErrorMessage(e, 'Failed to load buses information'),
+      );
     }
   }
 
@@ -263,13 +275,9 @@ class ApiService {
         throw Exception('Failed to load children information');
       }
     } on DioException catch (e) {
-      if (e.response != null) {
-        throw Exception(e.response?.data['message'] ??
-            e.response?.data['error'] ??
-            'Failed to load children information');
-      } else {
-        throw Exception('Network error. Please check your connection.');
-      }
+      throw Exception(
+        _extractErrorMessage(e, 'Failed to load children information'),
+      );
     }
   }
 
@@ -299,13 +307,9 @@ class ApiService {
         throw Exception('Failed to mark attendance');
       }
     } on DioException catch (e) {
-      if (e.response != null) {
-        throw Exception(e.response?.data['message'] ??
-            e.response?.data['error'] ??
-            'Failed to mark attendance');
-      } else {
-        throw Exception('Network error. Please check your connection.');
-      }
+      throw Exception(
+        _extractErrorMessage(e, 'Failed to mark attendance'),
+      );
     }
   }
 

@@ -30,7 +30,7 @@ export async function getAssignmentHistory(id: string) {
 }
 
 export async function bulkAssignChildrenToBus(busId: number, childrenIds: number[], effectiveDate?: string) {
-  return axiosInstance.post('/assignments/list/bulk-assign-children-to-bus/', {
+  return axiosInstance.post('/assignments/list/bulk_assign_children_to_bus/', {
     busId,
     childrenIds,
     effectiveDate
@@ -38,7 +38,7 @@ export async function bulkAssignChildrenToBus(busId: number, childrenIds: number
 }
 
 export async function bulkAssignChildrenToRoute(routeId: number, childrenIds: number[], effectiveDate?: string) {
-  return axiosInstance.post('/assignments/list/bulk-assign-children-to-route/', {
+  return axiosInstance.post('/assignments/list/bulk_assign_children_to_route/', {
     routeId,
     childrenIds,
     effectiveDate
@@ -46,7 +46,7 @@ export async function bulkAssignChildrenToRoute(routeId: number, childrenIds: nu
 }
 
 export async function getBusUtilization() {
-  return axiosInstance.get('/assignments/list/bus-utilization/');
+  return axiosInstance.get('/assignments/list/bus_utilization/');
 }
 
 export async function transferAssignment(assignmentId: number, newAssignedToId: number, newAssignedToType: string, reason?: string) {
