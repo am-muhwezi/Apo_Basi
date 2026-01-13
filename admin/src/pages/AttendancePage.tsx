@@ -12,6 +12,8 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { getAttendanceStats, getDailyAttendanceReport } from '../services/api';
+import { exportService } from '../services/exportService';
+import { useToast } from '../contexts/ToastContext';
 
 type AttendanceStatus = 'picked_up' | 'dropped_off' | 'absent' | 'pending';
 
@@ -41,6 +43,7 @@ interface DailyStats {
 }
 
 export default function AttendancePage() {
+  const toast = useToast();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -146,7 +149,6 @@ export default function AttendancePage() {
       
       setAttendanceRecords(records);
     } catch (error) {
-      console.error('Error fetching attendance data:', error);
     } finally {
       setLoading(false);
     }
@@ -212,6 +214,25 @@ export default function AttendancePage() {
 
     return matchesSearch && matchesStatus;
   });
+
+  const handleExport = () => {
+    try {
+      if (filteredRecords.length === 0) {
+        toast.error('No data to export');
+        return;
+      }
+
+      exportService.exportAttendanceReport(
+        filteredRecords,
+        selectedDate,
+        tripType
+      );
+
+      toast.success(`Exported ${filteredRecords.length} records successfully`);
+    } catch (error) {
+      toast.error('Failed to export report. Please try again.');
+    }
+  };
 
   return (
     <div>
@@ -377,7 +398,11 @@ export default function AttendancePage() {
           </div>
 
           {/* Export Button */}
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <button
+            onClick={handleExport}
+            disabled={filteredRecords.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed"
+          >
             <Download size={20} />
             Export Report
           </button>

@@ -89,10 +89,7 @@ class BusService {
    * Example usage:
    * const result = await busService.loadBuses({ limit: 20, offset: 0 });
    * if (result.success) {
-   *   console.log('Buses:', result.data.buses);
-   *   console.log('Total count:', result.data.count);
    * } else {
-   *   console.error('Error:', result.error.message);
    * }
    */
   async loadBuses(params?: PaginationParams): Promise<

@@ -70,7 +70,6 @@ export default function TripsPage() {
         setHasMore(Array.isArray(tripsData) && tripsData.length === 20);
       }
     } catch (error) {
-      console.error('Failed to load trips:', error);
       if (!append) {
         setTrips([]);
       }
@@ -88,7 +87,6 @@ export default function TripsPage() {
   function initializeWebSocket() {
     const token = localStorage.getItem('adminToken');
     if (!token) {
-      console.error('❌ No auth token found in localStorage');
       setWsConnected(false);
       return;
     }
@@ -97,24 +95,20 @@ export default function TripsPage() {
     const busIds = [...new Set(trips.map(trip => trip.busId))].filter(Boolean);
 
     if (busIds.length === 0) {
-      console.log('⚠️ No bus IDs found in trips');
       return;
     }
 
-    console.log('🔌 Initializing WebSocket for buses:', busIds);
 
     // Set authentication token
     busWebSocketService.setToken(token);
 
     // Subscribe to all buses
     busIds.forEach(busId => {
-      console.log(`📡 Subscribing to bus ${busId}...`);
       busWebSocketService.subscribeToBus(busId);
 
       // Listen for location updates for this bus
       busWebSocketService.on(busId, (data) => {
         if (data.type === 'location_update') {
-          console.log('📍 Location update:', data);
 
           // Update bus locations map
           setBusLocations(prev => {
@@ -151,10 +145,8 @@ export default function TripsPage() {
             } : trip
           ));
         } else if (data.type === 'connected') {
-          console.log('✅ Connected to bus:', data.bus_id);
           setWsConnected(true);
         } else if (data.type === 'error') {
-          console.error('❌ WebSocket error:', data.message);
         }
       });
     });
@@ -163,7 +155,6 @@ export default function TripsPage() {
   // Initialize WebSocket when trips are loaded
   useEffect(() => {
     if (trips.length > 0) {
-      console.log('🚌 Trips loaded, initializing WebSocket...');
       initializeWebSocket();
     }
   }, [trips.length]);
@@ -220,7 +211,6 @@ export default function TripsPage() {
       toast.success(`✅ Trip Cancelled - Bus ${trip.busNumber} ${trip.type} route has been stopped. Parents and driver have been notified.`, 6000);
       loadTrips(); // Refresh the list
     } catch (error) {
-      console.error('Failed to stop trip:', error);
       toast.error('❌ Failed to cancel trip. The trip may already be completed or cancelled. Please refresh and try again.');
     }
   };

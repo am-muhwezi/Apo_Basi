@@ -6,7 +6,8 @@ import '../config/api_config.dart';
 /// Service for fetching routes from Mapbox Directions API and Map Matching
 class MapboxRouteService {
   static const String _baseUrl = 'https://api.mapbox.com/directions/v5/mapbox';
-  static const String _matchingUrl = 'https://api.mapbox.com/matching/v5/mapbox';
+  static const String _matchingUrl =
+      'https://api.mapbox.com/matching/v5/mapbox';
 
   /// Fetch route between two coordinates
   ///
@@ -17,7 +18,8 @@ class MapboxRouteService {
     String profile = 'driving', // driving, walking, cycling, driving-traffic
   }) async {
     try {
-      final coordinates = '${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}';
+      final coordinates =
+          '${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}';
       final url = Uri.parse(
         '$_baseUrl/$profile/$coordinates?geometries=geojson&overview=full&access_token=${ApiConfig.mapboxAccessToken}',
       );
@@ -32,8 +34,16 @@ class MapboxRouteService {
           final coordinates = geometry['coordinates'] as List;
 
           // Convert coordinates to LatLng points
-          return coordinates.map((coord) {
-            return LatLng(coord[1].toDouble(), coord[0].toDouble());
+          // Convert coordinates to LatLng points with type safety
+          return coordinates.map<LatLng>((coord) {
+            if (coord is List && coord.length >= 2) {
+              final lon = coord[0];
+              final lat = coord[1];
+              if (lon is num && lat is num) {
+                return LatLng(lat.toDouble(), lon.toDouble());
+              }
+            }
+            throw const FormatException('Invalid coordinate from Mapbox');
           }).toList();
         }
       }
@@ -51,7 +61,8 @@ class MapboxRouteService {
     String profile = 'driving',
   }) async {
     try {
-      final coordinates = '${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}';
+      final coordinates =
+          '${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}';
       final url = Uri.parse(
         '$_baseUrl/$profile/$coordinates?geometries=geojson&overview=full&access_token=${ApiConfig.mapboxAccessToken}',
       );
@@ -65,7 +76,8 @@ class MapboxRouteService {
           return {
             'duration': route['duration'], // in seconds
             'distance': route['distance'], // in meters
-            'duration_typical': route['duration_typical'], // typical duration in traffic
+            'duration_typical':
+                route['duration_typical'], // typical duration in traffic
           };
         }
       }
@@ -96,7 +108,8 @@ class MapboxRouteService {
       // Build radiuses parameter if provided
       String radiusesParam = '';
       if (radiuses != null && radiuses.isNotEmpty) {
-        radiusesParam = '&radiuses=${radiuses.map((r) => r?.toString() ?? '').join(';')}';
+        radiusesParam =
+            '&radiuses=${radiuses.map((r) => r?.toString() ?? '').join(';')}';
       }
 
       final url = Uri.parse(
@@ -107,14 +120,23 @@ class MapboxRouteService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['matchings'] != null && (data['matchings'] as List).isNotEmpty) {
+        if (data['matchings'] != null &&
+            (data['matchings'] as List).isNotEmpty) {
           final matching = data['matchings'][0];
           final geometry = matching['geometry'];
           final coordinates = geometry['coordinates'] as List;
 
           // Convert coordinates to LatLng points
-          final snappedPoints = coordinates.map((coord) {
-            return LatLng(coord[1].toDouble(), coord[0].toDouble());
+          // Convert coordinates to LatLng points with type safety
+          final snappedPoints = coordinates.map<LatLng>((coord) {
+            if (coord is List && coord.length >= 2) {
+              final lon = coord[0];
+              final lat = coord[1];
+              if (lon is num && lat is num) {
+                return LatLng(lat.toDouble(), lon.toDouble());
+              }
+            }
+            throw const FormatException('Invalid coordinate from Mapbox');
           }).toList();
 
           return {
@@ -220,7 +242,8 @@ class MapboxRouteService {
     String profile = 'driving-traffic',
   }) async {
     try {
-      final coordinates = '${busLocation.longitude},${busLocation.latitude};${homeLocation.longitude},${homeLocation.latitude}';
+      final coordinates =
+          '${busLocation.longitude},${busLocation.latitude};${homeLocation.longitude},${homeLocation.latitude}';
       final url = Uri.parse(
         '$_baseUrl/$profile/$coordinates?geometries=geojson&overview=full&steps=true&access_token=${ApiConfig.mapboxAccessToken}',
       );
@@ -246,7 +269,8 @@ class MapboxRouteService {
             'route': routePoints,
             'eta': (durationSeconds / 60).ceil(), // Minutes
             'duration': durationSeconds.toInt(), // Seconds
-            'distance': (distanceMeters / 1000).toStringAsFixed(2), // Kilometers
+            'distance':
+                (distanceMeters / 1000).toStringAsFixed(2), // Kilometers
             'distanceMeters': distanceMeters.toInt(),
           };
         }

@@ -60,64 +60,98 @@ def send_notification_to_parent(parent_id, notification_type, data):
     )
 
 
-def send_trip_started_notification(parent_id, trip, bus):
-    """Send trip started notification to parent."""
+def send_trip_started_notification(parent_id, trip, bus, child=None):
+    """Send trip started notification to parent.
+
+    For parents, this is phrased around their child:
+    "Child's bus has started pickup trip, bus will be arriving shortly".
+    """
+    child_name = f"{child.first_name} {child.last_name}" if child else "Your child"
+
+    title = f"{child_name} Pickup Trip Started" if trip.trip_type == 'pickup' else f"Bus {bus.bus_number} Started Trip"
+    message = (
+        f"{child_name}'s bus has started the pickup trip. The bus will be arriving shortly."
+        if trip.trip_type == 'pickup'
+        else f"The {trip.trip_type} trip has started."
+    )
+    full_message = message
+
     # Save to database
     save_notification_to_db(
         parent_id=parent_id,
         notification_type='trip_started',
-        title=f'Bus {bus.bus_number} Started Trip',
-        message=f'The {trip.trip_type} trip has started',
-        full_message=f'Bus {bus.bus_number} has started the {trip.trip_type} trip. You can track its location in real-time.',
+        title=title,
+        message=message,
+        full_message=full_message,
+        child=child,
         bus=bus,
         trip=trip,
-        additional_data={'trip_type': trip.trip_type}
+        additional_data={'trip_type': trip.trip_type, 'child_name': child_name}
     )
-    
+
     # Send real-time notification
     send_notification_to_parent(
         parent_id=parent_id,
         notification_type='trip_notification',
         data={
             'notification_type': 'trip_started',
-            'title': f'Bus {bus.bus_number} Started Trip',
-            'message': f'The {trip.trip_type} trip has started',
-            'full_message': f'Bus {bus.bus_number} has started the {trip.trip_type} trip. You can track its location in real-time.',
+            'title': title,
+            'message': message,
+            'full_message': full_message,
             'trip_id': trip.id,
             'bus_id': bus.id,
             'bus_number': bus.bus_number,
             'trip_type': trip.trip_type,
+            'child_name': child_name,
         }
     )
 
 
-def send_trip_completed_notification(parent_id, trip, bus):
-    """Send trip completed notification to parent."""
+def send_trip_completed_notification(parent_id, trip, bus, child=None):
+    """Send trip completed notification to parent.
+
+    For pickup trips, parents should see:
+    "ChildName has reached safe at school".
+    """
+    child_name = f"{child.first_name} {child.last_name}" if child else "Your child"
+
+    if trip.trip_type == 'pickup':
+        title = f"{child_name} Reached School Safely"
+        message = f"{child_name} has reached safe at school."
+    else:
+        # Fallback for non-pickup trips
+        title = f"Bus {bus.bus_number} Trip Completed"
+        message = f"The {trip.trip_type} trip has been completed."
+
+    full_message = message
+
     # Save to database
     save_notification_to_db(
         parent_id=parent_id,
         notification_type='trip_completed',
-        title=f'Bus {bus.bus_number} Trip Completed',
-        message=f'The {trip.trip_type} trip has been completed',
-        full_message=f'Bus {bus.bus_number} has successfully completed the {trip.trip_type} trip.',
+        title=title,
+        message=message,
+        full_message=full_message,
+        child=child,
         bus=bus,
         trip=trip,
-        additional_data={'trip_type': trip.trip_type}
+        additional_data={'trip_type': trip.trip_type, 'child_name': child_name}
     )
-    
+
     # Send real-time notification
     send_notification_to_parent(
         parent_id=parent_id,
         notification_type='trip_notification',
         data={
             'notification_type': 'trip_ended',
-            'title': f'Bus {bus.bus_number} Trip Completed',
-            'message': f'The {trip.trip_type} trip has been completed',
-            'full_message': f'Bus {bus.bus_number} has successfully completed the {trip.trip_type} trip.',
+            'title': title,
+            'message': message,
+            'full_message': full_message,
             'trip_id': trip.id,
             'bus_id': bus.id,
             'bus_number': bus.bus_number,
             'trip_type': trip.trip_type,
+            'child_name': child_name,
         }
     )
 
@@ -129,7 +163,7 @@ def send_child_pickup_notification(parent_id, child, bus, attendance):
         parent_id=parent_id,
         notification_type='child_picked_up',
         title=f'{child.first_name} Picked Up',
-        message=f'{child.first_name} has been picked up by Bus {bus.bus_number}',
+        message=f'{child.first_name} has been picked up by {bus.bus_number}',
         full_message=f'{child.first_name} {child.last_name} was picked up at {attendance.timestamp.strftime("%I:%M %p")}.',
         child=child,
         bus=bus,
@@ -149,7 +183,7 @@ def send_child_pickup_notification(parent_id, child, bus, attendance):
         data={
             'notification_type': 'pickup_confirmed',
             'title': f'{child.first_name} Picked Up',
-            'message': f'{child.first_name} has been picked up by Bus {bus.bus_number}',
+            'message': f'{child.first_name} has been picked up by {bus.bus_number}',
             'full_message': f'{child.first_name} {child.last_name} was picked up at {attendance.timestamp.strftime("%I:%M %p")}.',
             'child_id': child.id,
             'child_name': f'{child.first_name} {child.last_name}',
@@ -171,7 +205,7 @@ def send_child_dropoff_notification(parent_id, child, bus, attendance):
         parent_id=parent_id,
         notification_type='child_dropped_off',
         title=f'{child.first_name} Dropped Off',
-        message=f'{child.first_name} has been dropped off by Bus {bus.bus_number}',
+        message=f'{child.first_name} has been dropped off by {bus.bus_number}',
         full_message=f'{child.first_name} {child.last_name} was dropped off at {attendance.timestamp.strftime("%I:%M %p")}.',
         child=child,
         bus=bus,
@@ -191,7 +225,7 @@ def send_child_dropoff_notification(parent_id, child, bus, attendance):
         data={
             'notification_type': 'dropoff_complete',
             'title': f'{child.first_name} Dropped Off',
-            'message': f'{child.first_name} has been dropped off by Bus {bus.bus_number}',
+            'message': f'{child.first_name} has been dropped off by {bus.bus_number}',
             'full_message': f'{child.first_name} {child.last_name} was dropped off at {attendance.timestamp.strftime("%I:%M %p")}.',
             'child_id': child.id,
             'child_name': f'{child.first_name} {child.last_name}',

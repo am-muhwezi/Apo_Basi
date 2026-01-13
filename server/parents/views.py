@@ -1,16 +1,6 @@
-"""
-Parent ViewSet for managing parent CRUD operations.
+"""Parent views for CRUD and phone-based login flows."""
 
-This ViewSet consolidates all parent operations:
-- CRUD operations (list, create, retrieve, update, delete)
-- Child relationship queries
-
-Architecture Benefits:
-- Single ViewSet instead of multiple views
-- Automatic URL routing via DRF router
-- Built-in pagination (configured globally)
-- Built-in authentication (JWT)
-"""
+import logging
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -31,6 +21,7 @@ from assignments.models import Assignment
 from datetime import date
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class ParentViewSet(viewsets.ModelViewSet):
@@ -287,73 +278,91 @@ class ParentLoginView(APIView):
             )
 
         # Generate JWT tokens
-        refresh = RefreshToken.for_user(parent.user)
+        try:
+            # Generate JWT tokens
+            refresh = RefreshToken.for_user(parent.user)
 
-        # Get parent's children
-        children = Child.objects.filter(parent=parent)
+            # Get parent's children
+            children = Child.objects.filter(parent=parent)
 
-        # Build children data with bus assignments from Assignment API
-        children_data = []
-        for child in children:
-            # Get child's bus assignment using Assignment API
-            bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
+            # Build children data with bus assignments from Assignment API
+            children_data = []
+            for child in children:
+                # Get child's bus assignment using Assignment API
+                bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
 
-            child_data = {
-                "id": child.id,
-                "first_name": child.first_name,
-                "last_name": child.last_name,
-                "class_grade": child.class_grade,
-                "status": child.status,
-                "assigned_bus": None
-            }
-
-            if bus_assignment:
-                bus = bus_assignment.assigned_to
-                # Get driver and minder for the bus
-                driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
-                minder_assignment = Assignment.get_assignments_to(bus, 'minder_to_bus').first()
-
-                # Safely build driver info
-                driver_info = None
-                if driver_assignment and driver_assignment.assignee:
-                    driver_info = {
-                        "name": f"{driver_assignment.assignee.user.first_name} {driver_assignment.assignee.user.last_name}",
-                        "phone": driver_assignment.assignee.phone_number
-                    }
-
-                # Safely build minder info
-                minder_info = None
-                if minder_assignment and minder_assignment.assignee:
-                    minder_info = {
-                        "name": f"{minder_assignment.assignee.user.first_name} {minder_assignment.assignee.user.last_name}",
-                        "phone": minder_assignment.assignee.phone_number
-                    }
-
-                child_data["assigned_bus"] = {
-                    "id": bus.id,
-                    "bus_number": bus.bus_number,
-                    "number_plate": bus.number_plate,
-                    "driver": driver_info,
-                    "minder": minder_info
+                child_data = {
+                    "id": child.id,
+                    "first_name": child.first_name,
+                    "last_name": child.last_name,
+                    "class_grade": child.class_grade,
+                    "status": child.status,
+                    "assigned_bus": None
                 }
 
-            children_data.append(child_data)
+                if bus_assignment:
+                    bus = bus_assignment.assigned_to
+                    # Get driver and minder for the bus
+                    driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+                    minder_assignment = Assignment.get_assignments_to(bus, 'minder_to_bus').first()
 
-        return Response({
-            "message": "Login successful",
-            "tokens": {
-                "refresh": str(refresh),
-                "access": str(refresh.access_token)
-            },
-            "parent": {
-                "id": parent.user.id,
-                "first_name": parent.user.first_name,
-                "last_name": parent.user.last_name,
-                "email": parent.user.email,
-                "phone": parent.contact_number,
-            },
-            "children": children_data
-        }, status=status.HTTP_200_OK)
+                    # Safely build driver info
+                    driver_info = None
+                    if driver_assignment and driver_assignment.assignee:
+                        driver_info = {
+                            "name": f"{driver_assignment.assignee.user.first_name} {driver_assignment.assignee.user.last_name}",
+                            "phone": driver_assignment.assignee.phone_number
+                        }
+
+                    # Safely build minder info
+                    minder_info = None
+                    if minder_assignment and minder_assignment.assignee:
+                        minder_info = {
+                            "name": f"{minder_assignment.assignee.user.first_name} {minder_assignment.assignee.user.last_name}",
+                            "phone": minder_assignment.assignee.phone_number
+                        }
+
+                    child_data["assigned_bus"] = {
+                        "id": bus.id,
+                        "bus_number": bus.bus_number,
+                        "number_plate": bus.number_plate,
+                        "driver": driver_info,
+                        "minder": minder_info
+                    }
+
+                children_data.append(child_data)
+
+            return Response(
+                {
+                    "success": True,
+                    "parent": {
+                        "id": parent.user.id,
+                        "firstName": parent.user.first_name,
+                        "lastName": parent.user.last_name,
+                    },
+                    "children": children_data,
+                    "totalChildren": len(children_data),
+                    "tokens": {
+                        "access": str(refresh.access_token),
+                        "refresh": str(refresh),
+                    },
+                },
+                status=status.HTTP_200_OK
+            )
+        except Exception:
+            # Log full traceback server-side but return a safe, structured
+            # error payload to the mobile apps so they don't crash.
+            logger.exception("Unexpected error during parent phone login", extra={"phone_number": phone_number})
+            return Response(
+                {
+                    "success": False,
+                    "error": {
+                        "message": "Something went wrong while logging you in. Please try again.",
+                        "code": "parent_login_error",
+                    },
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class ChildAttendanceHistoryView(APIView):

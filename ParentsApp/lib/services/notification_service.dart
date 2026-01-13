@@ -43,6 +43,7 @@ class NotificationService {
   }
 
   Future<void> showTripStartNotification({
+    required String childName,
     required String busNumber,
     required String tripType,
     required int busId,
@@ -51,7 +52,8 @@ class NotificationService {
       await initialize();
     }
 
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
       'trip_notifications',
       'Trip Notifications',
       channelDescription: 'Notifications for trip start and completion',
@@ -73,8 +75,8 @@ class NotificationService {
 
     await _flutterLocalNotificationsPlugin.show(
       busId, // Notification ID based on bus ID
-      'Bus $busNumber Started $tripType Trip',
-      'Your child\'s bus has started the ${tripType.toLowerCase()} trip. Track it live now!',
+      '$childName Pickup Trip Started',
+      "$childName's bus has started the ${tripType.toLowerCase()} trip. The bus will be arriving shortly.",
       platformDetails,
       payload: 'trip_start:$busId',
     );
@@ -88,7 +90,8 @@ class NotificationService {
       await initialize();
     }
 
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
       'attendance_notifications',
       'Attendance Notifications',
       channelDescription: 'Notifications for child pickup and dropoff',
@@ -110,7 +113,7 @@ class NotificationService {
     await _flutterLocalNotificationsPlugin.show(
       DateTime.now().millisecondsSinceEpoch % 100000,
       '$childName Picked Up',
-      '$childName has been safely picked up by bus $busNumber',
+      '$childName has been safely picked up by $busNumber',
       platformDetails,
     );
   }
@@ -123,7 +126,8 @@ class NotificationService {
       await initialize();
     }
 
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
       'attendance_notifications',
       'Attendance Notifications',
       channelDescription: 'Notifications for child pickup and dropoff',
@@ -145,20 +149,23 @@ class NotificationService {
     await _flutterLocalNotificationsPlugin.show(
       DateTime.now().millisecondsSinceEpoch % 100000,
       '$childName Dropped Off',
-      '$childName has been safely dropped off by bus $busNumber',
+      '$childName has been safely dropped off by $busNumber',
       platformDetails,
     );
   }
 
   Future<void> showTripCompletedNotification({
+    required String childName,
     required String busNumber,
+    required String tripType,
     required int busId,
   }) async {
     if (!_isInitialized) {
       await initialize();
     }
 
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
       'trip_notifications',
       'Trip Notifications',
       channelDescription: 'Notifications for trip start and completion',
@@ -177,10 +184,16 @@ class NotificationService {
       iOS: iosDetails,
     );
 
+    final bool isPickupTrip = tripType.toLowerCase() == 'pickup';
+
     await _flutterLocalNotificationsPlugin.show(
       busId,
-      'Bus $busNumber Trip Completed',
-      'The bus trip has been completed',
+      isPickupTrip
+          ? '$childName Reached School Safely'
+          : 'Bus $busNumber Trip Completed',
+      isPickupTrip
+          ? '$childName has reached safe at school.'
+          : 'The bus trip has been completed',
       platformDetails,
     );
   }
