@@ -156,6 +156,41 @@ class ParentNotificationsService {
     } catch (e) {}
   }
 
+  String _resolveChildName(Map<String, dynamic> data) {
+    final rawFieldName = (data['child_name'] ??
+            data['childName'] ??
+            data['student_name'] ??
+            data['name'])
+        ?.toString()
+        .trim();
+
+    if (rawFieldName != null && rawFieldName.isNotEmpty) {
+      return rawFieldName;
+    }
+
+    final String title = (data['title'] ?? '').toString();
+    if (title.isNotEmpty) {
+      const patterns = [
+        ' Pickup Trip Started',
+        ' Reached School Safely',
+        ' Picked Up',
+        ' Dropped Off',
+        ' Trip Completed',
+      ];
+
+      for (final pattern in patterns) {
+        if (title.contains(pattern)) {
+          final namePart = title.split(pattern).first.trim();
+          if (namePart.isNotEmpty) {
+            return namePart;
+          }
+        }
+      }
+    }
+
+    return 'Your child';
+  }
+
   /// Handle trip notifications
   void _handleTripNotification(Map<String, dynamic> data) {
     _tripNotificationController.add(data);
@@ -164,7 +199,7 @@ class ParentNotificationsService {
 
     // Show local notification
     final notificationType = data['notification_type'];
-    final childName = data['child_name'] ?? 'Your child';
+    final childName = _resolveChildName(data);
     if (notificationType == 'trip_started') {
       NotificationService().showTripStartNotification(
         childName: childName,
@@ -190,7 +225,7 @@ class ParentNotificationsService {
 
     // Show local notification
     final notificationType = data['notification_type'];
-    final childName = data['child_name'] ?? 'Your child';
+    final childName = _resolveChildName(data);
     final busNumber = data['bus_number'] ?? 'Unknown';
 
     if (notificationType == 'pickup_confirmed') {

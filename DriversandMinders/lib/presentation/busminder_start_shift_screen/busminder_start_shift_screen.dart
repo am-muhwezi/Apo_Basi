@@ -109,27 +109,29 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
       final localTripInfo = await _tripStateService.getActiveTripInfo();
 
       if (hasLocalTrip) {
+        setState(() {
+          _hasActiveTrip = true;
+          _activeTripInfo = localTripInfo;
+        });
+
         try {
           final backendTrip = await _apiService.getActiveTrip();
-          if (backendTrip != null && backendTrip['status'] == 'in-progress') {
-            setState(() {
-              _hasActiveTrip = true;
-              _activeTripInfo = localTripInfo;
-            });
+          final status = backendTrip?['status']?.toString().toLowerCase();
+
+          if (backendTrip != null && status == 'in-progress') {
             final prefs = await SharedPreferences.getInstance();
             await prefs.setInt('current_trip_id', backendTrip['id']);
-          } else {
+          } else if (backendTrip != null && status != null) {
             await _clearStaleLocalTripState();
-            setState(() {
-              _hasActiveTrip = false;
-              _activeTripInfo = null;
-            });
+            if (mounted) {
+              setState(() {
+                _hasActiveTrip = false;
+                _activeTripInfo = null;
+              });
+            }
           }
-        } catch (e) {
-          setState(() {
-            _hasActiveTrip = true;
-            _activeTripInfo = localTripInfo;
-          });
+        } catch (_) {
+          // Keep local trip state when backend check fails
         }
       } else {
         setState(() {

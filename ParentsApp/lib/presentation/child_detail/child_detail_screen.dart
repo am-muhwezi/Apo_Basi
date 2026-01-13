@@ -58,6 +58,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       _childData = args;
     }
     _getCurrentLocation();
+    _subscribeToBus();
   }
 
   @override
@@ -119,24 +120,21 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   /// Subscribe to bus location updates
   void _subscribeToBus() {
-    if (_childData == null || _childData!['busId'] == null) {
+    if (_childData == null) {
       return;
     }
 
-    // Only subscribe when the child is actually on the bus.
-    final rawStatus = (_childData!['status'] ?? '').toString().toLowerCase();
-    const trackableStatuses = {
-      'on-bus',
-      'on_bus',
-      'on-way-home',
-      'on_way_home',
-    };
-
-    if (!trackableStatuses.contains(rawStatus)) {
+    final busValue = _childData!['busId'];
+    if (busValue == null) {
       return;
     }
 
-    final busId = _childData!['busId'] as int;
+    final busId =
+        busValue is int ? busValue : int.tryParse(busValue.toString());
+    if (busId == null) {
+      return;
+    }
+
     _webSocketService.subscribeToBus(busId);
   }
 
@@ -247,15 +245,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
     final String name = _childData!['name'] ?? 'Child Name';
     final String grade = _childData!['grade'] ?? 'N/A';
-    final String rawStatus =
-        (_childData!['status'] ?? '').toString().toLowerCase();
-    const trackableStatuses = {
-      'on-bus',
-      'on_bus',
-      'on-way-home',
-      'on_way_home',
-    };
-    final bool isTrackable = trackableStatuses.contains(rawStatus);
+    final bool hasAssignedBus = _childData!['busId'] != null;
+    final bool isTrackable = hasAssignedBus && _busLocation != null;
 
     return Scaffold(
       backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
@@ -285,7 +276,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                         ),
                         // Route Polyline (from bus to home)
                         // Only show when we are actively tracking the bus.
-                        if (isTrackable &&
+                        if (hasAssignedBus &&
                             _routePoints != null &&
                             _routePoints!.isNotEmpty)
                           PolylineLayer(

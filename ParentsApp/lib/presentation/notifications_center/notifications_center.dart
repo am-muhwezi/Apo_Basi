@@ -53,7 +53,6 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     _scrollController.addListener(_onScroll);
     _loadNotificationsFromAPI(); // Load from API first
     _setupNotificationListeners();
-    _startAutoRefresh(); // Auto-refresh every 30 seconds
   }
 
   // Load notifications from API

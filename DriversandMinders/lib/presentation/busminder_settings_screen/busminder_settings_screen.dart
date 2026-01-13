@@ -18,7 +18,6 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
   bool _notificationsEnabled = true;
   bool _soundEnabled = true;
   bool _vibrationEnabled = true;
-  bool _locationTracking = true;
   String _language = 'English';
 
   @override
@@ -33,7 +32,6 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
       _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
       _soundEnabled = prefs.getBool('sound_enabled') ?? true;
       _vibrationEnabled = prefs.getBool('vibration_enabled') ?? true;
-      _locationTracking = prefs.getBool('location_tracking') ?? true;
       _language = prefs.getString('language') ?? 'English';
     });
   }
@@ -223,24 +221,6 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
                 ),
               ],
             ),
-
-            // Location Section
-            _buildSettingsSection(
-              title: 'Location & Tracking',
-              children: [
-                _buildSwitchTile(
-                  icon: Icons.location_on,
-                  title: 'Location Tracking',
-                  subtitle: 'Share location during active trips',
-                  value: _locationTracking,
-                  onChanged: (value) {
-                    setState(() => _locationTracking = value);
-                    _saveSetting('location_tracking', value);
-                  },
-                ),
-              ],
-            ),
-
             // App Preferences Section
             _buildSettingsSection(
               title: 'App Preferences',
