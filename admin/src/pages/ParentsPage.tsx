@@ -284,7 +284,8 @@ export default function ParentsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* Parents Table - Desktop */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
@@ -386,6 +387,99 @@ export default function ParentsPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Parents Cards - Mobile */}
+      <div className="md:hidden space-y-4">
+        {filteredParents.map((parent) => (
+          <div key={parent.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h3 className="font-semibold text-slate-900 text-lg">
+                  {parent.firstName} {parent.lastName}
+                </h3>
+                <p className="text-sm text-slate-600">{parent.email}</p>
+              </div>
+              <span
+                className={`px-2 py-1 text-xs font-medium rounded-full ${
+                  parent.status === 'active'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-slate-100 text-slate-800'
+                }`}
+              >
+                {parent.status}
+              </span>
+            </div>
+
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600">Phone:</span>
+                <span className="font-medium text-slate-900">{parent.phone}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Baby className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600">Children:</span>
+                <span className="font-medium text-slate-900">
+                  {parent.childrenCount ? `${parent.childrenCount} ${parent.childrenCount === 1 ? 'child' : 'children'}` : 'No children'}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-200">
+              <button
+                onClick={() => handleAddChild(parent)}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
+              >
+                <UserPlus size={16} />
+                <span className="text-sm font-medium">Add Child</span>
+              </button>
+              <button
+                onClick={() => handleView(parent)}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                <Eye size={16} />
+                <span className="text-sm font-medium">View</span>
+              </button>
+              <button
+                onClick={() => handleEdit(parent)}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <Edit size={16} />
+                <span className="text-sm font-medium">Edit</span>
+              </button>
+              <button
+                onClick={() => handleDelete(parent.id)}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+              >
+                <Trash2 size={16} />
+                <span className="text-sm font-medium">Delete</span>
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {/* Pagination - Mobile */}
+        {filteredParents.length > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="flex flex-col items-center gap-3">
+              <span className="text-sm text-slate-600">
+                Loaded {filteredParents.length} of {filteredParents.length}{hasMore ? '+' : ''} parents
+              </span>
+              {hasMore && (
+                <Button
+                  onClick={loadMoreParents}
+                  disabled={loading}
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
+                >
+                  {loading ? 'Loading...' : 'Load More'}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <Modal
