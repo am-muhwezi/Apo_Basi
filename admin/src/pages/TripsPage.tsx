@@ -342,8 +342,8 @@ export default function TripsPage() {
         </div>
       </div>
 
-      {/* Trips Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Trips Table - Desktop */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
@@ -463,7 +463,7 @@ export default function TripsPage() {
           </table>
         </div>
 
-        {/* Load More */}
+        {/* Load More - Desktop */}
         <div className="p-4 border-t border-slate-200">
           <div className="flex flex-col items-center gap-3">
             <span className="text-sm text-slate-600">
@@ -481,6 +481,116 @@ export default function TripsPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Trips Cards - Mobile */}
+      <div className="md:hidden space-y-4">
+        {loading && trips.length === 0 ? (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
+            <RefreshCw className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
+            <p className="text-slate-600">Loading trips...</p>
+          </div>
+        ) : filteredTrips.length === 0 ? (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
+            <AlertCircle className="w-12 h-12 text-slate-400 mx-auto mb-2" />
+            <p className="text-slate-600">No trips found</p>
+          </div>
+        ) : (
+          filteredTrips.map((trip) => {
+            const location = busLocations.get(trip.busId);
+            const hasRecentLocation = location &&
+              (new Date().getTime() - new Date(location.timestamp).getTime()) < 60000;
+
+            return (
+              <div key={trip.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h3 className="font-semibold text-slate-900 text-lg">{trip.route}</h3>
+                    <p className="text-sm text-slate-600">{trip.busNumber}</p>
+                    {hasRecentLocation && (
+                      <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        Live Tracking
+                      </div>
+                    )}
+                  </div>
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(trip.status)}`}
+                  >
+                    {trip.status.replace('-', ' ').toUpperCase()}
+                  </span>
+                </div>
+
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Users className="w-4 h-4 text-slate-400" />
+                    <span className="text-slate-600">Driver:</span>
+                    <span className="font-medium text-slate-900">{trip.driverName}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Navigation className="w-4 h-4 text-slate-400" />
+                    <span className="text-slate-600">Type:</span>
+                    <span className="font-medium text-slate-900 capitalize">{trip.type}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="w-4 h-4 text-slate-400" />
+                    <span className="text-slate-600">Scheduled:</span>
+                    <span className="font-medium text-slate-900">{formatTime(trip.scheduledTime)}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-3 border-t border-slate-200">
+                  <button
+                    onClick={() => handleViewDetails(trip)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                  >
+                    <Eye size={18} />
+                    <span className="text-sm font-medium">View</span>
+                  </button>
+                  {trip.status === 'in-progress' && (
+                    <>
+                      <button
+                        onClick={() => handleTrackOnMap(trip)}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
+                      >
+                        <MapPin size={18} />
+                        <span className="text-sm font-medium">Track</span>
+                      </button>
+                      <button
+                        onClick={() => handleStopTrip(trip)}
+                        className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                      >
+                        <StopCircle size={18} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+
+        {/* Load More - Mobile */}
+        {filteredTrips.length > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="flex flex-col items-center gap-3">
+              <span className="text-sm text-slate-600">
+                Loaded {filteredTrips.length} of {filteredTrips.length}{hasMore ? '+' : ''} trips
+              </span>
+              {hasMore && (
+                <Button
+                  onClick={loadMoreTrips}
+                  disabled={loading}
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
+                >
+                  {loading ? 'Loading...' : 'Load More'}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Trip Details Modal */}

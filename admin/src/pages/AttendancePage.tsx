@@ -302,7 +302,7 @@ export default function AttendancePage() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <div className="p-2 bg-blue-100 rounded-lg">
@@ -409,8 +409,8 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* Attendance Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Attendance Table - Desktop */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
@@ -474,6 +474,55 @@ export default function AttendancePage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Attendance Cards - Mobile */}
+      <div className="md:hidden space-y-4">
+        {filteredRecords.length > 0 ? (
+          filteredRecords.map((record) => {
+            const currentStatus = tripType === 'pickup' ? record.pickupStatus : record.dropoffStatus;
+            const currentTime = tripType === 'pickup' ? record.pickupTime : record.dropoffTime;
+
+            return (
+              <div key={record.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h3 className="font-semibold text-slate-900 text-lg">{record.childName}</h3>
+                    <p className="text-sm text-slate-600">{record.class}</p>
+                  </div>
+                  {getStatusBadge(currentStatus)}
+                </div>
+
+                <div className="space-y-2 mb-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Users className="w-4 h-4 text-slate-400" />
+                    <span className="text-slate-600">Bus:</span>
+                    <span className="font-medium text-slate-900">{record.busNumber}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="w-4 h-4 text-slate-400" />
+                    <span className="text-slate-600">Time:</span>
+                    <span className="font-medium text-slate-900">{currentTime}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="w-4 h-4 text-slate-400" />
+                    <span className="text-slate-600">Parent Notified:</span>
+                    {record.parentNotified ? (
+                      <CheckCircle className="text-green-600" size={16} />
+                    ) : (
+                      <XCircle className="text-slate-400" size={16} />
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
+            <Users className="w-12 h-12 text-slate-400 mx-auto mb-2" />
+            <p className="text-slate-600">No attendance records found</p>
+          </div>
+        )}
       </div>
 
     </div>

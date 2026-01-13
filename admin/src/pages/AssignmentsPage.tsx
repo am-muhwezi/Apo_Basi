@@ -645,8 +645,8 @@ export default function AssignmentsPage() {
             </div>
           </div>
 
-          {/* Assignments Table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          {/* Assignments Table - Desktop */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hidden md:block">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
@@ -769,6 +769,107 @@ export default function AssignmentsPage() {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Assignments Cards - Mobile */}
+          <div className="md:hidden space-y-4">
+            {filteredAssignments.length === 0 ? (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
+                <FileText className="w-12 h-12 text-slate-400 mx-auto mb-2" />
+                <p className="text-slate-600">No assignments found</p>
+              </div>
+            ) : (
+              filteredAssignments.map((assignment) => (
+                <div key={assignment.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-slate-900 text-sm mb-1">
+                        {assignment.assignmentType.replace(/_/g, ' ').toUpperCase()}
+                      </h3>
+                      <p className="text-xs text-slate-600">{assignment.effectiveDate}</p>
+                    </div>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(
+                        assignment.status
+                      )}`}
+                    >
+                      {assignment.status.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 mb-4">
+                    <div className="bg-slate-50 p-3 rounded-lg">
+                      <p className="text-xs text-slate-500 mb-1">Assignee</p>
+                      <p className="font-medium text-slate-900 text-sm">{assignment.assigneeName || 'N/A'}</p>
+                      <p className="text-xs text-slate-600 capitalize">{assignment.assigneeType}</p>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-lg">
+                      <p className="text-xs text-slate-500 mb-1">Assigned To</p>
+                      <p className="font-medium text-slate-900 text-sm">{assignment.assignedToName || 'N/A'}</p>
+                      <p className="text-xs text-slate-600 capitalize">{assignment.assignedToType}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-200">
+                    <button
+                      onClick={() => {
+                        setViewingAssignment(assignment);
+                        setShowViewDetailsModal(true);
+                      }}
+                      className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                    >
+                      <Eye size={16} />
+                      <span className="text-sm font-medium">View</span>
+                    </button>
+                    <button
+                      onClick={() => handleEditAssignment(assignment)}
+                      className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                    >
+                      <Edit size={16} />
+                      <span className="text-sm font-medium">Edit</span>
+                    </button>
+                    {assignment.status === 'active' && (
+                      <button
+                        onClick={() => handleCancelAssignment(assignment.id)}
+                        className="flex items-center justify-center gap-2 px-3 py-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors"
+                      >
+                        <X size={16} />
+                        <span className="text-sm font-medium">Cancel</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDeleteAssignment(assignment.id)}
+                      className="flex items-center justify-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                    >
+                      <Trash2 size={16} />
+                      <span className="text-sm font-medium">Delete</span>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+
+            {/* Pagination - Mobile */}
+            {filteredAssignments.length > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                <div className="flex flex-col items-center gap-3">
+                  <span className="text-sm text-slate-600">
+                    Loaded {filteredAssignments.length} of {filteredAssignments.length}{hasMoreAssignments ? '+' : ''} assignments
+                  </span>
+                  {hasMoreAssignments && (
+                    <Button
+                      onClick={loadMoreAssignments}
+                      disabled={isLoading}
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                    >
+                      {isLoading ? 'Loading...' : 'Load More'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -1486,53 +1587,89 @@ export default function AssignmentsPage() {
                   </div>
 
                   {item.children && item.children.length > 0 ? (
-                    <div className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden shadow-sm">
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100">
-                              <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider border-b-2 border-slate-200">
-                                Student
-                              </th>
-                              <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider border-b-2 border-slate-200">
-                                Grade
-                              </th>
-                              <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider border-b-2 border-slate-200">
-                                Parent
-                              </th>
-                              <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider border-b-2 border-slate-200">
-                                Contact
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {item.children.map((child) => (
-                              <tr key={child.id} className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-colors group/row">
-                                <td className="px-5 py-4">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center text-white text-sm font-bold shadow-md group-hover/row:shadow-lg transition-shadow">
-                                      {child.first_name.charAt(0)}{child.last_name.charAt(0)}
-                                    </div>
-                                    <span className="font-bold text-slate-900 text-base">
-                                      {child.first_name} {child.last_name}
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="px-5 py-4">
-                                  <span className="inline-flex px-3 py-1.5 bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 text-xs font-bold rounded-lg shadow-sm">
-                                    {child.grade || 'N/A'}
-                                  </span>
-                                </td>
-                                <td className="px-5 py-4 font-semibold text-slate-900">{child.parent_name}</td>
-                                <td className="px-5 py-4 font-mono text-sm text-slate-600 bg-slate-50 group-hover/row:bg-white transition-colors">
-                                  {child.parent_phone}
-                                </td>
+                    <>
+                      {/* Children Table - Desktop */}
+                      <div className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden shadow-sm hidden md:block">
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100">
+                                <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider border-b-2 border-slate-200">
+                                  Student
+                                </th>
+                                <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider border-b-2 border-slate-200">
+                                  Grade
+                                </th>
+                                <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider border-b-2 border-slate-200">
+                                  Parent
+                                </th>
+                                <th className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider border-b-2 border-slate-200">
+                                  Contact
+                                </th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {item.children.map((child, index) => (
+                                <tr key={`${item.id}-child-${child.id}-${index}`} className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-colors group/row">
+                                  <td className="px-5 py-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center text-white text-sm font-bold shadow-md group-hover/row:shadow-lg transition-shadow">
+                                        {child.first_name.charAt(0)}{child.last_name.charAt(0)}
+                                      </div>
+                                      <span className="font-bold text-slate-900 text-base">
+                                        {child.first_name} {child.last_name}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="px-5 py-4">
+                                    <span className="inline-flex px-3 py-1.5 bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 text-xs font-bold rounded-lg shadow-sm">
+                                      {child.grade || 'N/A'}
+                                    </span>
+                                  </td>
+                                  <td className="px-5 py-4 font-semibold text-slate-900">{child.parent_name}</td>
+                                  <td className="px-5 py-4 font-mono text-sm text-slate-600 bg-slate-50 group-hover/row:bg-white transition-colors">
+                                    {child.parent_phone}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
-                    </div>
+
+                      {/* Children Cards - Mobile */}
+                      <div className="md:hidden space-y-3">
+                        {item.children.map((child, index) => (
+                          <div key={`${item.id}-child-mobile-${child.id}-${index}`} className="bg-white rounded-xl border-2 border-slate-200 p-4 shadow-sm">
+                            <div className="flex items-start gap-3 mb-3">
+                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center text-white text-sm font-bold shadow-md flex-shrink-0">
+                                {child.first_name.charAt(0)}{child.last_name.charAt(0)}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-bold text-slate-900 text-base">
+                                  {child.first_name} {child.last_name}
+                                </p>
+                                <span className="inline-flex px-2 py-1 bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 text-xs font-bold rounded-lg shadow-sm mt-1">
+                                  {child.grade || 'N/A'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="space-y-2 pt-3 border-t border-slate-200">
+                              <div className="flex items-center gap-2 text-sm">
+                                <Users className="w-4 h-4 text-slate-400" />
+                                <span className="text-slate-600">Parent:</span>
+                                <span className="font-semibold text-slate-900">{child.parent_name}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <Calendar className="w-4 h-4 text-slate-400" />
+                                <span className="text-slate-600">Contact:</span>
+                                <span className="font-mono text-sm text-slate-600">{child.parent_phone}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
                   ) : (
                     <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border-2 border-dashed border-slate-300 p-12 text-center">
                       <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white shadow-md mb-4">

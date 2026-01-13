@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2, Users, Bus as BusIcon, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, Users, Bus as BusIcon, AlertTriangle, CheckCircle, UserCircle, UserCheck } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -262,7 +262,8 @@ export default function BusesPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* Buses Table - Desktop */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
@@ -370,6 +371,102 @@ export default function BusesPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Buses Cards - Mobile */}
+      <div className="md:hidden space-y-4">
+        {filteredBuses.map((bus) => (
+          <div key={bus.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h3 className="font-semibold text-slate-900 text-lg">{bus.busNumber}</h3>
+                <p className="text-sm text-slate-600">{bus.licensePlate}</p>
+              </div>
+              <span
+                className={`px-2 py-1 text-xs font-medium rounded-full ${
+                  bus.status === 'active'
+                    ? 'bg-green-100 text-green-800'
+                    : bus.status === 'maintenance'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-slate-100 text-slate-800'
+                }`}
+              >
+                {bus.status}
+              </span>
+            </div>
+
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center gap-2 text-sm">
+                <UserCircle className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600">Driver:</span>
+                <span className="font-medium text-slate-900">{bus.driverName || 'Not Assigned'}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <UserCheck className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600">Minder:</span>
+                <span className="font-medium text-slate-900">{bus.minderName || 'Not Assigned'}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Users className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600">Capacity:</span>
+                <span className="font-medium text-slate-900">{bus.assignedChildrenCount || 0}/{bus.capacity}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-200">
+              <button
+                onClick={() => handleAssign(bus)}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
+              >
+                <Users size={16} />
+                <span className="text-sm font-medium">Assign</span>
+              </button>
+              <button
+                onClick={() => handleView(bus)}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                <Eye size={16} />
+                <span className="text-sm font-medium">View</span>
+              </button>
+              <button
+                onClick={() => handleEdit(bus)}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <Edit size={16} />
+                <span className="text-sm font-medium">Edit</span>
+              </button>
+              <button
+                onClick={() => handleDelete(bus.id)}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+              >
+                <Trash2 size={16} />
+                <span className="text-sm font-medium">Delete</span>
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {/* Pagination - Mobile */}
+        {filteredBuses.length > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="flex flex-col items-center gap-3">
+              <span className="text-sm text-slate-600">
+                Loaded {filteredBuses.length} of {filteredBuses.length}{busesHasMore ? '+' : ''} buses
+              </span>
+              {busesHasMore && (
+                <Button
+                  onClick={loadMoreBuses}
+                  disabled={busesLoading}
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
+                >
+                  {busesLoading ? 'Loading...' : 'Load More'}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Create/Edit Modal */}
