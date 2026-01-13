@@ -26,8 +26,23 @@ export default function LoginPage() {
     try {
       await login(email, password);
       // Navigation handled by AuthContext
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.error || 'Invalid email or password';
+    } catch (err: unknown) {
+      let errorMessage = 'Invalid email or password';
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        'response' in err &&
+        typeof (err as { response?: unknown }).response === 'object' &&
+        (err as { response?: { data?: { error?: string } } }).response !== null &&
+        'data' in (err as { response?: { data?: { error?: string } } }).response! &&
+        typeof ((err as { response?: { data?: { error?: string } } }).response as { data?: { error?: string } }).data === 'object' &&
+        ((err as { response?: { data?: { error?: string } } }).response as { data?: { error?: string } }).data !== null &&
+        'error' in ((err as { response?: { data?: { error?: string } } }).response as { data?: { error?: string } }).data!
+      ) {
+        errorMessage =
+          (((err as { response?: { data?: { error?: string } } }).response as { data?: { error?: string } }).data as { error?: string }).error ||
+          'Invalid email or password';
+      }
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -108,11 +123,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Demo Info */}
-        <div className="mt-6 text-center text-sm text-slate-600">
-          <p>Demo Credentials:</p>
-          <p className="font-mono mt-1">admin@test.com / admin123</p>
-        </div>
       </div>
     </div>
   );
