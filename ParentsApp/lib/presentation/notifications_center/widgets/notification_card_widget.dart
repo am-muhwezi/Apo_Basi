@@ -28,6 +28,11 @@ class NotificationCardWidget extends StatelessWidget {
     final bool isRead = notification['isRead'] ?? false;
     final String type = notification['type'] ?? '';
     final bool isCritical = type == 'emergency' || type == 'major_delay';
+    final String message = notification['message'] ?? '';
+    final String? fullMessage = notification['fullMessage'];
+    final bool hasExtraDetails = fullMessage != null &&
+        fullMessage.trim().isNotEmpty &&
+        fullMessage.trim() != message.trim();
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
@@ -115,7 +120,7 @@ class NotificationCardWidget extends StatelessWidget {
                           ),
                           SizedBox(height: 1.h),
                           Text(
-                            notification['message'] ?? '',
+                            message,
                             style: AppTheme.lightTheme.textTheme.bodyMedium
                                 ?.copyWith(
                               color: AppTheme.lightTheme.colorScheme.onSurface
@@ -125,18 +130,18 @@ class NotificationCardWidget extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                           if (notification['expanded'] == true) ...[
-                            SizedBox(height: 2.h),
-                            Text(
-                              notification['fullMessage'] ??
-                                  notification['message'] ??
-                                  '',
-                              style: AppTheme.lightTheme.textTheme.bodyMedium
-                                  ?.copyWith(
-                                color:
-                                    AppTheme.lightTheme.colorScheme.onSurface,
+                            if (hasExtraDetails) ...[
+                              SizedBox(height: 2.h),
+                              Text(
+                                fullMessage!,
+                                style: AppTheme.lightTheme.textTheme.bodyMedium
+                                    ?.copyWith(
+                                  color:
+                                      AppTheme.lightTheme.colorScheme.onSurface,
+                                ),
                               ),
-                            ),
-                            SizedBox(height: 2.h),
+                              SizedBox(height: 2.h),
+                            ],
                             Row(
                               children: [
                                 if (type == 'bus_approaching' ||
