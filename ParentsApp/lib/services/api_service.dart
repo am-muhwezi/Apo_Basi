@@ -76,7 +76,7 @@ class ApiService {
 
         // Save user ID for profile access - parent object contains the user id
         if (data['parent'] != null && data['parent']['id'] != null) {
-          await _saveUserId(data['parent']['id']);
+          await _saveUserId(int.parse(data['parent']['id'].toString()));
         }
 
         // Save user and children data (handle null safely)
