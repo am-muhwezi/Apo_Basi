@@ -174,7 +174,20 @@ class _ParentDashboardState extends State<ParentDashboard> {
   String _getFormattedDate() {
     final now = DateTime.now();
     final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
 
     final dayName = days[now.weekday - 1];
     final monthName = months[now.month - 1];
@@ -218,9 +231,11 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                   ),
                                 ),
                                 child: Padding(
-                                  padding: EdgeInsets.fromLTRB(5.w, 2.h, 5.w, 2.h),
+                                  padding:
+                                      EdgeInsets.fromLTRB(5.w, 2.h, 5.w, 2.h),
                                   child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       // Greeting text
                                       Text(
@@ -236,14 +251,16 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                         children: [
                                           Icon(
                                             Icons.calendar_today,
-                                            color: Colors.white.withValues(alpha: 0.85),
+                                            color: Colors.white
+                                                .withValues(alpha: 0.85),
                                             size: 4.w,
                                           ),
                                           SizedBox(width: 1.5.w),
                                           Text(
                                             _getFormattedDate(),
                                             style: TextStyle(
-                                              color: Colors.white.withValues(alpha: 0.85),
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.85),
                                               fontSize: 12.sp,
                                               fontWeight: FontWeight.w400,
                                             ),
@@ -258,12 +275,16 @@ class _ParentDashboardState extends State<ParentDashboard> {
                             // Section label with padding
                             SliverToBoxAdapter(
                               child: Padding(
-                                padding: EdgeInsets.fromLTRB(5.w, 2.h, 5.w, 1.h),
+                                padding:
+                                    EdgeInsets.fromLTRB(5.w, 2.h, 5.w, 1.h),
                                 child: Text(
                                   'Your Children',
-                                  style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
+                                  style: AppTheme
+                                      .lightTheme.textTheme.titleLarge
+                                      ?.copyWith(
                                     fontWeight: FontWeight.w600,
-                                    color: AppTheme.lightTheme.colorScheme.onSurface,
+                                    color: AppTheme
+                                        .lightTheme.colorScheme.onSurface,
                                     fontSize: 18.sp,
                                   ),
                                 ),
@@ -278,7 +299,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                     final child = _children[index];
                                     return ChildStatusCard(
                                       childData: _childToCardData(child),
-                                      onTap: () => _onChildCardTap(_childToCardData(child)),
+                                      onTap: () => _onChildCardTap(
+                                          _childToCardData(child)),
                                     );
                                   },
                                   childCount: _children.length,
@@ -304,8 +326,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
   }
 
   void _onChildCardTap(Map<String, dynamic> childData) {
-    // Navigate to child detail screen
-    // The card's onTap will only be called if status is trackable (not at_home, at_school, or no record)
+    // Always allow parent to open the map screen.
+    // The map screen itself will decide whether to show live bus tracking.
     Navigator.pushNamed(
       context,
       '/child-detail',
@@ -320,7 +342,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 64, color: AppTheme.lightTheme.colorScheme.error),
+            Icon(Icons.error_outline,
+                size: 64, color: AppTheme.lightTheme.colorScheme.error),
             SizedBox(height: 2.h),
             Text(
               'Error Loading Children',
@@ -355,7 +378,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.family_restroom, size: 64, color: AppTheme.lightTheme.colorScheme.onSurfaceVariant),
+            Icon(Icons.family_restroom,
+                size: 64,
+                color: AppTheme.lightTheme.colorScheme.onSurfaceVariant),
             SizedBox(height: 2.h),
             Text(
               'No Children Found',
@@ -386,10 +411,13 @@ class _ParentDashboardState extends State<ParentDashboard> {
 
     switch (status.toLowerCase()) {
       case 'at_school':
+      case 'at-school':
         statusMessage = '$childName is safely at school';
         statusColor = AppTheme.lightTheme.colorScheme.secondary;
         break;
       case 'at_home':
+      case 'at-home':
+      case 'home':
         statusMessage = '$childName is at home';
         statusColor = const Color(0xFF34C759);
         break;

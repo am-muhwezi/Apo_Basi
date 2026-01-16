@@ -74,7 +74,6 @@ export default function ParentSearchInput({
         setResults(data.results || []);
         setShowDropdown(true);
       } catch (error) {
-        console.error('Failed to search parents:', error);
         setResults([]);
       } finally {
         setLoading(false);

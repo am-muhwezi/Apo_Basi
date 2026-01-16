@@ -59,7 +59,6 @@ export function useMinders(): UseMindersReturn {
           }
         }
       } catch (err) {
-        console.error('Unexpected error in loadMinders:', err);
         setError('An unexpected error occurred');
         if (!append) {
           setMinders([]);

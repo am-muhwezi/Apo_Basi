@@ -9,7 +9,6 @@ class AssignmentService {
       // Handle paginated response from DRF: {results: [], count, next, previous}
       return response.data.results || response.data || [];
     } catch (error) {
-      console.error('Error loading assignments:', error);
       throw error;
     }
   }
@@ -19,7 +18,6 @@ class AssignmentService {
       const response = await assignmentApi.getAssignment(id);
       return response.data;
     } catch (error) {
-      console.error(`Error loading assignment ${id}:`, error);
       throw error;
     }
   }
@@ -29,7 +27,6 @@ class AssignmentService {
       const response = await assignmentApi.createAssignment(data);
       return response.data;
     } catch (error) {
-      console.error('Error creating assignment:', error);
       throw error;
     }
   }
@@ -39,7 +36,6 @@ class AssignmentService {
       const response = await assignmentApi.updateAssignment(id, data);
       return response.data;
     } catch (error) {
-      console.error(`Error updating assignment ${id}:`, error);
       throw error;
     }
   }
@@ -48,7 +44,6 @@ class AssignmentService {
     try {
       await assignmentApi.deleteAssignment(id);
     } catch (error) {
-      console.error(`Error deleting assignment ${id}:`, error);
       throw error;
     }
   }
@@ -57,7 +52,6 @@ class AssignmentService {
     try {
       await assignmentApi.cancelAssignment(id, reason);
     } catch (error) {
-      console.error(`Error cancelling assignment ${id}:`, error);
       throw error;
     }
   }
@@ -68,7 +62,6 @@ class AssignmentService {
       // Handle paginated response from DRF: {results: [], count, next, previous}
       return response.data.results || response.data || [];
     } catch (error) {
-      console.error(`Error loading assignment history for ${id}:`, error);
       throw error;
     }
   }
@@ -78,7 +71,6 @@ class AssignmentService {
       const response = await assignmentApi.bulkAssignChildrenToBus(busId, childrenIds, effectiveDate);
       return response.data;
     } catch (error) {
-      console.error('Error bulk assigning children to bus:', error);
       throw error;
     }
   }
@@ -88,7 +80,6 @@ class AssignmentService {
       const response = await assignmentApi.bulkAssignChildrenToRoute(routeId, childrenIds, effectiveDate);
       return response.data;
     } catch (error) {
-      console.error('Error bulk assigning children to route:', error);
       throw error;
     }
   }
@@ -99,7 +90,6 @@ class AssignmentService {
       // Handle paginated response from DRF: {results: [], count, next, previous}
       return response.data.results || response.data || [];
     } catch (error) {
-      console.error('Error loading bus utilization:', error);
       throw error;
     }
   }
@@ -109,7 +99,6 @@ class AssignmentService {
       const response = await assignmentApi.transferAssignment(assignmentId, newAssignedToId, newAssignedToType, reason);
       return response.data;
     } catch (error) {
-      console.error('Error transferring assignment:', error);
       throw error;
     }
   }
@@ -121,7 +110,6 @@ class AssignmentService {
       // Handle paginated response from DRF: {results: [], count, next, previous}
       return response.data.results || response.data || [];
     } catch (error) {
-      console.error('Error loading routes:', error);
       throw error;
     }
   }
@@ -131,7 +119,6 @@ class AssignmentService {
       const response = await assignmentApi.getRoute(id);
       return response.data;
     } catch (error) {
-      console.error(`Error loading route ${id}:`, error);
       throw error;
     }
   }
@@ -141,7 +128,6 @@ class AssignmentService {
       const response = await assignmentApi.createRoute(data);
       return response.data;
     } catch (error) {
-      console.error('Error creating route:', error);
       throw error;
     }
   }
@@ -151,7 +137,6 @@ class AssignmentService {
       const response = await assignmentApi.updateRoute(id, data);
       return response.data;
     } catch (error) {
-      console.error(`Error updating route ${id}:`, error);
       throw error;
     }
   }
@@ -160,7 +145,6 @@ class AssignmentService {
     try {
       await assignmentApi.deleteRoute(id);
     } catch (error) {
-      console.error(`Error deleting route ${id}:`, error);
       throw error;
     }
   }
@@ -171,7 +155,6 @@ class AssignmentService {
       // Handle paginated response from DRF: {results: [], count, next, previous}
       return response.data.results || response.data || [];
     } catch (error) {
-      console.error(`Error loading route assignments for ${id}:`, error);
       throw error;
     }
   }
@@ -181,7 +164,6 @@ class AssignmentService {
       const response = await assignmentApi.getRouteStatistics(id);
       return response.data;
     } catch (error) {
-      console.error(`Error loading route statistics for ${id}:`, error);
       throw error;
     }
   }
@@ -193,7 +175,6 @@ class AssignmentService {
       // Handle paginated response from DRF: {results: [], count, next, previous}
       return response.data.results || response.data || [];
     } catch (error) {
-      console.error('Error loading assignment history:', error);
       throw error;
     }
   }

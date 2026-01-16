@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
@@ -14,6 +16,9 @@ from attendance.models import Attendance
 from assignments.models import Assignment
 from datetime import date
 from django.contrib.contenttypes.models import ContentType
+
+
+logger = logging.getLogger(__name__)
 
 
 class DriverListCreateView(generics.ListCreateAPIView):

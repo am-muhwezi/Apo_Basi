@@ -54,7 +54,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(response.user);
       navigate('/dashboard');
     } catch (error) {
-      console.error('Login failed:', error);
       throw error;
     }
   };
@@ -66,7 +65,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(response.user);
       navigate('/dashboard');
     } catch (error) {
-      console.error('Signup failed:', error);
       throw error;
     }
   };
@@ -78,7 +76,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await authApi.logout(refreshToken);
       }
     } catch (error) {
-      console.error('Logout error:', error);
     } finally {
       authApi.clearAuthData();
       setUser(null);

@@ -47,7 +47,6 @@ class SocketService {
    */
   connect(token: string): void {
     if (this.socket?.connected) {
-      console.log('Socket already connected');
       return;
     }
 
@@ -63,27 +62,22 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('✅ Admin connected to Socket.IO server');
       this.emit('connected');
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('❌ Disconnected from Socket.IO server:', reason);
       this.emit('disconnected', reason);
     });
 
     this.socket.on('error', (error) => {
-      console.error('Socket.IO error:', error);
       this.emit('error', error);
     });
 
     this.socket.on('subscribed', (data) => {
-      console.log('✅ Subscribed to bus:', data.busId);
       this.emit('subscribed', data);
     });
 
     this.socket.on('unsubscribed', (data) => {
-      console.log('Unsubscribed from bus:', data.busId);
       this.emit('unsubscribed', data);
     });
 
@@ -119,7 +113,6 @@ class SocketService {
       this.socket.disconnect();
       this.socket = null;
       this.listeners.clear();
-      console.log('Disconnected from Socket.IO server');
     }
   }
 
@@ -129,7 +122,6 @@ class SocketService {
    */
   subscribeToBus(busId: string | number | 'all'): void {
     if (!this.socket?.connected) {
-      console.error('Socket not connected. Call connect() first.');
       return;
     }
 
@@ -152,7 +144,6 @@ class SocketService {
    */
   requestActiveTrips(): void {
     if (!this.socket?.connected) {
-      console.error('Socket not connected');
       return;
     }
 

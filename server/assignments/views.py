@@ -1,3 +1,4 @@
+import logging
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -9,6 +10,8 @@ from rest_framework.exceptions import ValidationError
 from django.contrib.contenttypes.models import ContentType
 
 from .models import Assignment, BusRoute, AssignmentHistory
+
+logger = logging.getLogger(__name__)
 from .serializers import (
     AssignmentSerializer,
     AssignmentCreateSerializer,
@@ -201,13 +204,17 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         children_ids = request.data.get('childrenIds', [])
         effective_date = request.data.get('effectiveDate')
 
+        logger.info(f"Bulk assign request: bus_id={bus_id}, children_count={len(children_ids)}, user={request.user}")
+
         if not bus_id:
+            logger.warning("Bulk assign failed: busId not provided")
             return Response(
                 {'error': 'busId is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         if not children_ids:
+            logger.warning("Bulk assign failed: childrenIds not provided")
             return Response(
                 {'error': 'childrenIds is required'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -215,7 +222,9 @@ class AssignmentViewSet(viewsets.ModelViewSet):
 
         try:
             bus = Bus.objects.get(pk=bus_id)
+            logger.debug(f"Found bus: {bus.bus_number}")
         except Bus.DoesNotExist:
+            logger.warning(f"Bulk assign failed: Bus {bus_id} not found")
             return Response(
                 {'error': f'Bus with id {bus_id} not found'},
                 status=status.HTTP_404_NOT_FOUND
@@ -229,6 +238,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 effective_date=effective_date
             )
 
+            logger.info(f"Successfully bulk assigned {len(assignments)} children to bus {bus.bus_number}")
             serializer = AssignmentSerializer(assignments, many=True)
             return Response({
                 'message': f'Successfully assigned {len(assignments)} children to bus {bus.bus_number}',
@@ -236,9 +246,16 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_201_CREATED)
 
         except DjangoValidationError as e:
+            logger.error(f"Validation error in bulk_assign_children_to_bus: {str(e)}")
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error in bulk_assign_children_to_bus: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Failed to assign children. Please try again later.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
     @action(detail=False, methods=['post'])
@@ -300,8 +317,23 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def bus_utilization(self, request):
         """Get utilization statistics for all buses"""
-        utilization = AssignmentService.get_bus_utilization()
-        return Response(utilization)
+        logger.info(f"Bus utilization request from user: {request.user}")
+        try:
+            utilization = AssignmentService.get_bus_utilization()
+            logger.info(f"Successfully retrieved utilization for {len(utilization)} buses")
+            return Response(utilization)
+        except DjangoValidationError as e:
+            logger.error(f"Validation error in bus_utilization: {str(e)}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error in bus_utilization: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Failed to retrieve bus utilization. Please try again later.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=False, methods=['post'])
     def transfer(self, request):

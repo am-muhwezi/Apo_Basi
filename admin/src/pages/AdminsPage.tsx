@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2, Key } from 'lucide-react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, Key, Shield, Calendar } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -33,7 +33,6 @@ export default function AdminsPage() {
       setAdmins(append ? [...admins, ...Array.isArray(data) ? data : []] : (Array.isArray(data) ? data : []));
       setHasMore(Array.isArray(data) && data.length === 20);
     } catch (error) {
-      console.error('Failed to load admins:', error);
       if (!append) setAdmins([]);
     } finally {
       setLoading(false);
@@ -124,7 +123,6 @@ export default function AdminsPage() {
         toast.success('Admin deleted successfully');
         await loadAdmins();
       } catch (error) {
-        console.error('Failed to delete admin:', error);
         toast.error('Failed to delete admin');
       }
     }
@@ -151,7 +149,6 @@ export default function AdminsPage() {
       await loadAdmins();
       setShowModal(false);
     } catch (error: any) {
-      console.error('Failed to save admin:', error);
       const message = error?.response?.data?.detail ||
                       error?.response?.data?.email?.[0] ||
                       error?.message ||
@@ -182,7 +179,6 @@ export default function AdminsPage() {
       setShowPasswordModal(false);
       setPasswordData({ newPassword: '', confirmPassword: '' });
     } catch (error: any) {
-      console.error('Failed to change password:', error);
       const message = error?.response?.data?.confirmPassword?.[0] ||
                       error?.response?.data?.detail ||
                       error?.message ||
@@ -239,7 +235,8 @@ export default function AdminsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* Admins Table - Desktop */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
@@ -358,6 +355,114 @@ export default function AdminsPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Admins Cards - Mobile */}
+      <div className="md:hidden space-y-4">
+        {filteredAdmins.map((admin) => (
+          <div key={admin.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h3 className="font-semibold text-slate-900 text-lg">
+                  {admin.firstName} {admin.lastName}
+                </h3>
+                <p className="text-sm text-slate-600">{admin.email}</p>
+              </div>
+              <span
+                className={`px-2 py-1 text-xs font-medium rounded-full ${
+                  admin.status === 'active'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-slate-100 text-slate-800'
+                }`}
+              >
+                {admin.status}
+              </span>
+            </div>
+
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center gap-2 text-sm">
+                <Shield className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600">Role:</span>
+                <span
+                  className={`px-2 py-1 text-xs font-medium rounded-full ${
+                    admin.role === 'super-admin'
+                      ? 'bg-red-100 text-red-800'
+                      : admin.role === 'admin'
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-slate-100 text-slate-800'
+                  }`}
+                >
+                  {admin.role}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Key className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600">Permissions:</span>
+                <span className="font-medium text-slate-900">{admin.permissions.length}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600">Last Login:</span>
+                <span className="font-medium text-slate-900 text-xs">
+                  {admin.lastLogin ? formatDate(admin.lastLogin) : 'Never'}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-200">
+              <button
+                onClick={() => handleView(admin)}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                <Eye size={16} />
+                <span className="text-sm font-medium">View</span>
+              </button>
+              <button
+                onClick={() => handleChangePassword(admin)}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors"
+              >
+                <Key size={16} />
+                <span className="text-sm font-medium">Password</span>
+              </button>
+              <button
+                onClick={() => handleEdit(admin)}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <Edit size={16} />
+                <span className="text-sm font-medium">Edit</span>
+              </button>
+              <button
+                onClick={() => handleDelete(admin.id)}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+              >
+                <Trash2 size={16} />
+                <span className="text-sm font-medium">Delete</span>
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {/* Pagination - Mobile */}
+        {filteredAdmins.length > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="flex flex-col items-center gap-3">
+              <span className="text-sm text-slate-600">
+                Loaded {filteredAdmins.length} of {filteredAdmins.length}{hasMore ? '+' : ''} admins
+              </span>
+              {hasMore && (
+                <Button
+                  onClick={loadMoreAdmins}
+                  disabled={loading}
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
+                >
+                  {loading ? 'Loading...' : 'Load More'}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <Modal

@@ -24,7 +24,6 @@ export default function DashboardPage() {
       const data = await dashboardService.getStats();
       setStats(data);
     } catch (error) {
-      console.error('Failed to load dashboard stats:', error);
     } finally {
       setLoading(false);
     }

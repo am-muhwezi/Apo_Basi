@@ -274,8 +274,11 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       // Extract and convert children data to students list
       if (routeResponse['children'] != null &&
           routeResponse['children'] is List) {
-        _students = [];
+        final Map<String, Map<String, dynamic>> byId = {};
         for (var child in routeResponse['children']) {
+          final String id = child['id']?.toString() ?? '';
+          if (id.isEmpty) continue;
+
           // Extract grade and strip 'Grade' prefix if already present
           String gradeValue = child['grade']?.toString() ??
               child['class_grade']?.toString() ??
@@ -283,8 +286,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
           if (gradeValue.toLowerCase().startsWith('grade')) {
             gradeValue = gradeValue.substring(5).trim();
           }
-          _students.add({
-            "id": child['id'] ?? 0,
+
+          byId[id] = {
+            "id": id,
             "name": '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}',
             "grade": gradeValue,
             "stopName": child['address']?.toString() ?? 'No address',
@@ -293,8 +297,10 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
                 'N/A',
             "specialNotes": child['special_needs']?.toString() ?? '',
             "isPickedUp": false,
-          });
+          };
         }
+
+        _students = byId.values.toList();
 
         // Set current stop to first student's address if available
         if (_students.isNotEmpty) {

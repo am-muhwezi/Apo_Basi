@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -7,6 +9,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from users.serializers import BusMinderRegistrationSerializer, UserSerializer
 from .models import BusMinder
 from .serializers import BusMinderSerializer, BusMinderCreateSerializer
+
+
+logger = logging.getLogger(__name__)
 
 
 class BusMinderListCreateView(generics.ListCreateAPIView):
@@ -405,8 +410,8 @@ def busminder_phone_login(request):
     if not phone_number:
         return Response({"error": "Phone number required"}, status=400)
 
-    # Find bus minder by phone number
     try:
+        # Find bus minder by phone number
         busminder = BusMinder.objects.select_related('user').get(phone_number=phone_number.strip())
         user = busminder.user
 
@@ -425,3 +430,15 @@ def busminder_phone_login(request):
 
     except BusMinder.DoesNotExist:
         return Response({"error": "Phone number not registered"}, status=404)
+    except Exception:
+        logger.exception("Unexpected error during bus minder phone login", extra={"phone_number": phone_number})
+        return Response(
+            {
+                "success": False,
+                "error": {
+                    "message": "Something went wrong while logging you in. Please try again.",
+                    "code": "busminder_login_error",
+                },
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )

@@ -101,7 +101,6 @@ export function useBuses(): UseBusesReturn {
           }
         }
       } catch (err) {
-        console.error('Unexpected error in loadBuses:', err);
         setError('An unexpected error occurred');
         if (!append) {
           setBuses([]);
