@@ -12,12 +12,10 @@ import 'services/parent_notifications_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Load .env before starting the app
+  await dotenv.load();
 
-  // Start the app IMMEDIATELY to avoid splash freeze
   runApp(MyApp());
-
-  // Load .env in background (non-blocking)
-  unawaited(dotenv.load());
 
   // Initialize notifications (non-blocking)
   unawaited(NotificationService().initialize());
