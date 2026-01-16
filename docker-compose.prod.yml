@@ -1,0 +1,172 @@
+# ApoBasi Production Environment
+# Usage: docker compose -f docker-compose.prod.yml up --build -d
+# Access: https://apobasi.com
+
+version: '3.8'
+
+services:
+  # ===================
+  # Backend API Server
+  # ===================
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: apobasi_backend_prod
+    env_file: .env.prod
+    environment:
+      - DJANGO_SETTINGS_MODULE=apo_basi.settings
+    volumes:
+      - backend_static_prod:/app/staticfiles
+      - backend_media_prod:/app/media
+    expose:
+      - "8000"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - apobasi_prod
+    restart: always
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             daphne -b 0.0.0.0 -p 8000 apo_basi.asgi:application"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  # ===================
+  # Admin Dashboard
+  # ===================
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: https://apobasi.com
+    container_name: apobasi_admin_prod
+    env_file: .env.prod
+    expose:
+      - "80"
+    networks:
+      - apobasi_prod
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # ===================
+  # Landing Site
+  # ===================
+  landing:
+    build:
+      context: ./landing
+      dockerfile: Dockerfile
+    container_name: apobasi_landing_prod
+    expose:
+      - "80"
+    networks:
+      - apobasi_prod
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+
+  # ===================
+  # PostgreSQL Database
+  # ===================
+  postgres:
+    image: postgres:15-alpine
+    container_name: apobasi_postgres_prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-apobasi_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-apobasi_prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+      - ./backups/postgres:/backups
+    networks:
+      - apobasi_prod
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+  # ===================
+  # Redis Cache
+  # ===================
+  redis:
+    image: redis:7-alpine
+    container_name: apobasi_redis_prod
+    volumes:
+      - redis_data_prod:/data
+    networks:
+      - apobasi_prod
+    restart: always
+    command: redis-server --appendonly yes
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # ===================
+  # Nginx Reverse Proxy + SSL
+  # ===================
+  nginx:
+    image: nginx:alpine
+    container_name: apobasi_nginx_prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - backend_static_prod:/var/www/static:ro
+      - backend_media_prod:/var/www/media:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - backend
+      - admin
+      - landing
+    networks:
+      - apobasi_prod
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+
+  # ===================
+  # Certbot for SSL (optional - run manually)
+  # ===================
+  certbot:
+    image: certbot/certbot
+    container_name: apobasi_certbot
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /var/www/certbot:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - apobasi_prod
+    profiles:
+      - ssl
+
+networks:
+  apobasi_prod:
+    driver: bridge
+
+volumes:
+  postgres_data_prod:
+  redis_data_prod:
+  backend_static_prod:
+  backend_media_prod:
