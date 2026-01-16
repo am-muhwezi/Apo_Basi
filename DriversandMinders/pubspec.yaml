@@ -1,7 +1,8 @@
+
 name: Basi_driver
 description: ApoBasi Drivers & Bus Minders - Real-time school bus tracking and student attendance management for drivers and bus minders across African schools.
 publish_to: none
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.6.0

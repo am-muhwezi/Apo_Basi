@@ -212,9 +212,22 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
               };
             }).toList();
           }
+        } else {
+          // No buses assigned in backend – clear any stale cached bus
+          // data so we don't keep showing an old bus like "Fangone".
+          _busData = null;
+          _assignedChildren = [];
+          await prefs.remove('cached_bus_data');
         }
       } catch (apiError) {
         // Use cached data if API fails
+      }
+
+      if (_busData == null) {
+        // No valid bus data available – fall back to a clean
+        // "Not Assigned" state for this minder.
+        await _initializeFallbackData();
+        return;
       }
 
       _minderData = {
@@ -251,6 +264,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
         "isAssigned": false,
       };
       _assignedChildren = [];
+      _isLoadingData = false;
     });
   }
 
