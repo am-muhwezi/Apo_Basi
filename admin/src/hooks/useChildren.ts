@@ -59,7 +59,6 @@ export function useChildren(): UseChildrenReturn {
           }
         }
       } catch (err) {
-        console.error('Unexpected error in loadChildren:', err);
         setError('An unexpected error occurred');
         if (!append) {
           setChildren([]);

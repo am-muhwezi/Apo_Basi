@@ -2,6 +2,7 @@
 Assignment service layer for business logic and complex operations.
 """
 
+import logging
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.utils import timezone
@@ -12,6 +13,8 @@ from buses.models import Bus
 from drivers.models import Driver
 from busminders.models import BusMinder
 from children.models import Child
+
+logger = logging.getLogger(__name__)
 
 
 class AssignmentService:
@@ -184,6 +187,32 @@ class AssignmentService:
         Raises:
             ValidationError: If capacity exceeded or children don't exist
         """
+        # Basic input validation to prevent hard-to-debug errors further down
+        if not isinstance(children_ids, (list, tuple)):
+            raise ValidationError({
+                'children_ids': 'children_ids must be a list of child IDs'
+            })
+
+        if not children_ids:
+            raise ValidationError({
+                'children_ids': 'At least one child ID is required'
+            })
+
+        # Ensure all IDs are integers and there are no duplicates
+        try:
+            normalized_ids = [int(child_id) for child_id in children_ids]
+        except (TypeError, ValueError):
+            raise ValidationError({
+                'children_ids': 'children_ids must contain only integer IDs'
+            })
+
+        if len(normalized_ids) != len(set(normalized_ids)):
+            raise ValidationError({
+                'children_ids': 'Duplicate child IDs are not allowed in children_ids'
+            })
+
+        children_ids = normalized_ids
+
         if effective_date is None:
             effective_date = timezone.now().date()
 
@@ -385,25 +414,97 @@ class AssignmentService:
     @staticmethod
     def get_bus_utilization():
         """
-        Get utilization statistics for all buses.
+        Get detailed utilization statistics for all buses including children and parent information.
 
         Returns:
             List of dicts with bus utilization data
         """
-        buses = Bus.objects.all()
-        utilization = []
+        logger.info("Getting bus utilization statistics")
+        try:
+            buses = Bus.objects.all()
+            logger.debug(f"Found {buses.count()} buses to process")
+            utilization = []
 
-        for bus in buses:
-            child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus').count()
-            utilization.append({
-                'bus_id': bus.id,
-                'bus_number': bus.bus_number,
-                'capacity': bus.capacity,
-                'assigned_children': child_assignments,
-                'available_seats': bus.capacity - child_assignments,
-                'utilization_percentage': round((child_assignments / bus.capacity * 100), 2) if bus.capacity > 0 else 0,
-                'driver': f"{bus.driver.first_name} {bus.driver.last_name}" if bus.driver else None,
-                'minder': f"{bus.bus_minder.first_name} {bus.bus_minder.last_name}" if bus.bus_minder else None,
-            })
+            for bus in buses:
+                logger.debug(f"Processing bus: {bus.bus_number} (ID: {bus.id})")
+                # Get all child assignments for this bus
+                child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
+                child_count = child_assignments.count()
 
-        return sorted(utilization, key=lambda x: x['utilization_percentage'], reverse=True)
+                # Get driver assignment
+                driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+                driver = driver_assignment.assignee if driver_assignment else None
+
+                # Get minder assignment
+                minder_assignment = Assignment.get_assignments_to(bus, 'minder_to_bus').first()
+                minder = minder_assignment.assignee if minder_assignment else None
+
+                # Get route assignment for this bus
+                route_assignment = Assignment.get_assignments_to(bus, 'bus_to_route').first()
+                route = route_assignment.assigned_to if route_assignment else None
+
+                # Build children list with parent information
+                children_list = []
+                for assignment in child_assignments:
+                    try:
+                        child = assignment.assignee
+                        if not child:
+                            continue  # Skip if child is None
+
+                        parent = child.parent if hasattr(child, 'parent') else None
+
+                        # Get parent name and phone safely
+                        parent_name = 'N/A'
+                        parent_phone = 'N/A'
+                        if parent:
+                            if hasattr(parent, 'user') and parent.user:
+                                parent_name = parent.user.get_full_name() or f"{parent.user.first_name} {parent.user.last_name}".strip() or 'N/A'
+                            parent_phone = getattr(parent, 'contact_number', 'N/A') or 'N/A'
+
+                        children_list.append({
+                            'id': child.id,
+                            'first_name': getattr(child, 'first_name', 'Unknown'),
+                            'last_name': getattr(child, 'last_name', 'Unknown'),
+                            'grade': getattr(child, 'grade', 'N/A'),
+                            'parent_name': parent_name,
+                            'parent_phone': parent_phone,
+                        })
+                    except Exception as e:
+                        # Log the error but continue processing other children
+                        logger.warning(f"Error processing child assignment {assignment.id} for bus {bus.bus_number}: {str(e)}")
+                        continue
+
+                utilization.append({
+                    'bus_id': bus.id,
+                    'bus_number': bus.bus_number,
+                    'license_plate': getattr(bus, 'number_plate', 'N/A'),
+                    'capacity': bus.capacity,
+                    'assigned_children': child_count,
+                    'available_seats': bus.capacity - child_count,
+                    'utilization_percentage': round((child_count / bus.capacity * 100), 2) if bus.capacity > 0 else 0,
+                    'driver': {
+                        'id': driver.user.id if driver else None,
+                        'first_name': driver.user.first_name if driver else None,
+                        'last_name': driver.user.last_name if driver else None,
+                        'phone': driver.user.email if driver else None,
+                    } if driver else None,
+                    'minder': {
+                        'id': minder.user.id if minder else None,
+                        'first_name': minder.user.first_name if minder else None,
+                        'last_name': minder.user.last_name if minder else None,
+                        'phone': minder.phone_number if minder and hasattr(minder, 'phone_number') else None,
+                    } if minder else None,
+                    'route': {
+                        'id': route.id if route else None,
+                        'name': route.name if route else None,
+                        'route_code': route.route_code if route else None,
+                    } if route else None,
+                    'children': children_list,
+                })
+
+            logger.info(f"Successfully processed {len(utilization)} buses")
+            return sorted(utilization, key=lambda x: x['utilization_percentage'], reverse=True)
+
+        except Exception as e:
+            logger.error(f"Error in get_bus_utilization: {str(e)}", exc_info=True)
+            raise ValidationError(f"Failed to get bus utilization: {str(e)}")

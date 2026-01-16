@@ -6,7 +6,6 @@
  *
  * Usage:
  * import { config } from '@/config/environment';
- * console.log(config.apiBaseUrl);
  */
 
 export const config = {
@@ -32,7 +31,5 @@ export function validateConfig(): void {
   }
 
   if (config.enableDebugLogs) {
-    console.log('🔧 Running in development mode');
-    console.log('📡 API Base URL:', config.apiBaseUrl);
   }
 }

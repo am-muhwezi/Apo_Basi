@@ -132,7 +132,6 @@ const BusMap: React.FC<BusMapProps> = ({
   // Snap bus location to road when coordinates change
   useEffect(() => {
     if (!isMapboxConfigured()) {
-      console.warn('⚠️ Mapbox not configured. Add VITE_MAPBOX_ACCESS_TOKEN to .env file');
       return;
     }
 
@@ -161,7 +160,6 @@ const BusMap: React.FC<BusMapProps> = ({
         const route = await getRoute(busLocation, destination);
         setRouteData(route);
       } catch (error) {
-        console.error('Error fetching route:', error);
       } finally {
         setIsLoadingRoute(false);
       }

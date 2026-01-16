@@ -86,37 +86,12 @@ class TripStartView(APIView):
         trip.start_time = timezone.now()
         trip.save()
 
-        # Trip start notifications now handled by Django Channels WebSocket
-        # Socket.IO notification removed - clients receive updates via WebSocket
+        # Trip start notifications to parents are handled by the
+        # notifications.signals.trip_status_changed signal, which triggers on
+        # the status transition into 'in-progress'. This keeps notification
+        # logic in one place and uses bus assignments so all subscribed
+        # parents for this bus are notified.
         print(f"✅ Trip started: {trip.id} for bus {trip.bus.bus_number}")
-
-        # Create notifications for all parents with children on this bus
-        try:
-            from notifications.views import create_notification
-            from children.models import Child
-
-            # Get all children assigned to this bus
-            children = Child.objects.filter(
-                trips=trip
-            ).select_related('parent').distinct()
-
-            for child in children:
-                if child.parent:
-                    title = f"Bus {trip.bus.bus_number} Started {trip.get_trip_type_display()} Trip"
-                    message = f"Your child's bus has started the {trip.get_trip_type_display().lower()} trip."
-
-                    try:
-                        create_notification(
-                            parent=child.parent,
-                            notification_type='general',
-                            title=title,
-                            message=message,
-                            related_object=trip
-                        )
-                    except Exception as e:
-                        print(f"Failed to create notification for parent {child.parent.user.id}: {e}")
-        except Exception as e:
-            print(f"Failed to create parent notifications: {e}")
 
         serializer = TripSerializer(trip)
         return Response(serializer.data)

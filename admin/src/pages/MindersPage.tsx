@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserCircle, Bus as BusIcon, CheckCircle, Users } from 'lucide-react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserCircle, Bus as BusIcon, CheckCircle, Users, Phone, Mail } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -174,7 +174,8 @@ export default function MindersPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* Minders Table - Desktop */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
@@ -267,6 +268,89 @@ export default function MindersPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Minders Cards - Mobile */}
+      <div className="md:hidden space-y-4">
+        {filteredMinders.map((minder) => (
+          <div key={minder.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h3 className="font-semibold text-slate-900 text-lg">
+                  {minder.firstName} {minder.lastName}
+                </h3>
+                <p className="text-sm text-slate-600">{minder.email}</p>
+              </div>
+              <span
+                className={`px-2 py-1 text-xs font-medium rounded-full ${
+                  minder.status === 'active'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-slate-100 text-slate-800'
+                }`}
+              >
+                {minder.status}
+              </span>
+            </div>
+
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600">Phone:</span>
+                <span className="font-medium text-slate-900">{minder.phone}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <BusIcon className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600">Bus:</span>
+                <span className="font-medium text-slate-900">{minder.assignedBusNumber || 'Not Assigned'}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-3 border-t border-slate-200">
+              <button
+                onClick={() => handleView(minder)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                <Eye size={18} />
+                <span className="text-sm font-medium">View</span>
+              </button>
+              <button
+                onClick={() => handleEdit(minder)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <Edit size={18} />
+                <span className="text-sm font-medium">Edit</span>
+              </button>
+              <button
+                onClick={() => handleDelete(minder.id)}
+                className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+              >
+                <Trash2 size={18} />
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {/* Pagination - Mobile */}
+        {filteredMinders.length > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="flex flex-col items-center gap-3">
+              <span className="text-sm text-slate-600">
+                Loaded {filteredMinders.length} of {filteredMinders.length}{hasMore ? '+' : ''} minders
+              </span>
+              {hasMore && (
+                <Button
+                  onClick={loadMoreMinders}
+                  disabled={loading}
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
+                >
+                  {loading ? 'Loading...' : 'Load More'}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <Modal

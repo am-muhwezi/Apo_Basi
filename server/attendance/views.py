@@ -374,13 +374,10 @@ def mark_attendance(request):
         attendance.notes = notes or ''
         attendance.save()
 
-    # TODO: Create notification for parent when pickup or dropoff is confirmed
-    # Notifications feature will be implemented later
-    if child.parent and new_status in ['picked_up', 'dropped_off']:
-        if new_status == 'picked_up':
-            print(f"📬 Notification: {child.first_name} {child.last_name} picked up at {attendance.timestamp.strftime('%I:%M %p')}")
-        else:  # dropped_off
-            print(f"📬 Notification: {child.first_name} {child.last_name} dropped off at {attendance.timestamp.strftime('%I:%M %p')}")
+    # Notifications are sent via the attendance mark signals in
+    # notifications.signals.attendance_marked. This view is responsible for
+    # creating/updating the Attendance record; the signal handles notifying
+    # parents when status changes to picked_up / dropped_off.
 
     return Response({
         "success": True,

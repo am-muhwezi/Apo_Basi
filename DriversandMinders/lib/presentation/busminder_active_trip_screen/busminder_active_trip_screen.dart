@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,11 +39,41 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
   // Student data
   List<Map<String, dynamic>> _students = [];
   String _searchQuery = '';
+  String? _tripDuration;
+  Timer? _tripTimer;
 
   @override
   void initState() {
     super.initState();
     _checkActiveTrip();
+  }
+
+  void _startTripTimer(DateTime startTime) {
+    _tripTimer?.cancel();
+
+    void update() {
+      final now = DateTime.now();
+      final diff = now.difference(startTime);
+      final hours = diff.inHours;
+      final minutes = diff.inMinutes.remainder(60);
+      final seconds = diff.inSeconds.remainder(60);
+
+      final buffer = StringBuffer();
+      if (hours > 0) {
+        buffer.write(hours.toString().padLeft(2, '0'));
+        buffer.write(':');
+      }
+      buffer.write(minutes.toString().padLeft(2, '0'));
+      buffer.write(':');
+      buffer.write(seconds.toString().padLeft(2, '0'));
+
+      setState(() {
+        _tripDuration = buffer.toString();
+      });
+    }
+
+    update();
+    _tripTimer = Timer.periodic(const Duration(seconds: 1), (_) => update());
   }
 
   Future<void> _checkActiveTrip() async {
@@ -82,10 +114,10 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
       _tripStartTime = prefs.getString('trip_start_time');
       _userName = prefs.getString('user_name') ?? 'Busminder';
 
-      if (_tripStartTime != null && _tripStartTime!.contains('T')) {
-        // Parse ISO format and extract time
+      if (_tripStartTime != null && _tripStartTime!.isNotEmpty) {
         try {
           final dt = DateTime.parse(_tripStartTime!);
+          _startTripTimer(dt);
           _tripStartTime =
               '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
         } catch (_) {}
@@ -113,13 +145,14 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
         final childrenData =
             await _apiService.getBusChildren(_busId!, tripType: _tripType);
 
-        final List<Map<String, dynamic>> students = [];
+        final Map<int, Map<String, dynamic>> byId = {};
         for (final child in childrenData) {
-          final studentId = child['id'].toString();
+          final int id = child['id'] as int;
+          final studentId = id.toString();
           final savedStatus = await _loadAttendanceStatus(studentId);
 
-          students.add({
-            'id': child['id'],
+          byId[id] = {
+            'id': id,
             'name': '${child['first_name']} ${child['last_name']}',
             'grade': child['class_grade']?.toString() ??
                 child['grade']?.toString() ??
@@ -131,9 +164,9 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
             'emergencyContact': child['emergency_contact'] ?? 'N/A',
             'address': child['address'] ?? 'N/A',
             'notes': child['notes'] ?? '',
-          });
+          };
         }
-        _students = students;
+        _students = byId.values.toList();
       }
 
       setState(() {
@@ -490,9 +523,18 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
                   children: [
                     Icon(Icons.access_time, color: Colors.white70, size: 14),
                     SizedBox(width: 1.w),
-                    Text(
-                      'Started at ${_tripStartTime ?? 'N/A'}',
-                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    Expanded(
+                      child: Text(
+                        _tripDuration != null
+                            ? 'Started at ${_tripStartTime ?? 'N/A'} • $_tripDuration'
+                            : 'Started at ${_tripStartTime ?? 'N/A'}',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),

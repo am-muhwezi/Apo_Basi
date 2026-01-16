@@ -59,13 +59,11 @@ class BusWebSocketService {
    */
   subscribeToBus(busId: string): void {
     if (!this.token) {
-      console.error('No auth token set. Call setToken() first.');
       return;
     }
 
     // If already connected, don't create a new connection
     if (this.connections.has(busId)) {
-      console.log(`Already subscribed to bus ${busId}`);
       return;
     }
 
@@ -83,7 +81,6 @@ class BusWebSocketService {
       }
       connection.ws.close();
       this.connections.delete(busId);
-      console.log(`Unsubscribed from bus ${busId}`);
     }
   }
 
@@ -107,7 +104,6 @@ class BusWebSocketService {
     });
     this.connections.clear();
     this.listeners.clear();
-    console.log('Disconnected from all buses');
   }
 
   /**
@@ -130,8 +126,6 @@ class BusWebSocketService {
         heading,
         timestamp: new Date().toISOString()
       }));
-    } else {
-      console.error(`Not connected to bus ${busId}`);
     }
   }
 
@@ -198,7 +192,6 @@ class BusWebSocketService {
     this.connections.set(busId, connection);
 
     ws.onopen = () => {
-      console.log(`✅ Connected to bus ${busId}`);
       connection.reconnectAttempts = 0;
 
       // Request current location on connect
@@ -214,36 +207,25 @@ class BusWebSocketService {
 
         // Emit to global listeners
         this.emit('*', data);
-
-        // Log for debugging
-        if (data.type === 'location_update') {
-          console.log(`📍 Location update for bus ${busId}:`, data);
-        }
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+        // Silent error handling
       }
     };
 
     ws.onerror = (error) => {
-      console.error(`❌ WebSocket error for bus ${busId}:`, error);
+      // Silent error handling
     };
 
     ws.onclose = (event) => {
-      console.log(`🔌 Connection closed for bus ${busId}. Code: ${event.code}`);
-
       // Attempt reconnection if not a normal closure and under max attempts
       if (event.code !== 1000 && connection.reconnectAttempts < this.MAX_RECONNECT_ATTEMPTS) {
         connection.reconnectAttempts++;
-        console.log(
-          `🔄 Attempting to reconnect to bus ${busId} (${connection.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS})...`
-        );
 
         connection.reconnectTimer = window.setTimeout(() => {
           this.connections.delete(busId);
           this.createConnection(busId);
         }, this.RECONNECT_DELAY);
       } else if (connection.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
-        console.error(`❌ Max reconnection attempts reached for bus ${busId}`);
         this.connections.delete(busId);
       }
     };

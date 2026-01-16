@@ -202,17 +202,21 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
           if (_routeDetails?['children'] != null &&
               _routeDetails!['children'] is List) {
-            _assignedChildren = [];
+            final Map<String, Map<String, dynamic>> byId = {};
             for (var child in _routeDetails!['children']) {
-              _assignedChildren.add({
-                'id': child['id']?.toString() ?? '',
+              final String id = child['id']?.toString() ?? '';
+              if (id.isEmpty) continue;
+
+              byId[id] = {
+                'id': id,
                 'name':
                     '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}',
                 'grade': child['grade']?.toString() ??
                     child['class_grade']?.toString() ??
                     'N/A',
-              });
+              };
             }
+            _assignedChildren = byId.values.toList();
           }
 
           _driverData = {
@@ -222,7 +226,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
             "busPlate": _busData?['number_plate'] ?? 'N/A',
             "routeName": _routeDetails?['route_name'] ?? 'No Route',
             "estimatedDuration": _routeDetails?['estimated_duration'] ?? "N/A",
-            "studentCount": _routeDetails?['total_children'] ?? 0,
+            "studentCount": _assignedChildren.length,
           };
           setState(() => _isLoadingData = false);
           return;
@@ -246,17 +250,21 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
         if (routeResponse['children'] != null &&
             routeResponse['children'] is List) {
-          _assignedChildren = [];
+          final Map<String, Map<String, dynamic>> byId = {};
           for (var child in routeResponse['children']) {
-            _assignedChildren.add({
-              'id': child['id']?.toString() ?? '',
+            final String id = child['id']?.toString() ?? '';
+            if (id.isEmpty) continue;
+
+            byId[id] = {
+              'id': id,
               'name':
                   '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}',
               'grade': child['grade']?.toString() ??
                   child['class_grade']?.toString() ??
                   'N/A',
-            });
+            };
           }
+          _assignedChildren = byId.values.toList();
         }
 
         _driverData = {
@@ -268,7 +276,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
           "routeAssignment":
               '${_busData?['bus_number'] ?? 'No Bus'}${routeResponse['route_name'] != null ? ' - ${routeResponse['route_name']}' : ''}',
           "estimatedDuration": routeResponse['estimated_duration'] ?? "N/A",
-          "studentCount": routeResponse['total_children'] ?? 0,
+          "studentCount": _assignedChildren.length,
         };
       } catch (apiError) {
         await _initializeFallbackData();
