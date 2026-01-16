@@ -7,7 +7,6 @@ __pycache__/
 db.sqlite3
 server/.python-version
 
-
 .vite/
 diagnose_startup.sh
 test_live_location_tracking.sh
@@ -15,11 +14,8 @@ docs/
 server/assignments/management/
 server/send_terms_*.py
 
-
 # Django
 *migrations/
-
-
 
 # Flutter
 **/build/
@@ -34,6 +30,7 @@ server/send_terms_*.py
 **/pubspec.lock
 ParentsApp/lib/config/api_config.dart
 DriversandMinders/lib/config/api_config.dart
+
 # Node / React
 node_modules/
 .env*
@@ -70,3 +67,8 @@ server/scripts/test_trip_start_notification.py
 tools/remove_flutter_comments.py
 tools/remove_flutter_debug_prints.py
 admin/MAP_TRACKING_GUIDE.md
+
+# Virtual environments
+.venv/
+venv/
+/venv/
