@@ -15,6 +15,11 @@ import AssignmentsPage from './pages/AssignmentsPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import { useAuth } from './contexts/AuthContext';
+import HomePage from './pages/landing/HomePage';
+import DownloadPage from './pages/landing/DownloadPage';
+import FeaturesPage from './pages/landing/FeaturesPage';
+import TermsPage from './pages/landing/TermsPage';
+import PrivacyPage from './pages/landing/PrivacyPage';
 
 function App() {
   const { isAuthenticated, loading } = useAuth();
@@ -29,27 +34,23 @@ function App() {
 
   return (
     <Routes>
-      {/* Public routes */}
-      <Route
-        path="/login"
-        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />}
-      />
-      <Route
-        path="/signup"
-        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <SignupPage />}
-      />
+      {/* Public routes - marketing/landing */}
+      <Route path="/" element={<HomePage />} />
+      <Route path="/download" element={<DownloadPage />} />
+      <Route path="/features" element={<FeaturesPage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
 
       {/* Protected routes */}
       <Route
-        path="/"
+        path="/dashboard"
         element={
           <PrivateRoute>
             <Layout />
           </PrivateRoute>
         }
       >
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
+        <Route index element={<DashboardPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="attendance" element={<AttendancePage />} />
         <Route path="children" element={<ChildrenPage />} />
@@ -62,11 +63,8 @@ function App() {
         <Route path="admins" element={<AdminsPage />} />
       </Route>
 
-      {/* Catch all - redirect to dashboard or login */}
-      <Route
-        path="*"
-        element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />}
-      />
+      {/* Catch all - redirect to landing page */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
