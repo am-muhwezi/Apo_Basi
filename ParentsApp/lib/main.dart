@@ -55,7 +55,8 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final BusWebSocketService _webSocketService = BusWebSocketService();
-  final ParentNotificationsService _notificationsService = ParentNotificationsService();
+  final ParentNotificationsService _notificationsService =
+      ParentNotificationsService();
   final NotificationService _notificationService = NotificationService();
 
   @override
@@ -65,7 +66,10 @@ class _MyAppState extends State<MyApp> {
     // Delay WebSocket initialization until the first frame renders
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _webSocketService.connect();
-      _notificationsService.connect();
+      // Temporarily disable parent notifications WebSocket in staging
+      // to avoid crashes when the backend WebSocket endpoint is not
+      // available. The rest of the app will continue to work normally.
+      // _notificationsService.connect();
     });
   }
 

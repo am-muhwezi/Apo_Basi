@@ -1,35 +1,82 @@
 services:
   backend:
-    build: ./server
+    build:
+      context: ./server
+      dockerfile: Dockerfile
     container_name: apobasi_backend
     env_file: .env
     volumes:
-      - sqlite_data:/app/db
+      - backend_static:/app/staticfiles
+    ports:
+      - "8100:8000"
     depends_on:
+      - postgres
       - redis
-    expose:
-      - "8000"
+    networks:
+      - apobasi_net
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             daphne -b 0.0.0.0 -p 8000 apo_basi.asgi:application"
 
-  admin:
-    build: ./admin
-    container_name: apobasi_admin
-    expose:
-      - "80"
+  frontend:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: https://api.apobasi.com
+    container_name: apobasi_frontend
+    env_file: .env
+    ports:
+      - "8080:80"
+    networks:
+      - apobasi_net
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: apobasi_postgres
+    environment:
+      POSTGRES_DB: apobasi_prod
+      POSTGRES_USER: apobasi_prod
+      POSTGRES_PASSWORD: prod_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - apobasi_net
+    restart: unless-stopped
 
   redis:
-    image: redis:7
+    image: redis:7-alpine
     container_name: apobasi_redis
-
-  nginx:
-    image: nginx:alpine
-    container_name: apobasi_nginx
-    ports:
-      - "80:80"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - backend
-      - admin
+      - redis_data:/data
+    networks:
+      - apobasi_net
+    restart: unless-stopped
+
+#  nginx:
+#    image: nginx:1.27-alpine
+#    container_name: apobasi_nginx
+#    ports:
+#      - "8080:80"
+#    volumes:
+#      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+#      - backend_static:/var/www/static:ro
+#    depends_on:
+#      - backend
+#      - admin
+#      - landing
+#    networks:
+#      - apobasi_net
+#    restart: unless-stopped
+
+networks:
+  apobasi_net:
+    driver: bridge
 
 volumes:
-  sqlite_data:
+  postgres_data:
+  redis_data:
+  backend_static:
