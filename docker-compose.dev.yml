@@ -1,0 +1,118 @@
+# ApoBasi Development Environment
+# Usage: docker-compose -f docker-compose.dev.yml up --build
+
+version: '3.8'
+
+services:
+  # ===================
+  # Backend API Server
+  # ===================
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: apobasi_backend_dev
+    env_file: .env.dev
+    environment:
+      - DJANGO_SETTINGS_MODULE=apo_basi.settings
+    volumes:
+      - ./server:/app
+      - backend_static_dev:/app/staticfiles
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - apobasi_dev
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             daphne -b 0.0.0.0 -p 8000 apo_basi.asgi:application"
+
+  # ===================
+  # Admin Dashboard
+  # ===================
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    container_name: apobasi_admin_dev
+    env_file: .env.dev
+    volumes:
+      - ./admin/src:/app/src
+    ports:
+      - "5173:80"
+    networks:
+      - apobasi_dev
+    restart: unless-stopped
+
+  # ===================
+  # Landing Site
+  # ===================
+  landing:
+    build:
+      context: ./landing
+      dockerfile: Dockerfile
+    container_name: apobasi_landing_dev
+    ports:
+      - "4321:80"
+    networks:
+      - apobasi_dev
+    restart: unless-stopped
+
+  # ===================
+  # PostgreSQL Database
+  # ===================
+  postgres:
+    image: postgres:15-alpine
+    container_name: apobasi_postgres_dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-apobasi_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-apobasi_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_123}
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    networks:
+      - apobasi_dev
+    restart: unless-stopped
+
+  # ===================
+  # Redis Cache
+  # ===================
+  redis:
+    image: redis:7-alpine
+    container_name: apobasi_redis_dev
+    volumes:
+      - redis_data_dev:/data
+    networks:
+      - apobasi_dev
+    restart: unless-stopped
+
+  # ===================
+  # Nginx Reverse Proxy
+  # ===================
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: apo_basi-nginx-1
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - admin
+      - landing
+    networks:
+      - apobasi_dev
+    restart: unless-stopped
+
+networks:
+  apobasi_dev:
+    driver: bridge
+
+volumes:
+  postgres_data_dev:
+  redis_data_dev:
+  backend_static_dev:
