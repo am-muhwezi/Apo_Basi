@@ -90,11 +90,8 @@ class ParentNotificationsService {
       _connectionStateController.add('connecting');
 
       // Build WebSocket URL with token authentication
-      final baseUrl = ApiConfig.apiBaseUrl;
-      final wsProtocol = baseUrl.startsWith('https') ? 'wss' : 'ws';
-      final host = Uri.parse(baseUrl).host;
-      final wsUrl =
-          '$wsProtocol://$host/ws/notifications/parent/?token=$_accessToken';
+      final wsUrl =                                                                                                 
+      '${_getWebSocketBaseUrl()}/ws/notifications/parent/?token=$_accessToken';    
 
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
 
@@ -448,6 +445,18 @@ class ParentNotificationsService {
       return false;
     }
   }
+
+  /// Get WebSocket base URL from API config                                                                  
+    String _getWebSocketBaseUrl() {                                                                             
+      // Convert HTTP URL to WebSocket URL                                                                      
+      final baseUrl = ApiConfig.apiBaseUrl;                                                                     
+      if (baseUrl.startsWith('https://')) {                                                                     
+        return baseUrl.replaceFirst('https://', 'wss://');                                                      
+      } else if (baseUrl.startsWith('http://')) {                                                               
+        return baseUrl.replaceFirst('http://', 'ws://');                                                        
+      }                                                                                                         
+      return 'ws://$baseUrl';                                                                                   
+    }               
 
   /// Dispose all resources
   void dispose() {
