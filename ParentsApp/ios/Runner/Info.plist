@@ -45,5 +45,33 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	 <!-- Location Permissions (for GPS tracking) -->                                               
+        <key>NSLocationWhenInUseUsageDescription</key>                                                          
+        <string>ApoBasi needs your location to show your child's bus location and arrival time in real-time.</string>
+        <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>                                                 
+        <string>ApoBasi needs background location access to notify you when your child's bus is approaching.</string>
+                                                                                                                
+        <!-- Camera Permission (if used for profile photos) -->                                                 
+        <key>NSCameraUsageDescription</key>                                                                     
+        <string>ApoBasi needs camera access to take profile photos.</string>                                    
+                                                                                                                
+        <!-- Photo Library Permission (	to upload profile photos) -->                                          
+        <key>NSPhotoLibraryUsageDescription</key>                                                               
+        <string>ApoBasi needs access to your photo library to select profile photos.</string>                   
+        <key>NSPhotoLibraryAddUsageDescription</key>                                                            
+        <string>ApoBasi needs access to save photos to your library.</string>                                   
+                                                                                                                
+        <!-- Notifications Permission -->                                                                       
+        <key>NSUserNotificationsUsageDescription</key>                                                          
+        <string>ApoBasi sends you important updates about your child's bus trips, pickups, and drop-offs.</string>
+                                                                                                                
+        <!-- Background Modes (for location updates) -->                                                        
+        <key>UIBackgroundModes</key>                                                                            
+        <array>                                                                                                 
+                <string>location</string>                                                                       
+                <string>fetch</string>                                                                          
+                <string>remote-notification</string>                                                            
+        </array>                                        
 </dict>
 </plist>
