@@ -21,19 +21,19 @@ export default function Layout() {
 
   const menuItems = [
     { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'analytics', path: '/analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'attendance', path: '/attendance', label: 'Attendance', icon: CheckSquare },
-    { id: 'trips', path: '/trips', label: 'Trips & Tracking', icon: MapPin },
-    { id: 'assignments', path: '/assignments', label: 'Assignments', icon: Layers },
-    { id: 'admins', path: '/admins', label: 'Admins', icon: Shield },
+    { id: 'analytics', path: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'attendance', path: '/dashboard/attendance', label: 'Attendance', icon: CheckSquare },
+    { id: 'trips', path: '/dashboard/trips', label: 'Trips & Tracking', icon: MapPin },
+    { id: 'assignments', path: '/dashboard/assignments', label: 'Assignments', icon: Layers },
+    { id: 'admins', path: '/dashboard/admins', label: 'Admins', icon: Shield },
   ];
 
   const managementItems = [
-    { id: 'children', path: '/children', label: 'Children', icon: Baby },
-    { id: 'parents', path: '/parents', label: 'Parents', icon: Users },
-    { id: 'buses', path: '/buses', label: 'Buses', icon: Bus },
-    { id: 'drivers', path: '/drivers', label: 'Drivers', icon: UserCircle },
-    { id: 'minders', path: '/minders', label: 'Bus Minders', icon: UserCircle },
+    { id: 'children', path: '/dashboard/children', label: 'Children', icon: Baby },
+    { id: 'parents', path: '/dashboard/parents', label: 'Parents', icon: Users },
+    { id: 'buses', path: '/dashboard/buses', label: 'Buses', icon: Bus },
+    { id: 'drivers', path: '/dashboard/drivers', label: 'Drivers', icon: UserCircle },
+    { id: 'minders', path: '/dashboard/minders', label: 'Bus Minders', icon: UserCircle },
   ];
 
   // Check if any management item is active
