@@ -90,8 +90,11 @@ class ParentNotificationsService {
       _connectionStateController.add('connecting');
 
       // Build WebSocket URL with token authentication
+      final baseUrl = ApiConfig.apiBaseUrl;
+      final wsProtocol = baseUrl.startsWith('https') ? 'wss' : 'ws';
+      final host = Uri.parse(baseUrl).host;
       final wsUrl =
-          '${ApiConfig.apiBaseUrl.replaceFirst('http', 'ws')}/ws/notifications/parent/?token=$_accessToken';
+          '$wsProtocol://$host/ws/notifications/parent/?token=$_accessToken';
 
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
 
