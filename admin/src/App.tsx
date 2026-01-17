@@ -41,6 +41,16 @@ function App() {
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
 
+      {/* Admin auth routes */}
+      <Route
+        path="/admin/login"
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />}
+      />
+      <Route
+        path="/admin/signup"
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <SignupPage />}
+      />
+
       {/* Protected routes */}
       <Route
         path="/dashboard"
