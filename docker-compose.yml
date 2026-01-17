@@ -22,7 +22,7 @@ services:
 
   frontend:
     build:
-      context: ./admin
+      context: ./client
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: https://api.apobasi.com
