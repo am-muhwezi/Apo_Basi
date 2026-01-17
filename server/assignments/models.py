@@ -1,4 +1,6 @@
 from django.db import models
+from django.db.models import Value
+from django.db.models.functions import Concat
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -326,7 +328,10 @@ class Assignment(models.Model):
                     status='active'
                 ).exclude(pk=self.pk if self.pk else None).update(
                     status='expired',
-                    notes=models.F('notes') + '\nAuto-expired: Busminder reassigned to different bus'
+                    notes=Concat(
+                        'notes',
+                        Value('\nAuto-expired: Busminder reassigned to different bus'),
+                    ),
                 )
 
             # For driver_to_bus, ensure a driver isn't assigned to multiple buses
@@ -338,7 +343,10 @@ class Assignment(models.Model):
                     status='active'
                 ).exclude(pk=self.pk if self.pk else None).update(
                     status='expired',
-                    notes=models.F('notes') + '\nAuto-expired: Driver reassigned to different bus'
+                    notes=Concat(
+                        'notes',
+                        Value('\nAuto-expired: Driver reassigned to different bus'),
+                    ),
                 )
 
             # For child_to_bus, ensure a child isn't assigned to multiple buses
@@ -350,7 +358,10 @@ class Assignment(models.Model):
                     status='active'
                 ).exclude(pk=self.pk if self.pk else None).update(
                     status='expired',
-                    notes=models.F('notes') + '\nAuto-expired: Child reassigned to different bus'
+                    notes=Concat(
+                        'notes',
+                        Value('\nAuto-expired: Child reassigned to different bus'),
+                    ),
                 )
 
         super().save(*args, **kwargs)
