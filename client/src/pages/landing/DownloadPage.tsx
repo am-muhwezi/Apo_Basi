@@ -6,7 +6,7 @@ import Button from '../../components/landing/Button';
 
 export default function DownloadPage() {
   return (
-    <div className="min-h-screen bg-gray-950">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <Navbar />
       <main className="pt-24 pb-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -17,8 +17,8 @@ export default function DownloadPage() {
 
           <div className="grid md:grid-cols-2 gap-6 mt-12">
             <Card variant="gradient">
-              <h3 className="text-2xl font-bold text-white mb-4">For Parents</h3>
-              <p className="text-gray-300 mb-6">
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">For Parents</h3>
+              <p className="text-gray-700 dark:text-gray-300 mb-6">
                 Track your children's school bus in real-time. Get notifications for every pickup and drop-off.
               </p>
               <div className="space-y-3">
@@ -38,8 +38,8 @@ export default function DownloadPage() {
             </Card>
 
             <Card variant="gradient">
-              <h3 className="text-2xl font-bold text-white mb-4">For Drivers & Minders</h3>
-              <p className="text-gray-300 mb-6">
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">For Drivers & Minders</h3>
+              <p className="text-gray-700 dark:text-gray-300 mb-6">
                 Drivers broadcast GPS. Bus minders mark attendance. All offline-capable.
               </p>
               <div className="space-y-3">
@@ -59,9 +59,9 @@ export default function DownloadPage() {
             </Card>
           </div>
 
-          <div className="mt-12 p-6 bg-blue-500/10 border border-blue-500/30 rounded-2xl">
-            <h4 className="text-lg font-semibold text-white mb-2">For School Administrators</h4>
-            <p className="text-gray-300 mb-4">
+          <div className="mt-12 p-6 bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/30 rounded-2xl">
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">For School Administrators</h4>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
               Access the admin dashboard from any web browser. No download required.
             </p>
             <Button variant="primary" href="/admin/login">

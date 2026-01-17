@@ -8,9 +8,10 @@ interface CardProps {
 
 export default function Card({ variant = 'default', className = '', children }: CardProps) {
   const variants = {
-    default: 'bg-gray-900 border-gray-800',
-    glass: 'glass backdrop-blur-sm bg-gray-900/50',
-    gradient: 'bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700/50',
+    default: 'bg-white border-gray-200 dark:bg-gray-900 dark:border-gray-800',
+    glass: 'glass backdrop-blur-sm bg-white/80 border-gray-200 shadow-sm dark:bg-gray-900/50 dark:border-gray-700/50',
+    gradient:
+      'bg-gradient-to-br from-blue-50 to-blue-100 border-blue-100 dark:from-gray-900 dark:to-gray-800 dark:border-gray-700/50',
   };
 
   const classes = `rounded-2xl border p-6 ${variants[variant]} ${className}`;
