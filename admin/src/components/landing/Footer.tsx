@@ -7,12 +7,12 @@ const footerLinks = {
     { href: '/#features', label: 'Features' },
     { href: '/#how-it-works', label: 'How it Works' },
     { href: '/download', label: 'Download App' },
-    { href: '/#pricing', label: 'Pricing' },
+    //{ href: '/#pricing', label: 'Pricing' },
   ],
   company: [
     { href: '/#about', label: 'About Us' },
     { href: '/#contact', label: 'Contact' },
-    { href: '/careers', label: 'Careers' },
+    //{ href: '/careers', label: 'Careers' },
   ],
   legal: [
     { href: '/privacy', label: 'Privacy Policy' },

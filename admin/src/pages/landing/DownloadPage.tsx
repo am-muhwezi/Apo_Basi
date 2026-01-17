@@ -64,7 +64,7 @@ export default function DownloadPage() {
             <p className="text-gray-300 mb-4">
               Access the admin dashboard from any web browser. No download required.
             </p>
-            <Button variant="primary" href="/login">
+            <Button variant="primary" href="/admin/login">
               Go to Admin Dashboard
             </Button>
           </div>
