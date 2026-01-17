@@ -73,8 +73,8 @@ function App() {
         <Route path="admins" element={<AdminsPage />} />
       </Route>
 
-      {/* Catch all - redirect to landing page */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* Catch all - redirect unauthenticated to home, authenticated to dashboard */}
+      <Route path="*" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/" replace />} />
     </Routes>
   );
 }
