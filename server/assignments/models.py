@@ -315,7 +315,10 @@ class Assignment(models.Model):
                     status='active'
                 ).exclude(pk=self.pk if self.pk else None).update(
                     status='expired',
-                    notes=models.F('notes') + '\nAuto-expired: New assignment created'
+                    notes=Concat(
+                        'notes',
+                        Value('\nAuto-expired: New assignment created'),
+                    ),
                 )
 
             # For minder_to_bus, also ensure one busminder isn't assigned to multiple buses
