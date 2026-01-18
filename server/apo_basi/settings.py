@@ -1,6 +1,6 @@
 from pathlib import Path
 from decouple import config
-
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -87,11 +87,10 @@ ASGI_APPLICATION = "apo_basi.asgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+DATABASES = { 
+    "default": dj_database_url.parse(
+        config("DATABASE_URL")
+    )
 }
 
 
@@ -193,9 +192,6 @@ if not CORS_ALLOW_ALL_ORIGINS:
         default=[],
     )
 
-# Socket.IO Server URL for real-time notifications
-SOCKETIO_SERVER_URL = config("SOCKETIO_SERVER_URL", default="http://localhost:3000")
-
 # Redis Configuration for real-time location tracking
 REDIS_HOST = config("REDIS_HOST", default="localhost")
 REDIS_PORT = config("REDIS_PORT", default=6379, cast=int)
@@ -228,3 +224,10 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", cast=bool, default=False)
+
+SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", cast=bool, default=False)
+CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", cast=bool, default=False)
