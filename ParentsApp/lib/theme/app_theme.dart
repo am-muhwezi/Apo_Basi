@@ -115,7 +115,7 @@ class AppTheme {
       shadowColor: shadowLight,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     ),
@@ -164,7 +164,7 @@ class AppTheme {
         foregroundColor: Colors.white,
         elevation: 2,
         shadowColor: shadowLight,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
         ),
@@ -613,7 +613,7 @@ class AppTheme {
 
       // Body styles - Main content text
       bodyLarge: GoogleFonts.inter(
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: FontWeight.w400,
         color: textPrimary,
         letterSpacing: 0.5,

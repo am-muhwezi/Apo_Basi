@@ -215,6 +215,11 @@ REDIS_LOCATION_UPDATES_CHANNEL = "location_updates"
 REDIS_BUS_LOCATION_KEY_PATTERN = "bus:{bus_id}:location"
 REDIS_LOCATION_TTL = 60  # seconds
 
+# Supabase Configuration for Magic Link Authentication
+SUPABASE_URL = config("SUPABASE_URL", default="")
+SUPABASE_PUBLISHABLE_KEY = config("SUPABASE_PUBLISHABLE_KEY", default="")
+SUPABASE_SECRET_KEY = config("SUPABASE_SECRET_KEY", default="")
+SUPABASE_JWKS_URL = config("SUPABASE_JWKS_URL", default="")
 
 CHANNEL_LAYERS = {
     "default": {

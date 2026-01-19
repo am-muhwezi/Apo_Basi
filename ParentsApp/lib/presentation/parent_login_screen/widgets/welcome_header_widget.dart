@@ -3,6 +3,8 @@ import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
 
+/// Apple-inspired welcome header with ApoBasi branding
+/// Uses subtle gradient in brand blue with clean, minimal design
 class WelcomeHeaderWidget extends StatelessWidget {
   const WelcomeHeaderWidget({Key? key}) : super(key: key);
 
@@ -10,64 +12,76 @@ class WelcomeHeaderWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 6.h),
+      padding: EdgeInsets.only(
+        left: 6.w,
+        right: 6.w,
+        top: 8.h,
+        bottom: 4.h,
+      ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF6366F1), // Modern indigo
-            Color(0xFF8B5CF6), // Purple
-            Color(0xFFEC4899), // Pink accent
+            AppTheme.primaryLight, // ApoBasi blue
+            AppTheme.primaryLight.withOpacity(0.85), // Subtle variation
           ],
         ),
       ),
       child: SafeArea(
+        bottom: false,
         child: Column(
           children: [
-            SizedBox(height: 4.h),
-            // Modern icon instead of image
+            // App Icon - Clean, minimal
             Container(
-              width: 24.w,
-              height: 24.w,
+              width: 20.w,
+              height: 20.w,
               decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 20,
-                    offset: Offset(0, 10),
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
               child: Icon(
                 Icons.directions_bus_rounded,
-                size: 12.w,
-                color: Color(0xFF6366F1),
+                size: 10.w,
+                color: AppTheme.primaryLight,
               ),
             ),
+
             SizedBox(height: 3.h),
+
+            // App Name - Bold, confident
             Text(
               'ApoBasi',
-              style: AppTheme.lightTheme.textTheme.headlineLarge?.copyWith(
+              style: GoogleFonts.inter(
+                fontSize: 34, // iOS Large Title size
+                fontWeight: FontWeight.w700,
                 color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 32.sp,
                 letterSpacing: -0.5,
+                height: 1.2,
               ),
             ),
-            SizedBox(height: 1.h),
+
+            SizedBox(height: 0.5.h),
+
+            // Tagline - Subtle, reassuring
             Text(
-              'Track Your Child\'s Journey',
+              'Safe journeys, Happy parents',
               textAlign: TextAlign.center,
-              style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.95),
+              style: GoogleFonts.inter(
+                fontSize: 17, // iOS body size
                 fontWeight: FontWeight.w400,
-                letterSpacing: 0.2,
+                color: Colors.white.withOpacity(0.9),
+                letterSpacing: 0,
+                height: 1.4,
               ),
             ),
-            SizedBox(height: 4.h),
           ],
         ),
       ),
