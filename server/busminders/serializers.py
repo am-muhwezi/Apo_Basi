@@ -72,32 +72,42 @@ class BusMinderCreateSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
-        # Extract user data
-        first_name = validated_data.pop('firstName')
-        last_name = validated_data.pop('lastName')
-        email = validated_data.pop('email', '') or ''
+        from django.db import IntegrityError
+        try:
+            # Extract user data
+            first_name = validated_data.pop('firstName')
+            last_name = validated_data.pop('lastName')
+            email = validated_data.pop('email', '') or ''
 
-        # Generate a unique username (required by Django)
-        import uuid
-        username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
+            # Generate a unique username (required by Django)
+            import uuid
+            username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
 
-        # Create User
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            first_name=first_name,
-            last_name=last_name,
-            user_type='busminder'
-        )
+            # Create User
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                user_type='busminder'
+            )
 
-        # Create BusMinder
-        busminder = BusMinder.objects.create(
-            user=user,
-            phone_number=validated_data.get('phone'),
-            status=validated_data.get('status', 'active'),
-        )
-
-        return busminder
+            # Create BusMinder
+            busminder = BusMinder.objects.create(
+                user=user,
+                phone_number=validated_data.get('phone'),
+                status=validated_data.get('status', 'active'),
+            )
+            return busminder
+        except IntegrityError as e:
+            # Clean up user if busminder creation fails
+            try:
+                user.delete()
+            except Exception:
+                pass
+            if 'already in use' in str(e):
+                raise serializers.ValidationError({'phone': str(e)})
+            raise serializers.ValidationError({'non_field_errors': [str(e)]})
 
     def update(self, instance, validated_data):
         # Update User fields
