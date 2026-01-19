@@ -1,4 +1,22 @@
 /**
+ * Checks if a phone or email exists as a driver, minder, or parent.
+ * Returns { exists: boolean, role: 'driver'|'minder'|'parent'|null }
+ */
+export async function checkPhoneOrEmailExists(phone?: string, email?: string) {
+  try {
+    const params = new URLSearchParams();
+    if (phone) params.append('phone', phone);
+    if (email) params.append('email', email);
+    const res = await fetch(`/api/check-user-unique?${params.toString()}`);
+    if (!res.ok) return { exists: false, role: null };
+    const data = await res.json();
+    return { exists: data.exists, role: data.role };
+  } catch {
+    return { exists: false, role: null };
+  }
+}
+// ...existing code...
+/**
  * Driver Service Layer
  *
  * Business logic and error handling for driver operations.
