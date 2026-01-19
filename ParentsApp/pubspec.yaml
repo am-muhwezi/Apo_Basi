@@ -41,6 +41,8 @@ dependencies:
   geocoding: ^3.0.0
   http: ^1.1.0
   shorebird_code_push: ^2.0.5
+  # Supabase for magic link authentication
+  supabase_flutter: ^2.10.0
 
 dev_dependencies:
   flutter_test:    # CRITICAL: Required for Flutter project testing - DO NOT REMOVE
