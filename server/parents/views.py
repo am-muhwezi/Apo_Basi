@@ -1,6 +1,8 @@
 """Parent views for CRUD and phone-based login flows."""
 
 import logging
+import requests
+from jose import jwt, JWTError
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -11,6 +13,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.conf import settings
 
 from .models import Parent
 from .serializers import ParentLoginSerializer, ParentSerializer, ParentCreateSerializer
@@ -362,6 +365,163 @@ class ParentLoginView(APIView):
                     },
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class SupabaseMagicLinkAuthView(APIView):
+    """
+    POST /api/parents/auth/magic-link/
+    Exchange Supabase session for Django JWT tokens.
+
+    The magic link flow:
+    1. User enters email in Flutter app
+    2. Supabase sends magic link email
+    3. User clicks link → opens app via deep linking
+    4. Flutter extracts Supabase access_token
+    5. Flutter sends token to this endpoint
+    6. Django verifies token and returns Django JWT tokens
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        access_token = request.data.get('access_token')
+
+        if not access_token:
+            return Response(
+                {"error": "access_token is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Fetch JWKS (JSON Web Key Set) from Supabase
+            jwks_response = requests.get(settings.SUPABASE_JWKS_URL, timeout=5)
+            jwks_response.raise_for_status()
+            jwks = jwks_response.json()
+
+            # Verify and decode the Supabase JWT token
+            payload = jwt.decode(
+                access_token,
+                jwks,
+                algorithms=['ES256'],
+                options={
+                    'verify_aud': False,  # Supabase uses different audience
+                    'verify_iss': True,
+                }
+            )
+
+            email = payload.get('email')
+            if not email:
+                return Response(
+                    {"error": "Email not found in token"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if parent exists with this email
+            try:
+                parent = Parent.objects.select_related('user').get(
+                    user__email=email,
+                    status='active'
+                )
+                user = parent.user
+            except Parent.DoesNotExist:
+                return Response(
+                    {
+                        "error": "No parent account found",
+                        "message": "Your email is not registered. Please contact your school administrator to set up your account."
+                    },
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Generate Django JWT tokens
+            refresh = RefreshToken.for_user(user)
+
+            # Get parent's children with bus assignments
+            children = Child.objects.filter(parent=parent)
+            children_data = []
+
+            for child in children:
+                bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
+
+                child_data = {
+                    "id": child.id,
+                    "first_name": child.first_name,
+                    "last_name": child.last_name,
+                    "class_grade": child.class_grade,
+                    "status": child.status,
+                    "assigned_bus": None
+                }
+
+                if bus_assignment:
+                    bus = bus_assignment.assigned_to
+                    driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+                    minder_assignment = Assignment.get_assignments_to(bus, 'minder_to_bus').first()
+
+                    driver_info = None
+                    if driver_assignment and driver_assignment.assignee:
+                        driver_info = {
+                            "name": f"{driver_assignment.assignee.user.first_name} {driver_assignment.assignee.user.last_name}",
+                            "phone": driver_assignment.assignee.phone_number
+                        }
+
+                    minder_info = None
+                    if minder_assignment and minder_assignment.assignee:
+                        minder_info = {
+                            "name": f"{minder_assignment.assignee.user.first_name} {minder_assignment.assignee.user.last_name}",
+                            "phone": minder_assignment.assignee.phone_number
+                        }
+
+                    child_data["assigned_bus"] = {
+                        "id": bus.id,
+                        "bus_number": bus.bus_number,
+                        "number_plate": bus.number_plate,
+                        "driver": driver_info,
+                        "minder": minder_info
+                    }
+
+                children_data.append(child_data)
+
+            return Response(
+                {
+                    "success": True,
+                    "parent": {
+                        "id": user.id,
+                        "firstName": user.first_name,
+                        "lastName": user.last_name,
+                        "email": user.email,
+                    },
+                    "children": children_data,
+                    "totalChildren": len(children_data),
+                    "tokens": {
+                        "access": str(refresh.access_token),
+                        "refresh": str(refresh),
+                    },
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except JWTError as e:
+            logger.error(f"JWT verification failed: {str(e)}")
+            return Response(
+                {
+                    "error": "Invalid or expired token",
+                    "message": "Your session has expired. Please request a new magic link."
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        except requests.RequestException as e:
+            logger.error(f"Failed to fetch JWKS: {str(e)}")
+            return Response(
+                {"error": "Authentication service unavailable"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+        except Exception as e:
+            logger.exception("Unexpected error during Supabase magic link auth")
+            return Response(
+                {
+                    "error": "Authentication failed",
+                    "message": "Something went wrong. Please try again."
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 

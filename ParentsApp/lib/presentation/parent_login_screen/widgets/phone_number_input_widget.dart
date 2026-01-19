@@ -4,7 +4,9 @@ import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
 
-class PhoneNumberInputWidget extends StatelessWidget {
+/// iOS-standard phone input with 48pt minimum height
+/// Features: Focus states, validation feedback, smooth animations
+class PhoneNumberInputWidget extends StatefulWidget {
   final TextEditingController controller;
   final Function(String) onChanged;
   final String? errorText;
@@ -19,91 +21,127 @@ class PhoneNumberInputWidget extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<PhoneNumberInputWidget> createState() => _PhoneNumberInputWidgetState();
+}
+
+class _PhoneNumberInputWidgetState extends State<PhoneNumberInputWidget> {
+  bool _isFocused = false;
+
+  @override
   Widget build(BuildContext context) {
+    // Determine border color based on state
+    Color borderColor = AppTheme.dividerLight;
+    if (widget.errorText != null) {
+      borderColor = AppTheme.errorLight;
+    } else if (_isFocused) {
+      borderColor = AppTheme.primaryLight;
+    } else if (widget.isValid) {
+      borderColor = AppTheme.secondaryLight;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
+        // Input field with iOS-standard 48pt height
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
           decoration: BoxDecoration(
-            color: AppTheme.lightTheme.colorScheme.surface,
+            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: errorText != null
-                  ? AppTheme.lightTheme.colorScheme.error
-                  : isValid
-                      ? AppTheme.lightTheme.colorScheme.primary
-                      : AppTheme.lightTheme.colorScheme.outline,
-              width: errorText != null ? 2 : 1,
+              color: borderColor,
+              width: _isFocused ? 2 : 1.5,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.lightTheme.colorScheme.shadow
-                    .withValues(alpha: 0.05),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            boxShadow: _isFocused
+                ? [
+                    BoxShadow(
+                      color: AppTheme.primaryLight.withOpacity(0.1),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
           child: TextField(
-            controller: controller,
-            onChanged: onChanged,
+            controller: widget.controller,
+            onChanged: widget.onChanged,
             keyboardType: TextInputType.phone,
+            textInputAction: TextInputAction.done,
             inputFormatters: [
-              // Allow digits and plus sign for international numbers
               FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
               LengthLimitingTextInputFormatter(15),
             ],
-            style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w500,
-              letterSpacing: 1.2,
+            style: GoogleFonts.inter(
+              fontSize: 17, // iOS standard
+              fontWeight: FontWeight.w400,
+              letterSpacing: 0.5,
+              color: AppTheme.textPrimaryLight,
             ),
             decoration: InputDecoration(
-              hintText: 'Enter phone number',
-              hintStyle: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                color: AppTheme.lightTheme.colorScheme.onSurfaceVariant
-                    .withValues(alpha: 0.5),
+              hintText: '+256 700 000 000',
+              hintStyle: GoogleFonts.inter(
+                fontSize: 17,
+                fontWeight: FontWeight.w400,
+                color: AppTheme.textSecondaryLight,
               ),
               prefixIcon: Icon(
-                Icons.phone_android,
-                color: AppTheme.lightTheme.colorScheme.primary,
-                size: 5.w,
+                Icons.phone_outlined,
+                color: _isFocused
+                    ? AppTheme.primaryLight
+                    : AppTheme.textSecondaryLight,
+                size: 22,
               ),
-              suffixIcon: isValid
+              suffixIcon: widget.isValid
                   ? Icon(
                       Icons.check_circle,
-                      color: AppTheme.lightTheme.colorScheme.primary,
-                      size: 5.w,
+                      color: AppTheme.secondaryLight,
+                      size: 22,
                     )
                   : null,
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 4.w,
-                vertical: 2.h,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14, // Ensures 48pt total height
               ),
             ),
+            onTap: () => setState(() => _isFocused = true),
+            onTapOutside: (_) => setState(() => _isFocused = false),
+            onEditingComplete: () => setState(() => _isFocused = false),
           ),
         ),
-        if (errorText != null) ...[
-          SizedBox(height: 1.h),
-          Row(
-            children: [
-              Icon(
-                Icons.error_outline,
-                color: AppTheme.lightTheme.colorScheme.error,
-                size: 4.w,
-              ),
-              SizedBox(width: 2.w),
-              Expanded(
-                child: Text(
-                  errorText!,
-                  style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                    color: AppTheme.lightTheme.colorScheme.error,
+
+        // Error message with animation
+        if (widget.errorText != null)
+          Padding(
+            padding: EdgeInsets.only(top: 1.h, left: 2.w),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  color: AppTheme.errorLight,
+                  size: 16,
+                ),
+                SizedBox(width: 1.w),
+                Expanded(
+                  child: Text(
+                    widget.errorText!,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                      color: AppTheme.errorLight,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ],
       ],
     );
   }
