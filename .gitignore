@@ -86,3 +86,4 @@ deploy_to_production.sh
 deploy_prod.sh
 DriversandMinders/PERFORMANCE_OPTIMIZATIONS.md
 ParentsApp/test/parent_login_screen_test.dart
+ParentsApp/test/widget_test.dart
