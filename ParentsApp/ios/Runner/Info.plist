@@ -66,12 +66,27 @@
         <key>NSUserNotificationsUsageDescription</key>                                                          
         <string>ApoBasi sends you important updates about your child's bus trips, pickups, and drop-offs.</string>
                                                                                                                 
-        <!-- Background Modes (for location updates) -->                                                        
-        <key>UIBackgroundModes</key>                                                                            
-        <array>                                                                                                 
-                <string>location</string>                                                                       
-                <string>fetch</string>                                                                          
-                <string>remote-notification</string>                                                            
-        </array>                                        
+        <!-- Background Modes (for location updates) -->
+        <key>UIBackgroundModes</key>
+        <array>
+                <string>location</string>
+                <string>fetch</string>
+                <string>remote-notification</string>
+        </array>
+
+	<!-- Deep Linking for Magic Link Authentication -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.apobasi.parentsapp</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>apobasi</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

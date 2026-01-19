@@ -3,17 +3,26 @@ import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/app_export.dart';
 import 'widgets/custom_error_widget.dart';
 import 'services/notification_service.dart';
 import 'services/bus_websocket_service.dart';
 import 'services/parent_notifications_service.dart';
+import 'config/supabase_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   // Load .env before starting the app
   await dotenv.load();
+
+  // Initialize Supabase for magic link authentication
+  await Supabase.initialize(
+    url: SupabaseConfig.supabaseUrl,
+    anonKey: SupabaseConfig.supabasePublishableKey,
+  );
 
   runApp(MyApp());
 
