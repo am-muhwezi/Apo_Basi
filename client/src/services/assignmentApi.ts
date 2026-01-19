@@ -29,11 +29,16 @@ export async function getAssignmentHistory(id: string) {
   return axiosInstance.get(`/assignments/list/${id}/history/`);
 }
 
-export async function bulkAssignChildrenToBus(busId: number, childrenIds: number[], effectiveDate?: string) {
+export async function bulkAssignChildrenToBus(busId: number, childrenIds: number[], effectiveDateOrPayload?: any) {
+  // Accept either an effectiveDate string or a full payload object
+  if (typeof effectiveDateOrPayload === 'object' && effectiveDateOrPayload !== null) {
+    return axiosInstance.post('/assignments/list/bulk_assign_children_to_bus/', effectiveDateOrPayload);
+  }
+
   return axiosInstance.post('/assignments/list/bulk_assign_children_to_bus/', {
     busId,
     childrenIds,
-    effectiveDate
+    effectiveDate: effectiveDateOrPayload
   });
 }
 
