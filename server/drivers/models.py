@@ -14,7 +14,7 @@ class Driver(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
     license_number = models.CharField(max_length=50)
     license_expiry = models.DateField(null=True, blank=True)
-    phone_number = models.CharField(max_length=20)
+    phone_number = models.CharField(max_length=20, blank=True, null=True, unique=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     assigned_bus = models.ForeignKey(
         Bus, on_delete=models.SET_NULL, null=True, blank=True, related_name='driver_profile'

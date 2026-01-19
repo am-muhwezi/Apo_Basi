@@ -72,3 +72,16 @@ admin/MAP_TRACKING_GUIDE.md
 .venv/
 venv/
 /venv/
+apobasi---smart-school-transport-for-east-africa/.gitignore
+apobasi---smart-school-transport-for-east-africa/components/Features.tsx
+DriversandMinders/test/simple_test.dart
+DriversandMinders/test/services/api_service_test.dart
+DriversandMinders/test/validation/phone_number_validation_test.dart
+.gitignore
+COMPREHENSIVE_TESTING_GUIDE.md
+.gitignore
+DIGITAL_OCEAN_DEPLOYMENT_GUIDE.md
+deploy_staging.sh
+deploy_to_production.sh
+deploy_prod.sh
+DriversandMinders/PERFORMANCE_OPTIMIZATIONS.md
