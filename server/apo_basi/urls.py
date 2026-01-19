@@ -3,6 +3,7 @@ from django.urls import path
 from django.urls import include
 from users.views import health_check
 from rest_framework_simplejwt.views import TokenRefreshView
+from trips.views import StopDetailView, StopCompleteView, StopSkipView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -17,6 +18,10 @@ urlpatterns = [
     path("api/busminders/", include("busminders.urls")),
     path("api/admins/", include("admins.urls")),
     path("api/trips/", include("trips.urls")),
+    # Expose stop detail/actions at top-level paths for compatibility
+    path("api/stops/<int:pk>/", StopDetailView.as_view()),
+    path("api/stops/<int:pk>/complete/", StopCompleteView.as_view()),
+    path("api/stops/<int:pk>/skip/", StopSkipView.as_view()),
     path("api/assignments/", include("assignments.urls")),
     path("api/attendance/", include("attendance.urls")),
     path("api/analytics/", include("analytics.urls")),
