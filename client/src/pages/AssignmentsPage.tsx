@@ -330,6 +330,31 @@ export default function AssignmentsPage() {
       await loadAssignments();
       setShowAssignmentModal(false);
     } catch (error) {
+      // If backend reported conflicting assignments, offer to cancel and reassign
+      // @ts-ignore
+      const conflicts = error?.response?.data?.conflicts;
+      if (conflicts && conflicts.length) {
+        const confirmed = await confirm({
+          title: 'Conflicting assignments detected',
+          message: `The following conflicts were found:\n${conflicts.join('\n')}\n\nCancel conflicting assignments and proceed?`,
+          confirmText: 'Cancel and Reassign',
+          variant: 'danger'
+        });
+
+        if (confirmed) {
+          try {
+            await assignmentService.createAssignment({ ...assignmentFormData, auto_cancel_conflicting: true });
+            toast.success('Assignment created and conflicting assignments cancelled');
+            await loadAssignments();
+            setShowAssignmentModal(false);
+            return;
+          } catch (err) {
+            toast.error('Failed to force-create assignment after cancelling conflicts.');
+            return;
+          }
+        }
+      }
+
       toast.error('Failed to save assignment. Please check all fields and try again.');
     }
   }
@@ -421,6 +446,32 @@ export default function AssignmentsPage() {
       setShowBulkAssignModal(false);
       setBulkAssignData({ busId: '', childrenIds: [] });
     } catch (error) {
+      // Offer to cancel and reassign when conflicts reported by backend
+      // @ts-ignore
+      const conflicts = error?.response?.data?.conflicts;
+      if (conflicts && conflicts.length) {
+        const confirmed = await confirm({
+          title: 'Conflicting assignments detected',
+          message: `Conflicts:\n${conflicts.join('\n')}\n\nCancel conflicting assignments and continue?`,
+          confirmText: 'Cancel and Continue',
+          variant: 'danger'
+        });
+
+        if (confirmed) {
+          try {
+            await assignmentService.bulkAssignChildrenToBus(Number(bulkAssignData.busId), bulkAssignData.childrenIds, undefined, { auto_cancel_conflicting: true });
+            toast.success('Children assigned after cancelling conflicting assignments');
+            await loadAssignments();
+            setShowBulkAssignModal(false);
+            setBulkAssignData({ busId: '', childrenIds: [] });
+            return;
+          } catch (err) {
+            toast.error('Failed to assign children after cancelling conflicts.');
+            return;
+          }
+        }
+      }
+
       toast.error('Failed to assign children. Please check bus capacity and existing assignments.');
     }
   }

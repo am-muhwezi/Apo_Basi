@@ -11,7 +11,7 @@ class BusMinder(models.Model):
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
-    phone_number = models.CharField(max_length=20, blank=True)
+    phone_number = models.CharField(max_length=20, blank=True, null=True, unique=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
 
     class Meta:
@@ -19,6 +19,10 @@ class BusMinder(models.Model):
 
     def __str__(self):
         return f"BusMinder: {self.user.get_full_name() or self.user.username}"
+
+    @property
+    def id(self):
+        return self.pk
 
     def delete(self, *args, **kwargs):
         """Override delete to clean up assignments before deletion"""
@@ -34,3 +38,20 @@ class BusMinder(models.Model):
 
         # Now delete the busminder
         super().delete(*args, **kwargs)
+
+    def save(self, *args, **kwargs):
+        # Enforce cross-model phone uniqueness when saving busminder profile
+        phone = getattr(self, 'phone_number', None)
+        if phone:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            from drivers.models import Driver
+            from parents.models import Parent
+            from django.db import IntegrityError
+
+            # Exclude self when checking existing records (for updates)
+            user_pk = getattr(self, 'user_id', None)
+            if User.objects.filter(phone_number=phone).exclude(pk=user_pk).exists() or Driver.objects.filter(phone_number=phone).exclude(user_id=user_pk).exists() or Parent.objects.filter(contact_number=phone).exclude(user_id=user_pk).exists():
+                raise IntegrityError(f"Phone number '{phone}' already in use")
+
+        super().save(*args, **kwargs)

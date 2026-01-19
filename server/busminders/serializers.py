@@ -90,12 +90,20 @@ class BusMinderCreateSerializer(serializers.Serializer):
             user_type='busminder'
         )
 
-        # Create BusMinder
-        busminder = BusMinder.objects.create(
-            user=user,
-            phone_number=validated_data.get('phone'),
-            status=validated_data.get('status', 'active'),
-        )
+        # Create BusMinder, catch phone uniqueness error
+        from django.db import IntegrityError
+        try:
+            busminder = BusMinder.objects.create(
+                user=user,
+                phone_number=validated_data.get('phone'),
+                status=validated_data.get('status', 'active'),
+            )
+        except IntegrityError as e:
+            # Clean up user if busminder creation fails
+            user.delete()
+            if 'already in use' in str(e):
+                raise serializers.ValidationError({'phone': str(e)})
+            raise serializers.ValidationError({'non_field_errors': [str(e)]})
 
         return busminder
 

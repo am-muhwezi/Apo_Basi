@@ -5,7 +5,7 @@ from django.utils import timezone
 
 class Bus(models.Model):
     # Basic bus information
-    bus_number = models.CharField(max_length=20, help_text="Bus identification number")
+    bus_number = models.CharField(max_length=20, unique=True, help_text="Bus identification number")
     number_plate = models.CharField(
         max_length=20, unique=True, help_text="License plate number"
     )
@@ -73,7 +73,7 @@ class Bus(models.Model):
     )
 
     def __str__(self):
-        return self.number_plate
+        return f"Bus {self.bus_number} ({self.number_plate})"
 
     def delete(self, *args, **kwargs):
         """Override delete to clean up assignments before deletion"""
