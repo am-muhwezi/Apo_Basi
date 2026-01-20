@@ -72,23 +72,25 @@ class BusMinderCreateSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
-        # Extract user data
-        first_name = validated_data.pop('firstName')
-        last_name = validated_data.pop('lastName')
-        email = validated_data.pop('email', '') or ''
+        from django.db import IntegrityError
+        try:
+            # Extract user data
+            first_name = validated_data.pop('firstName')
+            last_name = validated_data.pop('lastName')
+            email = validated_data.pop('email', '') or ''
 
-        # Generate a unique username (required by Django)
-        import uuid
-        username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
+            # Generate a unique username (required by Django)
+            import uuid
+            username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
 
-        # Create User
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            first_name=first_name,
-            last_name=last_name,
-            user_type='busminder'
-        )
+            # Create User
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                user_type='busminder'
+            )
 
         # Create BusMinder, catch phone uniqueness error
         from django.db import IntegrityError
