@@ -22,6 +22,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     ParentViewSet,
     ParentLoginView,
+    CheckEmailView,
     SupabaseMagicLinkAuthView,
     ChildAttendanceHistoryView
 )
@@ -33,6 +34,7 @@ router.register(r'', ParentViewSet, basename='parent')
 urlpatterns = [
     # Authentication - must come before router to avoid conflicts
     path('login/', ParentLoginView.as_view(), name='parent-login'),
+    path('auth/check-email/', CheckEmailView.as_view(), name='check-email'),
     path('auth/magic-link/', SupabaseMagicLinkAuthView.as_view(), name='supabase-magic-link-auth'),
     path('children/<int:child_id>/attendance/', ChildAttendanceHistoryView.as_view(), name='child-attendance-history'),
 
