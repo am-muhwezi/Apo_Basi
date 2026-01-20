@@ -108,9 +108,9 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
 
     try {
       final email = _emailController.text.trim();
-      final success = await _authService.sendMagicLink(email);
+      final result = await _authService.sendMagicLink(email);
 
-      if (success) {
+      if (result['success']) {
         setState(() {
           _magicLinkSent = true;
           _isLoading = false;
@@ -120,13 +120,18 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Magic link sent! Check your email.'),
+            content: Text(result['message'] ?? 'Magic link sent! Check your email.'),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 3),
           ),
         );
       } else {
-        throw Exception('Failed to send magic link. Please try again.');
+        // Email not registered or other error
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _emailError = result['message'];
+          _isLoading = false;
+        });
       }
     } catch (e) {
       HapticFeedback.heavyImpact();
