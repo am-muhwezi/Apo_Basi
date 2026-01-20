@@ -11,7 +11,7 @@ class Parent(models.Model):
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
-    contact_number = models.CharField(max_length=15, blank=True)
+    contact_number = models.CharField(max_length=15, blank=True, null=True, unique=True)
     address = models.TextField(blank=True)
     emergency_contact = models.CharField(max_length=15, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')

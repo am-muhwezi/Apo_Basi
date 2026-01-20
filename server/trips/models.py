@@ -91,15 +91,15 @@ class Trip(models.Model):
 
     # Current location (for in-progress trips)
     current_latitude = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
+        max_digits=12,
+        decimal_places=8,
         null=True,
         blank=True,
         help_text="Current GPS latitude"
     )
     current_longitude = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
+        max_digits=12,
+        decimal_places=8,
         null=True,
         blank=True,
         help_text="Current GPS longitude"
@@ -159,13 +159,13 @@ class Stop(models.Model):
 
     # Location
     latitude = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
+        max_digits=12,
+        decimal_places=8,
         help_text="Stop GPS latitude"
     )
     longitude = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
+        max_digits=12,
+        decimal_places=8,
         help_text="Stop GPS longitude"
     )
 
