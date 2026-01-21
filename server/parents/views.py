@@ -368,6 +368,48 @@ class ParentLoginView(APIView):
             )
 
 
+class CheckEmailView(APIView):
+    """
+    POST /api/parents/auth/check-email/
+    Check if an email is registered in the system before sending magic link.
+
+    This prevents Supabase from sending magic links to unregistered users.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+
+        if not email:
+            return Response(
+                {"error": "email is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if parent exists with this email
+        try:
+            parent = Parent.objects.select_related('user').get(
+                user__email__iexact=email,  # Case-insensitive match
+                status='active'
+            )
+
+            return Response(
+                {
+                    "registered": True,
+                    "message": "Email is registered"
+                },
+                status=status.HTTP_200_OK
+            )
+        except Parent.DoesNotExist:
+            return Response(
+                {
+                    "registered": False,
+                    "message": "This email is not registered. Please contact your school administrator to set up your account."
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
 class SupabaseMagicLinkAuthView(APIView):
     """
     POST /api/parents/auth/magic-link/

@@ -28,18 +28,55 @@ class AuthService {
 
   /// Send magic link to email
   ///
+  /// First checks if email is registered in Django backend,
+  /// then sends magic link via Supabase.
+  ///
   /// Returns:
-  /// - true if email sent successfully
-  /// - false if error occurred
-  Future<bool> sendMagicLink(String email) async {
+  /// - Map with 'success' and 'message' keys
+  Future<Map<String, dynamic>> sendMagicLink(String email) async {
     try {
+      // Step 1: Check if email is registered in Django
+      final checkResponse = await _dio.post(
+        '/api/parents/auth/check-email/',
+        data: {'email': email},
+      );
+
+      if (checkResponse.statusCode != 200) {
+        // Email not registered
+        return {
+          'success': false,
+          'message': checkResponse.data['message'] ??
+              'This email is not registered. Please contact your school administrator.',
+        };
+      }
+
+      // Step 2: Email is registered, send magic link via Supabase
       await _supabase.auth.signInWithOtp(
         email: email,
         emailRedirectTo: SupabaseConfig.redirectUrl,
       );
-      return true;
+
+      return {
+        'success': true,
+        'message': 'Magic link sent to your email',
+      };
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return {
+          'success': false,
+          'message': e.response?.data['message'] ??
+              'This email is not registered. Please contact your school administrator.',
+        };
+      }
+      return {
+        'success': false,
+        'message': 'Connection error. Please check your internet connection.',
+      };
     } catch (e) {
-      return false;
+      return {
+        'success': false,
+        'message': 'Failed to send magic link. Please try again.',
+      };
     }
   }
 
@@ -55,24 +92,42 @@ class AuthService {
   Stream<AuthResult> listenForAuthCallback() {
     final controller = StreamController<AuthResult>();
 
-    _authSubscription = _supabase.auth.onAuthStateChange.listen((authState) async {
-      final session = authState.session;
+    _authSubscription = _supabase.auth.onAuthStateChange.listen(
+      (authState) async {
+        final session = authState.session;
 
-      if (session != null) {
-        // User authenticated via magic link - exchange for Django tokens
-        final accessToken = session.accessToken;
+        if (session != null) {
+          // User authenticated via magic link - exchange for Django tokens
+          final accessToken = session.accessToken;
 
-        try {
-          final result = await _exchangeTokenForDjangoAuth(accessToken);
-          controller.add(result);
-        } catch (e) {
-          controller.add(AuthResult(
-            success: false,
-            error: 'Failed to complete authentication: ${e.toString()}',
-          ));
+          try {
+            final result = await _exchangeTokenForDjangoAuth(accessToken);
+            controller.add(result);
+          } catch (e) {
+            controller.add(AuthResult(
+              success: false,
+              error: 'Failed to complete authentication: ${e.toString()}',
+            ));
+          }
         }
-      }
-    });
+      },
+      onError: (error) {
+        // Handle Supabase auth errors (expired links, invalid tokens, etc.)
+        String errorMessage = 'Authentication failed';
+
+        if (error.toString().contains('otp_expired') ||
+            error.toString().contains('expired')) {
+          errorMessage = 'Magic link has expired. Please request a new one.';
+        } else if (error.toString().contains('invalid')) {
+          errorMessage = 'Invalid magic link. Please request a new one.';
+        }
+
+        controller.add(AuthResult(
+          success: false,
+          error: errorMessage,
+        ));
+      },
+    );
 
     return controller.stream;
   }
