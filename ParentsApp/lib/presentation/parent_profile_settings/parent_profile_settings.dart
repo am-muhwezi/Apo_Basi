@@ -6,6 +6,7 @@ import 'package:geocoding/geocoding.dart';
 import '../../core/app_export.dart';
 import '../../theme/app_theme.dart';
 import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
 import '../../models/child_model.dart';
 import '../../models/parent_model.dart';
 import './widgets/child_information_widget.dart';
@@ -773,10 +774,28 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
+              onPressed: () async {
+                // Save navigator reference before async operations
+                final navigator = Navigator.of(context);
+
+                // Close the logout dialog first
+                navigator.pop();
+
+                // Show loading indicator
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (buildContext) => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+
+                // Clear all authentication data
+                await AuthService().signOut();
+
+                // Close loading dialog and navigate using saved navigator
+                navigator.pop(); // Close loading
+                navigator.pushNamedAndRemoveUntil(
                   '/parent-login-screen',
                   (route) => false,
                 );
