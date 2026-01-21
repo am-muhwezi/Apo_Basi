@@ -365,7 +365,7 @@ export default function HomePage() {
                     </div>
                     <div>
                       <p className="text-gray-500 text-sm dark:text-gray-400">Serving schools in</p>
-                      <p className="text-gray-900 font-medium dark:text-white">Uganda, Kenya & East Africa</p>
+                      <p className="text-gray-900 font-medium dark:text-white">East Africa</p>
                     </div>
                   </div>
                 </div>
