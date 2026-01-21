@@ -104,7 +104,7 @@ export default function HomePage() {
                 </h1>
                 <p className="text-lg text-gray-700 dark:text-gray-300 leading-relaxed mb-8 max-w-xl">
                   ApoBasi helps schools, parents, drivers and bus minders track every child's
-                  journey in real time — built for low-network environments in Uganda, Kenya,
+                  journey in real time — built for low-network environments in Africa,
                   and across the continent.
                 </p>
 
