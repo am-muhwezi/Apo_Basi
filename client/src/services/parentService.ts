@@ -10,6 +10,7 @@ function getErrorMessage(error: unknown): string {
   if (error instanceof AxiosError) {
     if (error.response?.data) {
       const data = error.response.data;
+      // Try to extract specific error message
       if (data.detail) return data.detail;
       if (typeof data === 'object') {
         const firstError = Object.values(data)[0];
@@ -19,6 +20,10 @@ function getErrorMessage(error: unknown): string {
       }
       if (data.error) return data.error;
       if (data.message) return data.message;
+      // For 500 errors, try to extract message from string response
+      if (error.response?.status >= 500 && typeof data === 'string') {
+        return data || 'Server error. Please try again later.';
+      }
     }
     if (error.response?.status === 404) return 'Resource not found';
     if (error.response?.status === 403) return 'Permission denied';
