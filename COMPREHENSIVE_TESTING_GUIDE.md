@@ -1,3 +1,49 @@
+
+# ApoBasi Comprehensive Testing Guide
+
+**Quick Reference: How to Run All Tests**
+
+---
+
+## Flutter Apps (ParentsApp, DriversandMinders)
+```bash
+# ParentsApp
+cd Apo_Basi/ParentsApp
+flutter pub get
+flutter test
+
+# DriversandMinders
+cd Apo_Basi/DriversandMinders
+flutter pub get
+flutter test
+```
+
+## Django Backend
+```bash
+cd Apo_Basi/server
+pip install -r ../requirements.txt
+python manage.py test
+# Or, for coverage:
+pip install coverage
+coverage run --source='.' manage.py test
+coverage report
+```
+
+## React/Vite Admin Dashboard
+```bash
+cd Apo_Basi/client
+npm install
+npm run lint
+npm run typecheck
+# (No automated tests yet; add with Vitest/Jest if needed)
+```
+
+---
+
+For troubleshooting, coverage, and advanced usage, see the detailed sections below.
+
+---
+
 # Comprehensive Testing Guide - ApoBasi Platform
 
 <div align="center">
