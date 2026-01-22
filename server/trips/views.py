@@ -74,6 +74,10 @@ class TripStartView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
+        # Block parents from starting trips
+        if request.user.user_type == 'parent':
+            return Response({"error": "Parents cannot start trips."}, status=status.HTTP_403_FORBIDDEN)
+
         trip = get_object_or_404(Trip, pk=pk)
 
         if trip.status != 'scheduled':
@@ -91,7 +95,7 @@ class TripStartView(APIView):
         # the status transition into 'in-progress'. This keeps notification
         # logic in one place and uses bus assignments so all subscribed
         # parents for this bus are notified.
-        print(f"✅ Trip started: {trip.id} for bus {trip.bus.bus_number}")
+        print(f"\u2705 Trip started: {trip.id} for bus {trip.bus.bus_number}")
 
         serializer = TripSerializer(trip)
         return Response(serializer.data)

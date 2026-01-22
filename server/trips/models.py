@@ -1,4 +1,6 @@
 from django.db import models
+from django.core.exceptions import ValidationError
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from buses.models import Bus
 from drivers.models import Driver
@@ -6,6 +8,38 @@ from busminders.models import BusMinder
 from children.models import Child
 
 User = get_user_model()
+
+
+class TripManager(models.Manager):
+    def start_trip(self, trip_id):
+        trip = self.get(pk=trip_id)
+        if not trip.driver:
+            raise ValidationError('Trip must have a driver to start')
+        if trip.children.count() == 0:
+            raise ValidationError('Trip must have at least one child to start')
+        if trip.status != 'scheduled':
+            raise ValidationError('Trip must be scheduled to start')
+        trip.status = 'in-progress'
+        trip.start_time = timezone.now()
+        trip.save()
+        return trip
+
+    def complete_trip(self, trip_id):
+        trip = self.get(pk=trip_id)
+        if trip.status != 'in-progress':
+            raise ValidationError('Trip must be in-progress to be completed')
+        trip.status = 'completed'
+        trip.end_time = timezone.now()
+        if hasattr(trip, 'total_students'):
+            trip.total_students = trip.children.count()
+        trip.save()
+        return trip
+
+    def cancel_trip(self, trip_id):
+        trip = self.get(pk=trip_id)
+        trip.status = 'cancelled'
+        trip.save()
+        return trip
 
 
 class Trip(models.Model):
@@ -57,15 +91,15 @@ class Trip(models.Model):
 
     # Current location (for in-progress trips)
     current_latitude = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
+        max_digits=12,
+        decimal_places=8,
         null=True,
         blank=True,
         help_text="Current GPS latitude"
     )
     current_longitude = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
+        max_digits=12,
+        decimal_places=8,
         null=True,
         blank=True,
         help_text="Current GPS longitude"
@@ -93,6 +127,8 @@ class Trip(models.Model):
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = TripManager()
 
     def __str__(self):
         return f"{self.route} - {self.get_trip_type_display()} ({self.get_status_display()})"
@@ -123,13 +159,13 @@ class Stop(models.Model):
 
     # Location
     latitude = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
+        max_digits=12,
+        decimal_places=8,
         help_text="Stop GPS latitude"
     )
     longitude = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
+        max_digits=12,
+        decimal_places=8,
         help_text="Stop GPS longitude"
     )
 
