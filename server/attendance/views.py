@@ -242,6 +242,12 @@ def mark_attendance(request):
     notes = request.data.get('notes', '')
     trip_type = request.data.get('trip_type')
 
+
+    # Block parents from marking attendance
+    user = request.user
+    if user.user_type == 'parent':
+        return Response({"error": "Parents cannot mark attendance."}, status=status.HTTP_403_FORBIDDEN)
+
     # Validate required fields
     if not child_id or not new_status:
         return Response(
@@ -266,71 +272,39 @@ def mark_attendance(request):
             status=status.HTTP_404_NOT_FOUND
         )
 
-    # Verify the user has permission to mark attendance for this child's bus
-    user = request.user
+    # Permission logic
     has_permission = False
-
-    print(f"🔍 Permission check for user: {user.username} (type: {user.user_type})")
-    print(f"🔍 Child: {child.first_name} {child.last_name}, assigned_bus: {child.assigned_bus}")
-
     if user.user_type == 'driver':
         try:
             driver = Driver.objects.get(user=user)
-            print(f"🔍 Driver assigned_bus: {driver.assigned_bus}")
             has_permission = child.assigned_bus and driver.assigned_bus == child.assigned_bus
-            print(f"🔍 Driver has_permission: {has_permission}")
         except Driver.DoesNotExist:
-            print(f"❌ Driver profile not found for user {user.username}")
             has_permission = False
     elif user.user_type == 'busminder':
         try:
             busminder = BusMinder.objects.get(user=user)
-            print(f"🔍 BusMinder found: {busminder}")
-            # Get busminder's assigned bus through Assignment model
             from assignments.models import Assignment
-
-            # Get active bus assignment for this bus minder
-            busminder_bus_assignment = Assignment.get_active_assignments_for(
-                busminder,
-                'minder_to_bus'
-            ).first()
-
-            # Get child's bus assignment through Assignment model (NOT child.assigned_bus)
-            child_bus_assignment = Assignment.get_active_assignments_for(
-                child,
-                'child_to_bus'
-            ).first()
-
-            print(f"🔍 BusMinder bus assignment: {busminder_bus_assignment}")
-            print(f"🔍 Child bus assignment: {child_bus_assignment}")
-
-            if busminder_bus_assignment:
-                print(f"🔍 BusMinder assigned to bus: {busminder_bus_assignment.assigned_to} (ID: {busminder_bus_assignment.assigned_to.id})")
-            if child_bus_assignment:
-                print(f"🔍 Child assigned to bus: {child_bus_assignment.assigned_to} (ID: {child_bus_assignment.assigned_to.id})")
-
-            # Check if both have assignments and they match
-            if busminder_bus_assignment and child_bus_assignment:
-                # Compare the bus IDs
-                has_permission = busminder_bus_assignment.assigned_to.id == child_bus_assignment.assigned_to.id
-                print(f"🔍 BusMinder has_permission: {has_permission}")
+            busminder_bus_assignment = Assignment.get_active_assignments_for(busminder, 'minder_to_bus').first()
+            child_bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
+            # Must be assigned to same bus
+            if busminder_bus_assignment and child_bus_assignment and busminder_bus_assignment.assigned_to.id == child_bus_assignment.assigned_to.id:
+                # Only allow marking for the current trip type (pickup/dropoff)
+                # If trip_type is not provided, infer from status
+                allowed_trip_type = trip_type if trip_type in ['pickup', 'dropoff'] else ('dropoff' if new_status == 'dropped_off' else 'pickup')
+                # Optionally, check if the trip_type matches the current trip for the bus (not implemented here, but can be added)
+                has_permission = True
+                # Prevent marking pickup for dropoff trip and vice versa
+                if allowed_trip_type != child_bus_assignment.assigned_to.current_trip_type:
+                    return Response({"error": "Bus minder can only mark attendance for the current trip type (pickup or dropoff) assigned to the bus."}, status=status.HTTP_403_FORBIDDEN)
             else:
-                print(f"❌ Missing assignments: busminder={busminder_bus_assignment}, child={child_bus_assignment}")
                 has_permission = False
         except BusMinder.DoesNotExist:
-            print(f"❌ BusMinder profile not found for user {user.username}")
             has_permission = False
-        except Exception as e:
-            print(f"❌ Error checking busminder permission: {e}")
-            import traceback
-            traceback.print_exc()
+        except Exception:
             has_permission = False
-
-    print(f"🔍 Final has_permission: {has_permission}")
-
     if not has_permission:
         return Response(
-            {"error": "You can only mark attendance for children on your assigned bus"},
+            {"error": "You can only mark attendance for children on your assigned bus."},
             status=status.HTTP_403_FORBIDDEN
         )
 

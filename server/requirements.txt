@@ -24,6 +24,7 @@ django-redis==6.0.0
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
 drf-yasg==1.21.11
+factory-boy==3.3.3
 fastapi==0.109.0
 h11==0.16.0
 httptools==0.7.1

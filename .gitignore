@@ -72,3 +72,12 @@ admin/MAP_TRACKING_GUIDE.md
 .venv/
 venv/
 /venv/
+landing/Dockerfile
+DriversandMinders/PERFORMANCE_OPTIMIZATIONS.md
+.github/copilot-instructions.md
+.gitignore
+apobasi---smart-school-transport-for-east-africa/components/Features.tsx
+deploy_prod.sh
+deploy_staging.sh
+deploy_to_production.sh
+DIGITAL_OCEAN_DEPLOYMENT_GUIDE.md

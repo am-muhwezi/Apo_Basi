@@ -171,6 +171,18 @@ export default function ParentsPage() {
         setFormError(result.error?.message || 'Failed to update parent');
       }
     } else {
+      // Cross-role uniqueness check
+      const checkResult = await parentService.checkPhoneOrEmailExists(formData.phone, formData.email);
+      if (checkResult.exists) {
+        setFormError(
+          checkResult.role === 'driver'
+            ? 'This phone/email is already registered as a Driver.'
+            : checkResult.role === 'minder'
+            ? 'This phone/email is already registered as a Bus Minder.'
+            : 'This phone/email is already registered.'
+        );
+        return;
+      }
       const result = await parentService.createParent(formData);
       if (result.success) {
         toast.success('Parent created successfully');

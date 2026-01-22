@@ -33,7 +33,7 @@ def trip_status_changed(sender, instance, created, **kwargs):
     previous_status = getattr(trip, '_previous_status', None)
     current_status = trip.status
 
-    # Get all children assigned to this trip's bus
+    # Collect children related to this trip or assigned to the trip's bus.
     from children.models import Child
     from assignments.models import Assignment
     from django.contrib.contenttypes.models import ContentType
@@ -42,16 +42,27 @@ def trip_status_changed(sender, instance, created, **kwargs):
         bus_content_type = ContentType.objects.get_for_model(trip.bus)
         child_content_type = ContentType.objects.get(app_label='children', model='child')
 
-        # Get children assigned to this bus
+        # Children explicitly added to the trip
+        trip_children_qs = trip.children.filter(parent__isnull=False)
+
+        # Children assigned via Assignment records to this bus
         child_assignments = Assignment.objects.filter(
             assigned_to_content_type=bus_content_type,
             assigned_to_object_id=trip.bus.id,
             assignee_content_type=child_content_type,
             status='active'
         )
+        assignment_child_ids = [assignment.assignee_object_id for assignment in child_assignments]
 
-        child_ids = [assignment.assignee_object_id for assignment in child_assignments]
-        children = Child.objects.filter(id__in=child_ids, parent__isnull=False)
+        # Children with legacy FK assigned_bus
+        fk_children_qs = Child.objects.filter(assigned_bus=trip.bus, parent__isnull=False).values_list('id', flat=True)
+
+        # Union of IDs from trip children, assignment children, and FK children
+        ids = set(trip_children_qs.values_list('id', flat=True))
+        ids.update(assignment_child_ids)
+        ids.update(list(fk_children_qs))
+
+        children = Child.objects.filter(id__in=list(ids), parent__isnull=False)
 
         # Trip started: transition into 'in-progress'
         if current_status == 'in-progress' and previous_status != 'in-progress':

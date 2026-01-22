@@ -31,5 +31,6 @@ export function validateConfig(): void {
   }
 
   if (config.enableDebugLogs) {
+    console.log('Environment configuration:', config);
   }
 }

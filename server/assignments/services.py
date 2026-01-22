@@ -74,6 +74,8 @@ class AssignmentService:
         )
 
         if conflicts:
+            # Do not auto-cancel conflicting assignments by default.
+            # The caller may explicitly request `auto_cancel_conflicting=True` to force cancellation.
             if auto_cancel_conflicting:
                 # Cancel conflicting assignments
                 for conflict in conflicts:
@@ -82,13 +84,38 @@ class AssignmentService:
                         reason=f"Cancelled due to new assignment created on {timezone.now().date()}"
                     )
             else:
-                # Raise error with conflict details
+                # Raise error with conflict details so higher-level code (or frontend) can decide
                 conflict_details = [
                     f"Assignment #{c.id}: {c.assignee} → {c.assigned_to} ({c.effective_date} to {c.expiry_date or 'permanent'})"
                     for c in conflicts
                 ]
                 raise ValidationError({
-                    'conflicts': f"Conflicting assignments found: {'; '.join(conflict_details)}"
+                    'conflicts': conflict_details
+                })
+
+        # Pre-insert validations
+        # Enforce bus capacity for single child_to_bus assignments at service layer
+        if assignment_type == 'child_to_bus':
+            # Count unique children already assigned to this bus via Assignment records
+            # and via the legacy `Child.assigned_bus` FK so capacity checks are accurate.
+            try:
+                assigned_via_assignments = list(Assignment.get_assignments_to(assigned_to, 'child_to_bus').values_list('assignee_object_id', flat=True))
+            except Exception:
+                assigned_via_assignments = []
+
+            assigned_via_fk = list(Child.objects.filter(assigned_bus=assigned_to).values_list('id', flat=True))
+            current_assigned_ids = set(assigned_via_assignments + assigned_via_fk)
+            current_assignments = len(current_assigned_ids)
+
+            # If the assignee is already assigned to this bus, adding it should not increase count
+            attempt_add = 0 if getattr(assignee, 'pk', None) in current_assigned_ids else 1
+
+            if current_assignments + attempt_add > getattr(assigned_to, 'capacity', 0):
+                raise ValidationError({
+                    'capacity': (
+                        f'Bus capacity ({getattr(assigned_to, "capacity", 0)}) exceeded. '
+                        f'Current: {current_assignments}, Attempting to add: {attempt_add}'
+                    )
                 })
 
         # Create assignment
@@ -171,7 +198,7 @@ class AssignmentService:
         return conflicts
 
     @staticmethod
-    def bulk_assign_children_to_bus(bus, children_ids, assigned_by=None, effective_date=None):
+    def bulk_assign_children_to_bus(bus, children_ids, assigned_by=None, effective_date=None, auto_cancel_conflicting=False):
         """
         Bulk assign multiple children to a bus with capacity validation.
 
@@ -225,12 +252,22 @@ class AssignmentService:
             })
 
         # Check capacity
-        current_assignments = Assignment.get_assignments_to(bus, 'child_to_bus').count()
-        total_after_assignment = current_assignments + len(children)
+        # Count unique children already assigned to this bus via Assignment records
+        # and via the legacy `Child.assigned_bus` FK so capacity checks are accurate.
+        assigned_via_assignments = list(Assignment.get_assignments_to(bus, 'child_to_bus').values_list('assignee_object_id', flat=True))
+        assigned_via_fk = list(Child.objects.filter(assigned_bus=bus).values_list('id', flat=True))
+        current_assigned_ids = set(assigned_via_assignments + assigned_via_fk)
 
-        if total_after_assignment > bus.capacity:
+        # Determine unique children that would be assigned after this operation
+        requested_ids_set = set(children_ids)
+        final_assigned_ids = current_assigned_ids.union(requested_ids_set)
+        current_assignments = len(current_assigned_ids)
+        total_after_assignment = len(final_assigned_ids)
+
+        # Only raise if final unique assignments exceed capacity
+        if total_after_assignment > getattr(bus, 'capacity', 0):
             raise ValidationError({
-                'capacity': f'Bus capacity ({bus.capacity}) exceeded. Current: {current_assignments}, Attempting to add: {len(children)}'
+                'capacity': f'Bus capacity ({getattr(bus, "capacity", 0)}) exceeded. Current: {current_assignments}, Attempting to add: {len(requested_ids_set - current_assigned_ids)}'
             })
 
         # Create assignments
@@ -244,7 +281,7 @@ class AssignmentService:
                     assigned_by=assigned_by,
                     effective_date=effective_date,
                     reason=f"Bulk assignment to bus {bus.bus_number}",
-                    auto_cancel_conflicting=True
+                    auto_cancel_conflicting=auto_cancel_conflicting
                 )
                 assignments.append(assignment)
 

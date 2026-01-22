@@ -66,9 +66,13 @@ class AssignmentService {
     }
   }
 
-  async bulkAssignChildrenToBus(busId: number, childrenIds: number[], effectiveDate?: string): Promise<any> {
+  async bulkAssignChildrenToBus(busId: number, childrenIds: number[], effectiveDate?: string, options?: Record<string, any>): Promise<any> {
     try {
-      const response = await assignmentApi.bulkAssignChildrenToBus(busId, childrenIds, effectiveDate);
+      const payload: any = { busId, childrenIds };
+      if (effectiveDate) payload.effectiveDate = effectiveDate;
+      if (options) Object.assign(payload, options);
+
+      const response = await assignmentApi.bulkAssignChildrenToBus(busId, childrenIds, payload.effectiveDate);
       return response.data;
     } catch (error) {
       throw error;

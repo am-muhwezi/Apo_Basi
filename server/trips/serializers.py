@@ -8,8 +8,9 @@ User = get_user_model()
 
 class StopSerializer(serializers.ModelSerializer):
     """Serializer for Stop model - uses camelCase for frontend"""
+    # use 'children.all' so the serializer receives a QuerySet (iterable), not the manager
     childrenIds = serializers.PrimaryKeyRelatedField(
-        source='children',
+        source='children.all',
         many=True,
         read_only=True
     )
@@ -35,14 +36,15 @@ class StopCreateSerializer(serializers.ModelSerializer):
         child=serializers.IntegerField(),
         source='children',
         required=False,
-        allow_empty=True
+        allow_empty=True,
+        write_only=True
     )
     scheduledTime = serializers.DateTimeField(source='scheduled_time')
     actualTime = serializers.DateTimeField(source='actual_time', allow_null=True, required=False)
 
     class Meta:
         model = Stop
-        fields = ['address', 'latitude', 'longitude', 'childrenIds', 'scheduledTime', 'actualTime', 'status', 'order']
+        fields = ['id', 'address', 'latitude', 'longitude', 'childrenIds', 'scheduledTime', 'actualTime', 'status', 'order']
 
     def create(self, validated_data):
         children_ids = validated_data.pop('children', [])
@@ -75,8 +77,9 @@ class TripSerializer(serializers.ModelSerializer):
     endTime = serializers.DateTimeField(source='end_time', allow_null=True, required=False)
     currentLocation = serializers.SerializerMethodField()
     stops = StopSerializer(many=True, read_only=True)
+    # expose children IDs as list of PKs; use `.all` to get a QuerySet
     childrenIds = serializers.PrimaryKeyRelatedField(
-        source='children',
+        source='children.all',
         many=True,
         read_only=True
     )

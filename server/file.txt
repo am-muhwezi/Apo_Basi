@@ -1,0 +1,224 @@
+Found 19 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: channels, corsheaders, django_extensions, messages, rest_framework, rest_framework_simplejwt, staticfiles
+  Apply all migrations: admin, admins, assignments, attendance, auth, buses, busminders, children, contenttypes, drivers, notifications, parents, sessions, token_blacklist, trips, users
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying users.0001_initial... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying users.0002_alter_user_user_type... OK
+  ```plaintext
+  Found 19 test(s).
+  Operations to perform:
+    Synchronize unmigrated apps: channels, corsheaders, django_extensions, messages, rest_framework, rest_framework_simplejwt, staticfiles
+    Apply all migrations: admin, admins, assignments, attendance, auth, buses, busminders, children, contenttypes, drivers, notifications, parents, sessions, token_blacklist, trips, users
+  Synchronizing apps without migrations:
+    Creating tables...
+      Running deferred SQL...
+  Running migrations:
+    Applying contenttypes.0001_initial... OK
+    Applying contenttypes.0002_remove_content_type_name... OK
+    Applying auth.0001_initial... OK
+    Applying auth.0002_alter_permission_name_max_length... OK
+    Applying auth.0003_alter_user_email_max_length... OK
+    Applying auth.0004_alter_user_username_opts... OK
+    Applying auth.0005_alter_user_last_login_null... OK
+    Applying auth.0006_require_contenttypes_0002... OK
+    Applying auth.0007_alter_validators_add_error_messages... OK
+    Applying auth.0008_alter_user_username_max_length... OK
+    Applying auth.0009_alter_user_last_name_max_length... OK
+    Applying auth.0010_alter_group_name_max_length... OK
+    Applying auth.0011_update_proxy_permissions... OK
+    Applying auth.0012_alter_user_first_name_max_length... OK
+    Applying users.0001_initial... OK
+    Applying admin.0001_initial... OK
+    Applying admin.0002_logentry_remove_auto_add... OK
+    Applying admin.0003_logentry_add_action_flag_choices... OK
+    Applying users.0002_alter_user_user_type... OK
+    Applying admins.0001_initial... OK
+    Applying admins.0002_alter_admin_options... OK
+    Applying buses.0001_initial... OK
+    Applying buses.0002_alter_bus_options_bus_driver_bus_heading_and_more... OK
+    Applying drivers.0001_initial... OK
+    Applying drivers.0002_driver_license_expiry_driver_status... OK
+    Applying busminders.0001_initial... OK
+    Applying busminders.0002_busminder_phone_number_busminder_status... OK
+    Applying buses.0003_bus_bus_minder... OK
+    Applying buses.0004_bus_capacity... OK
+    Applying buses.0005_bus_bus_number_bus_last_maintenance_bus_model_and_more... OK
+    Applying buses.0006_alter_bus_bus_number... OK
+    Applying assignments.0001_initial... OK
+    Applying parents.0001_initial... OK
+    Applying parents.0002_parent_address_parent_contact_number_and_more... OK
+    Applying parents.0003_parent_status... OK
+    Applying children.0001_initial... OK
+    Applying children.0002_child_age_child_status_alter_child_parent... OK
+    Applying children.0003_alter_child_options_alter_child_status... OK
+    Applying children.0004_child_address_child_emergency_contact_and_more... OK
+    Applying children.0005_make_parent_nullable... OK
+    Applying attendance.0001_initial... OK
+    Applying attendance.0002_alter_attendance_status... OK
+    Applying attendance.0003_attendance_trip_type... OK
+    Applying attendance.0004_backfill_trip_type... OK
+    Applying attendance.0005_allow_separate_pickup_dropoff_attendance... OK
+    Applying attendance.0006_alter_attendance_trip_type... OK
+    Applying trips.0001_initial... OK
+    Applying trips.0002_trip_students_absent_trip_students_completed_and_more... OK
+    Applying buses.0007_alter_bus_options... OK
+    Applying buses.0008_buslocationhistory... OK
+    Applying buses.0009_alter_bus_latitude_alter_bus_longitude_and_more... OK
+    Applying busminders.0003_alter_busminder_options... OK
+    Applying drivers.0003_alter_driver_options... OK
+    Applying notifications.0001_initial... OK
+    Applying sessions.0001_initial... OK
+    Applying token_blacklist.0001_initial... OK
+    Applying token_blacklist.0002_outstandingtoken_jti_hex... OK
+    Applying token_blacklist.0003_auto_20171017_2007... OK
+    Applying token_blacklist.0004_auto_20171017_2013... OK
+    Applying token_blacklist.0005_remove_outstandingtoken_jti... OK
+    Applying token_blacklist.0006_auto_20171017_2113... OK
+    Applying token_blacklist.0007_auto_20171017_2214... OK
+    Applying token_blacklist.0008_migrate_to_bigautofield... OK
+    Applying token_blacklist.0010_fix_migrate_to_bigautofield... OK
+    Applying token_blacklist.0011_linearizes_history... OK
+    Applying token_blacklist.0012_alter_outstandingtoken_user... OK
+    Applying token_blacklist.0013_alter_blacklistedtoken_options_and_more... OK
+    Applying users.0003_alter_user_phone_number... OK
+  System check identified no issues (0 silenced).
+  ✅ Sent pickup notification for Alice to parent 4
+  ✅ Sent pickup notification for Alice to parent 4
+  🚀 Trip started - sending notifications to 0 parents
+  🚀 Trip started - sending notifications to 0 parents
+  🏁 Trip completed - sending notifications to 0 parents
+  🚀 Trip started - sending notifications to 0 parents
+
+  Should raise ValidationError when some children don't exist ... ok
+  test_bus_utilization_empty_bus (tests.test_assignments.BusUtilizationTests.test_bus_utilization_empty_bus)
+  Should handle empty bus correctly ... ok
+  test_bus_utilization_sorted_by_percentage (tests.test_assignments.BusUtilizationTests.test_bus_utilization_sorted_by_percentage)
+  Should return buses sorted by utilization percentage (descending) ... ok
+  test_bus_utilization_statistics (tests.test_assignments.BusUtilizationTests.test_bus_utilization_statistics)
+  Should calculate correct bus utilization statistics ... ok
+  test_bus_can_have_only_one_active_driver (tests.test_assignments.SingleAssignmentRuleTests.test_bus_can_have_only_one_active_driver)
+  Bus should have only one active driver at a time ... ok
+  test_driver_single_bus_assignment_model_level (tests.test_assignments.SingleAssignmentRuleTests.test_driver_single_bus_assignment_model_leve
+  l)                                                                                                                                          Model should auto-expire old driver assignment when new one created ... ok
+  test_minder_single_bus_assignment_model_level (tests.test_assignments.SingleAssignmentRuleTests.test_minder_single_bus_assignment_model_leve
+  l)                                                                                                                                          Model should auto-expire old minder assignment when new one created ... ok
+  test_assistant_can_mark_attendance (tests.test_attendance.AttendanceTests.test_assistant_can_mark_attendance) ... ✅ Sent pickup notificatio
+  n for Alice to parent 4                                                                                                                     ok
+  test_attendance_unique_together (tests.test_attendance.AttendanceTests.test_attendance_unique_together) ... ✅ Sent pickup notification for 
+  Alice to parent 4                                                                                                                           ok
+  test_attendance_default_status_pending (tests.test_attendance_during_trip.AttendanceDuringTripTests.test_attendance_default_status_pending) 
+  ... ok                                                                                                                                      test_attendance_for_unassigned_child_still_allowed (tests.test_attendance_during_trip.AttendanceDuringTripTests.test_attendance_for_unassign
+  ed_child_still_allowed) ... ok                                                                                                              test_attendance_str_contains_child (tests.test_attendance_during_trip.AttendanceDuringTripTests.test_attendance_str_contains_child) ... ok
+  test_attendance_timestamp_updated (tests.test_attendance_during_trip.AttendanceDuringTripTests.test_attendance_timestamp_updated) ... ok
+  test_attendance_unique_together_property (tests.test_attendance_during_trip.AttendanceDuringTripTests.test_attendance_unique_together_proper
+  ty) ... ok                                                                                                                                  test_duplicate_attendance_for_same_day_rejected (tests.test_attendance_during_trip.AttendanceDuringTripTests.test_duplicate_attendance_for_s
+  ame_day_rejected) ... ok                                                                                                                    test_mark_absent_allowed (tests.test_attendance_during_trip.AttendanceDuringTripTests.test_mark_absent_allowed) ... ok
+  test_mark_dropoff_allowed (tests.test_attendance_during_trip.AttendanceDuringTripTests.test_mark_dropoff_allowed) ... ok
+  test_mark_pickup_by_minder (tests.test_attendance_during_trip.AttendanceDuringTripTests.test_mark_pickup_by_minder) ... ok
+  test_multiple_minders_marking_allowed (tests.test_attendance_during_trip.AttendanceDuringTripTests.test_multiple_minders_marking_allowed) ..
+  . ok                                                                                                                                        test_bus_capacity_enforced_by_business_rule (tests.test_buses.BusTests.test_bus_capacity_enforced_by_business_rule) ... ok
+  test_bus_has_driver_and_busminder_and_trip_route (tests.test_buses.BusTests.test_bus_has_driver_and_busminder_and_trip_route) ... ok
+  test_cannot_assign_bus_more_than_capacity_children (tests.test_buses.BusTests.test_cannot_assign_bus_more_than_capacity_children) ... ok
+  test_bus_can_have_only_one_busminder_at_time (tests.test_busminders_comprehensive.BusMinderBusAssignmentTests.test_bus_can_have_only_one_bus
+  minder_at_time)                                                                                                                             Bus should only have one busminder at a time ... ok
+  test_busminder_can_be_assigned_to_bus_via_assignment_system (tests.test_busminders_comprehensive.BusMinderBusAssignmentTests.test_busminder_
+  can_be_assigned_to_bus_via_assignment_system)                                                                                               Should allow busminder assignment to bus through assignment system ... ok
+  test_busminder_can_only_be_assigned_to_one_bus_at_time (tests.test_busminders_comprehensive.BusMinderBusAssignmentTests.test_busminder_can_o
+  nly_be_assigned_to_one_bus_at_time)                                                                                                         BusMinder should only be assigned to one bus at a time ... ok
+  test_busminder_reassignment_via_assignment_system (tests.test_busminders_comprehensive.BusMinderBusAssignmentTests.test_busminder_reassignme
+  nt_via_assignment_system)                                                                                                                   Should handle busminder reassignment correctly ... ERROR
+  test_busminder_user_must_have_busminder_type (tests.test_busminders_comprehensive.BusMinderCreationTests.test_busminder_user_must_have_busmi
+  nder_type)                                                                                                                                  Should validate that busminder's user has busminder user_type ... ok
+  test_busminder_without_user_fails (tests.test_busminders_comprehensive.BusMinderCreationTests.test_busminder_without_user_fails)
+  Should not allow busminder creation without a user ... ok
+  test_create_busminder_using_factory (tests.test_busminders_comprehensive.BusMinderCreationTests.test_create_busminder_using_factory)
+  Should create busminder using factory pattern ... ok
+  test_create_busminder_with_valid_data (tests.test_busminders_comprehensive.BusMinderCreationTests.test_create_busminder_with_valid_data)
+  Should successfully create a busminder with all required fields ... ok
+  test_delete_busminder (tests.test_busminders_comprehensive.BusMinderDeletionTests.test_delete_busminder)
+  Should be able to delete busminder ... ERROR
+  test_delete_busminder_does_not_delete_user (tests.test_busminders_comprehensive.BusMinderDeletionTests.test_delete_busminder_does_not_delete
+  _user)                                                                                                                                      Deleting busminder should not delete the user ... ok
+  test_delete_busminder_with_active_assignment (tests.test_busminders_comprehensive.BusMinderDeletionTests.test_delete_busminder_with_active_a
+  ssignment)                                                                                                                                  Should handle deletion of busminder with active assignments ... ERROR
+  test_delete_user_cascades_to_busminder (tests.test_busminders_comprehensive.BusMinderDeletionTests.test_delete_user_cascades_to_busminder)
+  Deleting user should cascade to busminder profile ... ERROR
+  test_busminder_with_special_characters_in_phone (tests.test_busminders_comprehensive.BusMinderEdgeCasesTests.test_busminder_with_special_cha
+  racters_in_phone)                                                                                                                           Should handle special characters in phone number ... ok
+  test_busminder_with_very_long_phone_number (tests.test_busminders_comprehensive.BusMinderEdgeCasesTests.test_busminder_with_very_long_phone_
+  number)                                                                                                                                     Should handle long phone numbers ... ok
+  test_create_many_busminders_performance (tests.test_busminders_comprehensive.BusMinderEdgeCasesTests.test_create_many_busminders_performance
+  )                                                                                                                                           Should handle bulk busminder creation ... ok
+  test_bus_legacy_bus_minder_field (tests.test_busminders_comprehensive.BusMinderLegacyFieldTests.test_bus_legacy_bus_minder_field)
+  Bus model has legacy bus_minder field ... ok
+  test_bus_minder_via_legacy_and_assignment_system (tests.test_busminders_comprehensive.BusMinderLegacyFieldTests.test_bus_minder_via_legacy_a
+  nd_assignment_system)                                                                                                                       Can use both legacy field and assignment system simultaneously ... ok
+  test_busminder_and_user_phone_mismatch_allowed (tests.test_busminders_comprehensive.BusMinderPhoneNumberTests.test_busminder_and_user_phone_
+  mismatch_allowed)                                                                                                                           System allows busminder phone_number to differ from user phone_number ... ok
+  test_busminder_phone_number_can_be_null (tests.test_busminders_comprehensive.BusMinderPhoneNumberTests.test_busminder_phone_number_can_be_nu
+  ll)                                                                                                                                         BusMinder phone_number field allows null values ... ERROR
+  test_busminder_phone_number_matches_user_phone (tests.test_busminders_comprehensive.BusMinderPhoneNumberTests.test_busminder_phone_number_ma
+  tches_user_phone)                                                                                                                           BusMinder phone_number should typically match user phone_number ... ok
+  test_two_busminders_cannot_share_phone_number (tests.test_busminders_comprehensive.BusMinderPhoneNumberTests.test_two_busminders_cannot_shar
+  e_phone_number)                                                                                                                             Should prevent two busminders from having the same phone number ... FAIL
+  test_get_all_busminders (tests.test_busminders_comprehensive.BusMinderQueryTests.test_get_all_busminders)
+  Should retrieve all busminders ... ok
+  test_get_busminder_by_user (tests.test_busminders_comprehensive.BusMinderQueryTests.test_get_busminder_by_user)
+  Should retrieve busminder by user ... ok
+  test_get_busminder_current_assignment (tests.test_busminders_comprehensive.BusMinderQueryTests.test_get_busminder_current_assignment)
+  Should retrieve busminder's current bus assignment ... ok
+  test_get_busminders_by_status (tests.test_busminders_comprehensive.BusMinderQueryTests.test_get_busminders_by_status)
+  Should filter busminders by status ... ok
+  test_busminder_default_status (tests.test_busminders_comprehensive.BusMinderStatusTests.test_busminder_default_status)
+  BusMinder should have default status when created ... ok
+  test_busminder_has_status_field (tests.test_busminders_comprehensive.BusMinderStatusTests.test_busminder_has_status_field)
+  BusMinder model should have status field ... ok
+  test_busminder_status_can_be_changed (tests.test_busminders_comprehensive.BusMinderStatusTests.test_busminder_status_can_be_changed)
+  Should be able to change busminder status ... ok
+  test_busminder_str_representation (tests.test_busminders_comprehensive.BusMinderStringRepresentationTests.test_busminder_str_representation)
+  BusMinder should have meaningful string representation ... ok
+  test_child_belongs_to_exactly_one_parent_model_enforced (tests.test_children.ChildrenTests.test_child_belongs_to_exactly_one_parent_model_en
+  forced) ... ok                                                                                                                              test_child_has_parent_and_parent_can_have_multiple_children (tests.test_children.ChildrenTests.test_child_has_parent_and_parent_can_have_mul
+  tiple_children) ... ok                                                                                                                      test_driver_cannot_start_trip_without_assigned_bus_or_children (tests.test_drivers.DriverTests.test_driver_cannot_start_trip_without_assigne
+  d_bus_or_children) ... ok                                                                                                                   test_driver_only_sees_assigned_bus (tests.test_drivers.DriverTests.test_driver_only_sees_assigned_bus) ... ok
+  test_driver_can_be_assigned_to_bus_via_assignment_system (tests.test_drivers_comprehensive.DriverBusAssignmentTests.test_driver_can_be_assig
+  ned_to_bus_via_assignment_system)                                                                                                           Should allow driver assignment to bus through assignment system ... ok
+  test_driver_can_have_assigned_bus_field (tests.test_drivers_comprehensive.DriverBusAssignmentTests.test_driver_can_have_assigned_bus_field)
+  Driver model has assigned_bus field (old system) ... ok
+  test_driver_reassignment_via_assignment_system (tests.test_drivers_comprehensive.DriverBusAssignmentTests.test_driver_reassignment_via_assig
+  nment_system)                                                                                                                               Should handle driver reassignment correctly ... ERROR
+  test_driver_without_assigned_bus (tests.test_drivers_comprehensive.DriverBusAssignmentTests.test_driver_without_assigned_bus)
+  Driver can exist without an assigned bus ... ok
+  test_multiple_drivers_cannot_share_same_bus_legacy_field (tests.test_drivers_comprehensive.DriverBusAssignmentTests.test_multiple_drivers_ca
+  nnot_share_same_bus_legacy_field)                                                                                                           Multiple drivers can have same bus in assigned_bus field (no constraint) ... ok
+  test_create_driver_using_factory (tests.test_drivers_comprehensive.DriverCreationTests.test_create_driver_using_factory)
+  Should create driver using factory pattern ... ok
+  test_create_driver_with_valid_data (tests.test_drivers_comprehensive.DriverCreationTests.test_create_driver_with_valid_data)
+  Should successfully create a driver with all required fields ... ok
+  test_driver_user_must_have_driver_type (tests.test_drivers_comprehensive.DriverCreationTests.test_driver_user_must_have_driver_type)
+  Should validate that driver's user has driver user_type ... ok
+  test_driver_without_user_fails (tests.test_drivers_comprehensive.DriverCreationTests.test_driver_without_user_fails)
+  Should not allow driver creation without a user ... ok
+  test_delete_driver (tests.test_drivers_comprehensive.DriverDeletionTests.test_delete_driver)
+  Should be able to delete driver ... ERROR

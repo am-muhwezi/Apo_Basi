@@ -192,6 +192,14 @@ class AdminAddDriverView(generics.CreateAPIView):
     queryset = User.objects.all()
 
     def post(self, request, *args, **kwargs):
+        # Cross-role uniqueness check
+        phone_number = request.data.get("phone_number")
+        email = request.data.get("email")
+        from django.db.models import Q
+        if phone_number and User.objects.filter(Q(phone_number=phone_number) | Q(email=email)).exists():
+            return Response({
+                "error": "A user with this phone number or email is already registered as a driver, minder, or parent."
+            }, status=status.HTTP_400_BAD_REQUEST)
         """
         Business Logic: AdminAddDriverView
 
@@ -253,6 +261,14 @@ class AdminAddBusminderView(generics.CreateAPIView):
     queryset = User.objects.all()
 
     def post(self, request, *args, **kwargs):
+        # Cross-role uniqueness check
+        phone_number = request.data.get("phone_number")
+        email = request.data.get("email")
+        from django.db.models import Q
+        if phone_number and User.objects.filter(Q(phone_number=phone_number) | Q(email=email)).exists():
+            return Response({
+                "error": "A user with this phone number or email is already registered as a driver, minder, or parent."
+            }, status=status.HTTP_400_BAD_REQUEST)
         """
         Business Logic: AdminAddBusminderView
 
