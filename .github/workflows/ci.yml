@@ -1,0 +1,107 @@
+name: CI - ApoBasi Full Test Suite
+
+on:
+  push:
+    branches: [ main, staging, dev, docs/unified-testing-guide ]
+  pull_request:
+    branches: [ main, staging, dev ]
+
+jobs:
+  test-backend:
+    name: Django Backend Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: apobasi
+          POSTGRES_PASSWORD: apobasi
+          POSTGRES_DB: apobasi_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DJANGO_DB_HOST: localhost
+      DJANGO_DB_PORT: 5432
+      DJANGO_DB_NAME: apobasi_test
+      DJANGO_DB_USER: apobasi
+      DJANGO_DB_PASSWORD: apobasi
+      PYTHONUNBUFFERED: 1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          cd server
+          python -m venv venv
+          . venv/bin/activate
+          pip install -r ../requirements.txt
+      - name: Run migrations
+        run: |
+          cd server
+          . venv/bin/activate
+          python manage.py migrate
+      - name: Run Django tests
+        run: |
+          cd server
+          . venv/bin/activate
+          python manage.py test --parallel --keepdb
+
+  test-parentsapp:
+    name: Flutter Tests - ParentsApp
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.6.0'
+      - name: Install dependencies
+        run: |
+          cd ParentsApp
+          flutter pub get
+      - name: Run Flutter tests
+        run: |
+          cd ParentsApp
+          flutter test
+
+  test-driversandminders:
+    name: Flutter Tests - DriversandMinders
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.6.0'
+      - name: Install dependencies
+        run: |
+          cd DriversandMinders
+          flutter pub get
+      - name: Run Flutter tests
+        run: |
+          cd DriversandMinders
+          flutter test
+
+  test-client:
+    name: Lint & Typecheck - React/Vite Client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: |
+          cd client
+          npm install
+      - name: Lint
+        run: |
+          cd client
+          npm run lint
+      - name: Typecheck
+        run: |
+          cd client
+          npm run typecheck
