@@ -33,13 +33,13 @@ class Parent(models.Model):
         contact = getattr(self, 'contact_number', None)
         if contact:
             from django.contrib.auth import get_user_model
+            from django.core.exceptions import ValidationError
             User = get_user_model()
             from drivers.models import Driver
             from busminders.models import BusMinder
-            from django.db import IntegrityError
 
             user_pk = getattr(self, 'user_id', None)
             if User.objects.filter(phone_number=contact).exclude(pk=user_pk).exists() or Driver.objects.filter(phone_number=contact).exclude(user_id=user_pk).exists() or BusMinder.objects.filter(phone_number=contact).exclude(user_id=user_pk).exists():
-                raise IntegrityError(f"Contact number '{contact}' already in use by another account")
+                raise ValidationError(f"Contact number '{contact}' already in use by another account")
 
         super().save(*args, **kwargs)

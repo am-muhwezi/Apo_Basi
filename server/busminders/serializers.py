@@ -72,44 +72,45 @@ class BusMinderCreateSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
-        from django.db import IntegrityError
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.db import transaction
+        import uuid
+
+        # Extract user data
+        first_name = validated_data.pop('firstName')
+        last_name = validated_data.pop('lastName')
+        email = validated_data.pop('email', '') or ''
+
+        # Generate a unique username (required by Django)
+        username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
+
+        # Use atomic transaction to ensure both User and BusMinder are created together
         try:
-            # Extract user data
-            first_name = validated_data.pop('firstName')
-            last_name = validated_data.pop('lastName')
-            email = validated_data.pop('email', '') or ''
+            with transaction.atomic():
+                # Create User
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    user_type='busminder'
+                )
 
-            # Generate a unique username (required by Django)
-            import uuid
-            username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
+                # Create BusMinder
+                busminder = BusMinder.objects.create(
+                    user=user,
+                    phone_number=validated_data.get('phone'),
+                    status=validated_data.get('status', 'active'),
+                )
 
-            # Create User
-            user = User.objects.create_user(
-                username=username,
-                email=email,
-                first_name=first_name,
-                last_name=last_name,
-                user_type='busminder'
-            )
-
-            # Create BusMinder, catch phone uniqueness error
-            busminder = BusMinder.objects.create(
-                user=user,
-                phone_number=validated_data.get('phone'),
-                status=validated_data.get('status', 'active'),
-            )
-            return busminder
-        except IntegrityError as e:
-            # Clean up user if busminder creation fails
-            try:
-                user.delete()
-            except Exception:
-                pass
-            if 'already in use' in str(e):
-                raise serializers.ValidationError({'phone': str(e)})
-            raise serializers.ValidationError({'non_field_errors': [str(e)]})
+                return busminder
+        except DjangoValidationError as e:
+            # Transaction will automatically rollback
+            raise serializers.ValidationError(str(e))
 
     def update(self, instance, validated_data):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
         # Update User fields
         if 'firstName' in validated_data:
             instance.user.first_name = validated_data.pop('firstName')
@@ -126,7 +127,11 @@ class BusMinderCreateSerializer(serializers.Serializer):
         if 'status' in validated_data:
             instance.status = validated_data.pop('status')
 
-        instance.save()
+        try:
+            instance.save()
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(str(e))
+
         return instance
 
     def to_representation(self, instance):

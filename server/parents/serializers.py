@@ -98,6 +98,8 @@ class ParentCreateSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         from django.contrib.auth import get_user_model
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.db import transaction
         User = get_user_model()
         import uuid
 
@@ -109,27 +111,37 @@ class ParentCreateSerializer(serializers.Serializer):
         # Generate a unique username (required by Django)
         username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
 
-        # Create User
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            first_name=first_name,
-            last_name=last_name,
-            user_type='parent'
-        )
+        # Use atomic transaction to ensure both User and Parent are created together
+        # If parent creation fails, user creation is also rolled back
+        try:
+            with transaction.atomic():
+                # Create User
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    user_type='parent'
+                )
 
-        # Create Parent
-        parent = Parent.objects.create(
-            user=user,
-            contact_number=validated_data.get('phone'),
-            address=validated_data.get('address', ''),
-            emergency_contact=validated_data.get('emergencyContact', ''),
-            status=validated_data.get('status', 'active'),
-        )
+                # Create Parent
+                parent = Parent.objects.create(
+                    user=user,
+                    contact_number=validated_data.get('phone'),
+                    address=validated_data.get('address', ''),
+                    emergency_contact=validated_data.get('emergencyContact', ''),
+                    status=validated_data.get('status', 'active'),
+                )
 
-        return parent
+                return parent
+        except DjangoValidationError as e:
+            # Transaction will automatically rollback, so user won't be saved
+            # Convert Django ValidationError to DRF ValidationError
+            raise serializers.ValidationError(str(e))
 
     def update(self, instance, validated_data):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
         # Update User fields
         if 'firstName' in validated_data:
             instance.user.first_name = validated_data.pop('firstName')
@@ -150,7 +162,12 @@ class ParentCreateSerializer(serializers.Serializer):
         if 'status' in validated_data:
             instance.status = validated_data.pop('status')
 
-        instance.save()
+        try:
+            instance.save()
+        except DjangoValidationError as e:
+            # Convert Django ValidationError to DRF ValidationError
+            raise serializers.ValidationError(str(e))
+
         return instance
 
     def to_representation(self, instance):
