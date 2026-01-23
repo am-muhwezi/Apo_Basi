@@ -87,24 +87,16 @@ export default function MindersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
-    let result;
-    if (selectedMinder) {
-      result = await busMinderService.updateBusMinder(selectedMinder.id, formData);
-    } else {
-      // Cross-role uniqueness check
-      const checkResult = await busMinderService.checkPhoneOrEmailExists(formData.phone, formData.email);
-      if (checkResult.exists) {
-        setFormError(
-          checkResult.role === 'driver'
-            ? 'This phone/email is already registered as a Driver.'
-            : checkResult.role === 'parent'
-            ? 'This phone/email is already registered as a Parent.'
-            : 'This phone/email is already registered.'
-        );
-        return;
-      }
-      result = await busMinderService.createBusMinder(formData);
+
+    // Validate phone number length (minimum 10 digits)
+    if (formData.phone && formData.phone.replace(/\D/g, '').length < 10) {
+      setFormError('Phone number must be at least 10 digits');
+      return;
     }
+
+    const result = selectedMinder
+      ? await busMinderService.updateBusMinder(selectedMinder.id, formData)
+      : await busMinderService.createBusMinder(formData);
 
     if (result.success) {
       toast.success(`Bus minder ${selectedMinder ? 'updated' : 'created'} successfully`);

@@ -161,36 +161,22 @@ export default function ParentsPage() {
     e.preventDefault();
     setFormError(null);
 
-    if (selectedParent) {
-      const result = await parentService.updateParent(selectedParent.id, formData);
-      if (result.success) {
-        toast.success('Parent updated successfully');
-        loadParents();
-        setShowModal(false);
-      } else {
-        setFormError(result.error?.message || 'Failed to update parent');
-      }
+    // Validate phone number length (minimum 10 digits)
+    if (formData.phone && formData.phone.replace(/\D/g, '').length < 10) {
+      setFormError('Phone number must be at least 10 digits');
+      return;
+    }
+
+    const result = selectedParent
+      ? await parentService.updateParent(selectedParent.id, formData)
+      : await parentService.createParent(formData);
+
+    if (result.success) {
+      toast.success(`Parent ${selectedParent ? 'updated' : 'created'} successfully`);
+      loadParents();
+      setShowModal(false);
     } else {
-      // Cross-role uniqueness check
-      const checkResult = await parentService.checkPhoneOrEmailExists(formData.phone, formData.email);
-      if (checkResult.exists) {
-        setFormError(
-          checkResult.role === 'driver'
-            ? 'This phone/email is already registered as a Driver.'
-            : checkResult.role === 'minder'
-            ? 'This phone/email is already registered as a Bus Minder.'
-            : 'This phone/email is already registered.'
-        );
-        return;
-      }
-      const result = await parentService.createParent(formData);
-      if (result.success) {
-        toast.success('Parent created successfully');
-        loadParents();
-        setShowModal(false);
-      } else {
-        setFormError(result.error?.message || 'Failed to create parent');
-      }
+      setFormError(result.error?.message || `Failed to ${selectedParent ? 'update' : 'create'} parent`);
     }
   };
 
