@@ -106,7 +106,9 @@ class BusMinderCreateSerializer(serializers.Serializer):
                 return busminder
         except DjangoValidationError as e:
             # Transaction will automatically rollback
-            raise serializers.ValidationError(str(e))
+            # Extract the actual error message from Django's ValidationError
+            error_message = e.message if hasattr(e, 'message') else str(e)
+            raise serializers.ValidationError({'phone': [error_message]})
 
     def update(self, instance, validated_data):
         from django.core.exceptions import ValidationError as DjangoValidationError
@@ -130,7 +132,9 @@ class BusMinderCreateSerializer(serializers.Serializer):
         try:
             instance.save()
         except DjangoValidationError as e:
-            raise serializers.ValidationError(str(e))
+            # Extract the actual error message from Django's ValidationError
+            error_message = e.message if hasattr(e, 'message') else str(e)
+            raise serializers.ValidationError({'phone': [error_message]})
 
         return instance
 

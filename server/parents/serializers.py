@@ -136,8 +136,9 @@ class ParentCreateSerializer(serializers.Serializer):
                 return parent
         except DjangoValidationError as e:
             # Transaction will automatically rollback, so user won't be saved
-            # Convert Django ValidationError to DRF ValidationError
-            raise serializers.ValidationError(str(e))
+            # Extract the actual error message from Django's ValidationError
+            error_message = e.message if hasattr(e, 'message') else str(e)
+            raise serializers.ValidationError({'phone': [error_message]})
 
     def update(self, instance, validated_data):
         from django.core.exceptions import ValidationError as DjangoValidationError
@@ -165,8 +166,9 @@ class ParentCreateSerializer(serializers.Serializer):
         try:
             instance.save()
         except DjangoValidationError as e:
-            # Convert Django ValidationError to DRF ValidationError
-            raise serializers.ValidationError(str(e))
+            # Extract the actual error message from Django's ValidationError
+            error_message = e.message if hasattr(e, 'message') else str(e)
+            raise serializers.ValidationError({'phone': [error_message]})
 
         return instance
 
