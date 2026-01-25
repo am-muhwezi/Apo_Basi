@@ -1,9 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <!-- Location permissions for GPS tracking -->
+    <!-- Required to track bus location in real-time for parent visibility and student safety -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Background location is used to continue tracking during active trips when app is in background -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"
+                     android:usesPermissionFlags="neverForLocation"/>
 
     <!-- Internet permission for API calls -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -22,7 +25,6 @@
         android:label="Basi Driver"
         android:name="com.apobasi.driver.LocationApp"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true"
         android:enableOnBackInvokedCallback="true">
         <activity
             android:name=".MainActivity"
