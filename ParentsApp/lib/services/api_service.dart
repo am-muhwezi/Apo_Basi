@@ -3,10 +3,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/child_model.dart';
 import '../models/parent_model.dart';
 import '../config/api_config.dart';
+import 'auth_service.dart';
 
 class ApiService {
   late Dio _dio;
   String? _accessToken;
+  final AuthService _authService = AuthService();
+  bool _isRefreshing = false;
 
   ApiService() {
     _dio = Dio(BaseOptions(
@@ -27,7 +30,44 @@ class ApiService {
         }
         return handler.next(options);
       },
-      onError: (error, handler) {
+      onError: (error, handler) async {
+        // Handle 401 errors by attempting to refresh the token
+        if (error.response?.statusCode == 401 && !_isRefreshing) {
+          _isRefreshing = true;
+
+          try {
+            // Attempt to refresh the access token
+            final newAccessToken = await _authService.refreshAccessToken();
+
+            if (newAccessToken != null) {
+              // Update the token
+              _accessToken = newAccessToken;
+
+              // Retry the original request with the new token
+              final options = error.requestOptions;
+              options.headers['Authorization'] = 'Bearer $newAccessToken';
+
+              _isRefreshing = false;
+
+              // Retry the request
+              try {
+                final response = await _dio.fetch(options);
+                return handler.resolve(response);
+              } catch (e) {
+                return handler.next(error);
+              }
+            } else {
+              // Refresh failed, clear tokens and force re-login
+              await clearToken();
+              _isRefreshing = false;
+              return handler.next(error);
+            }
+          } catch (e) {
+            _isRefreshing = false;
+            return handler.next(error);
+          }
+        }
+
         return handler.next(error);
       },
     ));
