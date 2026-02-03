@@ -56,7 +56,8 @@ class BusMarker3D extends StatelessWidget {
                 ),
                 BoxShadow(
                   color: isMoving
-                      ? Color(0xFFFFD700).withValues(alpha: 0.4) // Gold glow when moving
+                      ? Color(0xFFFFD700)
+                          .withValues(alpha: 0.4) // Gold glow when moving
                       : Colors.transparent,
                   blurRadius: 16,
                   spreadRadius: 2,

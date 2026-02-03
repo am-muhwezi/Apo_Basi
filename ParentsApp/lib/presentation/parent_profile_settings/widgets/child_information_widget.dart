@@ -29,8 +29,8 @@ class ChildInformationWidget extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppTheme.lightTheme.colorScheme.surface,
-            AppTheme.lightTheme.colorScheme.surface.withValues(alpha: 0.95),
+            Theme.of(context).colorScheme.surface,
+            Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -39,13 +39,13 @@ class ChildInformationWidget extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color:
-                AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.06),
+                Theme.of(context).colorScheme.primary.withValues(alpha: 0.06),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.08),
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
           width: 1,
         ),
       ),
@@ -60,8 +60,14 @@ class ChildInformationWidget extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
                     colors: [
-                      AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.25),
-                      AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.1),
+                      Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.25),
+                      Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.1),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -72,15 +78,15 @@ class ChildInformationWidget extends StatelessWidget {
                   height: 13.w,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppTheme.lightTheme.colorScheme.surface,
+                    color: Theme.of(context).colorScheme.surface,
                   ),
                   child: Center(
                     child: Text(
                       _getInitials(childData['name'] ?? 'Child Name'),
-                      style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.lightTheme.colorScheme.primary,
-                      ),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
                     ),
                   ),
                 ),
@@ -92,10 +98,10 @@ class ChildInformationWidget extends StatelessWidget {
                   children: [
                     Text(
                       childData['name'] ?? 'Child Name',
-                      style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.lightTheme.colorScheme.onSurface,
-                      ),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                     ),
                     SizedBox(height: 0.3.h),
                     Row(
@@ -103,16 +109,19 @@ class ChildInformationWidget extends StatelessWidget {
                         Icon(
                           Icons.school_outlined,
                           size: 13,
-                          color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         SizedBox(width: 1.w),
                         Expanded(
                           child: Text(
-                            '${childData['class'] ?? 'Class Unknown'} • ${childData['school'] ?? 'School Name'}',
-                            style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                              color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                              fontSize: 11.sp,
-                            ),
+                            childData['class'] ?? 'Class Unknown',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                      fontSize: 11.sp,
+                                    ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -131,23 +140,28 @@ class ChildInformationWidget extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.04),
-                  AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.02),
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.04),
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.02),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: AppTheme.lightTheme.colorScheme.primary.withValues(alpha: 0.06),
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.06),
                 width: 1,
               ),
             ),
             child: Column(
               children: [
-                _buildCompactInfoRow(Icons.badge_outlined, 'Student ID', childData['studentId'] ?? 'N/A'),
+                _buildCompactInfoRow(context, Icons.badge_outlined,
+                    'Student ID', childData['studentId'] ?? 'N/A'),
                 SizedBox(height: 1.2.h),
-                _buildCompactInfoRow(Icons.class_outlined, 'Grade', childData['grade'] ?? 'N/A'),
+                _buildCompactInfoRow(context, Icons.class_outlined, 'Grade',
+                    childData['grade'] ?? 'N/A'),
               ],
             ),
           ),
@@ -156,13 +170,15 @@ class ChildInformationWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildCompactInfoRow(IconData icon, String label, String value, {bool isAddress = false}) {
+  Widget _buildCompactInfoRow(
+      BuildContext context, IconData icon, String label, String value,
+      {bool isAddress = false}) {
     return Row(
       children: [
         Icon(
           icon,
           size: 18,
-          color: AppTheme.lightTheme.colorScheme.primary,
+          color: Theme.of(context).colorScheme.primary,
         ),
         SizedBox(width: 2.w),
         Expanded(
@@ -171,18 +187,18 @@ class ChildInformationWidget extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                  color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
               ),
               SizedBox(height: 0.3.h),
               Text(
                 value,
-                style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.lightTheme.colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
                 maxLines: isAddress ? 2 : 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -193,7 +209,8 @@ class ChildInformationWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(String label, String value, {bool isAddress = false}) {
+  Widget _buildInfoRow(BuildContext context, String label, String value,
+      {bool isAddress = false}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -201,27 +218,27 @@ class ChildInformationWidget extends StatelessWidget {
           width: 25.w,
           child: Text(
             label,
-            style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-              color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
           ),
         ),
         SizedBox(width: 2.w),
         Text(
           ':',
-          style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-            color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-          ),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
         ),
         SizedBox(width: 2.w),
         Expanded(
           child: Text(
             value,
-            style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
-              color: AppTheme.lightTheme.colorScheme.onSurface,
-              fontWeight: FontWeight.w500,
-            ),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
             maxLines: isAddress ? 3 : 1,
             overflow: TextOverflow.ellipsis,
           ),

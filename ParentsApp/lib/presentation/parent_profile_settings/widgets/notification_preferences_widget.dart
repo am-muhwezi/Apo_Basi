@@ -45,7 +45,7 @@ class _NotificationPreferencesWidgetState
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Notification preferences updated'),
-        backgroundColor: AppTheme.lightTheme.colorScheme.secondary,
+        backgroundColor: Theme.of(context).colorScheme.secondary,
       ),
     );
   }
@@ -63,12 +63,12 @@ class _NotificationPreferencesWidgetState
           Container(
             padding: EdgeInsets.all(2.w),
             decoration: BoxDecoration(
-              color: AppTheme.lightTheme.colorScheme.primaryContainer,
+              color: Theme.of(context).colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(8),
             ),
             child: CustomIconWidget(
               iconName: icon.toString().split('.').last,
-              color: AppTheme.lightTheme.colorScheme.primary,
+              color: Theme.of(context).colorScheme.primary,
               size: 20,
             ),
           ),
@@ -79,16 +79,16 @@ class _NotificationPreferencesWidgetState
               children: [
                 Text(
                   title,
-                  style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
                 ),
                 SizedBox(height: 0.5.h),
                 Text(
                   subtitle,
-                  style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                    color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                 ),
               ],
             ),
@@ -117,9 +117,9 @@ class _NotificationPreferencesWidgetState
         children: [
           Text(
             title,
-            style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w500,
-            ),
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
           ),
           SizedBox(height: 1.h),
           Slider(
@@ -136,11 +136,11 @@ class _NotificationPreferencesWidgetState
             children: [
               Text(
                 labelFormatter(min),
-                style: AppTheme.lightTheme.textTheme.bodySmall,
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               Text(
                 labelFormatter(max),
-                style: AppTheme.lightTheme.textTheme.bodySmall,
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
           ),
@@ -155,11 +155,11 @@ class _NotificationPreferencesWidgetState
       margin: EdgeInsets.symmetric(vertical: 1.h),
       padding: EdgeInsets.all(4.w),
       decoration: BoxDecoration(
-        color: AppTheme.lightTheme.colorScheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.lightTheme.colorScheme.shadow,
+            color: Theme.of(context).colorScheme.shadow,
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -172,15 +172,15 @@ class _NotificationPreferencesWidgetState
             children: [
               CustomIconWidget(
                 iconName: 'notifications',
-                color: AppTheme.lightTheme.colorScheme.primary,
+                color: Theme.of(context).colorScheme.primary,
                 size: 24,
               ),
               SizedBox(width: 3.w),
               Text(
                 'Notification Preferences',
-                style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
               Spacer(),
               if (_hasUnsavedChanges)
@@ -188,7 +188,7 @@ class _NotificationPreferencesWidgetState
                   width: 2.w,
                   height: 2.w,
                   decoration: BoxDecoration(
-                    color: AppTheme.lightTheme.colorScheme.error,
+                    color: Theme.of(context).colorScheme.error,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -229,14 +229,14 @@ class _NotificationPreferencesWidgetState
           ),
 
           SizedBox(height: 2.h),
-          Divider(color: AppTheme.lightTheme.colorScheme.outline),
+          Divider(color: Theme.of(context).colorScheme.outline),
           SizedBox(height: 2.h),
 
           Text(
             'Timing Controls',
-            style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
           ),
           SizedBox(height: 2.h),
 
@@ -266,7 +266,7 @@ class _NotificationPreferencesWidgetState
           Container(
             padding: EdgeInsets.all(3.w),
             decoration: BoxDecoration(
-              color: AppTheme.lightTheme.colorScheme.surfaceContainerHighest,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -276,15 +276,15 @@ class _NotificationPreferencesWidgetState
                   children: [
                     CustomIconWidget(
                       iconName: 'bedtime',
-                      color: AppTheme.lightTheme.colorScheme.primary,
+                      color: Theme.of(context).colorScheme.primary,
                       size: 20,
                     ),
                     SizedBox(width: 2.w),
                     Text(
                       'Quiet Hours',
-                      style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
                     ),
                     Spacer(),
                     Switch(
@@ -304,16 +304,18 @@ class _NotificationPreferencesWidgetState
                           children: [
                             Text(
                               'From',
-                              style: AppTheme.lightTheme.textTheme.bodySmall,
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
                             SizedBox(height: 0.5.h),
                             Text(
                               _settings['quietHoursStart'] as String? ??
                                   '22:00',
-                              style: AppTheme.lightTheme.textTheme.bodyLarge
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
                                   ?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
+                                    fontWeight: FontWeight.w500,
+                                  ),
                             ),
                           ],
                         ),
@@ -324,15 +326,17 @@ class _NotificationPreferencesWidgetState
                           children: [
                             Text(
                               'To',
-                              style: AppTheme.lightTheme.textTheme.bodySmall,
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
                             SizedBox(height: 0.5.h),
                             Text(
                               _settings['quietHoursEnd'] as String? ?? '07:00',
-                              style: AppTheme.lightTheme.textTheme.bodyLarge
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
                                   ?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
+                                    fontWeight: FontWeight.w500,
+                                  ),
                             ),
                           ],
                         ),

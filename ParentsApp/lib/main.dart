@@ -10,19 +10,23 @@ import 'widgets/custom_error_widget.dart';
 import 'services/notification_service.dart';
 import 'services/bus_websocket_service.dart';
 import 'services/parent_notifications_service.dart';
+import 'services/theme_service.dart';
 import 'config/supabase_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load .env before starting the app
+  // Load env first so other services can read configuration safely
   await dotenv.load();
 
-  // Initialize Supabase for magic link authentication
-  await Supabase.initialize(
-    url: SupabaseConfig.supabaseUrl,
-    anonKey: SupabaseConfig.supabasePublishableKey,
-  );
+  // Initialize remaining core services in parallel to reduce startup time
+  await Future.wait([
+    Supabase.initialize(
+      url: SupabaseConfig.supabaseUrl,
+      anonKey: SupabaseConfig.supabasePublishableKey,
+    ),
+    ThemeService().initialize(),
+  ]);
 
   runApp(MyApp());
 
@@ -65,6 +69,7 @@ class _MyAppState extends State<MyApp> {
   final ParentNotificationsService _notificationsService =
       ParentNotificationsService();
   final NotificationService _notificationService = NotificationService();
+  final ThemeService _themeService = ThemeService();
 
   @override
   void initState() {
@@ -89,22 +94,28 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return Sizer(builder: (context, orientation, screenType) {
-      return MaterialApp(
-        title: 'ApoBasi',
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.light,
-        builder: (context, child) {
-          return MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: TextScaler.linear(1.0),
-            ),
-            child: child!,
+      // Listen to theme changes and rebuild MaterialApp when theme changes
+      return ValueListenableBuilder<ThemeMode>(
+        valueListenable: _themeService.themeModeNotifier,
+        builder: (context, themeMode, child) {
+          return MaterialApp(
+            title: 'ApoBasi',
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeMode,
+            builder: (context, child) {
+              return MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(1.0),
+                ),
+                child: child!,
+              );
+            },
+            debugShowCheckedModeBanner: false,
+            routes: AppRoutes.routes,
+            initialRoute: AppRoutes.initial,
           );
         },
-        debugShowCheckedModeBanner: false,
-        routes: AppRoutes.routes,
-        initialRoute: AppRoutes.initial,
       );
     });
   }
