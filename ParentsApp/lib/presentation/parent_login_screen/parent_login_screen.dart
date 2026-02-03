@@ -32,6 +32,16 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
     super.initState();
     _emailController.addListener(_validateEmail);
     _listenForAuthCallback();
+    _checkAuthAndAutoNavigate();
+  }
+
+  /// Check if user is already authenticated and auto-navigate to dashboard
+  Future<void> _checkAuthAndAutoNavigate() async {
+    final isAuthenticated = await _authService.isAuthenticated();
+    if (isAuthenticated && mounted) {
+      // User already logged in - go straight to dashboard like Uber
+      Navigator.pushReplacementNamed(context, '/parent-dashboard');
+    }
   }
 
   @override
