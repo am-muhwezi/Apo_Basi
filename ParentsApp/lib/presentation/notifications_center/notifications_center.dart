@@ -47,12 +47,18 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   // Local storage key for notifications
   static const _notificationsKey = 'cached_notifications';
 
+  // Flag to prevent concurrent setState calls
+  bool _isUpdatingState = false;
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    _loadNotificationsFromAPI(); // Load from API first
-    _setupNotificationListeners();
+    // Defer heavy operations to after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadNotificationsFromAPI(); // Load from API first
+      _setupNotificationListeners();
+    });
   }
 
   // Load notifications from API
@@ -82,7 +88,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
         _allNotifications = notificationsList.map((notification) {
           return {
             'id': notification['id'].toString(),
-            'type': notification['notification_type'] ?? 'general',
+            'type': _normalizeType(notification['notification_type']),
             'title': notification['title'] ?? '',
             'message': notification['message'] ?? '',
             'fullMessage': notification['full_message'],
@@ -112,11 +118,12 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   }
 
   // Start auto-refresh timer
-  void _startAutoRefresh() {
-    _refreshTimer = Timer.periodic(_refreshInterval, (_) {
-      _loadNotificationsFromAPI();
-    });
-  }
+  // Auto-refresh is currently disabled; enable when backend rate limits permit
+  // void _startAutoRefresh() {
+  //   _refreshTimer = Timer.periodic(_refreshInterval, (_) {
+  //     _loadNotificationsFromAPI();
+  //   });
+  // }
 
   // Load cached notifications from local storage (fallback)
   Future<void> _loadCachedNotifications() async {
@@ -166,24 +173,27 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     // Listen for all incoming notifications from WebSocket
     _notificationsSubscription =
         _notificationsService.allNotificationsStream.listen((data) {
-      _addNotification({
-        'id': data['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-        'type': data['notification_type'] ?? 'general',
-        'title': data['title'] ?? 'Notification',
-        'message': data['message'] ?? '',
-        'fullMessage': data['full_message'],
-        'isRead': false,
-        'timestamp': data['timestamp'] != null
-            ? DateTime.parse(data['timestamp'])
-            : DateTime.now(),
-        'expanded': false,
-        // Store additional data
-        'bus_id': data['bus_id'],
-        'bus_number': data['bus_number'],
-        'child_id': data['child_id'],
-        'child_name': data['child_name'],
-        'trip_id': data['trip_id'],
-      });
+      // Only add notification if widget is mounted and not updating
+      if (mounted && !_isUpdatingState) {
+        _addNotification({
+          'id': data['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          'type': _normalizeType(data['notification_type']),
+          'title': data['title'] ?? 'Notification',
+          'message': data['message'] ?? '',
+          'fullMessage': data['full_message'],
+          'isRead': false,
+          'timestamp': data['timestamp'] != null
+              ? DateTime.parse(data['timestamp'])
+              : DateTime.now(),
+          'expanded': false,
+          // Store additional data
+          'bus_id': data['bus_id'],
+          'bus_number': data['bus_number'],
+          'child_id': data['child_id'],
+          'child_name': data['child_name'],
+          'trip_id': data['trip_id'],
+        });
+      }
     }, onError: (error) {});
   }
 
@@ -191,27 +201,34 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   void _addNotification(Map<String, dynamic> notification) {
     // Use post-frame callback to avoid setState during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
+      if (!mounted || _isUpdatingState) {
         return;
       }
 
-      setState(() {
-        _allNotifications.insert(
-            0, notification); // Add to beginning (newest first)
-        _groupNotificationsByDate();
-      });
+      _isUpdatingState = true;
+      try {
+        setState(() {
+          _allNotifications.insert(
+              0, notification); // Add to beginning (newest first)
+          _groupNotificationsByDate();
+        });
 
-      // Save to local storage
-      _saveNotifications();
+        // Save to local storage
+        _saveNotifications();
 
-      // Show a snackbar for new notification
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(notification['title']),
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+        // Show a snackbar for new notification
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(notification['title']),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } finally {
+        _isUpdatingState = false;
+      }
     });
   }
 
@@ -318,45 +335,68 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   }
 
   void _markAllAsRead() async {
-    // Call API to mark all as read
+    if (_isUpdatingState) return;
+
+    _isUpdatingState = true;
     try {
-      await _apiService.markNotificationsAsRead();
-    } catch (e) {}
+      // Call API to mark all as read
+      try {
+        await _apiService.markNotificationsAsRead();
+      } catch (e) {}
 
-    setState(() {
-      for (var notification in _allNotifications) {
-        notification['isRead'] = true;
+      if (mounted) {
+        setState(() {
+          for (var notification in _allNotifications) {
+            notification['isRead'] = true;
+          }
+          _groupNotificationsByDate();
+        });
+        await _saveNotifications();
+
+        HapticFeedback.lightImpact();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('All notifications marked as read'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
       }
-    });
-    _groupNotificationsByDate();
-    await _saveNotifications();
-
-    HapticFeedback.lightImpact();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('All notifications marked as read'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+    } finally {
+      _isUpdatingState = false;
     }
   }
 
   void _toggleSearch() {
-    setState(() {
-      _isSearchVisible = !_isSearchVisible;
-      if (!_isSearchVisible) {
-        _searchQuery = '';
-        _groupNotificationsByDate();
+    if (!_isUpdatingState && mounted) {
+      _isUpdatingState = true;
+      try {
+        setState(() {
+          _isSearchVisible = !_isSearchVisible;
+          if (!_isSearchVisible) {
+            _searchQuery = '';
+            _groupNotificationsByDate();
+          }
+        });
+      } finally {
+        _isUpdatingState = false;
       }
-    });
+    }
   }
 
   void _onSearchChanged(String query) {
-    setState(() {
-      _searchQuery = query;
-      _groupNotificationsByDate();
-    });
+    if (!_isUpdatingState && mounted) {
+      _isUpdatingState = true;
+      try {
+        setState(() {
+          _searchQuery = query;
+          _groupNotificationsByDate();
+        });
+      } finally {
+        _isUpdatingState = false;
+      }
+    }
   }
 
   void _showFilterSheet() {
@@ -367,9 +407,19 @@ class _NotificationsCenterState extends State<NotificationsCenter>
       builder: (context) => NotificationFilterSheetWidget(
         selectedTypes: _selectedFilters,
         onFiltersChanged: (filters) {
-          setState(() {
-            _selectedFilters = filters;
-            _groupNotificationsByDate();
+          // Delay state update to ensure sheet is fully dismissed
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted && !_isUpdatingState) {
+              _isUpdatingState = true;
+              try {
+                setState(() {
+                  _selectedFilters = filters;
+                  _groupNotificationsByDate();
+                });
+              } finally {
+                _isUpdatingState = false;
+              }
+            }
           });
         },
       ),
@@ -478,7 +528,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     // Show loading indicator
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
           title: Text('Notifications'),
         ),
@@ -491,7 +541,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     // Show error message if any
     if (_errorMessage != null) {
       return Scaffold(
-        backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
           title: Text('Notifications'),
         ),
@@ -514,23 +564,23 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     }
 
     return Scaffold(
-      backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Notifications',
-              style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             if (_unreadCount > 0)
               Text(
                 '$_unreadCount unread',
-                style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                  color: AppTheme.lightTheme.colorScheme.primary,
-                ),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
               ),
           ],
         ),
@@ -539,7 +589,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
             onPressed: _toggleSearch,
             icon: CustomIconWidget(
               iconName: _isSearchVisible ? 'close' : 'search',
-              color: AppTheme.lightTheme.colorScheme.onSurface,
+              color: Theme.of(context).colorScheme.onSurface,
               size: 24,
             ),
           ),
@@ -548,10 +598,10 @@ class _NotificationsCenterState extends State<NotificationsCenter>
               onPressed: _markAllAsRead,
               child: Text(
                 'Mark All Read',
-                style: AppTheme.lightTheme.textTheme.labelMedium?.copyWith(
-                  color: AppTheme.lightTheme.colorScheme.primary,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
               ),
             ),
           SizedBox(width: 2.w),
@@ -583,12 +633,14 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                             _groupNotificationsByDate();
                           });
                         },
-                        backgroundColor: AppTheme.lightTheme.colorScheme.error
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .error
                             .withValues(alpha: 0.1),
                         labelStyle:
-                            AppTheme.lightTheme.textTheme.labelSmall?.copyWith(
-                          color: AppTheme.lightTheme.colorScheme.error,
-                        ),
+                            Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
                       ),
                     );
                   }
@@ -605,12 +657,14 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                           _groupNotificationsByDate();
                         });
                       },
-                      selectedColor: AppTheme.lightTheme.colorScheme.primary
+                      selectedColor: Theme.of(context)
+                          .colorScheme
+                          .primary
                           .withValues(alpha: 0.1),
                       labelStyle:
-                          AppTheme.lightTheme.textTheme.labelSmall?.copyWith(
-                        color: AppTheme.lightTheme.colorScheme.primary,
-                      ),
+                          Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
                     ),
                   );
                 },
@@ -639,12 +693,15 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                                   horizontal: 4.w, vertical: 1.h),
                               child: Text(
                                 dateKey,
-                                style: AppTheme.lightTheme.textTheme.titleSmall
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
                                     ?.copyWith(
-                                  color: AppTheme
-                                      .lightTheme.colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                               ),
                             ),
                             ...notifications.map((notification) => Slidable(
@@ -731,6 +788,41 @@ class _NotificationsCenterState extends State<NotificationsCenter>
         return 'Major Delays';
       default:
         return filterType;
+    }
+  }
+
+  String _normalizeType(dynamic rawType) {
+    if (rawType == null) return 'general';
+    final t = rawType.toString().toLowerCase().replaceAll('-', '_');
+    switch (t) {
+      case 'bus_approaching':
+      case 'busapproaching':
+      case 'bus_coming':
+      case 'approaching':
+        return 'bus_approaching';
+      case 'pickup_confirmed':
+      case 'pickupcomplete':
+      case 'pickup_done':
+      case 'picked_up':
+        return 'pickup_confirmed';
+      case 'dropoff_complete':
+      case 'dropoffconfirmed':
+      case 'dropped_off':
+        return 'dropoff_complete';
+      case 'route_change':
+      case 'routechanged':
+      case 'route_update':
+        return 'route_change';
+      case 'emergency':
+      case 'alert_emergency':
+      case 'critical':
+        return 'emergency';
+      case 'major_delay':
+      case 'delay_major':
+      case 'delayed':
+        return 'major_delay';
+      default:
+        return 'general';
     }
   }
 

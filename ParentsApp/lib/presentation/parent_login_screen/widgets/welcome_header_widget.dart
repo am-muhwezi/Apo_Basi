@@ -32,7 +32,7 @@ class WelcomeHeaderWidget extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
-            // App Icon - Clean, minimal
+            // App Logo - ApoBasi branding
             Container(
               width: 20.w,
               height: 20.w,
@@ -47,10 +47,21 @@ class WelcomeHeaderWidget extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Icon(
-                Icons.directions_bus_rounded,
-                size: 10.w,
-                color: AppTheme.primaryLight,
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/AB_logo.jpg',
+                  width: 20.w,
+                  height: 20.w,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback to icon if image fails to load
+                    return Icon(
+                      Icons.directions_bus_rounded,
+                      size: 10.w,
+                      color: AppTheme.primaryLight,
+                    );
+                  },
+                ),
               ),
             ),
 

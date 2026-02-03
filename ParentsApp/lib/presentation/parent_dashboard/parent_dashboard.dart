@@ -3,12 +3,14 @@ import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
 import '../../services/api_service.dart';
+import '../../services/home_location_service.dart';
 import '../../models/child_model.dart';
 import '../notifications_center/notifications_center.dart';
 import '../parent_profile_settings/parent_profile_settings.dart';
 import './widgets/child_status_card.dart';
-import './widgets/connection_status_bar.dart';
-import './widgets/telegram_background.dart';
+import './widgets/home_location_prompt_dialog.dart';
+// import './widgets/connection_status_bar.dart'; // not used currently
+// Removed legacy telegram-style background to reduce UI redundancy
 
 class ParentDashboard extends StatefulWidget {
   const ParentDashboard({Key? key}) : super(key: key);
@@ -23,16 +25,26 @@ class _ParentDashboardState extends State<ParentDashboard> {
   String _lastUpdated = '2 min ago';
 
   final ApiService _apiService = ApiService();
+  final HomeLocationService _homeLocationService = HomeLocationService();
   bool _isLoading = true;
   List<Child> _children = [];
   String? _error;
   String _parentName = 'Parent';
+  String? _parentAddress;
+  bool _hasShownLocationPrompt = false;
+
+  // Global key to access profile settings state
+  final GlobalKey<State> _profileKey = GlobalKey<State>();
 
   @override
   void initState() {
     super.initState();
-    _loadData();
-    _simulateConnectionStatus();
+    // Defer heavy operations to after first frame renders
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+      _simulateConnectionStatus();
+      _checkAndPromptHomeLocation();
+    });
   }
 
   Future<void> _loadData() async {
@@ -42,9 +54,14 @@ class _ParentDashboardState extends State<ParentDashboard> {
     });
 
     try {
-      // Load both parent profile and children
-      final parentProfile = await _apiService.getParentProfile();
-      final children = await _apiService.getMyChildren();
+      // Load both parent profile and children in parallel for faster loading
+      final results = await Future.wait([
+        _apiService.getParentProfile(),
+        _apiService.getMyChildren(),
+      ]);
+
+      final parentProfile = results[0] as Map<String, dynamic>;
+      final children = results[1] as List<Child>;
 
       setState(() {
         // Get name from user object
@@ -53,6 +70,11 @@ class _ParentDashboardState extends State<ParentDashboard> {
           _parentName = user['first_name'] ?? user['username'] ?? 'Parent';
         } else {
           _parentName = 'Parent';
+        }
+        // Get parent's home address
+        final parent = parentProfile['parent'];
+        if (parent != null) {
+          _parentAddress = parent['address'];
         }
         _children = children;
         _isLoading = false;
@@ -73,6 +95,44 @@ class _ParentDashboardState extends State<ParentDashboard> {
     await _loadData();
   }
 
+  /// Check if home location is set, and prompt user if not
+  Future<void> _checkAndPromptHomeLocation() async {
+    // Wait a bit for the UI to settle
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    if (!mounted || _hasShownLocationPrompt) return;
+
+    try {
+      // Check if home location is already cached
+      final homeLocation = await _homeLocationService.getHomeCoordinates();
+      final homeAddress = await _homeLocationService.getHomeAddress();
+
+      // If neither coordinates nor address are set, show prompt
+      if (homeLocation == null && (homeAddress == null || homeAddress.isEmpty)) {
+        _hasShownLocationPrompt = true;
+
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => HomeLocationPromptDialog(
+              onLocationSet: () {
+                // Refresh children data to update with new address
+                _loadChildren();
+                // Also refresh profile to show updated address
+                if (_profileKey.currentState != null) {
+                  (_profileKey.currentState as dynamic).refreshData();
+                }
+              },
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Silently fail - don't interrupt user experience
+    }
+  }
+
   void _simulateConnectionStatus() {
     Future.delayed(const Duration(seconds: 10), () {
       if (mounted) {
@@ -88,13 +148,16 @@ class _ParentDashboardState extends State<ParentDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: IndexedStack(
         index: _currentIndex,
         children: [
           _buildHomeScreen(),
           const NotificationsCenter(),
-          const ParentProfileSettings(),
+          ParentProfileSettings(
+            key: _profileKey,
+            onRefreshDashboard: _loadData,
+          ),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -103,12 +166,13 @@ class _ParentDashboardState extends State<ParentDashboard> {
           setState(() {
             _currentIndex = index;
           });
+          // Don't auto-refresh tabs - let users pull to refresh instead
         },
         type: BottomNavigationBarType.fixed,
         backgroundColor:
-            AppTheme.lightTheme.bottomNavigationBarTheme.backgroundColor,
-        selectedItemColor: AppTheme.lightTheme.colorScheme.primary,
-        unselectedItemColor: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+            Theme.of(context).bottomNavigationBarTheme.backgroundColor,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
         showSelectedLabels: true,
         showUnselectedLabels: true,
         items: [
@@ -116,8 +180,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
             icon: CustomIconWidget(
               iconName: 'home',
               color: _currentIndex == 0
-                  ? AppTheme.lightTheme.colorScheme.primary
-                  : AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
               size: 6.w,
             ),
             label: 'Home',
@@ -128,8 +192,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
                 CustomIconWidget(
                   iconName: 'notifications',
                   color: _currentIndex == 1
-                      ? AppTheme.lightTheme.colorScheme.primary
-                      : AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                   size: 6.w,
                 ),
                 if (_hasUnreadNotifications())
@@ -153,8 +217,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
             icon: CustomIconWidget(
               iconName: 'person',
               color: _currentIndex == 2
-                  ? AppTheme.lightTheme.colorScheme.primary
-                  : AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
               size: 6.w,
             ),
             label: 'Profile',
@@ -204,7 +268,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
 
   Widget _buildHomeScreen() {
     return Scaffold(
-      backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -221,13 +285,19 @@ class _ParentDashboardState extends State<ParentDashboard> {
                             SliverToBoxAdapter(
                               child: Container(
                                 decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      const Color(0xFF4CAF50), // Green
-                                      const Color(0xFF388E3C), // Darker green
-                                    ],
+                                  color: Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? Theme.of(context).colorScheme.surface
+                                      : Theme.of(context)
+                                          .colorScheme
+                                          .surfaceVariant,
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outline
+                                          .withValues(alpha: 0.15),
+                                    ),
                                   ),
                                 ),
                                 child: Padding(
@@ -241,7 +311,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                       Text(
                                         '${_getGreeting()}, $_parentName',
                                         style: TextStyle(
-                                          color: Colors.white,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface,
                                           fontSize: 18.sp,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -251,16 +323,18 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                         children: [
                                           Icon(
                                             Icons.calendar_today,
-                                            color: Colors.white
-                                                .withValues(alpha: 0.85),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant,
                                             size: 4.w,
                                           ),
                                           SizedBox(width: 1.5.w),
                                           Text(
                                             _getFormattedDate(),
                                             style: TextStyle(
-                                              color: Colors.white
-                                                  .withValues(alpha: 0.85),
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
                                               fontSize: 12.sp,
                                               fontWeight: FontWeight.w400,
                                             ),
@@ -279,14 +353,16 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                     EdgeInsets.fromLTRB(5.w, 2.h, 5.w, 1.h),
                                 child: Text(
                                   'Your Children',
-                                  style: AppTheme
-                                      .lightTheme.textTheme.titleLarge
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
                                       ?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: AppTheme
-                                        .lightTheme.colorScheme.onSurface,
-                                    fontSize: 18.sp,
-                                  ),
+                                        fontWeight: FontWeight.w600,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
+                                        fontSize: 18.sp,
+                                      ),
                                 ),
                               ),
                             ),
@@ -322,6 +398,10 @@ class _ParentDashboardState extends State<ParentDashboard> {
       "status": child.currentStatus ?? 'no record today',
       "busId": child.assignedBus?.id,
       "busNumber": child.assignedBus?.numberPlate,
+      "driverName": child.assignedBus?.driverName,
+      "route": child.assignedBus?.route,
+      "address": child.address,
+      "homeAddress": _parentAddress, // Parent's home address for map
     };
   }
 
@@ -343,21 +423,21 @@ class _ParentDashboardState extends State<ParentDashboard> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.error_outline,
-                size: 64, color: AppTheme.lightTheme.colorScheme.error),
+                size: 64, color: Theme.of(context).colorScheme.error),
             SizedBox(height: 2.h),
             Text(
               'Error Loading Children',
-              style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             SizedBox(height: 1.h),
             Text(
               _error!,
               textAlign: TextAlign.center,
-              style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
-                color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
             SizedBox(height: 3.h),
             ElevatedButton.icon(
@@ -380,21 +460,21 @@ class _ParentDashboardState extends State<ParentDashboard> {
           children: [
             Icon(Icons.family_restroom,
                 size: 64,
-                color: AppTheme.lightTheme.colorScheme.onSurfaceVariant),
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
             SizedBox(height: 2.h),
             Text(
               'No Children Found',
-              style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             SizedBox(height: 1.h),
             Text(
               'Contact your school admin to add children to your account',
               textAlign: TextAlign.center,
-              style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
-                color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
           ],
         ),
@@ -407,13 +487,13 @@ class _ParentDashboardState extends State<ParentDashboard> {
     final String childName = childData['name'] ?? 'Child';
 
     String statusMessage = '';
-    Color statusColor = AppTheme.lightTheme.colorScheme.primary;
+    Color statusColor = Theme.of(context).colorScheme.primary;
 
     switch (status.toLowerCase()) {
       case 'at_school':
       case 'at-school':
         statusMessage = '$childName is safely at school';
-        statusColor = AppTheme.lightTheme.colorScheme.secondary;
+        statusColor = Theme.of(context).colorScheme.secondary;
         break;
       case 'at_home':
       case 'at-home':
@@ -449,9 +529,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
               Expanded(
                 child: Text(
                   'Status Update',
-                  style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
               ),
             ],
@@ -462,27 +542,27 @@ class _ParentDashboardState extends State<ParentDashboard> {
             children: [
               Text(
                 statusMessage,
-                style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
               ),
               if (childData['arrivalTime'] != null &&
                   childData['arrivalTime'].toString().isNotEmpty) ...[
                 SizedBox(height: 2.h),
                 Text(
                   'Next Update: ${childData['arrivalTime']}',
-                  style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                  ),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                 ),
               ],
               if (childData['busNumber'] != null) ...[
                 SizedBox(height: 1.h),
                 Text(
                   'Bus: ${childData['busNumber']} • ${childData['driverName'] ?? 'Unknown Driver'}',
-                  style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                  ),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                 ),
               ],
             ],

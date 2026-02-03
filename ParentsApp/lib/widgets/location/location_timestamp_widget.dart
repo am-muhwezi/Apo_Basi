@@ -22,7 +22,8 @@ class LocationTimestampWidget extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<LocationTimestampWidget> createState() => _LocationTimestampWidgetState();
+  State<LocationTimestampWidget> createState() =>
+      _LocationTimestampWidgetState();
 }
 
 class _LocationTimestampWidgetState extends State<LocationTimestampWidget> {
@@ -102,10 +103,10 @@ class _LocationTimestampWidgetState extends State<LocationTimestampWidget> {
   Widget build(BuildContext context) {
     final color = _getTextColor();
     final textStyle = widget.textStyle ??
-        AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w500,
-        );
+        Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w500,
+            );
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -158,7 +159,7 @@ class CompactLocationTimestamp extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       _formatCompact(),
-      style: AppTheme.lightTheme.textTheme.labelSmall,
+      style: Theme.of(context).textTheme.labelSmall,
     );
   }
 }

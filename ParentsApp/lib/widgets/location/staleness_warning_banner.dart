@@ -90,17 +90,17 @@ class StalenessWarningBanner extends StatelessWidget {
               children: [
                 Text(
                   message,
-                  style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
-                    color: colors.text,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colors.text,
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
                 if (severity == WarningSeverity.error)
                   Text(
                     'The driver may have lost connection',
-                    style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                      color: colors.text.withOpacity(0.8),
-                    ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colors.text.withOpacity(0.8),
+                        ),
                   ),
               ],
             ),

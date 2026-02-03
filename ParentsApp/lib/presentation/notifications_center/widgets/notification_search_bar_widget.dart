@@ -79,15 +79,19 @@ class _NotificationSearchBarWidgetState
             margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
             padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
             decoration: BoxDecoration(
-              color: AppTheme.lightTheme.colorScheme.surface,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: AppTheme.lightTheme.colorScheme.outline
+                color: Theme.of(context)
+                    .colorScheme
+                    .outline
                     .withValues(alpha: 0.3),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.lightTheme.colorScheme.shadow
+                  color: Theme.of(context)
+                      .colorScheme
+                      .shadow
                       .withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
@@ -98,7 +102,7 @@ class _NotificationSearchBarWidgetState
               children: [
                 CustomIconWidget(
                   iconName: 'search',
-                  color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   size: 20,
                 ),
                 SizedBox(width: 3.w),
@@ -108,16 +112,19 @@ class _NotificationSearchBarWidgetState
                     onChanged: widget.onSearchChanged,
                     decoration: InputDecoration(
                       hintText: 'Search notifications...',
-                      hintStyle:
-                          AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                      ),
+                      hintStyle: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
                       contentPadding: EdgeInsets.zero,
                     ),
-                    style: AppTheme.lightTheme.textTheme.bodyMedium,
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
                 if (_searchController.text.isNotEmpty) ...[
@@ -129,7 +136,7 @@ class _NotificationSearchBarWidgetState
                     },
                     child: CustomIconWidget(
                       iconName: 'clear',
-                      color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       size: 18,
                     ),
                   ),
@@ -140,13 +147,15 @@ class _NotificationSearchBarWidgetState
                   child: Container(
                     padding: EdgeInsets.all(1.w),
                     decoration: BoxDecoration(
-                      color: AppTheme.lightTheme.colorScheme.primary
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
                           .withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: CustomIconWidget(
                       iconName: 'filter_list',
-                      color: AppTheme.lightTheme.colorScheme.primary,
+                      color: Theme.of(context).colorScheme.primary,
                       size: 18,
                     ),
                   ),
