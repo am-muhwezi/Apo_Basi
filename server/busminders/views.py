@@ -1,4 +1,6 @@
 import logging
+import requests
+from jose import jwt, JWTError
 
 from rest_framework import status, generics
 from rest_framework.views import APIView
@@ -6,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.conf import settings
 from users.serializers import BusMinderRegistrationSerializer, UserSerializer
 from .models import BusMinder
 from .serializers import BusMinderSerializer, BusMinderCreateSerializer
@@ -441,4 +444,207 @@ def busminder_phone_login(request):
                 },
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def check_busminder_email(request):
+    """
+    Check if an email is registered as a bus minder before sending magic link.
+
+    POST /api/busminders/auth/check-email/
+    Body: {"email": "minder@example.com"}
+
+    Returns:
+    {
+        "registered": true/false,
+        "message": "..."
+    }
+    """
+    email = request.data.get('email')
+
+    if not email:
+        return Response(
+            {"error": "email is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check if bus minder exists with this email
+    try:
+        busminder = BusMinder.objects.select_related('user').get(
+            user__email__iexact=email,  # Case-insensitive match
+            status='active'
+        )
+
+        return Response(
+            {
+                "registered": True,
+                "message": "Email is registered"
+            },
+            status=status.HTTP_200_OK
+        )
+    except BusMinder.DoesNotExist:
+        return Response(
+            {
+                "registered": False,
+                "message": "This email is not registered. Please contact your administrator to set up your account."
+            },
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def busminder_magic_link_auth(request):
+    """
+    Exchange Supabase magic link session for Django JWT tokens (bus minders).
+
+    POST /api/busminders/auth/magic-link/
+    Body: {"access_token": "supabase_jwt_token"}
+
+    The magic link flow:
+    1. Bus minder enters email in Flutter app
+    2. Supabase sends magic link email
+    3. Bus minder clicks link → opens app via deep linking
+    4. Flutter extracts Supabase access_token
+    5. Flutter sends token to this endpoint
+    6. Django verifies token and returns Django JWT tokens + bus data
+    """
+    access_token = request.data.get('access_token')
+
+    if not access_token:
+        return Response(
+            {"error": "access_token is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        # Fetch JWKS (JSON Web Key Set) from Supabase
+        jwks_response = requests.get(settings.SUPABASE_JWKS_URL, timeout=5)
+        jwks_response.raise_for_status()
+        jwks = jwks_response.json()
+
+        # Verify and decode the Supabase JWT token
+        payload = jwt.decode(
+            access_token,
+            jwks,
+            algorithms=['ES256'],
+            options={
+                'verify_aud': False,  # Supabase uses different audience
+                'verify_iss': True,
+            }
+        )
+
+        email = payload.get('email')
+        if not email:
+            return Response(
+                {"error": "Email not found in token"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if bus minder exists with this email
+        try:
+            busminder = BusMinder.objects.select_related('user').get(
+                user__email=email,
+                status='active'
+            )
+            user = busminder.user
+        except BusMinder.DoesNotExist:
+            return Response(
+                {
+                    "error": "No bus minder account found",
+                    "message": "Your email is not registered. Please contact your administrator to set up your account."
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Generate Django JWT tokens
+        refresh = RefreshToken.for_user(user)
+
+        # Get bus data (same as MyBusesView)
+        from assignments.models import Assignment
+        from buses.models import Bus
+        from children.models import Child
+        from attendance.models import Attendance
+        from datetime import date
+
+        bus_assignments = Assignment.get_active_assignments_for(busminder, 'minder_to_bus')
+        buses_data = []
+
+        for assignment in bus_assignments:
+            bus = assignment.assigned_to
+
+            # Get children assigned to this bus
+            child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
+            today = date.today()
+
+            children_data = []
+            for child_assignment in child_assignments:
+                child = child_assignment.assignee
+
+                # Get today's attendance
+                pickup_attendance = Attendance.objects.filter(child=child, date=today, trip_type='pickup').first()
+                dropoff_attendance = Attendance.objects.filter(child=child, date=today, trip_type='dropoff').first()
+
+                children_data.append({
+                    "id": child.id,
+                    "first_name": child.first_name,
+                    "last_name": child.last_name,
+                    "name": f"{child.first_name} {child.last_name}",
+                    "grade": child.class_grade,
+                    "parent_name": child.parent.user.get_full_name() if child.parent else "N/A",
+                    "parent_contact": child.parent.contact_number if child.parent else "N/A",
+                    "pickup_status": pickup_attendance.status if pickup_attendance else None,
+                    "pickup_status_display": pickup_attendance.get_status_display() if pickup_attendance else "Not marked",
+                    "dropoff_status": dropoff_attendance.status if dropoff_attendance else None,
+                    "dropoff_status_display": dropoff_attendance.get_status_display() if dropoff_attendance else "Not marked",
+                })
+
+            buses_data.append({
+                "id": bus.id,
+                "bus_number": bus.bus_number,
+                "number_plate": bus.number_plate,
+                "capacity": bus.capacity,
+                "is_active": bus.is_active,
+                "children_count": len(children_data),
+                "children": children_data,
+            })
+
+        return Response({
+            "user_id": user.id,
+            "name": user.get_full_name() or "Bus Minder",
+            "email": user.email,
+            "phone": busminder.phone_number,
+            "tokens": {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+            },
+            "buses": buses_data,
+            "total_buses": len(buses_data),
+        }, status=status.HTTP_200_OK)
+
+    except JWTError as e:
+        logger.error(f"JWT verification failed: {str(e)}")
+        return Response(
+            {
+                "error": "Invalid or expired token",
+                "message": "Your session has expired. Please request a new magic link."
+            },
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch JWKS: {str(e)}")
+        return Response(
+            {"error": "Authentication service unavailable"},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
+    except Exception as e:
+        logger.exception("Unexpected error during bus minder magic link auth")
+        return Response(
+            {
+                "error": "Authentication failed",
+                "message": "Something went wrong. Please try again."
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
