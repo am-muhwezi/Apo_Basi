@@ -1,4 +1,6 @@
 import logging
+import requests
+from jose import jwt, JWTError
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -6,6 +8,7 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
 from rest_framework import status, generics
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.conf import settings
 from .models import Driver
 from .serializers import DriverSerializer, DriverCreateSerializer
 from users.models import User
@@ -344,6 +347,237 @@ def driver_phone_login(request):
 
     except Driver.DoesNotExist:
         return Response({"error": "Phone number not registered"}, status=404)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def check_driver_email(request):
+    """
+    Check if an email is registered as a driver before sending magic link.
+
+    POST /api/drivers/auth/check-email/
+    Body: {"email": "driver@example.com"}
+
+    Returns:
+    {
+        "registered": true/false,
+        "message": "..."
+    }
+    """
+    email = request.data.get('email')
+
+    if not email:
+        return Response(
+            {"error": "email is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check if driver exists with this email
+    try:
+        driver = Driver.objects.select_related('user').get(
+            user__email__iexact=email,  # Case-insensitive match
+            status='active'
+        )
+
+        return Response(
+            {
+                "registered": True,
+                "message": "Email is registered"
+            },
+            status=status.HTTP_200_OK
+        )
+    except Driver.DoesNotExist:
+        return Response(
+            {
+                "registered": False,
+                "message": "This email is not registered. Please contact your administrator to set up your account."
+            },
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def driver_magic_link_auth(request):
+    """
+    Exchange Supabase magic link session for Django JWT tokens (drivers).
+
+    POST /api/drivers/auth/magic-link/
+    Body: {"access_token": "supabase_jwt_token"}
+
+    The magic link flow:
+    1. Driver enters email in Flutter app
+    2. Supabase sends magic link email
+    3. Driver clicks link → opens app via deep linking
+    4. Flutter extracts Supabase access_token
+    5. Flutter sends token to this endpoint
+    6. Django verifies token and returns Django JWT tokens + bus/route data
+    """
+    access_token = request.data.get('access_token')
+
+    if not access_token:
+        return Response(
+            {"error": "access_token is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        # Fetch JWKS (JSON Web Key Set) from Supabase
+        jwks_response = requests.get(settings.SUPABASE_JWKS_URL, timeout=5)
+        jwks_response.raise_for_status()
+        jwks = jwks_response.json()
+
+        # Verify and decode the Supabase JWT token
+        payload = jwt.decode(
+            access_token,
+            jwks,
+            algorithms=['ES256'],
+            options={
+                'verify_aud': False,  # Supabase uses different audience
+                'verify_iss': True,
+            }
+        )
+
+        email = payload.get('email')
+        if not email:
+            return Response(
+                {"error": "Email not found in token"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if driver exists with this email
+        try:
+            driver = Driver.objects.select_related('user').get(
+                user__email=email,
+                status='active'
+            )
+            user = driver.user
+        except Driver.DoesNotExist:
+            return Response(
+                {
+                    "error": "No driver account found",
+                    "message": "Your email is not registered. Please contact your administrator to set up your account."
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Generate Django JWT tokens
+        refresh = RefreshToken.for_user(user)
+
+        # Get bus and route data (same as phone login)
+        bus_data = None
+        route_data = None
+
+        # Find active driver-to-bus assignment
+        assignment = Assignment.get_active_assignments_for(driver, 'driver_to_bus').first()
+
+        if assignment:
+            bus = assignment.assigned_to
+
+            # Get children assigned to this bus
+            child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
+
+            # Get today's date for attendance
+            today = date.today()
+
+            children_data = []
+            for child_assignment in child_assignments:
+                child = child_assignment.assignee
+
+                # Get today's attendance for both pickup and dropoff
+                pickup_attendance = Attendance.objects.filter(child=child, date=today, trip_type='pickup').first()
+                dropoff_attendance = Attendance.objects.filter(child=child, date=today, trip_type='dropoff').first()
+
+                children_data.append({
+                    "id": child.id,
+                    "first_name": child.first_name,
+                    "last_name": child.last_name,
+                    "child_name": f"{child.first_name} {child.last_name}",
+                    "name": f"{child.first_name} {child.last_name}",
+                    "grade": child.class_grade,
+                    "class_grade": child.class_grade,
+                    "address": child.address if hasattr(child, 'address') else "N/A",
+                    "parent_name": child.parent.user.get_full_name() if child.parent else "N/A",
+                    "parent_contact": child.parent.contact_number if child.parent else "N/A",
+                    "emergency_contact": child.parent.emergency_contact if child.parent else "N/A",
+                    "pickup_status": pickup_attendance.status if pickup_attendance else None,
+                    "pickup_status_display": pickup_attendance.get_status_display() if pickup_attendance else "Not marked",
+                    "pickup_timestamp": pickup_attendance.timestamp if pickup_attendance else None,
+                    "dropoff_status": dropoff_attendance.status if dropoff_attendance else None,
+                    "dropoff_status_display": dropoff_attendance.get_status_display() if dropoff_attendance else "Not marked",
+                    "dropoff_timestamp": dropoff_attendance.timestamp if dropoff_attendance else None,
+                })
+
+            bus_data = {
+                "id": bus.id,
+                "bus_number": bus.bus_number,
+                "number_plate": bus.number_plate,
+                "capacity": bus.capacity,
+                "is_active": bus.is_active,
+                "current_location": bus.current_location,
+                "latitude": str(bus.latitude) if bus.latitude else None,
+                "longitude": str(bus.longitude) if bus.longitude else None,
+                "speed": bus.speed,
+                "heading": bus.heading,
+                "last_updated": bus.last_updated,
+                "children_count": len(children_data),
+                "children": children_data,
+            }
+
+            route_data = {
+                "bus_number": bus.bus_number,
+                "route_name": f"Bus {bus.bus_number} Route",
+                "estimated_duration": "45 minutes",
+                "bus": {
+                    "id": bus.id,
+                    "bus_number": bus.bus_number,
+                    "number_plate": bus.number_plate,
+                    "is_active": bus.is_active,
+                },
+                "children": children_data,
+                "route": children_data,
+                "total_children": len(children_data)
+            }
+
+        return Response({
+            "user_id": user.id,
+            "name": user.get_full_name() or "Driver",
+            "email": user.email,
+            "phone": driver.phone_number,
+            "license_number": driver.license_number,
+            "license_expiry": driver.license_expiry.isoformat() if driver.license_expiry else None,
+            "tokens": {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+            },
+            "bus": bus_data,
+            "route": route_data,
+        }, status=status.HTTP_200_OK)
+
+    except JWTError as e:
+        logger.error(f"JWT verification failed: {str(e)}")
+        return Response(
+            {
+                "error": "Invalid or expired token",
+                "message": "Your session has expired. Please request a new magic link."
+            },
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch JWKS: {str(e)}")
+        return Response(
+            {"error": "Authentication service unavailable"},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
+    except Exception as e:
+        logger.exception("Unexpected error during driver magic link auth")
+        return Response(
+            {
+                "error": "Authentication failed",
+                "message": "Something went wrong. Please try again."
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(['POST'])
