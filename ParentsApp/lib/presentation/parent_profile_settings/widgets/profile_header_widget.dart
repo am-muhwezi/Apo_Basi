@@ -123,7 +123,7 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
   void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.lightTheme.colorScheme.surface,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -136,25 +136,25 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
               width: 12.w,
               height: 0.5.h,
               decoration: BoxDecoration(
-                color: AppTheme.lightTheme.colorScheme.outline,
+                color: Theme.of(context).colorScheme.outline,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             SizedBox(height: 3.h),
             Text(
               'Update Profile Photo',
-              style: AppTheme.lightTheme.textTheme.titleLarge,
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 3.h),
             ListTile(
               leading: CustomIconWidget(
                 iconName: 'camera_alt',
-                color: AppTheme.lightTheme.colorScheme.primary,
+                color: Theme.of(context).colorScheme.primary,
                 size: 24,
               ),
               title: Text(
                 'Take Photo',
-                style: AppTheme.lightTheme.textTheme.bodyLarge,
+                style: Theme.of(context).textTheme.bodyLarge,
               ),
               onTap: () async {
                 Navigator.of(context).pop();
@@ -166,12 +166,12 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
             ListTile(
               leading: CustomIconWidget(
                 iconName: 'photo_library',
-                color: AppTheme.lightTheme.colorScheme.primary,
+                color: Theme.of(context).colorScheme.primary,
                 size: 24,
               ),
               title: Text(
                 'Choose from Gallery',
-                style: AppTheme.lightTheme.textTheme.bodyLarge,
+                style: Theme.of(context).textTheme.bodyLarge,
               ),
               onTap: _pickFromGallery,
             ),
@@ -195,7 +195,7 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
                 height: 60.h,
                 child: Center(
                   child: CircularProgressIndicator(
-                    color: AppTheme.lightTheme.colorScheme.primary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               );
@@ -259,11 +259,11 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
     return Container(
       padding: EdgeInsets.all(4.w),
       decoration: BoxDecoration(
-        color: AppTheme.lightTheme.colorScheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.lightTheme.colorScheme.shadow,
+            color: Theme.of(context).colorScheme.shadow,
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -283,7 +283,7 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: AppTheme.lightTheme.colorScheme.primary,
+                          color: Theme.of(context).colorScheme.primary,
                           width: 2,
                         ),
                       ),
@@ -309,7 +309,7 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
                                   child: CustomIconWidget(
                                     iconName: 'person',
                                     color:
-                                        AppTheme.lightTheme.colorScheme.primary,
+                                        Theme.of(context).colorScheme.primary,
                                     size: 32,
                                   ),
                                 ),
@@ -323,10 +323,10 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
                         width: 6.w,
                         height: 6.w,
                         decoration: BoxDecoration(
-                          color: AppTheme.lightTheme.colorScheme.primary,
+                          color: Theme.of(context).colorScheme.primary,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: AppTheme.lightTheme.colorScheme.surface,
+                            color: Theme.of(context).colorScheme.surface,
                             width: 2,
                           ),
                         ),
@@ -347,23 +347,25 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
                   children: [
                     Text(
                       widget.childData['name'] as String? ?? 'Child Name',
-                      style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
                     SizedBox(height: 1.h),
                     Text(
                       'Grade ${widget.childData['grade'] as String? ?? 'N/A'}',
-                      style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                     SizedBox(height: 0.5.h),
                     Text(
                       widget.childData['school'] as String? ?? 'School Name',
-                      style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                        color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                   ],
                 ),

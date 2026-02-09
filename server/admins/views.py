@@ -18,22 +18,15 @@ from children.models import Child
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def admin_register(request):
-    """Admin registration endpoint that returns JWT tokens"""
-    serializer = AdminRegistrationSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    user = serializer.save()
+    """Admin registration endpoint - DISABLED for security
 
-    # Generate JWT tokens
-    refresh = RefreshToken.for_user(user)
-
+    Admin accounts should only be created by existing admins through the admin panel.
+    Public signup is disabled to prevent unauthorized access to sensitive school data.
+    """
     return Response({
-        'user': UserSerializer(user).data,
-        'tokens': {
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-        },
-        'message': 'Admin registered successfully'
-    }, status=status.HTTP_201_CREATED)
+        'error': 'Admin registration is disabled',
+        'message': 'Admin accounts can only be created by existing administrators. Please contact your school administrator for access.'
+    }, status=status.HTTP_403_FORBIDDEN)
 
 
 # Admin CRUD Views

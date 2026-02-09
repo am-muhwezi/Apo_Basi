@@ -1,12 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Internet access for API calls -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Location permissions for GPS tracking -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- Background location (for tracking while app in background) - Android 10+ -->
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-    <uses-permission android:name="android.permission." />
     <application
         android:label="ApoBasi"
         android:name="${applicationName}"

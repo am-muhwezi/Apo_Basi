@@ -7,6 +7,8 @@ from .views import (
     BusChildrenView,
     MarkAttendanceView,
     busminder_phone_login,
+    check_busminder_email,
+    busminder_magic_link_auth,
 )
 
 urlpatterns = [
@@ -16,6 +18,8 @@ urlpatterns = [
 
     # Authentication
     path("phone-login/", busminder_phone_login, name="busminder-phone-login"),
+    path("auth/check-email/", check_busminder_email, name="check-busminder-email"),
+    path("auth/magic-link/", busminder_magic_link_auth, name="busminder-magic-link-auth"),
 
     # BusMinder-specific endpoints
     path("register/", BusMinderRegistrationView.as_view(), name="bus-minder-register"),

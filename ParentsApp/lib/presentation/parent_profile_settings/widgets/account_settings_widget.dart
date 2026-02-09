@@ -98,7 +98,7 @@ class _AccountSettingsWidgetState extends State<AccountSettingsWidget> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Password changed successfully'),
-        backgroundColor: AppTheme.lightTheme.colorScheme.secondary,
+        backgroundColor: Theme.of(context).colorScheme.secondary,
       ),
     );
   }
@@ -117,7 +117,7 @@ class _AccountSettingsWidgetState extends State<AccountSettingsWidget> {
         content: Text(value
             ? 'Biometric authentication enabled'
             : 'Biometric authentication disabled'),
-        backgroundColor: AppTheme.lightTheme.colorScheme.secondary,
+        backgroundColor: Theme.of(context).colorScheme.secondary,
       ),
     );
   }
@@ -126,7 +126,7 @@ class _AccountSettingsWidgetState extends State<AccountSettingsWidget> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: AppTheme.lightTheme.colorScheme.error,
+        backgroundColor: Theme.of(context).colorScheme.error,
       ),
     );
   }
@@ -146,7 +146,7 @@ class _AccountSettingsWidgetState extends State<AccountSettingsWidget> {
           padding: EdgeInsets.all(3.w),
           child: CustomIconWidget(
             iconName: 'lock',
-            color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             size: 20,
           ),
         ),
@@ -154,7 +154,7 @@ class _AccountSettingsWidgetState extends State<AccountSettingsWidget> {
           onPressed: onToggleVisibility,
           icon: CustomIconWidget(
             iconName: obscureText ? 'visibility' : 'visibility_off',
-            color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             size: 20,
           ),
         ),
@@ -168,11 +168,11 @@ class _AccountSettingsWidgetState extends State<AccountSettingsWidget> {
       margin: EdgeInsets.symmetric(vertical: 1.h),
       padding: EdgeInsets.all(4.w),
       decoration: BoxDecoration(
-        color: AppTheme.lightTheme.colorScheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.lightTheme.colorScheme.shadow,
+            color: Theme.of(context).colorScheme.shadow,
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -185,15 +185,15 @@ class _AccountSettingsWidgetState extends State<AccountSettingsWidget> {
             children: [
               CustomIconWidget(
                 iconName: 'account_circle',
-                color: AppTheme.lightTheme.colorScheme.primary,
+                color: Theme.of(context).colorScheme.primary,
                 size: 24,
               ),
               SizedBox(width: 3.w),
               Text(
                 'Account Settings',
-                style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
             ],
           ),
@@ -203,14 +203,14 @@ class _AccountSettingsWidgetState extends State<AccountSettingsWidget> {
           Container(
             padding: EdgeInsets.all(3.w),
             decoration: BoxDecoration(
-              color: AppTheme.lightTheme.colorScheme.surfaceContainerHighest,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
                 CustomIconWidget(
                   iconName: 'school',
-                  color: AppTheme.lightTheme.colorScheme.primary,
+                  color: Theme.of(context).colorScheme.primary,
                   size: 20,
                 ),
                 SizedBox(width: 3.w),
@@ -219,17 +219,18 @@ class _AccountSettingsWidgetState extends State<AccountSettingsWidget> {
                   children: [
                     Text(
                       'School Code',
-                      style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                        color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                     SizedBox(height: 0.5.h),
                     Text(
                       widget.accountData['schoolCode'] as String? ?? 'SCH001',
-                      style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'monospace',
-                      ),
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'monospace',
+                          ),
                     ),
                   ],
                 ),
@@ -248,7 +249,7 @@ class _AccountSettingsWidgetState extends State<AccountSettingsWidget> {
                   },
                   icon: CustomIconWidget(
                     iconName: 'copy',
-                    color: AppTheme.lightTheme.colorScheme.primary,
+                    color: Theme.of(context).colorScheme.primary,
                     size: 20,
                   ),
                 ),
@@ -261,7 +262,7 @@ class _AccountSettingsWidgetState extends State<AccountSettingsWidget> {
           Container(
             decoration: BoxDecoration(
               border: Border.all(
-                color: AppTheme.lightTheme.colorScheme.outline,
+                color: Theme.of(context).colorScheme.outline,
                 width: 1,
               ),
               borderRadius: BorderRadius.circular(8),
@@ -271,23 +272,23 @@ class _AccountSettingsWidgetState extends State<AccountSettingsWidget> {
                 ListTile(
                   leading: CustomIconWidget(
                     iconName: 'lock',
-                    color: AppTheme.lightTheme.colorScheme.primary,
+                    color: Theme.of(context).colorScheme.primary,
                     size: 24,
                   ),
                   title: Text(
                     'Change Password',
-                    style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
                   ),
                   subtitle: Text(
                     'Update your account password',
-                    style: AppTheme.lightTheme.textTheme.bodySmall,
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                   trailing: CustomIconWidget(
                     iconName:
                         _showPasswordFields ? 'expand_less' : 'expand_more',
-                    color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     size: 24,
                   ),
                   onTap: _togglePasswordChange,
@@ -355,14 +356,14 @@ class _AccountSettingsWidgetState extends State<AccountSettingsWidget> {
           Container(
             padding: EdgeInsets.all(3.w),
             decoration: BoxDecoration(
-              color: AppTheme.lightTheme.colorScheme.surfaceContainerHighest,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
                 CustomIconWidget(
                   iconName: 'fingerprint',
-                  color: AppTheme.lightTheme.colorScheme.primary,
+                  color: Theme.of(context).colorScheme.primary,
                   size: 24,
                 ),
                 SizedBox(width: 3.w),
@@ -372,19 +373,18 @@ class _AccountSettingsWidgetState extends State<AccountSettingsWidget> {
                     children: [
                       Text(
                         'Biometric Authentication',
-                        style:
-                            AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
                       ),
                       SizedBox(height: 0.5.h),
                       Text(
                         'Use fingerprint or face recognition to login',
-                        style:
-                            AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                          color:
-                              AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                        ),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                       ),
                     ],
                   ),

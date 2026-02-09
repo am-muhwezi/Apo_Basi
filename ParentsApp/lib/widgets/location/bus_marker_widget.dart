@@ -26,7 +26,7 @@ class BusMarkerWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final markerColor = color ??
         (isActive
-            ? AppTheme.lightTheme.colorScheme.secondary
+            ? Theme.of(context).colorScheme.secondary
             : Colors.grey.shade400);
 
     return Transform.scale(
@@ -107,7 +107,8 @@ class AnimatedBusMarkerWidget extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<AnimatedBusMarkerWidget> createState() => _AnimatedBusMarkerWidgetState();
+  State<AnimatedBusMarkerWidget> createState() =>
+      _AnimatedBusMarkerWidgetState();
 }
 
 class _AnimatedBusMarkerWidgetState extends State<AnimatedBusMarkerWidget>
