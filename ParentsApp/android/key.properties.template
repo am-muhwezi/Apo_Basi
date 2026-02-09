@@ -1,0 +1,9 @@
+## Rename to `key.properties` and fill with your secret values.
+storePassword=YOUR_STORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=app_key
+storeFile=app/release-keystore.jks
+
+## Notes:
+# - Keep `key.properties` out of version control.
+# - Place `release-keystore.jks` in `android/app/` (or adjust `storeFile` accordingly).
