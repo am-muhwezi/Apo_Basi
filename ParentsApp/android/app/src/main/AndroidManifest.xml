@@ -1,6 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Internet access for API calls -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Location permissions for one-time address detection and geocoding only -->
+    <!-- Fine location needed for accurate place names, NOT for continuous tracking -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Background location explicitly NOT included - parents are never tracked -->
+
     <application
         android:label="ApoBasi"
         android:name="${applicationName}"

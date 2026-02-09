@@ -51,7 +51,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
     // Remove multiple consecutive commas and spaces
     return address
         .replaceAll(RegExp(r',\s*,+'), ',') // Replace ", ," with ","
-        .replaceAll(RegExp(r'\s+'), ' ') // Replace multiple spaces with single space
+        .replaceAll(
+            RegExp(r'\s+'), ' ') // Replace multiple spaces with single space
         .replaceAll(RegExp(r',\s+,'), ',') // Replace ", ," with ","
         .trim();
   }
@@ -143,466 +144,570 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (_error != null)
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(4.w, 1.5.h, 4.w, 0),
-                          child: Container(
-                            padding: EdgeInsets.all(2.5.w),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .errorContainer
-                                  .withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_error != null)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(4.w, 1.5.h, 4.w, 0),
+                      child: Container(
+                        padding: EdgeInsets.all(2.5.w),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .errorContainer
+                              .withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 4.w,
+                              color: Theme.of(context).colorScheme.error,
                             ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(
-                                  Icons.info_outline,
-                                  size: 4.w,
-                                  color:
-                                      Theme.of(context).colorScheme.error,
-                                ),
-                                SizedBox(width: 2.w),
-                                Expanded(
-                                  child: Text(
-                                    _error!,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .error,
-                                        ),
-                                  ),
-                                ),
+                            SizedBox(width: 2.w),
+                            Expanded(
+                              child: Text(
+                                _error!,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color:
+                                          Theme.of(context).colorScheme.error,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  // Profile Header - Sleeker Design
+                  Container(
+                    width: double.infinity,
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 4.w, vertical: 3.h),
+                    margin: EdgeInsets.all(4.w),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.05),
+                          Theme.of(context).colorScheme.surface,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.1),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(1.w),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.2),
+                                Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.05),
                               ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 11.w,
+                            backgroundColor:
+                                Theme.of(context).colorScheme.surface,
+                            child: Text(
+                              _user?.fullName.substring(0, 1).toUpperCase() ??
+                                  'P',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineMedium
+                                  ?.copyWith(
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                             ),
                           ),
                         ),
-                      // Profile Header - Sleeker Design
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 4.w, vertical: 3.h),
-                        margin: EdgeInsets.all(4.w),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.05),
-                              Theme.of(context).colorScheme.surface,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                        SizedBox(height: 1.8.h),
+                        Text(
+                          _user?.fullName ?? 'Parent Name',
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: Theme.of(context).colorScheme.onSurface,
+                                letterSpacing: -0.5,
+                              ),
+                        ),
+                        SizedBox(height: 0.8.h),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 3.w, vertical: 0.5.h),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.08),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.email_outlined,
+                                size: 14,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              SizedBox(width: 1.5.w),
+                              Text(
+                                _user?.email ?? 'email@example.com',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 1.h),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 3.w, vertical: 0.5.h),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.phone_outlined,
+                                size: 14,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              SizedBox(width: 1.5.w),
+                              Text(
+                                _parent?.contactNumber ?? 'N/A',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Home Location Section
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                    child: Text(
+                      'Home Location',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.onSurface,
+                            letterSpacing: -0.3,
+                          ),
+                    ),
+                  ),
+                  SizedBox(height: 1.5.h),
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(3.5.w),
+                    margin: EdgeInsets.symmetric(horizontal: 4.w),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).colorScheme.surface,
+                          Theme.of(context)
+                              .colorScheme
+                              .surface
+                              .withValues(alpha: 0.95),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .shadow
+                              .withValues(alpha: 0.06),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outline
+                            .withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(2.8.w),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.15),
+                                Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.08),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                          ],
-                          border: Border.all(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(
+                            Icons.location_on_rounded,
+                            color: Theme.of(context).colorScheme.primary,
+                            size: 5.5.w,
+                          ),
+                        ),
+                        SizedBox(width: 3.w),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Current Address',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 10.sp,
+                                    ),
+                              ),
+                              SizedBox(height: 0.4.h),
+                              Text(
+                                _cleanAddress(_parent?.address),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.3,
+                                    ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: 2.w),
+                        Container(
+                          decoration: BoxDecoration(
                             color: Theme.of(context)
                                 .colorScheme
                                 .primary
                                 .withValues(alpha: 0.1),
-                            width: 1,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: IconButton(
+                            onPressed: () => _showUpdateAddressDialog(),
+                            icon: Icon(
+                              Icons.edit_rounded,
+                              color: Theme.of(context).colorScheme.primary,
+                              size: 5.w,
+                            ),
                           ),
                         ),
-                        child: Column(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(1.w),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.2),
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.05),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 4.h),
+
+                  // Children Information Section
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                    child: Text(
+                      'Children Information',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.onSurface,
+                            letterSpacing: -0.3,
+                          ),
+                    ),
+                  ),
+                  SizedBox(height: 1.5.h),
+
+                  // Children Cards
+                  ..._children
+                      .map((child) => ChildInformationWidget(
+                            childData: _childToCardData(child),
+                          ))
+                      .toList(),
+
+                  SizedBox(height: 4.h),
+
+                  // App Settings Section
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                    child: Text(
+                      'Settings',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.onSurface,
+                            letterSpacing: -0.3,
+                          ),
+                    ),
+                  ),
+                  SizedBox(height: 1.5.h),
+
+                  // Dark Mode Toggle
+                  Container(
+                    margin:
+                        EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
+                    padding: EdgeInsets.all(3.5.w),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).colorScheme.surface,
+                          Theme.of(context)
+                              .colorScheme
+                              .surface
+                              .withValues(alpha: 0.95),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .shadow
+                              .withValues(alpha: 0.06),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outline
+                            .withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(2.8.w),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.15),
+                                Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.08),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(
+                            Icons.dark_mode_rounded,
+                            color: Theme.of(context).colorScheme.primary,
+                            size: 5.5.w,
+                          ),
+                        ),
+                        SizedBox(width: 3.w),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Dark Mode',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
+                                    ),
                               ),
-                              child: CircleAvatar(
-                                radius: 11.w,
-                                backgroundColor:
-                                    Theme.of(context).colorScheme.surface,
-                                child: Text(
-                                  _user?.fullName
-                                          .substring(0, 1)
-                                          .toUpperCase() ??
-                                      'P',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineMedium
-                                      ?.copyWith(
-                                        color: Theme.of(context)
+                              SizedBox(height: 0.3.h),
+                              Text(
+                                'Enable dark theme',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                      fontSize: 10.sp,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ValueListenableBuilder<ThemeMode>(
+                          valueListenable: _themeService.themeModeNotifier,
+                          builder: (context, themeMode, child) {
+                            return Switch(
+                              value: themeMode == ThemeMode.dark,
+                              onChanged: (value) {
+                                _themeService.setThemeMode(
+                                  value ? ThemeMode.dark : ThemeMode.light,
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 0.5.h),
+
+                  // "Dark mode coming soon" message removed - it's working now!
+
+                  SizedBox(height: 1.h),
+
+                  // Privacy Policy and Terms & Conditions
+                  Container(
+                    margin:
+                        EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
+                    padding: EdgeInsets.all(3.5.w),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).colorScheme.surface,
+                          Theme.of(context)
+                              .colorScheme
+                              .surface
+                              .withValues(alpha: 0.95),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .shadow
+                              .withValues(alpha: 0.06),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outline
+                            .withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        InkWell(
+                          onTap: () => _openPrivacyPolicy(),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 1.2.h),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(2.8.w),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Theme.of(context)
                                             .colorScheme
-                                            .primary,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(height: 1.8.h),
-                            Text(
-                              _user?.fullName ?? 'Parent Name',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color:
-                                        Theme.of(context).colorScheme.onSurface,
-                                    letterSpacing: -0.5,
+                                            .primary
+                                            .withValues(alpha: 0.15),
+                                        Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withValues(alpha: 0.08),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
-                            ),
-                            SizedBox(height: 0.8.h),
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 3.w, vertical: 0.5.h),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.email_outlined,
-                                    size: 14,
+                                  child: Icon(
+                                    Icons.privacy_tip_outlined,
                                     color:
                                         Theme.of(context).colorScheme.primary,
+                                    size: 5.5.w,
                                   ),
-                                  SizedBox(width: 1.5.w),
-                                  Text(
-                                    _user?.email ?? 'email@example.com',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(height: 1.h),
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 3.w, vertical: 0.5.h),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.phone_outlined,
-                                    size: 14,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                  ),
-                                  SizedBox(width: 1.5.w),
-                                  Text(
-                                    _parent?.contactNumber ?? 'N/A',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Home Location Section
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4.w),
-                        child: Text(
-                          'Home Location',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: Theme.of(context).colorScheme.onSurface,
-                                letterSpacing: -0.3,
-                              ),
-                        ),
-                      ),
-                      SizedBox(height: 1.5.h),
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.all(3.5.w),
-                        margin: EdgeInsets.symmetric(horizontal: 4.w),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Theme.of(context).colorScheme.surface,
-                              Theme.of(context)
-                                  .colorScheme
-                                  .surface
-                                  .withValues(alpha: 0.95),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .shadow
-                                  .withValues(alpha: 0.06),
-                              blurRadius: 12,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                          border: Border.all(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outline
-                                .withValues(alpha: 0.08),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(2.8.w),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.15),
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.08),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
                                 ),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Icon(
-                                Icons.location_on_rounded,
-                                color: Theme.of(context).colorScheme.primary,
-                                size: 5.5.w,
-                              ),
-                            ),
-                            SizedBox(width: 3.w),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Current Address',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurfaceVariant,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 10.sp,
-                                        ),
-                                  ),
-                                  SizedBox(height: 0.4.h),
-                                  Text(
-                                    _cleanAddress(_parent?.address),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurface,
-                                          fontWeight: FontWeight.w600,
-                                          height: 1.3,
-                                        ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(width: 2.w),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: IconButton(
-                                onPressed: () => _showUpdateAddressDialog(),
-                                icon: Icon(
-                                  Icons.edit_rounded,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  size: 5.w,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      SizedBox(height: 4.h),
-
-                      // Children Information Section
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4.w),
-                        child: Text(
-                          'Children Information',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: Theme.of(context).colorScheme.onSurface,
-                                letterSpacing: -0.3,
-                              ),
-                        ),
-                      ),
-                      SizedBox(height: 1.5.h),
-
-                      // Children Cards
-                      ..._children
-                          .map((child) => ChildInformationWidget(
-                                childData: _childToCardData(child),
-                              ))
-                          .toList(),
-
-                      SizedBox(height: 4.h),
-
-                      // App Settings Section
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4.w),
-                        child: Text(
-                          'Settings',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: Theme.of(context).colorScheme.onSurface,
-                                letterSpacing: -0.3,
-                              ),
-                        ),
-                      ),
-                      SizedBox(height: 1.5.h),
-
-                      // Dark Mode Toggle
-                      Container(
-                        margin: EdgeInsets.symmetric(
-                            horizontal: 4.w, vertical: 1.h),
-                        padding: EdgeInsets.all(3.5.w),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Theme.of(context).colorScheme.surface,
-                              Theme.of(context)
-                                  .colorScheme
-                                  .surface
-                                  .withValues(alpha: 0.95),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .shadow
-                                  .withValues(alpha: 0.06),
-                              blurRadius: 12,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                          border: Border.all(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outline
-                                .withValues(alpha: 0.08),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(2.8.w),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.15),
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.08),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Icon(
-                                Icons.dark_mode_rounded,
-                                color: Theme.of(context).colorScheme.primary,
-                                size: 5.5.w,
-                              ),
-                            ),
-                            SizedBox(width: 3.w),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Dark Mode',
+                                SizedBox(width: 3.w),
+                                Expanded(
+                                  child: Text(
+                                    'Privacy Policy',
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodyLarge
@@ -613,251 +718,126 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                                               .onSurface,
                                         ),
                                   ),
-                                  SizedBox(height: 0.3.h),
-                                  Text(
-                                    'Enable dark theme',
+                                ),
+                                Icon(
+                                  Icons.chevron_right,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Divider(
+                          height: 1,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withValues(alpha: 0.1),
+                        ),
+                        InkWell(
+                          onTap: () => _openTermsAndConditions(),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 1.2.h),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(2.8.w),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withValues(alpha: 0.15),
+                                        Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withValues(alpha: 0.08),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Icon(
+                                    Icons.description_outlined,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                    size: 5.5.w,
+                                  ),
+                                ),
+                                SizedBox(width: 3.w),
+                                Expanded(
+                                  child: Text(
+                                    'Terms & Conditions',
                                     style: Theme.of(context)
                                         .textTheme
-                                        .bodySmall
+                                        .bodyLarge
                                         ?.copyWith(
+                                          fontWeight: FontWeight.w700,
                                           color: Theme.of(context)
                                               .colorScheme
-                                              .onSurfaceVariant,
-                                          fontSize: 10.sp,
+                                              .onSurface,
                                         ),
                                   ),
-                                ],
-                              ),
-                            ),
-                            ValueListenableBuilder<ThemeMode>(
-                              valueListenable: _themeService.themeModeNotifier,
-                              builder: (context, themeMode, child) {
-                                return Switch(
-                                  value: themeMode == ThemeMode.dark,
-                                  onChanged: (value) {
-                                    _themeService.setThemeMode(
-                                      value ? ThemeMode.dark : ThemeMode.light,
-                                    );
-                                  },
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      SizedBox(height: 0.5.h),
-
-                      // "Dark mode coming soon" message removed - it's working now!
-
-                      SizedBox(height: 1.h),
-
-                      // Privacy Policy and Terms & Conditions
-                      Container(
-                        margin: EdgeInsets.symmetric(
-                            horizontal: 4.w, vertical: 1.h),
-                        padding: EdgeInsets.all(3.5.w),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Theme.of(context).colorScheme.surface,
-                              Theme.of(context)
-                                  .colorScheme
-                                  .surface
-                                  .withValues(alpha: 0.95),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .shadow
-                                  .withValues(alpha: 0.06),
-                              blurRadius: 12,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                          border: Border.all(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outline
-                                .withValues(alpha: 0.08),
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            InkWell(
-                              onTap: () => _openPrivacyPolicy(),
-                              borderRadius: BorderRadius.circular(12),
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 1.2.h),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: EdgeInsets.all(2.8.w),
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Theme.of(context)
-                                                .colorScheme
-                                                .primary
-                                                .withValues(alpha: 0.15),
-                                            Theme.of(context)
-                                                .colorScheme
-                                                .primary
-                                                .withValues(alpha: 0.08),
-                                          ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Icon(
-                                        Icons.privacy_tip_outlined,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
-                                        size: 5.5.w,
-                                      ),
-                                    ),
-                                    SizedBox(width: 3.w),
-                                    Expanded(
-                                      child: Text(
-                                        'Privacy Policy',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyLarge
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface,
-                                            ),
-                                      ),
-                                    ),
-                                    Icon(
-                                      Icons.chevron_right,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
-                                  ],
                                 ),
-                              ),
-                            ),
-                            Divider(
-                              height: 1,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .outline
-                                  .withValues(alpha: 0.1),
-                            ),
-                            InkWell(
-                              onTap: () => _openTermsAndConditions(),
-                              borderRadius: BorderRadius.circular(12),
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 1.2.h),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: EdgeInsets.all(2.8.w),
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Theme.of(context)
-                                                .colorScheme
-                                                .primary
-                                                .withValues(alpha: 0.15),
-                                            Theme.of(context)
-                                                .colorScheme
-                                                .primary
-                                                .withValues(alpha: 0.08),
-                                          ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Icon(
-                                        Icons.description_outlined,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
-                                        size: 5.5.w,
-                                      ),
-                                    ),
-                                    SizedBox(width: 3.w),
-                                    Expanded(
-                                      child: Text(
-                                        'Terms & Conditions',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyLarge
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface,
-                                            ),
-                                      ),
-                                    ),
-                                    Icon(
-                                      Icons.chevron_right,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
-                                  ],
+                                Icon(
+                                  Icons.chevron_right,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
                                 ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      SizedBox(height: 2.h),
-
-                      // Logout Button
-                      Container(
-                        width: double.infinity,
-                        margin: EdgeInsets.symmetric(horizontal: 4.w),
-                        child: ElevatedButton(
-                          onPressed: () => _showLogoutDialog(),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF3B30),
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.symmetric(vertical: 2.h),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              ],
                             ),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.logout, size: 5.w),
-                              SizedBox(width: 2.w),
-                              Text(
-                                'Logout',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                            ],
-                          ),
                         ),
-                      ),
-
-                      SizedBox(height: 10.h), // Space for bottom navigation
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+
+                  SizedBox(height: 2.h),
+
+                  // Logout Button
+                  Container(
+                    width: double.infinity,
+                    margin: EdgeInsets.symmetric(horizontal: 4.w),
+                    child: ElevatedButton(
+                      onPressed: () => _showLogoutDialog(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF3B30),
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 2.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.logout, size: 5.w),
+                          SizedBox(width: 2.w),
+                          Text(
+                            'Logout',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: 10.h), // Space for bottom navigation
+                ],
+              ),
+            ),
     );
   }
 
@@ -980,7 +960,6 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
         return;
       }
 
-
       // Use reverse geocoding to get human-readable address
       String locationAddress;
       try {
@@ -996,7 +975,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
 
           // Helper function to check if string is a Plus Code (e.g., PQJR+H4F)
           bool isPlusCode(String text) {
-            return RegExp(r'^[A-Z0-9]{4}\+[A-Z0-9]{2,3}$').hasMatch(text.trim());
+            return RegExp(r'^[A-Z0-9]{4}\+[A-Z0-9]{2,3}$')
+                .hasMatch(text.trim());
           }
 
           // Helper function to check if string is meaningful (not just numbers or codes)
@@ -1150,8 +1130,14 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
-                          Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+                          Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.15),
+                          Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.05),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -1171,18 +1157,22 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                       children: [
                         Text(
                           'Update home address',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 18.sp,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 18.sp,
+                                  ),
                         ),
                         SizedBox(height: 0.3.h),
                         Text(
                           'Change your home location',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                fontSize: 11.sp,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                    fontSize: 11.sp,
+                                  ),
                         ),
                       ],
                     ),
@@ -1195,9 +1185,13 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                 children: [
                   // GPS accuracy badge
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 2.5.w, vertical: 0.6.h),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 2.5.w, vertical: 0.6.h),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
@@ -1211,7 +1205,10 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                         SizedBox(width: 1.5.w),
                         Text(
                           'Best accuracy with GPS',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(
                                 color: Theme.of(context).colorScheme.primary,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 11.sp,
@@ -1233,7 +1230,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                       icon: Icon(Icons.my_location, size: 4.5.w),
                       label: Text(
                         'Use current location',
-                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                            fontSize: 13.sp, fontWeight: FontWeight.w600),
                       ),
                       style: FilledButton.styleFrom(
                         padding: EdgeInsets.symmetric(vertical: 1.2.h),
@@ -1251,23 +1249,32 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                     children: [
                       Expanded(
                         child: Divider(
-                          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withValues(alpha: 0.3),
                         ),
                       ),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 2.w),
                         child: Text(
                           'OR',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 11.sp,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 11.sp,
+                                  ),
                         ),
                       ),
                       Expanded(
                         child: Divider(
-                          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withValues(alpha: 0.3),
                         ),
                       ),
                     ],
@@ -1340,7 +1347,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                       // Geocode the address FIRST to get coordinates
                       bool geocodeSuccess = false;
                       if (newAddress.isNotEmpty) {
-                        geocodeSuccess = await _homeLocationService.setHomeLocationFromAddress(newAddress);
+                        geocodeSuccess = await _homeLocationService
+                            .setHomeLocationFromAddress(newAddress);
                       }
 
                       // Save to backend
@@ -1365,7 +1373,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                         if (geocodeSuccess) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('✓ Home location updated successfully'),
+                              content:
+                                  Text('✓ Home location updated successfully'),
                               backgroundColor: Color(0xFF34C759),
                               duration: Duration(seconds: 2),
                             ),
@@ -1404,14 +1413,16 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                     }
                   },
                   style: FilledButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                   child: Text(
                     'Update',
-                    style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
+                    style:
+                        TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
