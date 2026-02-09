@@ -150,6 +150,7 @@ class AuthService {
 
         // Store parent info
         await prefs.setInt('parent_id', data['parent']['id']);
+        await prefs.setInt('user_id', data['parent']['id']); // Also save as user_id for API service
         await prefs.setString('parent_first_name', data['parent']['firstName']);
         await prefs.setString('parent_last_name', data['parent']['lastName']);
         await prefs.setString('parent_email', data['parent']['email']);
