@@ -62,6 +62,11 @@ class AttendanceListView(generics.ListAPIView):
         if status_param:
             queryset = queryset.filter(status=status_param)
 
+        # Optional filter by trip_type (pickup/dropoff)
+        trip_type = self.request.query_params.get('trip_type')
+        if trip_type:
+            queryset = queryset.filter(trip_type=trip_type)
+
         return queryset.order_by('-timestamp')
 
 
@@ -272,36 +277,41 @@ def mark_attendance(request):
             status=status.HTTP_404_NOT_FOUND
         )
 
-    # Permission logic
+    # Permission logic using Assignment system
     has_permission = False
+    from assignments.models import Assignment
+
     if user.user_type == 'driver':
         try:
             driver = Driver.objects.get(user=user)
-            has_permission = child.assigned_bus and driver.assigned_bus == child.assigned_bus
+            # Check if driver is assigned to the same bus as the child
+            driver_bus_assignment = Assignment.get_active_assignments_for(driver, 'driver_to_bus').first()
+            child_bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
+
+            if driver_bus_assignment and child_bus_assignment:
+                has_permission = driver_bus_assignment.assigned_to.id == child_bus_assignment.assigned_to.id
         except Driver.DoesNotExist:
             has_permission = False
+
     elif user.user_type == 'busminder':
         try:
             busminder = BusMinder.objects.get(user=user)
-            from assignments.models import Assignment
-            busminder_bus_assignment = Assignment.get_active_assignments_for(busminder, 'minder_to_bus').first()
+            # Check if bus minder is assigned to the same bus as the child
+            busminder_bus_assignments = Assignment.get_active_assignments_for(busminder, 'minder_to_bus')
             child_bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
-            # Must be assigned to same bus
-            if busminder_bus_assignment and child_bus_assignment and busminder_bus_assignment.assigned_to.id == child_bus_assignment.assigned_to.id:
-                # Only allow marking for the current trip type (pickup/dropoff)
-                # If trip_type is not provided, infer from status
-                allowed_trip_type = trip_type if trip_type in ['pickup', 'dropoff'] else ('dropoff' if new_status == 'dropped_off' else 'pickup')
-                # Optionally, check if the trip_type matches the current trip for the bus (not implemented here, but can be added)
-                has_permission = True
-                # Prevent marking pickup for dropoff trip and vice versa
-                if allowed_trip_type != child_bus_assignment.assigned_to.current_trip_type:
-                    return Response({"error": "Bus minder can only mark attendance for the current trip type (pickup or dropoff) assigned to the bus."}, status=status.HTTP_403_FORBIDDEN)
-            else:
-                has_permission = False
+
+            if child_bus_assignment:
+                child_bus_id = child_bus_assignment.assigned_to.id
+                # Bus minder can have multiple buses, check if child's bus is one of them
+                has_permission = any(
+                    assignment.assigned_to.id == child_bus_id
+                    for assignment in busminder_bus_assignments
+                )
         except BusMinder.DoesNotExist:
             has_permission = False
         except Exception:
             has_permission = False
+
     if not has_permission:
         return Response(
             {"error": "You can only mark attendance for children on your assigned bus."},
@@ -347,6 +357,18 @@ def mark_attendance(request):
         attendance.marked_by = request.user
         attendance.notes = notes or ''
         attendance.save()
+
+    # Update child's location_status based on attendance and trip type
+    # This ensures parents see real-time status updates in their app
+    if trip_type == 'pickup' and new_status == 'picked_up':
+        child.location_status = 'on-bus'
+        child.save(update_fields=['location_status'])
+    elif trip_type == 'dropoff' and new_status == 'dropped_off':
+        child.location_status = 'home'
+        child.save(update_fields=['location_status'])
+    elif new_status == 'absent':
+        child.location_status = 'home'  # Assume absent child is at home
+        child.save(update_fields=['location_status'])
 
     # Notifications are sent via the attendance mark signals in
     # notifications.signals.attendance_marked. This view is responsible for

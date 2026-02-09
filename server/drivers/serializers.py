@@ -82,70 +82,57 @@ class DriverCreateSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
-        from django.core.exceptions import ValidationError as DjangoValidationError
-        from django.db import transaction
-        import uuid
-
         # Extract user data
         first_name = validated_data.pop('firstName')
         last_name = validated_data.pop('lastName')
         email = validated_data.pop('email', '') or ''
 
         # Generate a unique username (required by Django)
+        import uuid
         username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
+
+        # Create User
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            user_type='driver'
+        )
 
         # Extract assigned_bus if provided
         assigned_bus_id = validated_data.pop('assignedBusId', None)
 
-        # Use atomic transaction to ensure all creates happen together or none at all
-        try:
-            with transaction.atomic():
-                # Create User
-                user = User.objects.create_user(
-                    username=username,
-                    email=email,
-                    first_name=first_name,
-                    last_name=last_name,
-                    user_type='driver'
+        # Create Driver with remaining fields
+        driver = Driver.objects.create(
+            user=user,
+            phone_number=validated_data.get('phone'),
+            license_number=validated_data.get('licenseNumber'),
+            license_expiry=validated_data.get('licenseExpiry'),
+            status=validated_data.get('status', 'active'),
+        )
+
+        # Assign bus if provided (using Assignment API)
+        if assigned_bus_id:
+            from buses.models import Bus
+            from assignments.services import AssignmentService
+            try:
+                bus = Bus.objects.get(id=assigned_bus_id)
+                # Use Assignment API instead of direct ForeignKey
+                AssignmentService.create_assignment(
+                    assignment_type='driver_to_bus',
+                    assignee=driver,
+                    assigned_to=bus,
+                    assigned_by=None,  # System assignment
+                    reason="Created via driver creation",
+                    auto_cancel_conflicting=True
                 )
+            except Bus.DoesNotExist:
+                pass
 
-                # Create Driver with remaining fields
-                driver = Driver.objects.create(
-                    user=user,
-                    phone_number=validated_data.get('phone'),
-                    license_number=validated_data.get('licenseNumber'),
-                    license_expiry=validated_data.get('licenseExpiry'),
-                    status=validated_data.get('status', 'active'),
-                )
-
-                # Assign bus if provided (using Assignment API)
-                if assigned_bus_id:
-                    from buses.models import Bus
-                    from assignments.services import AssignmentService
-                    try:
-                        bus = Bus.objects.get(id=assigned_bus_id)
-                        # Use Assignment API instead of direct ForeignKey
-                        AssignmentService.create_assignment(
-                            assignment_type='driver_to_bus',
-                            assignee=driver,
-                            assigned_to=bus,
-                            assigned_by=None,  # System assignment
-                            reason="Created via driver creation",
-                            auto_cancel_conflicting=True
-                        )
-                    except Bus.DoesNotExist:
-                        pass
-
-                return driver
-        except DjangoValidationError as e:
-            # Transaction will automatically rollback
-            # Extract the actual error message from Django's ValidationError
-            error_message = e.message if hasattr(e, 'message') else str(e)
-            raise serializers.ValidationError({'phone': [error_message]})
+        return driver
 
     def update(self, instance, validated_data):
-        from django.core.exceptions import ValidationError as DjangoValidationError
-
         # Update User fields
         if 'firstName' in validated_data:
             instance.user.first_name = validated_data.pop('firstName')
@@ -191,13 +178,7 @@ class DriverCreateSerializer(serializers.Serializer):
                     existing_assignment.status = 'cancelled'
                     existing_assignment.save()
 
-        try:
-            instance.save()
-        except DjangoValidationError as e:
-            # Extract the actual error message from Django's ValidationError
-            error_message = e.message if hasattr(e, 'message') else str(e)
-            raise serializers.ValidationError({'phone': [error_message]})
-
+        instance.save()
         return instance
 
     def to_representation(self, instance):

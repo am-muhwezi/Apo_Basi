@@ -14,9 +14,6 @@ Generated URLs:
 
 Additional endpoints (non-ViewSet):
     POST   /api/parents/login/                    → parent login
-    POST   /api/parents/auth/check-email/         → check email before magic link
-    POST   /api/parents/auth/magic-link/          → magic link authentication
-    POST   /api/parents/auth/demo-login/          → demo login for App Store review
     GET    /api/parents/children/<id>/attendance/ → child attendance history
 """
 
@@ -27,7 +24,6 @@ from .views import (
     ParentLoginView,
     CheckEmailView,
     SupabaseMagicLinkAuthView,
-    DemoLoginView,
     ChildAttendanceHistoryView
 )
 
@@ -40,7 +36,6 @@ urlpatterns = [
     path('login/', ParentLoginView.as_view(), name='parent-login'),
     path('auth/check-email/', CheckEmailView.as_view(), name='check-email'),
     path('auth/magic-link/', SupabaseMagicLinkAuthView.as_view(), name='supabase-magic-link-auth'),
-    path('auth/demo-login/', DemoLoginView.as_view(), name='demo-login'),
     path('children/<int:child_id>/attendance/', ChildAttendanceHistoryView.as_view(), name='child-attendance-history'),
 
     # Include router URLs

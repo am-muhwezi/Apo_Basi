@@ -187,6 +187,13 @@ class MyRouteView(APIView):
             pickup_attendance = Attendance.objects.filter(child=child, date=today, trip_type='pickup').first()
             dropoff_attendance = Attendance.objects.filter(child=child, date=today, trip_type='dropoff').first()
 
+            # Get home address - prefer parent's address over child's optional address field
+            home_address = "No address"
+            if child.parent and child.parent.address:
+                home_address = child.parent.address
+            elif child.address:
+                home_address = child.address
+
             route_data.append({
                 "id": child.id,
                 "first_name": child.first_name,
@@ -194,7 +201,7 @@ class MyRouteView(APIView):
                 "child_name": f"{child.first_name} {child.last_name}",
                 "grade": child.class_grade,
                 "class_grade": child.class_grade,
-                "address": child.address if hasattr(child, 'address') else "N/A",
+                "address": home_address,
                 "parent_name": child.parent.user.get_full_name() if child.parent else "N/A",
                 "pickup_status": pickup_attendance.status if pickup_attendance else None,
                 "pickup_status_display": pickup_attendance.get_status_display() if pickup_attendance else "Not marked",
@@ -625,6 +632,35 @@ def start_trip(request):
     # Get trip type from request
     trip_type = request.data.get('trip_type', 'pickup')
 
+    # Validate driver name
+    if not driver.user.first_name or not driver.user.last_name:
+        return Response({
+            "error": "Driver name is missing",
+            "message": "Your profile is incomplete. Please contact the administrator to set your full name."
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Get the actual route assignment from the bus
+    route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
+    route_name = None
+    if route_assignment:
+        route_obj = route_assignment.assigned_to
+        route_name = route_obj.name if hasattr(route_obj, 'name') else None
+
+    # Validate route is assigned
+    if not route_name:
+        return Response({
+            "error": "No route assigned",
+            "message": "This bus has no route assigned. Please contact the administrator."
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate children are assigned to the bus
+    child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
+    if not child_assignments.exists():
+        return Response({
+            "error": "No children assigned",
+            "message": "This bus has no children assigned. Please contact the administrator."
+        }, status=status.HTTP_400_BAD_REQUEST)
+
     # Create new trip
     now = timezone.now()
     trip = Trip.objects.create(
@@ -634,11 +670,10 @@ def start_trip(request):
         status='in-progress',
         scheduled_time=now,  # For driver-initiated trips, scheduled time = start time
         start_time=now,
-        route=f"Bus {bus.bus_number} Route"  # Set route name
+        route=route_name  # Use actual admin-created route name
     )
 
-    # Add all children from the bus to the trip
-    child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
+    # Add all children from the bus to the trip (already validated above)
     for child_assignment in child_assignments:
         trip.children.add(child_assignment.assignee)
 
@@ -696,6 +731,14 @@ def end_trip(request, trip_id):
         trip.students_pending = request.data.get('studentsPending')
 
     trip.save()
+
+    # Update children's location_status for PICKUP trips only
+    # Pickup trip ended → children have arrived at school
+    # Dropoff status is already handled by bus assistant marking attendance
+    if trip.trip_type == 'pickup':
+        for child in trip.children.all():
+            child.location_status = 'at-school'
+            child.save(update_fields=['location_status'])
 
     return Response({
         "message": "Trip ended successfully",
