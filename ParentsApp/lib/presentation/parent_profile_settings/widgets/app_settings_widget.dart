@@ -64,7 +64,7 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('App settings updated'),
-        backgroundColor: AppTheme.lightTheme.colorScheme.secondary,
+        backgroundColor: Theme.of(context).colorScheme.secondary,
       ),
     );
   }
@@ -72,7 +72,7 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
   void _showLanguageSelector() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.lightTheme.colorScheme.surface,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -85,14 +85,14 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
               width: 12.w,
               height: 0.5.h,
               decoration: BoxDecoration(
-                color: AppTheme.lightTheme.colorScheme.outline,
+                color: Theme.of(context).colorScheme.outline,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             SizedBox(height: 3.h),
             Text(
               'Select Language',
-              style: AppTheme.lightTheme.textTheme.titleLarge,
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 3.h),
             ...(_languages
@@ -101,8 +101,7 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
                         width: 10.w,
                         height: 10.w,
                         decoration: BoxDecoration(
-                          color:
-                              AppTheme.lightTheme.colorScheme.primaryContainer,
+                          color: Theme.of(context).colorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Center(
@@ -111,27 +110,27 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
                             style: AppTheme.lightTheme.textTheme.labelMedium
                                 ?.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: AppTheme.lightTheme.colorScheme.primary,
+                              color: Theme.of(context).colorScheme.primary,
                             ),
                           ),
                         ),
                       ),
                       title: Text(
                         language['name']!,
-                        style: AppTheme.lightTheme.textTheme.bodyLarge,
+                        style: Theme.of(context).textTheme.bodyLarge,
                       ),
                       subtitle: Text(
                         language['nativeName']!,
-                        style: AppTheme.lightTheme.textTheme.bodySmall,
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
-                      trailing: (_settings['language'] as String?) ==
-                              language['code']
-                          ? CustomIconWidget(
-                              iconName: 'check_circle',
-                              color: AppTheme.lightTheme.colorScheme.primary,
-                              size: 24,
-                            )
-                          : null,
+                      trailing:
+                          (_settings['language'] as String?) == language['code']
+                              ? CustomIconWidget(
+                                  iconName: 'check_circle',
+                                  color: Theme.of(context).colorScheme.primary,
+                                  size: 24,
+                                )
+                              : null,
                       onTap: () {
                         _updateSetting('language', language['code']);
                         Navigator.of(context).pop();
@@ -148,7 +147,7 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
   void _showThemeSelector() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.lightTheme.colorScheme.surface,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -161,14 +160,14 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
               width: 12.w,
               height: 0.5.h,
               decoration: BoxDecoration(
-                color: AppTheme.lightTheme.colorScheme.outline,
+                color: Theme.of(context).colorScheme.outline,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             SizedBox(height: 3.h),
             Text(
               'Select Theme',
-              style: AppTheme.lightTheme.textTheme.titleLarge,
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 3.h),
             ...(_themes
@@ -179,21 +178,21 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
                             : theme['value'] == 'light'
                                 ? 'light_mode'
                                 : 'dark_mode',
-                        color: AppTheme.lightTheme.colorScheme.primary,
+                        color: Theme.of(context).colorScheme.primary,
                         size: 24,
                       ),
                       title: Text(
                         theme['name']!,
-                        style: AppTheme.lightTheme.textTheme.bodyLarge,
+                        style: Theme.of(context).textTheme.bodyLarge,
                       ),
-                      trailing: (_settings['theme'] as String?) ==
-                              theme['value']
-                          ? CustomIconWidget(
-                              iconName: 'check_circle',
-                              color: AppTheme.lightTheme.colorScheme.primary,
-                              size: 24,
-                            )
-                          : null,
+                      trailing:
+                          (_settings['theme'] as String?) == theme['value']
+                              ? CustomIconWidget(
+                                  iconName: 'check_circle',
+                                  color: Theme.of(context).colorScheme.primary,
+                                  size: 24,
+                                )
+                              : null,
                       onTap: () {
                         _updateSetting('theme', theme['value']);
                         Navigator.of(context).pop();
@@ -248,7 +247,7 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
                   SnackBar(
                     content: Text(
                         'Thank you for your feedback! We appreciate your input.'),
-                    backgroundColor: AppTheme.lightTheme.colorScheme.secondary,
+                    backgroundColor: Theme.of(context).colorScheme.secondary,
                     duration: Duration(seconds: 3),
                   ),
                 );
@@ -284,11 +283,11 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
       margin: EdgeInsets.symmetric(vertical: 1.h),
       padding: EdgeInsets.all(4.w),
       decoration: BoxDecoration(
-        color: AppTheme.lightTheme.colorScheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.lightTheme.colorScheme.shadow,
+            color: Theme.of(context).colorScheme.shadow,
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -301,15 +300,15 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
             children: [
               CustomIconWidget(
                 iconName: 'settings',
-                color: AppTheme.lightTheme.colorScheme.primary,
+                color: Theme.of(context).colorScheme.primary,
                 size: 24,
               ),
               SizedBox(width: 3.w),
               Text(
                 'App Settings',
-                style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
               Spacer(),
               if (_hasUnsavedChanges)
@@ -317,7 +316,7 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
                   width: 2.w,
                   height: 2.w,
                   decoration: BoxDecoration(
-                    color: AppTheme.lightTheme.colorScheme.error,
+                    color: Theme.of(context).colorScheme.error,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -330,56 +329,56 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
             contentPadding: EdgeInsets.zero,
             leading: CustomIconWidget(
               iconName: 'language',
-              color: AppTheme.lightTheme.colorScheme.primary,
+              color: Theme.of(context).colorScheme.primary,
               size: 24,
             ),
             title: Text(
               'Language',
-              style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
             ),
             subtitle: Text(
               _getLanguageName(_settings['language'] as String? ?? 'en'),
-              style: AppTheme.lightTheme.textTheme.bodySmall,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
             trailing: CustomIconWidget(
               iconName: 'arrow_forward_ios',
-              color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               size: 16,
             ),
             onTap: _showLanguageSelector,
           ),
 
-          Divider(color: AppTheme.lightTheme.colorScheme.outline),
+          Divider(color: Theme.of(context).colorScheme.outline),
 
           // Theme Selector
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: CustomIconWidget(
               iconName: 'palette',
-              color: AppTheme.lightTheme.colorScheme.primary,
+              color: Theme.of(context).colorScheme.primary,
               size: 24,
             ),
             title: Text(
               'Theme',
-              style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
             ),
             subtitle: Text(
               _getThemeName(_settings['theme'] as String? ?? 'system'),
-              style: AppTheme.lightTheme.textTheme.bodySmall,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
             trailing: CustomIconWidget(
               iconName: 'arrow_forward_ios',
-              color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               size: 16,
             ),
             onTap: _showThemeSelector,
           ),
 
-          Divider(color: AppTheme.lightTheme.colorScheme.outline),
+          Divider(color: Theme.of(context).colorScheme.outline),
 
           // Auto-update Settings
           Container(
@@ -388,7 +387,7 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
               children: [
                 CustomIconWidget(
                   iconName: 'system_update',
-                  color: AppTheme.lightTheme.colorScheme.primary,
+                  color: Theme.of(context).colorScheme.primary,
                   size: 24,
                 ),
                 SizedBox(width: 4.w),
@@ -398,19 +397,18 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
                     children: [
                       Text(
                         'Auto-update App',
-                        style:
-                            AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
                       ),
                       SizedBox(height: 0.5.h),
                       Text(
                         'Automatically download app updates',
-                        style:
-                            AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                          color:
-                              AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                        ),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                       ),
                     ],
                   ),
@@ -423,7 +421,7 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
             ),
           ),
 
-          Divider(color: AppTheme.lightTheme.colorScheme.outline),
+          Divider(color: Theme.of(context).colorScheme.outline),
 
           // Crash Reporting
           Container(
@@ -432,7 +430,7 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
               children: [
                 CustomIconWidget(
                   iconName: 'bug_report',
-                  color: AppTheme.lightTheme.colorScheme.primary,
+                  color: Theme.of(context).colorScheme.primary,
                   size: 24,
                 ),
                 SizedBox(width: 4.w),
@@ -442,19 +440,18 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
                     children: [
                       Text(
                         'Send Crash Reports',
-                        style:
-                            AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
                       ),
                       SizedBox(height: 0.5.h),
                       Text(
                         'Help improve app stability',
-                        style:
-                            AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                          color:
-                              AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                        ),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                       ),
                     ],
                   ),
@@ -467,29 +464,29 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
             ),
           ),
 
-          Divider(color: AppTheme.lightTheme.colorScheme.outline),
+          Divider(color: Theme.of(context).colorScheme.outline),
 
           // Feedback
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: CustomIconWidget(
               iconName: 'feedback',
-              color: AppTheme.lightTheme.colorScheme.primary,
+              color: Theme.of(context).colorScheme.primary,
               size: 24,
             ),
             title: Text(
               'Send Feedback',
-              style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
             ),
             subtitle: Text(
               'Share your thoughts and suggestions',
-              style: AppTheme.lightTheme.textTheme.bodySmall,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
             trailing: CustomIconWidget(
               iconName: 'arrow_forward_ios',
-              color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               size: 16,
             ),
             onTap: _showFeedbackDialog,
@@ -500,18 +497,18 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
             contentPadding: EdgeInsets.zero,
             leading: CustomIconWidget(
               iconName: 'info',
-              color: AppTheme.lightTheme.colorScheme.primary,
+              color: Theme.of(context).colorScheme.primary,
               size: 24,
             ),
             title: Text(
               'App Version',
-              style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
             ),
             subtitle: Text(
               'v1.2.3 (Build 45)',
-              style: AppTheme.lightTheme.textTheme.bodySmall,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
 

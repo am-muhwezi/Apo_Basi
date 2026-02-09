@@ -73,17 +73,18 @@ class BusMinderCreateSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         from django.db import IntegrityError
+        import uuid
+
+        # Extract user data
+        first_name = validated_data.pop('firstName')
+        last_name = validated_data.pop('lastName')
+        email = validated_data.pop('email', '') or ''
+
+        # Generate a unique username (required by Django)
+        username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
+
+        # Create User (handle integrity errors)
         try:
-            # Extract user data
-            first_name = validated_data.pop('firstName')
-            last_name = validated_data.pop('lastName')
-            email = validated_data.pop('email', '') or ''
-
-            # Generate a unique username (required by Django)
-            import uuid
-            username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
-
-            # Create User
             user = User.objects.create_user(
                 username=username,
                 email=email,
@@ -91,9 +92,10 @@ class BusMinderCreateSerializer(serializers.Serializer):
                 last_name=last_name,
                 user_type='busminder'
             )
+        except IntegrityError as e:
+            raise serializers.ValidationError({'non_field_errors': [str(e)]})
 
-        # Create BusMinder, catch phone uniqueness error
-        from django.db import IntegrityError
+        # Create BusMinder, catch phone uniqueness error and clean up user if needed
         try:
             busminder = BusMinder.objects.create(
                 user=user,
@@ -102,7 +104,10 @@ class BusMinderCreateSerializer(serializers.Serializer):
             )
         except IntegrityError as e:
             # Clean up user if busminder creation fails
-            user.delete()
+            try:
+                user.delete()
+            except Exception:
+                pass
             if 'already in use' in str(e):
                 raise serializers.ValidationError({'phone': str(e)})
             raise serializers.ValidationError({'non_field_errors': [str(e)]})

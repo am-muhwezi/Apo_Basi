@@ -28,36 +28,42 @@ class _NotificationFilterSheetWidgetState
       'label': 'Bus Approaching',
       'icon': 'directions_bus',
       'color': Color(0xFF2B5CE6),
+      'bgColor': Color(0xFF2B5CE6),
     },
     {
       'type': 'pickup_confirmed',
       'label': 'Pickup Confirmed',
       'icon': 'check_circle',
       'color': Color(0xFF34C759),
+      'bgColor': Color(0xFF0F4C25),
     },
     {
       'type': 'dropoff_complete',
       'label': 'Dropoff Complete',
-      'icon': 'check_circle',
-      'color': Color(0xFF34C759),
+      'icon': 'verified',
+      'color': Color(0xFF22C55E),
+      'bgColor': Color(0xFF0F4C25),
     },
     {
       'type': 'route_change',
       'label': 'Route Changes',
       'icon': 'alt_route',
       'color': Color(0xFFFF9500),
+      'bgColor': Color(0xFF663D00),
     },
     {
       'type': 'emergency',
       'label': 'Emergency Alerts',
       'icon': 'warning',
       'color': Color(0xFFFF3B30),
+      'bgColor': Color(0xFF5C0A05),
     },
     {
       'type': 'major_delay',
       'label': 'Major Delays',
       'icon': 'schedule',
-      'color': Color(0xFFFF3B30),
+      'color': Color(0xFFEF4444),
+      'bgColor': Color(0xFF5C0A05),
     },
   ];
 
@@ -71,7 +77,7 @@ class _NotificationFilterSheetWidgetState
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.lightTheme.colorScheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
@@ -82,7 +88,9 @@ class _NotificationFilterSheetWidgetState
             width: 12.w,
             height: 0.5.h,
             decoration: BoxDecoration(
-              color: AppTheme.lightTheme.colorScheme.onSurfaceVariant
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurfaceVariant
                   .withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(2),
             ),
@@ -97,9 +105,9 @@ class _NotificationFilterSheetWidgetState
                   children: [
                     Text(
                       'Filter Notifications',
-                      style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
                     TextButton(
                       onPressed: () {
@@ -109,10 +117,9 @@ class _NotificationFilterSheetWidgetState
                       },
                       child: Text(
                         'Clear All',
-                        style:
-                            AppTheme.lightTheme.textTheme.labelLarge?.copyWith(
-                          color: AppTheme.lightTheme.colorScheme.primary,
-                        ),
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                       ),
                     ),
                   ],
@@ -120,9 +127,9 @@ class _NotificationFilterSheetWidgetState
                 SizedBox(height: 2.h),
                 Text(
                   'Notification Types',
-                  style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
-                    color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                  ),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                 ),
                 SizedBox(height: 2.h),
                 ..._filterOptions.map((option) => _buildFilterOption(option)),
@@ -180,7 +187,9 @@ class _NotificationFilterSheetWidgetState
               border: Border.all(
                 color: isSelected
                     ? option['color']
-                    : AppTheme.lightTheme.colorScheme.outline
+                    : Theme.of(context)
+                        .colorScheme
+                        .outline
                         .withValues(alpha: 0.3),
                 width: isSelected ? 2 : 1,
               ),
@@ -194,8 +203,12 @@ class _NotificationFilterSheetWidgetState
                 Container(
                   padding: EdgeInsets.all(2.w),
                   decoration: BoxDecoration(
-                    color: option['color'].withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    color: option['color'].withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: option['color'].withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
                   ),
                   child: CustomIconWidget(
                     iconName: option['icon'],
@@ -207,13 +220,13 @@ class _NotificationFilterSheetWidgetState
                 Expanded(
                   child: Text(
                     option['label'],
-                    style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.w400,
-                      color: isSelected
-                          ? option['color']
-                          : AppTheme.lightTheme.colorScheme.onSurface,
-                    ),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w400,
+                          color: isSelected
+                              ? option['color']
+                              : Theme.of(context).colorScheme.onSurface,
+                        ),
                   ),
                 ),
                 if (isSelected)

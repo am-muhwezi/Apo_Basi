@@ -312,16 +312,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       return routeCode.toString();
     }
 
-    // Check if child has an assigned bus
-    final hasBus = _childData?['busId'] != null &&
-                   _childData?['busNumber'] != null &&
-                   _childData!['busNumber'] != 'N/A';
-
-    if (hasBus) {
-      return 'As directed by school';
-    } else {
-      return 'Not yet assigned';
-    }
+    // If no route name or code, show "Route not yet assigned"
+    return 'Route not yet assigned';
   }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
@@ -336,6 +328,11 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Cache theme to avoid 40+ repeated lookups
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     if (_childData == null) {
       return Scaffold(
         appBar: AppBar(),
@@ -351,14 +348,15 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     final bool isTrackable = hasAssignedBus && _busLocation != null;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Stack(
         children: [
-          // Mapbox Map via flutter_map
-          _isLoadingLocation
-              ? const Center(child: CircularProgressIndicator())
-              : _homeLocation != null
-                  ? FlutterMap(
+          // Mapbox Map via flutter_map - wrapped in RepaintBoundary for performance
+          RepaintBoundary(
+            child: _isLoadingLocation
+                ? const Center(child: CircularProgressIndicator())
+                : _homeLocation != null
+                    ? FlutterMap(
                       mapController: _mapController,
                       options: MapOptions(
                         initialCenter: LatLng(
@@ -367,7 +365,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                         ),
                         initialZoom: 19.0,
                         minZoom: 5.0,
-                        maxZoom: 22.0,
+                        maxZoom: 19.0,
                       ),
                       children: [
                         // Mapbox Tile Layer - uses default caching
@@ -439,21 +437,22 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                           Icon(
                             Icons.location_off,
                             size: 64,
-                            color: Theme.of(context).colorScheme.error,
+                            color: colorScheme.error,
                           ),
                           SizedBox(height: 2.h),
                           Text(
                             'Unable to get location',
-                            style: Theme.of(context).textTheme.titleLarge,
+                            style: textTheme.titleLarge,
                           ),
                           SizedBox(height: 1.h),
                           Text(
                             'Please enable location permissions',
-                            style: Theme.of(context).textTheme.bodyMedium,
+                            style: textTheme.bodyMedium,
                           ),
                         ],
                       ),
                     ),
+          ),
 
           // Clean top UI - only back button and recenter button
           SafeArea(
@@ -528,8 +527,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
           // Modern DraggableScrollableSheet
           DraggableScrollableSheet(
-            initialChildSize: 0.18,
-            minChildSize: 0.15,
+            initialChildSize: 0.20,
+            minChildSize: 0.18,
             maxChildSize: 0.50,
             builder: (context, scrollController) {
               return Container(

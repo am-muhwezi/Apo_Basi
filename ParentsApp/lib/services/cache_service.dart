@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
 /// Service for caching API responses with expiration timestamps
 ///
@@ -43,7 +44,9 @@ class CacheService {
 
       return json.decode(dataStr) as Map<String, dynamic>;
     } catch (e) {
-      print('Error getting cached dashboard: $e');
+      if (kDebugMode) {
+        debugPrint('Error getting cached dashboard: $e');
+      }
       return null;
     }
   }
@@ -53,9 +56,12 @@ class CacheService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_dashboardDataKey, json.encode(data));
-      await prefs.setString(_dashboardTimestampKey, DateTime.now().toIso8601String());
+      await prefs.setString(
+          _dashboardTimestampKey, DateTime.now().toIso8601String());
     } catch (e) {
-      print('Error caching dashboard: $e');
+      if (kDebugMode) {
+        debugPrint('Error caching dashboard: $e');
+      }
     }
   }
 
@@ -73,7 +79,9 @@ class CacheService {
 
       return json.decode(dataStr) as Map<String, dynamic>;
     } catch (e) {
-      print('Error getting cached profile: $e');
+      if (kDebugMode) {
+        debugPrint('Error getting cached profile: $e');
+      }
       return null;
     }
   }
@@ -83,9 +91,12 @@ class CacheService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_profileDataKey, json.encode(data));
-      await prefs.setString(_profileTimestampKey, DateTime.now().toIso8601String());
+      await prefs.setString(
+          _profileTimestampKey, DateTime.now().toIso8601String());
     } catch (e) {
-      print('Error caching profile: $e');
+      if (kDebugMode) {
+        debugPrint('Error caching profile: $e');
+      }
     }
   }
 
@@ -103,7 +114,9 @@ class CacheService {
 
       return json.decode(dataStr) as List<dynamic>;
     } catch (e) {
-      print('Error getting cached children: $e');
+      if (kDebugMode) {
+        debugPrint('Error getting cached children: $e');
+      }
       return null;
     }
   }
@@ -113,9 +126,12 @@ class CacheService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_childrenDataKey, json.encode(data));
-      await prefs.setString(_childrenTimestampKey, DateTime.now().toIso8601String());
+      await prefs.setString(
+          _childrenTimestampKey, DateTime.now().toIso8601String());
     } catch (e) {
-      print('Error caching children: $e');
+      if (kDebugMode) {
+        debugPrint('Error caching children: $e');
+      }
     }
   }
 
@@ -133,7 +149,9 @@ class CacheService {
 
       return json.decode(dataStr) as List<dynamic>;
     } catch (e) {
-      print('Error getting cached notifications: $e');
+      if (kDebugMode) {
+        debugPrint('Error getting cached notifications: $e');
+      }
       return null;
     }
   }
@@ -143,9 +161,12 @@ class CacheService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_notificationsDataKey, json.encode(data));
-      await prefs.setString(_notificationsTimestampKey, DateTime.now().toIso8601String());
+      await prefs.setString(
+          _notificationsTimestampKey, DateTime.now().toIso8601String());
     } catch (e) {
-      print('Error caching notifications: $e');
+      if (kDebugMode) {
+        debugPrint('Error caching notifications: $e');
+      }
     }
   }
 
@@ -162,7 +183,9 @@ class CacheService {
       await prefs.remove(_notificationsDataKey);
       await prefs.remove(_notificationsTimestampKey);
     } catch (e) {
-      print('Error clearing cache: $e');
+      if (kDebugMode) {
+        debugPrint('Error clearing cache: $e');
+      }
     }
   }
 
@@ -202,7 +225,8 @@ class CacheService {
       }
 
       // Check and clear notifications cache if expired
-      final notificationsTimestampStr = prefs.getString(_notificationsTimestampKey);
+      final notificationsTimestampStr =
+          prefs.getString(_notificationsTimestampKey);
       if (notificationsTimestampStr != null) {
         final timestamp = DateTime.parse(notificationsTimestampStr);
         if (!_isCacheFresh(timestamp)) {
@@ -211,7 +235,9 @@ class CacheService {
         }
       }
     } catch (e) {
-      print('Error clearing expired cache: $e');
+      if (kDebugMode) {
+        debugPrint('Error clearing expired cache: $e');
+      }
     }
   }
 
@@ -246,7 +272,25 @@ class CacheService {
       if (dataStr == null) return null;
       return json.decode(dataStr) as Map<String, dynamic>;
     } catch (e) {
-      print('Error getting stale dashboard: $e');
+      if (kDebugMode) {
+        debugPrint('Error getting stale dashboard: $e');
+      }
+      return null;
+    }
+  }
+
+  /// Get stale children data (even if expired)
+  /// Useful for offline mode to show something rather than nothing
+  Future<List<dynamic>?> getStaleChildren() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dataStr = prefs.getString(_childrenDataKey);
+      if (dataStr == null) return null;
+      return json.decode(dataStr) as List<dynamic>;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error getting stale children: $e');
+      }
       return null;
     }
   }

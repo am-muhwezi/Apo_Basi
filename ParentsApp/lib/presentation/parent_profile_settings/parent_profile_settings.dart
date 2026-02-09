@@ -1,12 +1,16 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/theme_service.dart';
 import '../../services/home_location_service.dart';
+import '../../services/connectivity_service.dart';
+import '../../services/cache_service.dart';
 import '../../models/child_model.dart';
 import '../../models/parent_model.dart';
 import './widgets/child_information_widget.dart';
@@ -27,8 +31,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   final ApiService _apiService = ApiService();
   final ThemeService _themeService = ThemeService();
   final HomeLocationService _homeLocationService = HomeLocationService();
+  final AuthService _authService = AuthService();
+  final ConnectivityService _connectivityService = ConnectivityService();
   bool _isLoading = true;
-  String? _error;
 
   // Parent data from API
   User? _user;
@@ -38,10 +43,28 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   @override
   void initState() {
     super.initState();
-    // Defer data loading to after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadProfileData();
+    // Load profile data immediately from cache
+    _loadProfileData();
+
+    // Defer connectivity initialization
+    Future.microtask(() {
+      _initializeConnectivity();
     });
+  }
+
+  Future<void> _initializeConnectivity() async {
+    await _connectivityService.initialize();
+    _connectivityService.onConnectionRestored = () {
+      if (mounted) {
+        // Don't show toast on profile page, home dashboard handles it
+        _loadProfileData(forceRefresh: true);
+      }
+    };
+    _connectivityService.onConnectionLost = () {
+      if (mounted) {
+        _showToast('Currently offline', isError: true);
+      }
+    };
   }
 
   // Helper to clean up address formatting (remove double commas, extra spaces)
@@ -57,57 +80,151 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
         .trim();
   }
 
+  void _showToast(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor:
+            isError ? const Color(0xFFFF9500) : const Color(0xFF34C759),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _loadProfileData({bool forceRefresh = false}) async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    if (!mounted) return;
+
+    // First, try to load from cache immediately (without showing loading)
+    if (!forceRefresh) {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedFirstName = prefs.getString('parent_first_name') ?? '';
+      final cachedLastName = prefs.getString('parent_last_name') ?? '';
+      final cachedEmail = prefs.getString('parent_email') ?? '';
+      final userId = prefs.getInt('user_id') ?? 0;
+
+      // Also load cached children
+      final cacheService = CacheService();
+      final cachedChildren = await cacheService.getStaleChildren();
+
+      if (cachedFirstName.isNotEmpty || cachedEmail.isNotEmpty) {
+        setState(() {
+          _user = User(
+            id: userId,
+            username: cachedEmail,
+            email: cachedEmail,
+            firstName: cachedFirstName,
+            lastName: cachedLastName,
+          );
+          // Load cached children
+          if (cachedChildren != null && cachedChildren.isNotEmpty) {
+            _children =
+                cachedChildren.map((json) => Child.fromJson(json)).toList();
+          }
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = true;
+        });
+      }
+    } else {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
-      // Use consolidated dashboard API endpoint - single call for all data
-      final dashboardData = await _apiService.getDashboardData(
-        forceRefresh: forceRefresh,
-      );
+      // Clear cache if force refreshing to ensure fresh data
+      if (forceRefresh) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('dashboard_data');
+        await prefs.remove('dashboard_timestamp');
+      }
 
-      setState(() {
-        // Extract parent data
-        final parentData = dashboardData['parent'];
-        if (parentData != null) {
-          _user = User(
-            id: parentData['id'],
-            username: parentData['email'] ?? '',
-            email: parentData['email'] ?? '',
-            firstName: parentData['firstName'] ?? '',
-            lastName: parentData['lastName'] ?? '',
+      // Load parent profile data with timeout
+      final parentProfile = await _apiService.getParentProfile().timeout(
+            const Duration(seconds: 8),
+            onTimeout: () => throw Exception('Currently offline'),
           );
 
-          _parent = Parent(
-            userId: parentData['id'],
-            contactNumber: parentData['phone'] ?? '',
-            address: parentData['address'] ?? '',
-            emergencyContact: parentData['emergencyContact'] ?? '',
-            status: parentData['status'] ?? 'active',
+      // Load children data separately (same as home dashboard) with timeout
+      final children = await _apiService.getMyChildren().timeout(
+            const Duration(seconds: 8),
+            onTimeout: () => throw Exception('Currently offline'),
           );
-        }
 
-        // Extract children data and convert to Child objects
-        final childrenJson = dashboardData['children'] as List<dynamic>?;
-        if (childrenJson != null && childrenJson.isNotEmpty) {
-          _children = childrenJson.map((json) => Child.fromJson(json)).toList();
-        } else {
-          _children = [];
-        }
+      if (mounted) {
+        setState(() {
+          // Extract user data from parent profile
+          final userData = parentProfile['user'];
 
-        _isLoading = false;
-      });
+          if (userData != null && userData['id'] != null) {
+            _user = User(
+              id: userData['id'],
+              username: userData['email'] ?? '',
+              email: userData['email'] ?? '',
+              firstName: userData['first_name'] ?? '',
+              lastName: userData['last_name'] ?? '',
+            );
+
+            // Extract parent data
+            final parentData = parentProfile['parent'];
+            _parent = Parent(
+              userId: userData['id'],
+              contactNumber: parentData['contact_number'] ?? '',
+              address: parentData['address'] ?? '',
+              emergencyContact: parentData['emergency_contact'] ?? '',
+              status: parentData['status'] ?? 'active',
+            );
+          }
+
+          // Set children data (same as home dashboard)
+          _children = children;
+
+          _isLoading = false;
+        });
+      }
 
       // Also refresh the dashboard when profile is refreshed
       widget.onRefreshDashboard?.call();
     } catch (e) {
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-        _isLoading = false;
-      });
+      // Try to get cached/existing user data as fallback
+      if (mounted && _user == null) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final firstName = prefs.getString('parent_first_name') ?? '';
+          final lastName = prefs.getString('parent_last_name') ?? '';
+          final email = prefs.getString('parent_email') ?? '';
+          final userId = prefs.getInt('user_id') ?? 0;
+
+          if (firstName.isNotEmpty || email.isNotEmpty) {
+            setState(() {
+              _user = User(
+                id: userId,
+                username: email,
+                email: email,
+                firstName: firstName,
+                lastName: lastName,
+              );
+            });
+          }
+        } catch (_) {}
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Show appropriate offline message
+        String errorMsg = e.toString().contains('offline') ||
+                e.toString().contains('TimeoutException') ||
+                e.toString().contains('SocketException')
+            ? 'Currently offline'
+            : e.toString().replaceAll('Exception: ', '');
+
+        _showToast(errorMsg, isError: true);
+      }
     }
   }
 
@@ -116,726 +233,620 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
     _loadProfileData(forceRefresh: forceRefresh);
   }
 
+  // Get parent name from cached data as fallback
+  Future<String> _getParentNameFallback() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final firstName = prefs.getString('parent_first_name') ?? '';
+      final lastName = prefs.getString('parent_last_name') ?? '';
+      if (firstName.isNotEmpty || lastName.isNotEmpty) {
+        return '$firstName $lastName'.trim();
+      }
+    } catch (_) {}
+    return 'Parent';
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Cache theme lookups
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
+    // Don't show loading if we have user data (even if it's from cache)
+    final bool showLoading = _isLoading && _user == null;
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
         automaticallyImplyLeading: false,
         title: Text(
           'Profile & Settings',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.refresh,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            onPressed: () => _loadProfileData(forceRefresh: true),
+          style: textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onSurface,
           ),
-        ],
+        ),
       ),
-      body: _isLoading
+      body: showLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_error != null)
+          : RefreshIndicator(
+              onRefresh: () => _loadProfileData(forceRefresh: true),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Profile Header - Sleeker Design
+                    Container(
+                      width: double.infinity,
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 4.w, vertical: 3.h),
+                      margin: EdgeInsets.all(4.w),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            colorScheme.primary.withValues(alpha: 0.05),
+                            colorScheme.surface,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colorScheme.primary.withValues(alpha: 0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        border: Border.all(
+                          color: colorScheme.primary.withValues(alpha: 0.1),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(1.w),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [
+                                  colorScheme.primary.withValues(alpha: 0.2),
+                                  colorScheme.primary.withValues(alpha: 0.05),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: CircleAvatar(
+                              radius: 11.w,
+                              backgroundColor: colorScheme.surface,
+                              child: Text(
+                                _user?.fullName.substring(0, 1).toUpperCase() ??
+                                    'P',
+                                style: textTheme.headlineMedium?.copyWith(
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 1.8.h),
+                          FutureBuilder<String>(
+                            future: _getParentNameFallback(),
+                            builder: (context, snapshot) {
+                              return Text(
+                                _user?.fullName ?? snapshot.data ?? 'Parent',
+                                style: textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: colorScheme.onSurface,
+                                  letterSpacing: -0.5,
+                                ),
+                              );
+                            },
+                          ),
+                          SizedBox(height: 0.8.h),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 3.w, vertical: 0.5.h),
+                            decoration: BoxDecoration(
+                              color:
+                                  colorScheme.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.email_outlined,
+                                  size: 14,
+                                  color: colorScheme.primary,
+                                ),
+                                SizedBox(width: 1.5.w),
+                                Text(
+                                  _user?.email ?? 'email@example.com',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: 1.h),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 3.w, vertical: 0.5.h),
+                            decoration: BoxDecoration(
+                              color:
+                                  colorScheme.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.phone_outlined,
+                                  size: 14,
+                                  color: colorScheme.primary,
+                                ),
+                                SizedBox(width: 1.5.w),
+                                Text(
+                                  _parent?.contactNumber ?? 'N/A',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Home Location Section
                     Padding(
-                      padding: EdgeInsets.fromLTRB(4.w, 1.5.h, 4.w, 0),
+                      padding: EdgeInsets.symmetric(horizontal: 4.w),
+                      child: Text(
+                        'Home Location',
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 1.5.h),
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(3.5.w),
+                      margin: EdgeInsets.symmetric(horizontal: 4.w),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            colorScheme.surface,
+                            colorScheme.surface.withValues(alpha: 0.95),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colorScheme.shadow.withValues(alpha: 0.06),
+                            blurRadius: 12,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                        border: Border.all(
+                          color: colorScheme.outline.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(2.8.w),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  colorScheme.primary.withValues(alpha: 0.15),
+                                  colorScheme.primary.withValues(alpha: 0.08),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(
+                              Icons.location_on_rounded,
+                              color: colorScheme.primary,
+                              size: 5.5.w,
+                            ),
+                          ),
+                          SizedBox(width: 3.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Home Location',
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12.sp,
+                                  ),
+                                ),
+                                SizedBox(height: 0.4.h),
+                                Text(
+                                  _cleanAddress(_parent?.address),
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurface,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.3,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(width: 2.w),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: IconButton(
+                              onPressed: () => _showUpdateAddressDialog(),
+                              icon: Icon(
+                                Icons.edit_rounded,
+                                color: colorScheme.primary,
+                                size: 5.w,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: 4.h),
+
+                    // Children Information Section
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4.w),
+                      child: Text(
+                        'Children Information',
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 1.5.h),
+
+                    // Children Cards
+                    if (_children.isEmpty)
+                      Padding(
+                        padding: EdgeInsets.all(4.w),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 48,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              SizedBox(height: 2.h),
+                              Text(
+                                'No children registered',
+                                style: textTheme.titleMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              SizedBox(height: 1.h),
+                              Text(
+                                'Contact your school admin to add children to your account',
+                                textAlign: TextAlign.center,
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      ..._children
+                          .map((child) => RepaintBoundary(
+                                child: ChildInformationWidget(
+                                  childData: _childToCardData(child),
+                                ),
+                              ))
+                          .toList(),
+
+                    SizedBox(height: 4.h),
+
+                    // App Settings Section
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4.w),
+                      child: Text(
+                        'Settings',
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 1.5.h),
+
+                    // Dark Mode Toggle
+                    RepaintBoundary(
                       child: Container(
-                        padding: EdgeInsets.all(2.5.w),
+                        margin: EdgeInsets.symmetric(
+                            horizontal: 4.w, vertical: 1.h),
+                        padding: EdgeInsets.all(3.5.w),
                         decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .errorContainer
-                              .withValues(alpha: 0.8),
-                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            colors: [
+                              colorScheme.surface,
+                              colorScheme.surface.withValues(alpha: 0.95),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: colorScheme.shadow.withValues(alpha: 0.06),
+                              blurRadius: 12,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                          border: Border.all(
+                            color: colorScheme.outline.withValues(alpha: 0.08),
+                          ),
                         ),
                         child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.info_outline,
-                              size: 4.w,
-                              color: Theme.of(context).colorScheme.error,
+                            Container(
+                              padding: EdgeInsets.all(2.8.w),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    colorScheme.primary.withValues(alpha: 0.15),
+                                    colorScheme.primary.withValues(alpha: 0.08),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                Icons.dark_mode_rounded,
+                                color: colorScheme.primary,
+                                size: 5.5.w,
+                              ),
                             ),
-                            SizedBox(width: 2.w),
+                            SizedBox(width: 3.w),
                             Expanded(
-                              child: Text(
-                                _error!,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color:
-                                          Theme.of(context).colorScheme.error,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Dark Mode',
+                                    style: textTheme.bodyLarge?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: colorScheme.onSurface,
                                     ),
+                                  ),
+                                  SizedBox(height: 0.3.h),
+                                  Text(
+                                    'Enable dark theme',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                      fontSize: 10.sp,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ValueListenableBuilder<ThemeMode>(
+                              valueListenable: _themeService.themeModeNotifier,
+                              builder: (context, themeMode, child) {
+                                return Switch(
+                                  value: themeMode == ThemeMode.dark,
+                                  onChanged: (value) {
+                                    _themeService.setThemeMode(
+                                      value ? ThemeMode.dark : ThemeMode.light,
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(height: 0.5.h),
+
+                    // "Dark mode coming soon" message removed - it's working now!
+
+                    SizedBox(height: 1.h),
+
+                    // Privacy Policy and Terms & Conditions
+                    RepaintBoundary(
+                      child: Container(
+                        margin: EdgeInsets.symmetric(
+                            horizontal: 4.w, vertical: 1.h),
+                        padding: EdgeInsets.all(3.5.w),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              colorScheme.surface,
+                              colorScheme.surface.withValues(alpha: 0.95),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: colorScheme.shadow.withValues(alpha: 0.06),
+                              blurRadius: 12,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                          border: Border.all(
+                            color: colorScheme.outline.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            InkWell(
+                              onTap: () => _openPrivacyPolicy(),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 1.2.h),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.all(2.8.w),
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            colorScheme.primary
+                                                .withValues(alpha: 0.15),
+                                            colorScheme.primary
+                                                .withValues(alpha: 0.08),
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      child: Icon(
+                                        Icons.privacy_tip_outlined,
+                                        color: colorScheme.primary,
+                                        size: 5.5.w,
+                                      ),
+                                    ),
+                                    SizedBox(width: 3.w),
+                                    Expanded(
+                                      child: Text(
+                                        'Privacy Policy',
+                                        style: textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: colorScheme.onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.chevron_right,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            Divider(
+                              height: 1,
+                              color: colorScheme.outline.withValues(alpha: 0.1),
+                            ),
+                            InkWell(
+                              onTap: () => _openTermsAndConditions(),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 1.2.h),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.all(2.8.w),
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            colorScheme.primary
+                                                .withValues(alpha: 0.15),
+                                            colorScheme.primary
+                                                .withValues(alpha: 0.08),
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      child: Icon(
+                                        Icons.description_outlined,
+                                        color: colorScheme.primary,
+                                        size: 5.5.w,
+                                      ),
+                                    ),
+                                    SizedBox(width: 3.w),
+                                    Expanded(
+                                      child: Text(
+                                        'Terms & Conditions',
+                                        style: textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: colorScheme.onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.chevron_right,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                  // Profile Header - Sleeker Design
-                  Container(
-                    width: double.infinity,
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 4.w, vertical: 3.h),
-                    margin: EdgeInsets.all(4.w),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withValues(alpha: 0.05),
-                          Theme.of(context).colorScheme.surface,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withValues(alpha: 0.08),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                      border: Border.all(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.1),
-                        width: 1,
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(1.w),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: [
-                                Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.2),
-                                Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.05),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                          child: CircleAvatar(
-                            radius: 11.w,
-                            backgroundColor:
-                                Theme.of(context).colorScheme.surface,
-                            child: Text(
-                              _user?.fullName.substring(0, 1).toUpperCase() ??
-                                  'P',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineMedium
-                                  ?.copyWith(
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 1.8.h),
-                        Text(
-                          _user?.fullName ?? 'Parent Name',
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: Theme.of(context).colorScheme.onSurface,
-                                letterSpacing: -0.5,
-                              ),
-                        ),
-                        SizedBox(height: 0.8.h),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 3.w, vertical: 0.5.h),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.email_outlined,
-                                size: 14,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              SizedBox(width: 1.5.w),
-                              Text(
-                                _user?.email ?? 'email@example.com',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color:
-                                          Theme.of(context).colorScheme.primary,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 1.h),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 3.w, vertical: 0.5.h),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.phone_outlined,
-                                size: 14,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              SizedBox(width: 1.5.w),
-                              Text(
-                                _parent?.contactNumber ?? 'N/A',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color:
-                                          Theme.of(context).colorScheme.primary,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
 
-                  // Home Location Section
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4.w),
-                    child: Text(
-                      'Home Location',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: Theme.of(context).colorScheme.onSurface,
-                            letterSpacing: -0.3,
-                          ),
-                    ),
-                  ),
-                  SizedBox(height: 1.5.h),
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(3.5.w),
-                    margin: EdgeInsets.symmetric(horizontal: 4.w),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Theme.of(context).colorScheme.surface,
-                          Theme.of(context)
-                              .colorScheme
-                              .surface
-                              .withValues(alpha: 0.95),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .shadow
-                              .withValues(alpha: 0.06),
-                          blurRadius: 12,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                      border: Border.all(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .outline
-                            .withValues(alpha: 0.08),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(2.8.w),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.15),
-                                Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.08),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(
-                            Icons.location_on_rounded,
-                            color: Theme.of(context).colorScheme.primary,
-                            size: 5.5.w,
-                          ),
-                        ),
-                        SizedBox(width: 3.w),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Current Address',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 10.sp,
-                                    ),
-                              ),
-                              SizedBox(height: 0.4.h),
-                              Text(
-                                _cleanAddress(_parent?.address),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface,
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.3,
-                                    ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(width: 2.w),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withValues(alpha: 0.1),
+                    SizedBox(height: 2.h),
+
+                    // Logout Button
+                    Container(
+                      width: double.infinity,
+                      margin: EdgeInsets.symmetric(horizontal: 4.w),
+                      child: ElevatedButton(
+                        onPressed: () => _showLogoutDialog(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF3B30),
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 2.h),
+                          shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: IconButton(
-                            onPressed: () => _showUpdateAddressDialog(),
-                            icon: Icon(
-                              Icons.edit_rounded,
-                              color: Theme.of(context).colorScheme.primary,
-                              size: 5.w,
-                            ),
-                          ),
                         ),
-                      ],
-                    ),
-                  ),
-
-                  SizedBox(height: 4.h),
-
-                  // Children Information Section
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4.w),
-                    child: Text(
-                      'Children Information',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: Theme.of(context).colorScheme.onSurface,
-                            letterSpacing: -0.3,
-                          ),
-                    ),
-                  ),
-                  SizedBox(height: 1.5.h),
-
-                  // Children Cards
-                  ..._children
-                      .map((child) => ChildInformationWidget(
-                            childData: _childToCardData(child),
-                          ))
-                      .toList(),
-
-                  SizedBox(height: 4.h),
-
-                  // App Settings Section
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4.w),
-                    child: Text(
-                      'Settings',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: Theme.of(context).colorScheme.onSurface,
-                            letterSpacing: -0.3,
-                          ),
-                    ),
-                  ),
-                  SizedBox(height: 1.5.h),
-
-                  // Dark Mode Toggle
-                  Container(
-                    margin:
-                        EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
-                    padding: EdgeInsets.all(3.5.w),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Theme.of(context).colorScheme.surface,
-                          Theme.of(context)
-                              .colorScheme
-                              .surface
-                              .withValues(alpha: 0.95),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .shadow
-                              .withValues(alpha: 0.06),
-                          blurRadius: 12,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                      border: Border.all(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .outline
-                            .withValues(alpha: 0.08),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(2.8.w),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.15),
-                                Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.08),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(
-                            Icons.dark_mode_rounded,
-                            color: Theme.of(context).colorScheme.primary,
-                            size: 5.5.w,
-                          ),
-                        ),
-                        SizedBox(width: 3.w),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Dark Mode',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyLarge
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface,
-                                    ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.logout, size: 5.w),
+                            SizedBox(width: 2.w),
+                            Text(
+                              'Logout',
+                              style: textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
                               ),
-                              SizedBox(height: 0.3.h),
-                              Text(
-                                'Enable dark theme',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                      fontSize: 10.sp,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ValueListenableBuilder<ThemeMode>(
-                          valueListenable: _themeService.themeModeNotifier,
-                          builder: (context, themeMode, child) {
-                            return Switch(
-                              value: themeMode == ThemeMode.dark,
-                              onChanged: (value) {
-                                _themeService.setThemeMode(
-                                  value ? ThemeMode.dark : ThemeMode.light,
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  SizedBox(height: 0.5.h),
-
-                  // "Dark mode coming soon" message removed - it's working now!
-
-                  SizedBox(height: 1.h),
-
-                  // Privacy Policy and Terms & Conditions
-                  Container(
-                    margin:
-                        EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
-                    padding: EdgeInsets.all(3.5.w),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Theme.of(context).colorScheme.surface,
-                          Theme.of(context)
-                              .colorScheme
-                              .surface
-                              .withValues(alpha: 0.95),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .shadow
-                              .withValues(alpha: 0.06),
-                          blurRadius: 12,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                      border: Border.all(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .outline
-                            .withValues(alpha: 0.08),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        InkWell(
-                          onTap: () => _openPrivacyPolicy(),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 1.2.h),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: EdgeInsets.all(2.8.w),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Theme.of(context)
-                                            .colorScheme
-                                            .primary
-                                            .withValues(alpha: 0.15),
-                                        Theme.of(context)
-                                            .colorScheme
-                                            .primary
-                                            .withValues(alpha: 0.08),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: Icon(
-                                    Icons.privacy_tip_outlined,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                    size: 5.5.w,
-                                  ),
-                                ),
-                                SizedBox(width: 3.w),
-                                Expanded(
-                                  child: Text(
-                                    'Privacy Policy',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurface,
-                                        ),
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.chevron_right,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                              ],
                             ),
-                          ),
-                        ),
-                        Divider(
-                          height: 1,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .outline
-                              .withValues(alpha: 0.1),
-                        ),
-                        InkWell(
-                          onTap: () => _openTermsAndConditions(),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 1.2.h),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: EdgeInsets.all(2.8.w),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Theme.of(context)
-                                            .colorScheme
-                                            .primary
-                                            .withValues(alpha: 0.15),
-                                        Theme.of(context)
-                                            .colorScheme
-                                            .primary
-                                            .withValues(alpha: 0.08),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: Icon(
-                                    Icons.description_outlined,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                    size: 5.5.w,
-                                  ),
-                                ),
-                                SizedBox(width: 3.w),
-                                Expanded(
-                                  child: Text(
-                                    'Terms & Conditions',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurface,
-                                        ),
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.chevron_right,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  SizedBox(height: 2.h),
-
-                  // Logout Button
-                  Container(
-                    width: double.infinity,
-                    margin: EdgeInsets.symmetric(horizontal: 4.w),
-                    child: ElevatedButton(
-                      onPressed: () => _showLogoutDialog(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF3B30),
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 2.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.logout, size: 5.w),
-                          SizedBox(width: 2.w),
-                          Text(
-                            'Logout',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                        ],
-                      ),
                     ),
-                  ),
 
-                  SizedBox(height: 10.h), // Space for bottom navigation
-                ],
+                    SizedBox(height: 10.h), // Space for bottom navigation
+                  ],
+                ),
               ),
             ),
     );
@@ -846,50 +857,13 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
       "id": child.id,
       "name": child.fullName,
       "grade": child.classGrade,
-      "school": "School Name", // TODO: Add school name to backend
-      "studentId": "STU${child.id}",
+      "childId": "AB${child.id}",
       "class": child.classGrade,
       "homeAddress": _parent?.address ?? 'Not set',
       "status": child.currentStatus ?? 'no record today',
       "busId": child.assignedBus?.id,
       "busNumber": child.assignedBus?.numberPlate,
     };
-  }
-
-  Widget _buildErrorView() {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(5.w),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline,
-                size: 64, color: Theme.of(context).colorScheme.error),
-            SizedBox(height: 2.h),
-            Text(
-              'Error Loading Profile',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            SizedBox(height: 1.h),
-            Text(
-              _error!,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            SizedBox(height: 3.h),
-            ElevatedButton.icon(
-              onPressed: () => _loadProfileData(forceRefresh: true),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<void> _useCurrentLocation() async {
@@ -1111,6 +1085,11 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
     final TextEditingController addressController =
         TextEditingController(text: _parent?.address ?? '');
 
+    // Cache theme for dialog
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1130,14 +1109,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withValues(alpha: 0.15),
-                          Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withValues(alpha: 0.05),
+                          colorScheme.primary.withValues(alpha: 0.15),
+                          colorScheme.primary.withValues(alpha: 0.05),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -1146,7 +1119,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                     ),
                     child: Icon(
                       Icons.edit_location_rounded,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: colorScheme.primary,
                       size: 5.w,
                     ),
                   ),
@@ -1157,22 +1130,18 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                       children: [
                         Text(
                           'Update home address',
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 18.sp,
-                                  ),
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 18.sp,
+                          ),
                         ),
                         SizedBox(height: 0.3.h),
                         Text(
                           'Change your home location',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                    fontSize: 11.sp,
-                                  ),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 11.sp,
+                          ),
                         ),
                       ],
                     ),
@@ -1188,10 +1157,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                     padding: EdgeInsets.symmetric(
                         horizontal: 2.5.w, vertical: 0.6.h),
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.08),
+                      color: colorScheme.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
@@ -1200,19 +1166,16 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                         Icon(
                           Icons.gps_fixed,
                           size: 3.5.w,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: colorScheme.primary,
                         ),
                         SizedBox(width: 1.5.w),
                         Text(
                           'Best accuracy with GPS',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 11.sp,
-                              ),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11.sp,
+                          ),
                         ),
                       ],
                     ),
@@ -1249,32 +1212,23 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                     children: [
                       Expanded(
                         child: Divider(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .outline
-                              .withValues(alpha: 0.3),
+                          color: colorScheme.outline.withValues(alpha: 0.3),
                         ),
                       ),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 2.w),
                         child: Text(
                           'OR',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 11.sp,
-                                  ),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11.sp,
+                          ),
                         ),
                       ),
                       Expanded(
                         child: Divider(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .outline
-                              .withValues(alpha: 0.3),
+                          color: colorScheme.outline.withValues(alpha: 0.3),
                         ),
                       ),
                     ],
@@ -1285,10 +1239,10 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                   // Manual address input
                   Text(
                     'Type address manually',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12.sp,
-                        ),
+                    style: textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12.sp,
+                    ),
                   ),
                   SizedBox(height: 0.8.h),
                   TextField(
@@ -1434,20 +1388,23 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   }
 
   void _showLogoutDialog() {
+    // Cache theme for dialog
+    final textTheme = Theme.of(context).textTheme;
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text(
             'Logout',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFFFF3B30),
-                ),
+            style: textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFFFF3B30),
+            ),
           ),
           content: Text(
             'Are you sure you want to logout?',
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: textTheme.bodyMedium,
           ),
           actions: [
             TextButton(
@@ -1494,6 +1451,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   }
 
   void _openPrivacyPolicy() {
+    // Cache theme for dialog
+    final textTheme = Theme.of(context).textTheme;
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1503,9 +1463,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
           ),
           title: Text(
             'Privacy Policy',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            style: textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           content: SingleChildScrollView(
             child: Text(
@@ -1519,7 +1479,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
               '• School safety compliance\n\n'
               'We do not share your data with third parties without consent.\n\n'
               'For questions, contact your school administrator.',
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: textTheme.bodyMedium,
             ),
           ),
           actions: [
@@ -1534,6 +1494,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   }
 
   void _openTermsAndConditions() {
+    // Cache theme for dialog
+    final textTheme = Theme.of(context).textTheme;
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1543,9 +1506,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
           ),
           title: Text(
             'Terms & Conditions',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            style: textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           content: SingleChildScrollView(
             child: Text(
@@ -1561,7 +1524,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
               '• Update terms as needed\n\n'
               'Continued use indicates acceptance of these terms.\n\n'
               'For support, contact your school administrator.',
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: textTheme.bodyMedium,
             ),
           ),
           actions: [
@@ -1573,5 +1536,11 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
         );
       },
     );
+  }
+
+  @override
+  void dispose() {
+    _connectivityService.dispose();
+    super.dispose();
   }
 }

@@ -35,14 +35,13 @@ class AuthService {
     await prefs.setString('access_token', data['tokens']['access']);
     await prefs.setString('refresh_token', data['tokens']['refresh']);
 
-    // Store driver info
-    await prefs.setInt('driver_id', data['user_id']);
-    await prefs.setInt('user_id', data['user_id']);
-    await prefs.setString('user_name', data['name']);
-    await prefs.setString('driver_name', data['name']);
-    await prefs.setString('user_email', data['email'] ?? '');
+    // Store driver info - parse user_id to int (API may return as String)
+    final userId = data['user_id'];
+    final userIdInt = userId is int ? userId : int.parse(userId.toString());
+
+    await prefs.setInt('driver_id', userIdInt);
+    await prefs.setString('driver_name', data['name'] ?? '');
     await prefs.setString('driver_email', data['email'] ?? '');
-    await prefs.setString('user_phone', data['phone'] ?? '');
     await prefs.setString('driver_phone', data['phone'] ?? '');
     await prefs.setString('license_number', data['license_number'] ?? '');
     await prefs.setString('license_expiry', data['license_expiry'] ?? '');
@@ -97,22 +96,37 @@ class AuthService {
         return {
           'success': false,
           'message': e.response?.data['error'] ??
-              'No driver account found with this phone number. Please contact your administrator.',
+              'No driver or bus assistant account found with this phone number. Please contact your administrator.',
         };
       } else if (e.response?.statusCode == 400) {
         return {
           'success': false,
-          'message': e.response?.data['error'] ?? 'Invalid phone number.',
+          'message': e.response?.data['error'] ?? 'Invalid phone number format.',
+        };
+      } else if (e.response?.statusCode == 403) {
+        return {
+          'success': false,
+          'message': e.response?.data['error'] ?? 'Account is inactive. Please contact your administrator.',
         };
       }
       return {
         'success': false,
         'message': 'Connection error. Please check your internet connection.',
       };
+    } on FormatException catch (e) {
+      return {
+        'success': false,
+        'message': 'Invalid data format received from server. Please contact your administrator.',
+      };
+    } on TypeError catch (e) {
+      return {
+        'success': false,
+        'message': 'Data type error. Please contact your administrator.',
+      };
     } catch (e) {
       return {
         'success': false,
-        'message': 'Failed to login. Please try again.',
+        'message': 'Login failed: ${e.toString()}',
       };
     }
   }

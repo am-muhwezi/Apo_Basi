@@ -8,59 +8,56 @@ class HomeMarkerWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Label
-        Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: 2.w,
-            vertical: 0.5.h,
-          ),
-          decoration: BoxDecoration(
-            color: Colors.blue,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.blue.withValues(alpha: 0.3),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '🏠',
-                style: TextStyle(fontSize: 12.sp),
-              ),
-              SizedBox(width: 1.w),
-              Text(
-                'Home',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10.sp,
+    return SizedBox(
+      width: 48,
+      height: 48,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          // Pin icon (centered)
+          Positioned(
+            bottom: 0,
+            child: Icon(
+              Icons.location_on,
+              color: Colors.blue,
+              size: 36,
+              shadows: [
+                Shadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
                 ),
-              ),
-            ],
-          ),
-        ),
-        // Pin
-        Icon(
-          Icons.location_on,
-          color: Colors.blue,
-          size: 40,
-          shadows: [
-            Shadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+              ],
             ),
-          ],
-        ),
-      ],
+          ),
+          // Label (above pin, can overflow the bounds)
+          Positioned(
+            top: -8,
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: 6,
+                vertical: 2,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                borderRadius: BorderRadius.circular(6),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withValues(alpha: 0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                '🏠',
+                style: TextStyle(fontSize: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -6,6 +6,8 @@ class Child {
   final Bus? assignedBus;
   final String? currentStatus;  // This is the locationStatus from backend
   final DateTime? lastUpdated;
+  final String? routeName;  // Route name from backend
+  final String? routeCode;  // Route code from backend
 
   Child({
     required this.id,
@@ -15,6 +17,8 @@ class Child {
     this.assignedBus,
     this.currentStatus = 'At Home',  // Default to 'At Home'
     this.lastUpdated,
+    this.routeName,
+    this.routeCode,
   });
 
   String get fullName => '$firstName $lastName';
@@ -39,6 +43,9 @@ class Child {
       lastUpdated: json['last_updated'] != null
           ? DateTime.parse(json['last_updated'])
           : null,
+      // Parse route information
+      routeName: json['routeName'] ?? json['route_name'] ?? json['route'],
+      routeCode: json['routeCode'] ?? json['route_code'],
     );
   }
 
@@ -51,6 +58,8 @@ class Child {
       'assigned_bus': assignedBus?.toJson(),
       'location_status': currentStatus,
       'last_updated': lastUpdated?.toIso8601String(),
+      'route_name': routeName,
+      'route_code': routeCode,
     };
   }
 }

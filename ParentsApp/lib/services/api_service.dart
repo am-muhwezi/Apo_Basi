@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/child_model.dart';
-import '../models/parent_model.dart';
 import '../config/api_config.dart';
 import 'auth_service.dart';
 import 'cache_service.dart';
@@ -236,22 +236,32 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = response.data;
+        // Handle both response structures:
+        // 1. Nested: { "parent": {...}, "children": [...] }
+        // 2. Flat: { "id": ..., "firstName": ..., ... }
+        final parentData = data['parent'] ?? data;
 
         // Return in a format that matches what the app expects
         return {
           'user': {
-            'id': data['id'] ?? userId,
-            'username': data['firstName'] ?? '',
-            'email': data['email'] ?? '',
-            'first_name': data['firstName'] ?? '',
-            'last_name': data['lastName'] ?? '',
+            'id': parentData['id'] ?? userId,
+            'username':
+                parentData['firstName'] ?? parentData['first_name'] ?? '',
+            'email': parentData['email'] ?? '',
+            'first_name':
+                parentData['firstName'] ?? parentData['first_name'] ?? '',
+            'last_name':
+                parentData['lastName'] ?? parentData['last_name'] ?? '',
           },
           'parent': {
-            'user': data['id'] ?? userId,
-            'contact_number': data['phone'] ?? '',
-            'address': data['address'] ?? '',
-            'emergency_contact': data['emergencyContact'] ?? '',
-            'status': data['status'] ?? 'active',
+            'user': parentData['id'] ?? userId,
+            'contact_number':
+                parentData['phone'] ?? parentData['contact_number'] ?? '',
+            'address': parentData['address'] ?? '',
+            'emergency_contact': parentData['emergencyContact'] ??
+                parentData['emergency_contact'] ??
+                '',
+            'status': parentData['status'] ?? 'active',
           }
         };
       } else {
@@ -337,8 +347,10 @@ class ApiService {
         await _cacheService.cacheDashboard(response.data);
       }
     } catch (e) {
-      // Silent fail for background refresh
-      print('Background dashboard refresh failed: $e');
+      // Silent fail for background refresh (only log in debug mode)
+      if (kDebugMode) {
+        debugPrint('Background dashboard refresh failed: $e');
+      }
     }
   }
 

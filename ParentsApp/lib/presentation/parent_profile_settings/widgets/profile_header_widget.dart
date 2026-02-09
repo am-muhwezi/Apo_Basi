@@ -37,8 +37,16 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
 
   @override
   void dispose() {
-    _cameraController?.dispose();
+    _disposeCameraResources();
     super.dispose();
+  }
+
+  void _disposeCameraResources() {
+    try {
+      _cameraController?.dispose();
+    } catch (_) {}
+    _cameraController = null;
+    _isCameraInitialized = false;
   }
 
   Future<bool> _requestCameraPermission() async {
@@ -97,6 +105,7 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
         _currentImagePath = photo.path;
       });
       widget.onImageUpdated(photo.path);
+      _disposeCameraResources();
       Navigator.of(context).pop();
     } catch (e) {
       // Handle capture error silently
@@ -113,6 +122,7 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
           _currentImagePath = image.path;
         });
         widget.onImageUpdated(image.path);
+        _disposeCameraResources();
         Navigator.of(context).pop();
       }
     } catch (e) {
@@ -123,7 +133,7 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
   void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.lightTheme.colorScheme.surface,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -136,25 +146,25 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
               width: 12.w,
               height: 0.5.h,
               decoration: BoxDecoration(
-                color: AppTheme.lightTheme.colorScheme.outline,
+                color: Theme.of(context).colorScheme.outline,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             SizedBox(height: 3.h),
             Text(
               'Update Profile Photo',
-              style: AppTheme.lightTheme.textTheme.titleLarge,
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 3.h),
             ListTile(
               leading: CustomIconWidget(
                 iconName: 'camera_alt',
-                color: AppTheme.lightTheme.colorScheme.primary,
+                color: Theme.of(context).colorScheme.primary,
                 size: 24,
               ),
               title: Text(
                 'Take Photo',
-                style: AppTheme.lightTheme.textTheme.bodyLarge,
+                style: Theme.of(context).textTheme.bodyLarge,
               ),
               onTap: () async {
                 Navigator.of(context).pop();
@@ -166,12 +176,12 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
             ListTile(
               leading: CustomIconWidget(
                 iconName: 'photo_library',
-                color: AppTheme.lightTheme.colorScheme.primary,
+                color: Theme.of(context).colorScheme.primary,
                 size: 24,
               ),
               title: Text(
                 'Choose from Gallery',
-                style: AppTheme.lightTheme.textTheme.bodyLarge,
+                style: Theme.of(context).textTheme.bodyLarge,
               ),
               onTap: _pickFromGallery,
             ),
@@ -185,70 +195,80 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
   void _showCameraDialog() {
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.black,
-        child: StatefulBuilder(
-          builder: (context, setState) {
-            if (!_isCameraInitialized) {
-              _initializeCamera();
-              return Container(
-                height: 60.h,
-                child: Center(
-                  child: CircularProgressIndicator(
-                    color: AppTheme.lightTheme.colorScheme.primary,
-                  ),
-                ),
-              );
-            }
-
-            return Container(
-              height: 60.h,
-              child: Column(
-                children: [
-                  Expanded(
-                    child: _cameraController != null &&
-                            _cameraController!.value.isInitialized
-                        ? CameraPreview(_cameraController!)
-                        : Center(
-                            child: Text(
-                              'Camera not available',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.all(4.w),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: CustomIconWidget(
-                            iconName: 'close',
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: _capturePhoto,
-                          child: Container(
-                            width: 16.w,
-                            height: 16.w,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.grey, width: 3),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 14.w),
-                      ],
+      builder: (dialogContext) => WillPopScope(
+        onWillPop: () async {
+          _disposeCameraResources();
+          return true;
+        },
+        child: Dialog(
+          backgroundColor: Colors.black,
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              if (!_isCameraInitialized) {
+                _initializeCamera();
+                return Container(
+                  height: 60.h,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
-                ],
-              ),
-            );
-          },
+                );
+              }
+
+              return Container(
+                height: 60.h,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: _cameraController != null &&
+                              _cameraController!.value.isInitialized
+                          ? CameraPreview(_cameraController!)
+                          : Center(
+                              child: Text(
+                                'Camera not available',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.all(4.w),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          IconButton(
+                            onPressed: () {
+                              _disposeCameraResources();
+                              Navigator.of(dialogContext).pop();
+                            },
+                            icon: CustomIconWidget(
+                              iconName: 'close',
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: _capturePhoto,
+                            child: Container(
+                              width: 16.w,
+                              height: 16.w,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: Colors.grey, width: 3),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 14.w),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -259,11 +279,11 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
     return Container(
       padding: EdgeInsets.all(4.w),
       decoration: BoxDecoration(
-        color: AppTheme.lightTheme.colorScheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.lightTheme.colorScheme.shadow,
+            color: Theme.of(context).colorScheme.shadow,
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -283,7 +303,7 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: AppTheme.lightTheme.colorScheme.primary,
+                          color: Theme.of(context).colorScheme.primary,
                           width: 2,
                         ),
                       ),
@@ -303,13 +323,14 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
                                     fit: BoxFit.cover,
                                   ))
                             : Container(
-                                color: AppTheme
-                                    .lightTheme.colorScheme.primaryContainer,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primaryContainer,
                                 child: Center(
                                   child: CustomIconWidget(
                                     iconName: 'person',
                                     color:
-                                        AppTheme.lightTheme.colorScheme.primary,
+                                        Theme.of(context).colorScheme.primary,
                                     size: 32,
                                   ),
                                 ),
@@ -323,10 +344,10 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
                         width: 6.w,
                         height: 6.w,
                         decoration: BoxDecoration(
-                          color: AppTheme.lightTheme.colorScheme.primary,
+                          color: Theme.of(context).colorScheme.primary,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: AppTheme.lightTheme.colorScheme.surface,
+                            color: Theme.of(context).colorScheme.surface,
                             width: 2,
                           ),
                         ),
@@ -347,23 +368,25 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
                   children: [
                     Text(
                       widget.childData['name'] as String? ?? 'Child Name',
-                      style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
                     SizedBox(height: 1.h),
                     Text(
                       'Grade ${widget.childData['grade'] as String? ?? 'N/A'}',
-                      style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                     SizedBox(height: 0.5.h),
                     Text(
                       widget.childData['school'] as String? ?? 'School Name',
-                      style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                        color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                   ],
                 ),

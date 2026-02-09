@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/app_export.dart';
 import '../../services/api_service.dart';
 import '../../services/parent_notifications_service.dart';
+import '../../services/connectivity_service.dart';
 import './widgets/empty_notifications_widget.dart';
 import './widgets/notification_card_widget.dart';
 import './widgets/notification_filter_sheet_widget.dart';
@@ -47,21 +48,50 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   // Local storage key for notifications
   static const _notificationsKey = 'cached_notifications';
 
+  final ConnectivityService _connectivityService = ConnectivityService();
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
     _loadNotificationsFromAPI(); // Load from API first
-    _setupNotificationListeners();
+
+    // Defer heavy initialization
+    Future.microtask(() {
+      _setupNotificationListeners();
+      _initializeConnectivity();
+    });
+  }
+
+  Future<void> _initializeConnectivity() async {
+    await _connectivityService.initialize();
+    _connectivityService.onConnectionRestored = () {
+      if (mounted) {
+        // Only show toast if this is the first restoration notification
+        if (_connectivityService.shouldShowRestoredToast) {
+          _showToast('Connection restored');
+        }
+        _loadNotificationsFromAPI();
+      }
+    };
+    _connectivityService.onConnectionLost = () {
+      if (mounted) {
+        _showToast('Currently offline');
+      }
+    };
   }
 
   // Load notifications from API
   Future<void> _loadNotificationsFromAPI() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    // First, load from cache immediately
+    final cachedNotifications = await _loadCachedNotifications();
+    if (cachedNotifications) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
 
+    // Then fetch fresh data in background
     try {
       final response = await _apiService.getNotifications();
 
@@ -78,37 +108,66 @@ class _NotificationsCenterState extends State<NotificationsCenter>
         notificationsList = [];
       }
 
-      setState(() {
-        _allNotifications = notificationsList.map((notification) {
-          return {
-            'id': notification['id'].toString(),
-            'type': notification['notification_type'] ?? 'general',
-            'title': notification['title'] ?? '',
-            'message': notification['message'] ?? '',
-            'fullMessage': notification['full_message'],
-            'isRead': notification['is_read'] ?? false,
-            'timestamp': DateTime.parse(notification['created_at']),
-            'expanded': false,
-            // Additional data
-            'child_name': notification['child_name'],
-            'bus_number': notification['bus_number'],
-            'additional_data': notification['additional_data'],
-          };
-        }).toList();
+      if (mounted) {
+        setState(() {
+          _allNotifications = notificationsList.map((notification) {
+            return {
+              'id': notification['id'].toString(),
+              'type': notification['notification_type'] ?? 'general',
+              'title': notification['title'] ?? '',
+              'message': notification['message'] ?? '',
+              'fullMessage': notification['full_message'],
+              'isRead': notification['is_read'] ?? false,
+              'timestamp': DateTime.parse(notification['created_at']),
+              'expanded': false,
+              // Additional data
+              'child_name': notification['child_name'],
+              'bus_number': notification['bus_number'],
+              'additional_data': notification['additional_data'],
+            };
+          }).toList();
 
-        _groupNotificationsByDate();
-        _isLoading = false;
-      });
+          _groupNotificationsByDate();
+          _isLoading = false;
+          _errorMessage = null;
+        });
 
-      // Cache the notifications
-      await _saveNotifications();
+        // Cache the notifications
+        await _saveNotifications();
+      }
     } catch (e) {
-      // Fall back to cached notifications
-      await _loadCachedNotifications();
-      setState(() {
-        _errorMessage = 'Failed to load notifications. Showing cached data.';
-      });
+      // If we have cached data, just show a toast
+      if (_allNotifications.isNotEmpty) {
+        if (mounted) {
+          _showToast('Currently offline');
+          setState(() {
+            _isLoading = false;
+            _errorMessage = null;
+          });
+        }
+      } else {
+        // No cached data available
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = null;
+          });
+          _showToast('Failed to load notifications');
+        }
+      }
     }
+  }
+
+  void _showToast(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFFF9500),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   // Start auto-refresh timer
@@ -119,45 +178,36 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   }
 
   // Load cached notifications from local storage (fallback)
-  Future<void> _loadCachedNotifications() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
+  Future<bool> _loadCachedNotifications() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedData = prefs.getString(_notificationsKey);
 
       if (cachedData != null) {
         final List<dynamic> notifications = jsonDecode(cachedData);
-        setState(() {
-          _allNotifications = notifications.map((notification) {
-            return {
-              'id': notification['id'] ??
-                  DateTime.now().millisecondsSinceEpoch.toString(),
-              'type': notification['type'] ?? 'general',
-              'title': notification['title'] ?? '',
-              'message': notification['message'] ?? '',
-              'isRead': notification['isRead'] ?? false,
-              'timestamp': DateTime.parse(notification['timestamp']),
-              'expanded': false,
-            };
-          }).toList();
+        if (mounted) {
+          setState(() {
+            _allNotifications = notifications.map((notification) {
+              return {
+                'id': notification['id'] ??
+                    DateTime.now().millisecondsSinceEpoch.toString(),
+                'type': notification['type'] ?? 'general',
+                'title': notification['title'] ?? '',
+                'message': notification['message'] ?? '',
+                'isRead': notification['isRead'] ?? false,
+                'timestamp': DateTime.parse(notification['timestamp']),
+                'expanded': false,
+              };
+            }).toList();
 
-          _groupNotificationsByDate();
-          _isLoading = false;
-        });
-      } else {
-        // No cached notifications
-        setState(() {
-          _isLoading = false;
-        });
+            _groupNotificationsByDate();
+          });
+        }
+        return true;
       }
+      return false;
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      return false;
     }
   }
 
@@ -353,9 +403,15 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   }
 
   void _onSearchChanged(String query) {
-    setState(() {
-      _searchQuery = query;
-      _groupNotificationsByDate();
+    // Defer setState to avoid calling during build
+    if (!mounted) return;
+    _searchQuery = query;
+    Future.microtask(() {
+      if (mounted) {
+        setState(() {
+          _groupNotificationsByDate();
+        });
+      }
     });
   }
 
@@ -475,10 +531,10 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   Widget build(BuildContext context) {
     final hasNotifications = _groupedNotifications.isNotEmpty;
 
-    // Show loading indicator
-    if (_isLoading) {
+    // Show loading indicator only if no cached data
+    if (_isLoading && _allNotifications.isEmpty) {
       return Scaffold(
-        backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
           title: Text('Notifications'),
         ),
@@ -488,49 +544,24 @@ class _NotificationsCenterState extends State<NotificationsCenter>
       );
     }
 
-    // Show error message if any
-    if (_errorMessage != null) {
-      return Scaffold(
-        backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: Text('Notifications'),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: Colors.red),
-              SizedBox(height: 16),
-              Text('Failed to load notifications'),
-              SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: _loadCachedNotifications,
-                child: Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
-      backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Notifications',
-              style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             if (_unreadCount > 0)
               Text(
                 '$_unreadCount unread',
-                style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                  color: AppTheme.lightTheme.colorScheme.primary,
-                ),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
               ),
           ],
         ),
@@ -539,7 +570,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
             onPressed: _toggleSearch,
             icon: CustomIconWidget(
               iconName: _isSearchVisible ? 'close' : 'search',
-              color: AppTheme.lightTheme.colorScheme.onSurface,
+              color: Theme.of(context).colorScheme.onSurface,
               size: 24,
             ),
           ),
@@ -548,10 +579,10 @@ class _NotificationsCenterState extends State<NotificationsCenter>
               onPressed: _markAllAsRead,
               child: Text(
                 'Mark All Read',
-                style: AppTheme.lightTheme.textTheme.labelMedium?.copyWith(
-                  color: AppTheme.lightTheme.colorScheme.primary,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
               ),
             ),
           SizedBox(width: 2.w),
@@ -583,12 +614,14 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                             _groupNotificationsByDate();
                           });
                         },
-                        backgroundColor: AppTheme.lightTheme.colorScheme.error
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .error
                             .withValues(alpha: 0.1),
                         labelStyle:
-                            AppTheme.lightTheme.textTheme.labelSmall?.copyWith(
-                          color: AppTheme.lightTheme.colorScheme.error,
-                        ),
+                            Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
                       ),
                     );
                   }
@@ -605,12 +638,14 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                           _groupNotificationsByDate();
                         });
                       },
-                      selectedColor: AppTheme.lightTheme.colorScheme.primary
+                      selectedColor: Theme.of(context)
+                          .colorScheme
+                          .primary
                           .withValues(alpha: 0.1),
                       labelStyle:
-                          AppTheme.lightTheme.textTheme.labelSmall?.copyWith(
-                        color: AppTheme.lightTheme.colorScheme.primary,
-                      ),
+                          Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
                     ),
                   );
                 },
@@ -639,15 +674,24 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                                   horizontal: 4.w, vertical: 1.h),
                               child: Text(
                                 dateKey,
-                                style: AppTheme.lightTheme.textTheme.titleSmall
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
                                     ?.copyWith(
-                                  color: AppTheme
-                                      .lightTheme.colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                               ),
                             ),
-                            ...notifications.map((notification) => Slidable(
+                            ...notifications.map((notification) {
+                              final theme = Theme.of(context);
+                              final colorScheme = theme.colorScheme;
+
+                              return RepaintBoundary(
+                                key: ValueKey('notif_${notification['id']}'),
+                                child: Slidable(
                                   key: ValueKey(notification['id']),
                                   startActionPane: ActionPane(
                                     motion: const ScrollMotion(),
@@ -656,20 +700,22 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                                         SlidableAction(
                                           onPressed: (_) =>
                                               _markAsRead(notification),
-                                          backgroundColor: AppTheme
-                                              .lightTheme.colorScheme.secondary,
+                                          backgroundColor:
+                                              colorScheme.secondary,
                                           foregroundColor: Colors.white,
                                           icon: Icons.mark_email_read,
                                           label: 'Read',
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                         ),
                                       SlidableAction(
                                         onPressed: (_) =>
                                             _shareNotification(notification),
-                                        backgroundColor: AppTheme
-                                            .lightTheme.colorScheme.primary,
+                                        backgroundColor: colorScheme.primary,
                                         foregroundColor: Colors.white,
                                         icon: Icons.share,
                                         label: 'Share',
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                     ],
                                   ),
@@ -680,11 +726,12 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                                         SlidableAction(
                                           onPressed: (_) =>
                                               _deleteNotification(notification),
-                                          backgroundColor: AppTheme
-                                              .lightTheme.colorScheme.error,
+                                          backgroundColor: colorScheme.error,
                                           foregroundColor: Colors.white,
                                           icon: Icons.delete,
                                           label: 'Delete',
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                         ),
                                     ],
                                   ),
@@ -700,7 +747,9 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                                     onContactSchool: _contactSchool,
                                     onViewOnMap: _viewOnMap,
                                   ),
-                                )),
+                                ),
+                              );
+                            }),
                             if (index == _groupedNotifications.length - 1)
                               SizedBox(height: 4.h),
                           ],
@@ -739,6 +788,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     _scrollController.dispose();
     _notificationsSubscription?.cancel();
     _refreshTimer?.cancel();
+    _connectivityService.dispose();
     super.dispose();
   }
 }

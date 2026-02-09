@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 
 /// Service for monitoring network connectivity status
 ///
@@ -11,6 +12,7 @@ class ConnectivityService {
 
   bool _isConnected = false;
   bool _wasOffline = false;
+  bool _hasShownRestoredToast = false;
 
   /// Callback triggered when connection is restored
   Function()? onConnectionRestored;
@@ -19,6 +21,15 @@ class ConnectivityService {
   Function()? onConnectionLost;
 
   bool get isConnected => _isConnected;
+
+  /// Check if we should show connection restored toast
+  bool get shouldShowRestoredToast {
+    if (!_hasShownRestoredToast && _wasOffline && _isConnected) {
+      _hasShownRestoredToast = true;
+      return true;
+    }
+    return false;
+  }
 
   /// Initialize connectivity monitoring
   Future<void> initialize() async {
@@ -39,13 +50,16 @@ class ConnectivityService {
       final results = await _connectivity.checkConnectivity();
       await _updateConnectivityStatus(results);
     } catch (e) {
-      print('Error checking connectivity: $e');
+      if (kDebugMode) {
+        debugPrint('Error checking connectivity: $e');
+      }
       _isConnected = false;
     }
   }
 
   /// Update connectivity status based on results
-  Future<void> _updateConnectivityStatus(List<ConnectivityResult> results) async {
+  Future<void> _updateConnectivityStatus(
+      List<ConnectivityResult> results) async {
     final wasConnected = _isConnected;
 
     // Check if any result indicates connectivity
@@ -57,7 +71,10 @@ class ConnectivityService {
     // Connection restored
     if (_isConnected && !wasConnected) {
       _wasOffline = false;
-      print('Connection restored');
+      _hasShownRestoredToast = false; // Reset flag
+      if (kDebugMode) {
+        debugPrint('Connection restored');
+      }
       if (onConnectionRestored != null) {
         onConnectionRestored!();
       }
@@ -66,7 +83,10 @@ class ConnectivityService {
     // Connection lost
     if (!_isConnected && wasConnected) {
       _wasOffline = true;
-      print('Connection lost');
+      _hasShownRestoredToast = false; // Reset flag when going offline
+      if (kDebugMode) {
+        debugPrint('Connection lost');
+      }
       if (onConnectionLost != null) {
         onConnectionLost!();
       }

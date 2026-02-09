@@ -262,28 +262,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       if (routeResponse['children'] != null &&
           routeResponse['children'] is List) {
         final Map<String, Map<String, dynamic>> byId = {};
-
-        // Fetch today's attendance for this bus and trip type so we can
-        // reflect assistant-marked statuses in a read-only way for drivers.
-        List<dynamic> attendanceList = [];
-        try {
-          if (_busData != null && _busData!['id'] != null) {
-            attendanceList = await _apiService.getTodayAttendance(
-              busId: _busData!['id'] as int,
-              tripType: tripType,
-            );
-          }
-        } catch (_) {
-          // If attendance fails to load, we fall back to pending status.
-        }
-
-        final Map<String, Map<String, dynamic>> attendanceByChildId = {};
-        for (final record in attendanceList) {
-          if (record is Map<String, dynamic> && record['child'] != null) {
-            attendanceByChildId[record['child'].toString()] = record;
-          }
-        }
-
         for (var child in routeResponse['children']) {
           final String id = child['id']?.toString() ?? '';
           if (id.isEmpty) continue;
@@ -296,38 +274,16 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
             gradeValue = gradeValue.substring(5).trim();
           }
 
-          final attendance = attendanceByChildId[id];
-          final status = (attendance != null
-                  ? attendance['status']?.toString()
-                  : null) ??
-              'pending';
-          final statusDisplay = (attendance != null
-                  ? attendance['status_display']?.toString()
-                  : null) ??
-              'Pending';
-
-          // Any non-pending status (picked_up, dropped_off, absent) counts
-          // as "completed" for trip progress purposes.
-          final isCompleted = status != 'pending';
-
-          // Prefer the latest parent-specified address for the stop name
-          final stopName = child['address']?.toString() ??
-              child['pickup_address']?.toString() ??
-              child['home_address']?.toString() ??
-              'No address';
-
           byId[id] = {
             "id": id,
             "name": '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}',
             "grade": gradeValue,
-            "stopName": stopName,
+            "stopName": child['address']?.toString() ?? 'No address',
             "parentContact": child['emergency_contact']?.toString() ??
                 child['parent_contact']?.toString() ??
                 'N/A',
             "specialNotes": child['special_needs']?.toString() ?? '',
-            "status": status,
-            "statusDisplay": statusDisplay,
-            "isPickedUp": isCompleted,
+            "isPickedUp": false,
           };
         }
 
@@ -406,9 +362,69 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     });
   }
 
-  // Drivers no longer mark attendance directly on this screen.
-  // Attendance is recorded by bus assistants and reflected here via
-  // read-only status fetched from the backend.
+  Future<void> _onPickupStatusChanged(int index, bool isPickedUp) async {
+    // Update local state immediately for responsiveness
+    setState(() {
+      _students[index]["isPickedUp"] = isPickedUp;
+    });
+
+    // Sync with backend
+    try {
+      final studentId = _students[index]["id"];
+      final prefs = await SharedPreferences.getInstance();
+      final tripType = prefs.getString('current_trip_type') ?? 'pickup';
+
+      await _apiService.markAttendance(
+        childId: studentId,
+        status: isPickedUp ? 'picked_up' : 'pending',
+        tripType: tripType,
+      );
+
+      // Show success confirmation
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 2.w),
+                Expanded(
+                  child: Text(
+                    isPickedUp
+                        ? '${_students[index]["name"]} marked as picked up'
+                        : '${_students[index]["name"]} marked as not picked up',
+                  ),
+                ),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+            backgroundColor: AppTheme.successAction,
+            behavior: SnackBarBehavior.fixed,
+          ),
+        );
+      }
+    } catch (e) {
+      // Show error but keep local state
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.warning, color: Colors.white),
+                SizedBox(width: 2.w),
+                Expanded(
+                  child: Text('Saved locally. Will sync when online.'),
+                ),
+              ],
+            ),
+            duration: Duration(seconds: 3),
+            backgroundColor: AppTheme.warningState,
+            behavior: SnackBarBehavior.fixed,
+          ),
+        );
+      }
+    }
+  }
 
   void _onEndTripPressed() {
     showDialog(
@@ -628,34 +644,41 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
   int get _studentsPickedUp =>
       _students.where((s) => s["isPickedUp"] as bool? ?? false).length;
-  int get _remainingStops => _tripData["stops"] != null
-      ? (_tripData["stops"] as List)
-          .where((s) => !(s["isCompleted"] as bool? ?? false))
-          .length
-      : _students.length - _studentsPickedUp;
 
-  /// Get the next student to pick up (first not-picked-up student)
-  Map<String, dynamic>? get _nextStudent {
-    try {
-      return _students.firstWhere(
-        (s) => !(s["isPickedUp"] as bool? ?? false),
-      );
-    } catch (e) {
-      return null; // All students picked up
-    }
-  }
-
-  /// Get upcoming students (all not-picked-up students after the next one)
-  List<Map<String, dynamic>> get _upcomingStudents {
-    final notPickedUp =
-        _students.where((s) => !(s["isPickedUp"] as bool? ?? false)).toList();
-
-    if (notPickedUp.length <= 1) {
-      return [];
-    }
-
-    // Return all except the first one (which is the next stop)
-    return notPickedUp.sublist(1);
+  Widget _buildStatItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          color: color,
+          size: 7.w,
+        ),
+        SizedBox(height: 1.h),
+        Text(
+          value,
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontSize: 20.sp,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        SizedBox(height: 0.5.h),
+        Text(
+          label,
+          style: TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 11.sp,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -677,7 +700,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
           title: _tripData["trip_type"] == 'pickup'
               ? 'Pickup Trip'
               : 'Dropoff Trip',
-          subtitle: '${_studentsPickedUp}/${_students.length} • $_elapsedTime',
+          subtitle: '$_studentsPickedUp/${_students.length} • $_elapsedTime',
           leading: Builder(
             builder: (context) => IconButton(
               icon: Icon(Icons.menu, color: AppTheme.textOnPrimary),
@@ -751,14 +774,72 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
                             ),
                           ),
 
-                        SizedBox(height: 2.h),
-
-                        // Sleek, read-only student list driven by attendance
-                        StudentListWidget(
-                          students: _students,
+                        // Trip summary card
+                        Container(
+                          margin: EdgeInsets.symmetric(
+                              horizontal: 4.w, vertical: 2.h),
+                          padding: EdgeInsets.all(4.w),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.primaryDriver.withValues(alpha: 0.1),
+                                AppTheme.primaryDriver.withValues(alpha: 0.05),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color:
+                                  AppTheme.primaryDriver.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildStatItem(
+                                icon: Icons.people_outline,
+                                label: 'Total',
+                                value: _students.length.toString(),
+                                color: AppTheme.primaryDriver,
+                              ),
+                              Container(
+                                width: 1,
+                                height: 8.h,
+                                color: AppTheme.borderLight,
+                              ),
+                              _buildStatItem(
+                                icon: Icons.check_circle_outline,
+                                label: 'Completed',
+                                value: _studentsPickedUp.toString(),
+                                color: AppTheme.successAction,
+                              ),
+                              Container(
+                                width: 1,
+                                height: 8.h,
+                                color: AppTheme.borderLight,
+                              ),
+                              _buildStatItem(
+                                icon: Icons.pending_outlined,
+                                label: 'Remaining',
+                                value: (_students.length - _studentsPickedUp)
+                                    .toString(),
+                                color: AppTheme.warningState,
+                              ),
+                            ],
+                          ),
                         ),
 
-                        SizedBox(height: 10.h), // Space for bottom button
+                        SizedBox(height: 2.h),
+
+                        // Student list
+                        StudentListWidget(
+                          students: _students,
+                          onPickupStatusChanged: _onPickupStatusChanged,
+                        ),
+
+                        SizedBox(height: 12.h), // Space for bottom button
                       ],
                     ),
                   ),
