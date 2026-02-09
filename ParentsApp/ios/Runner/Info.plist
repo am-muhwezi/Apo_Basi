@@ -88,5 +88,8 @@
 			</array>
 		</dict>
 	</array>
+	<!-- Export Compliance - App uses only standard HTTPS -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
