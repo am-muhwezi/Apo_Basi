@@ -25,11 +25,13 @@ class BusMarkerWidgetSimple extends StatelessWidget {
             vertical: 0.5.h,
           ),
           decoration: BoxDecoration(
-            color: AppTheme.lightTheme.colorScheme.primary,
+            color: Theme.of(context).colorScheme.primary,
             borderRadius: BorderRadius.circular(8),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.lightTheme.colorScheme.primary
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
                     .withValues(alpha: 0.3),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
@@ -58,7 +60,7 @@ class BusMarkerWidgetSimple extends StatelessWidget {
         // Pin
         Icon(
           Icons.location_on,
-          color: AppTheme.lightTheme.colorScheme.primary,
+          color: Theme.of(context).colorScheme.primary,
           size: 40,
           shadows: [
             Shadow(

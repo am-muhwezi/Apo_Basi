@@ -32,6 +32,16 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
     super.initState();
     _emailController.addListener(_validateEmail);
     _listenForAuthCallback();
+    _checkAuthAndAutoNavigate();
+  }
+
+  /// Check if user is already authenticated and auto-navigate to dashboard
+  Future<void> _checkAuthAndAutoNavigate() async {
+    final isAuthenticated = await _authService.isAuthenticated();
+    if (isAuthenticated && mounted) {
+      // User already logged in - go straight to dashboard like Uber
+      Navigator.pushReplacementNamed(context, '/parent-dashboard');
+    }
   }
 
   @override
@@ -120,7 +130,8 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Magic link sent! Check your email.'),
+            content:
+                Text(result['message'] ?? 'Magic link sent! Check your email.'),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 3),
           ),
@@ -144,8 +155,9 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Color(0xFFF8FAFC),
+      backgroundColor: isDark ? Theme.of(context).scaffoldBackgroundColor : Color(0xFFF8FAFC),
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: SingleChildScrollView(
@@ -168,10 +180,14 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
                       Container(
                         padding: EdgeInsets.all(3.h),
                         decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1),
+                          color: isDark
+                              ? Colors.green.shade900.withValues(alpha: 0.3)
+                              : Colors.green.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: Colors.green.withValues(alpha: 0.3),
+                            color: isDark
+                                ? Colors.green.shade700
+                                : Colors.green.withValues(alpha: 0.3),
                             width: 1.5,
                           ),
                         ),
@@ -185,26 +201,34 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
                             SizedBox(height: 2.h),
                             Text(
                               'Check your email',
-                              style: AppTheme.lightTheme.textTheme.titleLarge
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
                                   ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.green.shade900,
+                                  ),
                               textAlign: TextAlign.center,
                             ),
                             SizedBox(height: 1.h),
                             Text(
                               'We sent a magic link to\n${_emailController.text.trim()}',
-                              style: AppTheme.lightTheme.textTheme.bodyMedium,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.green.shade800,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                               textAlign: TextAlign.center,
                             ),
                             SizedBox(height: 2.h),
                             Text(
                               'Click the link in your email to sign in. The link will expire in 1 hour.',
-                              style: AppTheme.lightTheme.textTheme.bodySmall
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
                                   ?.copyWith(
-                                color: AppTheme.lightTheme.colorScheme.onSurface
-                                    .withValues(alpha: 0.6),
-                              ),
+                                    color: Colors.green.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                               textAlign: TextAlign.center,
                             ),
                           ],
@@ -218,7 +242,18 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
                               _magicLinkSent = false;
                             });
                           },
-                          child: Text('Use a different email'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.primaryLight,
+                            backgroundColor: AppTheme.primaryLight.withOpacity(0.1),
+                            padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.5.h),
+                          ),
+                          child: Text(
+                            'Use a different email',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                       ),
                     ] else ...[
@@ -226,9 +261,9 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
                       Text(
                         'Email Address',
                         style:
-                            AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
                       ),
                       SizedBox(height: 1.h),
                       _buildEmailInput(),
@@ -250,11 +285,12 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
                     Center(
                       child: Text(
                         '© 2026 ApoBasi - Powered by SoG',
-                        style:
-                            AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                          color: AppTheme.lightTheme.colorScheme.onSurface
-                              .withValues(alpha: 0.5),
-                        ),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.5),
+                            ),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -270,6 +306,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
   }
 
   Widget _buildEmailInput() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
@@ -278,10 +315,12 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
               ? Colors.red
               : _isEmailValid
                   ? AppTheme.primaryLight
-                  : Colors.grey.shade300,
+                  : isDark
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade300,
           width: _isEmailValid ? 2 : 1.5,
         ),
-        color: Colors.white,
+        color: isDark ? Colors.grey.shade900 : Colors.white,
       ),
       child: TextField(
         controller: _emailController,
@@ -295,11 +334,11 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
               ? Icon(Icons.check_circle, color: Colors.green)
               : null,
           errorText: _emailError,
-          errorStyle: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-            color: Colors.red,
-          ),
+          errorStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.red,
+              ),
         ),
-        style: AppTheme.lightTheme.textTheme.bodyLarge,
+        style: Theme.of(context).textTheme.bodyLarge,
       ),
     );
   }

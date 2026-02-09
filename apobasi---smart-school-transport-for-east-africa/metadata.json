@@ -1,8 +1,0 @@
-
-{
-  "name": "ApoBasi - Smart School Transport for East Africa",
-  "description": "A comprehensive school bus tracking and management system designed for safety, reliability, and peace of mind for schools and parents across East Africa.",
-  "requestFramePermissions": [
-    "geolocation"
-  ]
-}

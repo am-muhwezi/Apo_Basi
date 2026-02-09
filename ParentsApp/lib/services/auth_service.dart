@@ -279,6 +279,48 @@ class AuthService {
     return prefs.getString('access_token');
   }
 
+  /// Get stored refresh token
+  Future<String?> getRefreshToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('refresh_token');
+  }
+
+  /// Refresh access token using refresh token
+  /// Returns new access token if successful, null otherwise
+  Future<String?> refreshAccessToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final refreshToken = prefs.getString('refresh_token');
+
+      if (refreshToken == null || refreshToken.isEmpty) {
+        return null;
+      }
+
+      final response = await _dio.post(
+        '/api/token/refresh/',
+        data: {'refresh': refreshToken},
+      );
+
+      if (response.statusCode == 200) {
+        final newAccessToken = response.data['access'];
+
+        // Store new access token
+        await prefs.setString('access_token', newAccessToken);
+
+        // If a new refresh token is provided, update it too
+        if (response.data['refresh'] != null) {
+          await prefs.setString('refresh_token', response.data['refresh']);
+        }
+
+        return newAccessToken;
+      }
+
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   /// Sign out user
   Future<void> signOut() async {
     // Sign out from Supabase

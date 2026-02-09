@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
 
-import '../../../core/app_export.dart';
-
 class ChildStatusCard extends StatelessWidget {
   final Map<String, dynamic> childData;
   final VoidCallback? onTap;
@@ -26,6 +24,7 @@ class ChildStatusCard extends StatelessWidget {
     final String name = childData['name'] ?? 'Child Name';
     final String grade = childData['grade'] ?? 'N/A';
 
+    final Color statusColor = _getStatusColor(context, status);
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -33,15 +32,20 @@ class ChildStatusCard extends StatelessWidget {
         margin: EdgeInsets.symmetric(horizontal: 5.w, vertical: 1.h),
         padding: EdgeInsets.all(4.w),
         decoration: BoxDecoration(
-          color: const Color(0xFF4CAF50), // Green
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color:
+                  Theme.of(context).colorScheme.shadow.withValues(alpha: 0.05),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
           ],
+          border: Border.all(
+            color:
+                Theme.of(context).colorScheme.outline.withValues(alpha: 0.15),
+          ),
         ),
         child: Row(
           children: [
@@ -50,7 +54,7 @@ class ChildStatusCard extends StatelessWidget {
               width: 18.w,
               height: 18.w,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surfaceVariant,
                 shape: BoxShape.circle,
               ),
               child: Center(
@@ -58,7 +62,7 @@ class ChildStatusCard extends StatelessWidget {
                   _getInitials(name),
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF4CAF50), // Green
+                    color: Theme.of(context).colorScheme.primary,
                     fontSize: 16.sp,
                   ),
                 ),
@@ -74,7 +78,7 @@ class ChildStatusCard extends StatelessWidget {
                     name,
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 16.sp,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -83,40 +87,48 @@ class ChildStatusCard extends StatelessWidget {
                   Text(
                     grade,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 12.sp,
                       fontWeight: FontWeight.w400,
                     ),
                   ),
                   SizedBox(height: 1.h),
                   // Status chip with yellow background
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 0.6.h),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFDD835), // Bright yellow
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 1.5.w,
-                          height: 1.5.w,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4CAF50), // Green dot
-                            shape: BoxShape.circle,
-                          ),
+                  Semantics(
+                    label: 'Status',
+                    value: _getStatusText(status),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 3.w, vertical: 0.6.h),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: statusColor.withValues(alpha: 0.3),
                         ),
-                        SizedBox(width: 1.5.w),
-                        Text(
-                          _getStatusText(status),
-                          style: TextStyle(
-                            color: const Color(0xFF212121),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 10.sp,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 1.5.w,
+                            height: 1.5.w,
+                            decoration: BoxDecoration(
+                              color: statusColor,
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
-                      ],
+                          SizedBox(width: 1.5.w),
+                          Text(
+                            _getStatusText(status),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10.sp,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -126,7 +138,7 @@ class ChildStatusCard extends StatelessWidget {
             Icon(
               Icons.arrow_forward_ios,
               size: 5.w,
-              color: Colors.white.withValues(alpha: 0.7),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ],
         ),
@@ -134,7 +146,7 @@ class ChildStatusCard extends StatelessWidget {
     );
   }
 
-  Color _getStatusColor(String? status) {
+  Color _getStatusColor(BuildContext context, String? status) {
     if (status == null || status.trim().isEmpty) {
       return const Color(0xFF34C759); // Green for 'At home'
     }
@@ -142,10 +154,10 @@ class ChildStatusCard extends StatelessWidget {
     switch (status.toLowerCase()) {
       case 'on_bus':
       case 'on-bus':
-        return AppTheme.lightTheme.colorScheme.primary;
+        return Theme.of(context).colorScheme.primary;
       case 'at_school':
       case 'at-school':
-        return AppTheme.lightTheme.colorScheme.secondary;
+        return Theme.of(context).colorScheme.secondary;
       case 'at_home':
       case 'at-home':
       case 'home':
@@ -194,4 +206,3 @@ class ChildStatusCard extends StatelessWidget {
     }
   }
 }
-

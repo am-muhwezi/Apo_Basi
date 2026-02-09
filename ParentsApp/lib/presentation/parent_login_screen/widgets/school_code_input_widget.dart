@@ -34,20 +34,20 @@ class _SchoolCodeInputWidgetState extends State<SchoolCodeInputWidget> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: widget.errorText != null
-                  ? AppTheme.lightTheme.colorScheme.error
+                  ? Theme.of(context).colorScheme.error
                   : _isFocused
-                      ? AppTheme.lightTheme.colorScheme.primary
-                      : AppTheme.lightTheme.colorScheme.outline,
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.outline,
               width: _isFocused ? 2 : 1,
             ),
-            color: AppTheme.lightTheme.colorScheme.surface,
+            color: Theme.of(context).colorScheme.surface,
           ),
           child: TextFormField(
             controller: widget.controller,
             onChanged: widget.onChanged,
             keyboardType: TextInputType.text,
             textCapitalization: TextCapitalization.characters,
-            style: AppTheme.lightTheme.textTheme.bodyLarge,
+            style: Theme.of(context).textTheme.bodyLarge,
             onTap: () {
               setState(() {
                 _isFocused = true;
@@ -60,18 +60,18 @@ class _SchoolCodeInputWidgetState extends State<SchoolCodeInputWidget> {
             },
             decoration: InputDecoration(
               hintText: 'Enter school code',
-              hintStyle: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-              ),
+              hintStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
               prefixIcon: Padding(
                 padding: EdgeInsets.all(3.w),
                 child: CustomIconWidget(
                   iconName: 'school',
                   color: widget.errorText != null
-                      ? AppTheme.lightTheme.colorScheme.error
+                      ? Theme.of(context).colorScheme.error
                       : _isFocused
-                          ? AppTheme.lightTheme.colorScheme.primary
-                          : AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                   size: 6.w,
                 ),
               ),
@@ -80,7 +80,7 @@ class _SchoolCodeInputWidgetState extends State<SchoolCodeInputWidget> {
                       padding: EdgeInsets.all(3.w),
                       child: CustomIconWidget(
                         iconName: 'check_circle',
-                        color: AppTheme.lightTheme.colorScheme.secondary,
+                        color: Theme.of(context).colorScheme.secondary,
                         size: 6.w,
                       ),
                     )
@@ -101,16 +101,16 @@ class _SchoolCodeInputWidgetState extends State<SchoolCodeInputWidget> {
               children: [
                 CustomIconWidget(
                   iconName: 'error_outline',
-                  color: AppTheme.lightTheme.colorScheme.error,
+                  color: Theme.of(context).colorScheme.error,
                   size: 4.w,
                 ),
                 SizedBox(width: 2.w),
                 Expanded(
                   child: Text(
                     widget.errorText!,
-                    style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                      color: AppTheme.lightTheme.colorScheme.error,
-                    ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                   ),
                 ),
               ],

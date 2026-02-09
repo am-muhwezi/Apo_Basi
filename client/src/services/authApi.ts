@@ -44,12 +44,12 @@ export async function login(credentials: LoginCredentials): Promise<AuthResponse
 }
 
 /**
- * Register new admin
- * Note: Uses raw axios (not axiosInstance) to avoid auth interceptor during signup
+ * Register new admin - DISABLED FOR SECURITY
+ * Admin accounts can only be created by existing administrators
+ * Note: Backend endpoint is also disabled
  */
 export async function signup(data: SignupData): Promise<AuthResponse> {
-  const response = await axios.post(`${config.apiBaseUrl}/api/admins/register/`, data);
-  return response.data;
+  throw new Error('Admin registration is disabled. Contact your administrator to create an account.');
 }
 
 /**

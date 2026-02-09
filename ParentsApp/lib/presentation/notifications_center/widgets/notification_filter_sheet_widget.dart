@@ -69,89 +69,103 @@ class _NotificationFilterSheetWidgetState
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.lightTheme.colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            margin: EdgeInsets.only(top: 2.h),
-            width: 12.w,
-            height: 0.5.h,
-            decoration: BoxDecoration(
-              color: AppTheme.lightTheme.colorScheme.onSurfaceVariant
-                  .withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(4.w),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return SafeArea(
+      bottom: true,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SingleChildScrollView(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: EdgeInsets.only(top: 2.h),
+                width: 12.w,
+                height: 0.5.h,
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurfaceVariant
+                      .withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.all(4.w),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Filter Notifications',
-                      style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _selectedTypes.clear();
-                        });
-                      },
-                      child: Text(
-                        'Clear All',
-                        style:
-                            AppTheme.lightTheme.textTheme.labelLarge?.copyWith(
-                          color: AppTheme.lightTheme.colorScheme.primary,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Filter Notifications',
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                         ),
-                      ),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedTypes.clear();
+                            });
+                          },
+                          child: Text(
+                            'Clear All',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelLarge
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                          ),
+                        ),
+                      ],
                     ),
+                    SizedBox(height: 2.h),
+                    Text(
+                      'Notification Types',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                    SizedBox(height: 2.h),
+                    ..._filterOptions
+                        .map((option) => _buildFilterOption(option)),
+                    SizedBox(height: 3.h),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text('Cancel'),
+                          ),
+                        ),
+                        SizedBox(width: 4.w),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              widget.onFiltersChanged(_selectedTypes);
+                              Navigator.pop(context);
+                            },
+                            child: Text('Apply Filters'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 2.h),
                   ],
                 ),
-                SizedBox(height: 2.h),
-                Text(
-                  'Notification Types',
-                  style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
-                    color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                SizedBox(height: 2.h),
-                ..._filterOptions.map((option) => _buildFilterOption(option)),
-                SizedBox(height: 3.h),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: Text('Cancel'),
-                      ),
-                    ),
-                    SizedBox(width: 4.w),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          widget.onFiltersChanged(_selectedTypes);
-                          Navigator.pop(context);
-                        },
-                        child: Text('Apply Filters'),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 2.h),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -180,7 +194,9 @@ class _NotificationFilterSheetWidgetState
               border: Border.all(
                 color: isSelected
                     ? option['color']
-                    : AppTheme.lightTheme.colorScheme.outline
+                    : Theme.of(context)
+                        .colorScheme
+                        .outline
                         .withValues(alpha: 0.3),
                 width: isSelected ? 2 : 1,
               ),
@@ -207,13 +223,13 @@ class _NotificationFilterSheetWidgetState
                 Expanded(
                   child: Text(
                     option['label'],
-                    style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.w400,
-                      color: isSelected
-                          ? option['color']
-                          : AppTheme.lightTheme.colorScheme.onSurface,
-                    ),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w400,
+                          color: isSelected
+                              ? option['color']
+                              : Theme.of(context).colorScheme.onSurface,
+                        ),
                   ),
                 ),
                 if (isSelected)
