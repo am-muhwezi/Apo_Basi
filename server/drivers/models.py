@@ -51,14 +51,14 @@ class Driver(models.Model):
         phone = getattr(self, 'phone_number', None)
         if phone:
             from django.contrib.auth import get_user_model
-            from django.core.exceptions import ValidationError
             User = get_user_model()
             from busminders.models import BusMinder
             from parents.models import Parent
+            from django.db import IntegrityError
 
             # Exclude self when checking existing records (for updates)
             user_pk = getattr(self, 'user_id', None)
             if User.objects.filter(phone_number=phone).exclude(pk=user_pk).exists() or BusMinder.objects.filter(phone_number=phone).exclude(user_id=user_pk).exists() or Parent.objects.filter(contact_number=phone).exclude(user_id=user_pk).exists():
-                raise ValidationError(f"Phone number '{phone}' already in use")
+                raise IntegrityError(f"Phone number '{phone}' already in use")
 
         super().save(*args, **kwargs)

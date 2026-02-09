@@ -20,15 +20,13 @@ class ChildSerializer(serializers.ModelSerializer):
     parentName = serializers.SerializerMethodField()
     assignedBusId = serializers.SerializerMethodField()
     assignedBusNumber = serializers.SerializerMethodField()
-    driverName = serializers.SerializerMethodField()
-    route = serializers.SerializerMethodField()
 
     class Meta:
         model = Child
         fields = [
             'id', 'firstName', 'lastName', 'grade', 'age', 'status', 'locationStatus',
             'address', 'emergencyContact', 'medicalInfo',
-            'parentId', 'parentName', 'assignedBusId', 'assignedBusNumber', 'driverName', 'route'
+            'parentId', 'parentName', 'assignedBusId', 'assignedBusNumber'
         ]
 
     def get_parentName(self, obj):
@@ -45,32 +43,6 @@ class ChildSerializer(serializers.ModelSerializer):
         """Get assigned bus number from Assignment API"""
         assignment = Assignment.get_active_assignments_for(obj, 'child_to_bus').first()
         return assignment.assigned_to.bus_number if assignment and assignment.assigned_to else None
-
-    def get_driverName(self, obj):
-        """Get driver name from bus assignment"""
-        from assignments.models import Assignment
-        child_bus_assignment = Assignment.get_active_assignments_for(obj, 'child_to_bus').first()
-        if child_bus_assignment and child_bus_assignment.assigned_to:
-            bus = child_bus_assignment.assigned_to
-            driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
-            if driver_assignment and driver_assignment.assignee:
-                driver = driver_assignment.assignee
-                user = driver.user
-                return f"{user.first_name} {user.last_name}" if user.first_name else user.username
-        return None
-
-    def get_route(self, obj):
-        """Get route name from bus assignment
-
-        TODO: Implement proper Routes model and link it to buses
-        For now, returns None until Routes system is implemented
-        """
-        # from assignments.models import Assignment
-        # assignment = Assignment.get_active_assignments_for(obj, 'child_to_bus').first()
-        # if assignment and assignment.assigned_to:
-        #     # Get route from bus.route field once implemented
-        #     return assignment.assigned_to.route_name
-        return None
 
 
 class ChildCreateSerializer(serializers.Serializer):

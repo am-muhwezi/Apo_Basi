@@ -1,6 +1,5 @@
 """Parent views for CRUD and phone-based login flows."""
 
-import os
 import logging
 import requests
 from jose import jwt, JWTError
@@ -22,6 +21,9 @@ from children.models import Child
 from attendance.models import Attendance
 from users.permissions import IsParent
 from assignments.models import Assignment
+from notifications.models import Notification
+from notifications.serializers import NotificationSerializer
+from trips.models import Trip
 from datetime import date
 
 User = get_user_model()
@@ -52,6 +54,115 @@ class ParentViewSet(viewsets.ModelViewSet):
 
     queryset = Parent.objects.select_related('user').all()
     permission_classes = [IsAuthenticated]
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Enhanced retrieve to return parent profile + children + notifications in one call.
+
+        GET /api/parents/:id/
+
+        Returns consolidated dashboard data to reduce multiple API calls.
+        """
+        parent = self.get_object()
+
+        # Get parent profile data
+        parent_data = {
+            "id": parent.user.id,
+            "firstName": parent.user.first_name,
+            "lastName": parent.user.last_name,
+            "email": parent.user.email,
+            "phone": parent.contact_number,
+            "address": parent.address,
+            "emergencyContact": parent.emergency_contact,
+            "status": parent.status,
+        }
+
+        # Get all children for this parent with bus assignments
+        children = Child.objects.filter(parent=parent)
+        children_data = []
+
+        for child in children:
+            # Get child's bus assignment using Assignment API
+            bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
+
+            child_data = {
+                "id": child.id,
+                "firstName": child.first_name,
+                "lastName": child.last_name,
+                "grade": child.class_grade,
+                "age": getattr(child, 'age', None),
+                "status": child.location_status,  # Use location_status for real-time tracking
+                "assignedBus": None,
+                "routeName": None,
+                "routeCode": None,
+            }
+
+            if bus_assignment:
+                bus = bus_assignment.assigned_to
+
+                # Get driver name
+                from assignments.models import BusRoute
+                driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+                driver_name = None
+                if driver_assignment and driver_assignment.assignee:
+                    driver = driver_assignment.assignee
+                    driver_name = f"{driver.user.first_name} {driver.user.last_name}" if hasattr(driver, 'user') else None
+
+                # Get route information from bus assignment
+                route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
+                route_name = None
+                route_code = None
+                if route_assignment and hasattr(route_assignment, 'assigned_to'):
+                    route = route_assignment.assigned_to
+                    if isinstance(route, BusRoute):
+                        route_name = route.name
+                        route_code = route.route_code
+                        child_data["routeName"] = route.name
+                        child_data["routeCode"] = route.route_code
+
+                # Get active trip for this bus to show route on parent's map
+                active_trip = Trip.objects.filter(
+                    bus=bus,
+                    status='in-progress'
+                ).first()
+
+                trip_data = None
+                if active_trip:
+                    from trips.serializers import TripSerializer
+                    trip_data = TripSerializer(active_trip).data
+
+                child_data["assignedBus"] = {
+                    "id": bus.id,
+                    "busNumber": bus.bus_number,
+                    "licensePlate": bus.number_plate,
+                    "driverName": driver_name,
+                    "routeName": route_name,
+                    "route": route_name,  # Add route field for backward compatibility
+                    "activeTrip": trip_data,  # Include active trip with route data for map display
+                }
+
+            children_data.append(child_data)
+
+        # Get recent notifications (last 10 unread)
+        notifications = Notification.objects.filter(
+            parent=parent,
+            is_read=False
+        ).order_by('-created_at')[:10]
+
+        notifications_data = NotificationSerializer(notifications, many=True).data
+        unread_count = Notification.objects.filter(parent=parent, is_read=False).count()
+
+        return Response(
+            {
+                "success": True,
+                "parent": parent_data,
+                "children": children_data,
+                "totalChildren": len(children_data),
+                "notifications": notifications_data,
+                "unreadNotificationsCount": unread_count,
+            },
+            status=status.HTTP_200_OK
+        )
 
     def get_serializer_class(self):
         """
@@ -227,16 +338,54 @@ class ParentViewSet(viewsets.ModelViewSet):
                 "lastName": child.last_name,
                 "grade": child.class_grade,
                 "age": getattr(child, 'age', None),
-                "status": child.status,
-                "assignedBus": None
+                "status": child.location_status,  # Use location_status for real-time tracking
+                "assignedBus": None,
+                "routeName": None,
+                "routeCode": None,
             }
 
             if bus_assignment:
                 bus = bus_assignment.assigned_to
+
+                # Get driver name
+                from assignments.models import BusRoute
+                driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+                driver_name = None
+                if driver_assignment and driver_assignment.assignee:
+                    driver = driver_assignment.assignee
+                    driver_name = f"{driver.user.first_name} {driver.user.last_name}" if hasattr(driver, 'user') else None
+
+                # Get route information from bus assignment
+                route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
+                route_name = None
+                route_code = None
+                if route_assignment and hasattr(route_assignment, 'assigned_to'):
+                    route = route_assignment.assigned_to
+                    if isinstance(route, BusRoute):
+                        route_name = route.name
+                        route_code = route.route_code
+                        child_data["routeName"] = route.name
+                        child_data["routeCode"] = route.route_code
+
+                # Get active trip for this bus to show route on parent's map
+                active_trip = Trip.objects.filter(
+                    bus=bus,
+                    status='in-progress'
+                ).first()
+
+                trip_data = None
+                if active_trip:
+                    from trips.serializers import TripSerializer
+                    trip_data = TripSerializer(active_trip).data
+
                 child_data["assignedBus"] = {
                     "id": bus.id,
                     "busNumber": bus.bus_number,
                     "licensePlate": bus.number_plate,
+                    "driverName": driver_name,
+                    "routeName": route_name,
+                    "route": route_name,  # Add route field for backward compatibility
+                    "activeTrip": trip_data,  # Include active trip with route data for map display
                 }
 
             children_data.append(child_data)
@@ -254,7 +403,6 @@ class ParentViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK
         )
-
 
 class ParentLoginView(APIView):
     """
@@ -300,7 +448,7 @@ class ParentLoginView(APIView):
                     "first_name": child.first_name,
                     "last_name": child.last_name,
                     "class_grade": child.class_grade,
-                    "status": child.status,
+                    "status": child.location_status,  # Use location_status for real-time tracking
                     "assigned_bus": None
                 }
 
@@ -490,7 +638,7 @@ class SupabaseMagicLinkAuthView(APIView):
                     "first_name": child.first_name,
                     "last_name": child.last_name,
                     "class_grade": child.class_grade,
-                    "status": child.status,
+                    "status": child.location_status,  # Use location_status for real-time tracking
                     "assigned_bus": None
                 }
 
@@ -562,139 +710,6 @@ class SupabaseMagicLinkAuthView(APIView):
             return Response(
                 {
                     "error": "Authentication failed",
-                    "message": "Something went wrong. Please try again."
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-
-class DemoLoginView(APIView):
-    """
-    POST /api/parents/auth/demo-login/
-    Demo account login for Apple App Store review process.
-
-    This endpoint allows password-based authentication for a specific
-    demo account, bypassing the magic link flow for review purposes.
-
-    Credentials are stored in environment variables:
-    - REVIEWER_EMAIL
-    - REVIEWER_PASSWORD
-    """
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        email = request.data.get('email', '').strip().lower()
-        password = request.data.get('password', '')
-
-        # Get demo credentials from environment
-        reviewer_email = os.environ.get('REVIEWER_EMAIL', '').strip().lower()
-        reviewer_password = os.environ.get('REVIEWER_PASSWORD', '')
-
-        # Validate credentials
-        if not reviewer_email or not reviewer_password:
-            logger.error("Demo login credentials not configured in environment")
-            return Response(
-                {"error": "Demo login not available"},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
-
-        if email != reviewer_email or password != reviewer_password:
-            return Response(
-                {"error": "Invalid email or password"},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-
-        try:
-            # Look up the demo parent account
-            parent = Parent.objects.select_related('user').get(
-                user__email__iexact=email,
-                status='active'
-            )
-            user = parent.user
-
-            # Generate Django JWT tokens
-            refresh = RefreshToken.for_user(user)
-
-            # Get parent's children with bus assignments
-            children = Child.objects.filter(parent=parent)
-            children_data = []
-
-            for child in children:
-                bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
-
-                child_data = {
-                    "id": child.id,
-                    "first_name": child.first_name,
-                    "last_name": child.last_name,
-                    "class_grade": child.class_grade,
-                    "status": child.status,
-                    "assigned_bus": None
-                }
-
-                if bus_assignment:
-                    bus = bus_assignment.assigned_to
-                    driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
-                    minder_assignment = Assignment.get_assignments_to(bus, 'minder_to_bus').first()
-
-                    driver_info = None
-                    if driver_assignment and driver_assignment.assignee:
-                        driver_info = {
-                            "name": f"{driver_assignment.assignee.user.first_name} {driver_assignment.assignee.user.last_name}",
-                            "phone": driver_assignment.assignee.phone_number
-                        }
-
-                    minder_info = None
-                    if minder_assignment and minder_assignment.assignee:
-                        minder_info = {
-                            "name": f"{minder_assignment.assignee.user.first_name} {minder_assignment.assignee.user.last_name}",
-                            "phone": minder_assignment.assignee.phone_number
-                        }
-
-                    child_data["assigned_bus"] = {
-                        "id": bus.id,
-                        "bus_number": bus.bus_number,
-                        "number_plate": bus.number_plate,
-                        "driver": driver_info,
-                        "minder": minder_info
-                    }
-
-                children_data.append(child_data)
-
-            logger.info(f"Demo login successful for: {email}")
-
-            return Response(
-                {
-                    "success": True,
-                    "parent": {
-                        "id": user.id,
-                        "firstName": user.first_name,
-                        "lastName": user.last_name,
-                        "email": user.email,
-                    },
-                    "children": children_data,
-                    "totalChildren": len(children_data),
-                    "tokens": {
-                        "access": str(refresh.access_token),
-                        "refresh": str(refresh),
-                    },
-                },
-                status=status.HTTP_200_OK
-            )
-
-        except Parent.DoesNotExist:
-            logger.error(f"Demo parent account not found for email: {email}")
-            return Response(
-                {
-                    "error": "Demo account not found",
-                    "message": "The demo account has not been set up. Please contact support."
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except Exception as e:
-            logger.exception("Unexpected error during demo login")
-            return Response(
-                {
-                    "error": "Login failed",
                     "message": "Something went wrong. Please try again."
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
