@@ -1,4 +1,22 @@
 /**
+ * Checks if a phone or email exists as a driver, minder, or parent.
+ * Returns { exists: boolean, role: 'driver'|'minder'|'parent'|null }
+ */
+export async function checkPhoneOrEmailExists(phone?: string, email?: string) {
+  try {
+    const params = new URLSearchParams();
+    if (phone) params.append('phone', phone);
+    if (email) params.append('email', email);
+    const res = await fetch(`/api/check-user-unique?${params.toString()}`);
+    if (!res.ok) return { exists: false, role: null };
+    const data = await res.json();
+    return { exists: data.exists, role: data.role };
+  } catch {
+    return { exists: false, role: null };
+  }
+}
+// ...existing code...
+/**
  * Driver Service Layer
  *
  * Business logic and error handling for driver operations.
@@ -21,7 +39,6 @@ function getErrorMessage(error: unknown): string {
   if (error instanceof AxiosError) {
     if (error.response?.data) {
       const data = error.response.data;
-      // Try to extract specific error message
       if (data.detail) return data.detail;
       if (typeof data === 'object') {
         const firstError = Object.values(data)[0];
@@ -31,10 +48,6 @@ function getErrorMessage(error: unknown): string {
       }
       if (data.error) return data.error;
       if (data.message) return data.message;
-      // For 500 errors, try to extract message from string response
-      if (error.response?.status >= 500 && typeof data === 'string') {
-        return data || 'Server error. Please try again later.';
-      }
     }
     if (error.response?.status === 404) return 'Resource not found';
     if (error.response?.status === 403) return 'Permission denied';
