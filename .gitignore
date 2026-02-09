@@ -46,7 +46,6 @@ yarn-debug.log*
 
 # Documentation
 */docs
-DriversandMinders/DriversandMinders/lib/presentation/driver_start_shift_screen/driver_start_shift_screen.dart
 DriversandMinders/android/.kotlin/sessions/kotlin-compiler-14982754438029686895.salive
 DriversandMinders/flutter_01.png
 DriversandMinders/flutter_02.png
@@ -81,3 +80,11 @@ deploy_prod.sh
 deploy_staging.sh
 deploy_to_production.sh
 DIGITAL_OCEAN_DEPLOYMENT_GUIDE.md
+
+
+DriversandMinders/ios/Flutter/flutter_export_environment.sh
+DriversandMinders/linux/flutter/ephemeral/.plugin_symlinks/connectivity_plus
+DriversandMinders/linux/flutter/ephemeral/.plugin_symlinks/path_provider_linux
+DriversandMinders/linux/flutter/ephemeral/.plugin_symlinks/shared_preferences_linux
+
+.github/copilot-instructions.md

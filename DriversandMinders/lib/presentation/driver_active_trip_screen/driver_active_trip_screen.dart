@@ -2,24 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
-import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 
 import '../../core/app_export.dart';
 import '../../config/api_config.dart';
 import '../../services/api_service.dart';
-import '../../services/socket_service.dart';
 import '../../services/driver_location_service.dart';
 import '../../services/native_location_service.dart';
 import '../../services/trip_state_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/driver_drawer_widget.dart';
-import './widgets/socket_status_widget.dart';
 import './widgets/student_list_widget.dart';
-import './widgets/trip_statistics_widget.dart';
-import './widgets/trip_status_header_widget.dart';
-import './widgets/next_stop_widget.dart';
-import './widgets/upcoming_stops_widget.dart';
 
 class DriverActiveTripScreen extends StatefulWidget {
   const DriverActiveTripScreen({super.key});
@@ -33,7 +26,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   final ApiService _apiService = ApiService();
-  final SocketService _socketService = SocketService();
   final DriverLocationService _locationService = DriverLocationService();
   final NativeLocationService _nativeLocationService = NativeLocationService();
   final TripStateService _tripStateService = TripStateService();
@@ -41,7 +33,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   // Trip data
   DateTime _tripStartTime = DateTime.now();
   String _elapsedTime = "00:00:00";
-  String _currentStop = "";
   bool _isLoadingData = true;
   String? _errorMessage;
   int? _currentTripId;
@@ -50,7 +41,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   // Real trip data from API
   Map<String, dynamic> _tripData = {};
   List<Map<String, dynamic>> _students = [];
-  Map<String, dynamic>? _routeDetails;
   Map<String, dynamic>? _busData;
 
   @override
@@ -249,9 +239,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
               ? busResponse['buses'][0] as Map<String, dynamic>
               : null);
 
-      // Extract route data
-      _routeDetails = routeResponse;
-
       // Get trip type from SharedPreferences
       final tripType = prefs.getString('current_trip_type') ?? 'pickup';
 
@@ -275,6 +262,28 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       if (routeResponse['children'] != null &&
           routeResponse['children'] is List) {
         final Map<String, Map<String, dynamic>> byId = {};
+
+        // Fetch today's attendance for this bus and trip type so we can
+        // reflect assistant-marked statuses in a read-only way for drivers.
+        List<dynamic> attendanceList = [];
+        try {
+          if (_busData != null && _busData!['id'] != null) {
+            attendanceList = await _apiService.getTodayAttendance(
+              busId: _busData!['id'] as int,
+              tripType: tripType,
+            );
+          }
+        } catch (_) {
+          // If attendance fails to load, we fall back to pending status.
+        }
+
+        final Map<String, Map<String, dynamic>> attendanceByChildId = {};
+        for (final record in attendanceList) {
+          if (record is Map<String, dynamic> && record['child'] != null) {
+            attendanceByChildId[record['child'].toString()] = record;
+          }
+        }
+
         for (var child in routeResponse['children']) {
           final String id = child['id']?.toString() ?? '';
           if (id.isEmpty) continue;
@@ -287,25 +296,42 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
             gradeValue = gradeValue.substring(5).trim();
           }
 
+          final attendance = attendanceByChildId[id];
+          final status = (attendance != null
+                  ? attendance['status']?.toString()
+                  : null) ??
+              'pending';
+          final statusDisplay = (attendance != null
+                  ? attendance['status_display']?.toString()
+                  : null) ??
+              'Pending';
+
+          // Any non-pending status (picked_up, dropped_off, absent) counts
+          // as "completed" for trip progress purposes.
+          final isCompleted = status != 'pending';
+
+          // Prefer the latest parent-specified address for the stop name
+          final stopName = child['address']?.toString() ??
+              child['pickup_address']?.toString() ??
+              child['home_address']?.toString() ??
+              'No address';
+
           byId[id] = {
             "id": id,
             "name": '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}',
             "grade": gradeValue,
-            "stopName": child['address']?.toString() ?? 'No address',
+            "stopName": stopName,
             "parentContact": child['emergency_contact']?.toString() ??
                 child['parent_contact']?.toString() ??
                 'N/A',
             "specialNotes": child['special_needs']?.toString() ?? '',
-            "isPickedUp": false,
+            "status": status,
+            "statusDisplay": statusDisplay,
+            "isPickedUp": isCompleted,
           };
         }
 
         _students = byId.values.toList();
-
-        // Set current stop to first student's address if available
-        if (_students.isNotEmpty) {
-          _currentStop = _students[0]['stopName'] ?? '';
-        }
       }
 
       setState(() {
@@ -380,79 +406,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     });
   }
 
-  Future<void> _onPickupStatusChanged(int index, bool isPickedUp) async {
-    // Update local state immediately for responsiveness
-    setState(() {
-      _students[index]["isPickedUp"] = isPickedUp;
-
-      // Update current stop to next unpicked student
-      if (isPickedUp) {
-        final nextStudent = _nextStudent;
-        if (nextStudent != null) {
-          _currentStop = nextStudent["stopName"] as String? ?? '';
-        } else {
-          _currentStop = 'All students picked up';
-        }
-      }
-    });
-
-    // Sync with backend
-    try {
-      final studentId = _students[index]["id"];
-      final prefs = await SharedPreferences.getInstance();
-      final tripType = prefs.getString('current_trip_type') ?? 'pickup';
-
-      await _apiService.markAttendance(
-        childId: studentId,
-        status: isPickedUp ? 'picked_up' : 'pending',
-        tripType: tripType,
-      );
-
-      // Show success confirmation
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 2.w),
-                Expanded(
-                  child: Text(
-                    isPickedUp
-                        ? '${_students[index]["name"]} marked as picked up'
-                        : '${_students[index]["name"]} marked as not picked up',
-                  ),
-                ),
-              ],
-            ),
-            duration: Duration(seconds: 2),
-            backgroundColor: AppTheme.successAction,
-            behavior: SnackBarBehavior.fixed,
-          ),
-        );
-      }
-    } catch (e) {
-      // Show error but keep local state
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.warning, color: Colors.white),
-                SizedBox(width: 2.w),
-                Expanded(
-                  child: Text('Saved locally. Will sync when online.'),
-                ),
-              ],
-            ),
-            duration: Duration(seconds: 3),
-            backgroundColor: AppTheme.warningState,
-            behavior: SnackBarBehavior.fixed,
-          ),
-        );
-      }
-    }
-  }
+  // Drivers no longer mark attendance directly on this screen.
+  // Attendance is recorded by bus assistants and reflected here via
+  // read-only status fetched from the backend.
 
   void _onEndTripPressed() {
     showDialog(
@@ -702,17 +658,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     return notPickedUp.sublist(1);
   }
 
-  /// Mark the next student as picked up
-  void _markNextStudentPickedUp() {
-    final nextStudent = _nextStudent;
-    if (nextStudent == null) return;
-
-    final index = _students.indexOf(nextStudent);
-    if (index != -1) {
-      _onPickupStatusChanged(index, true);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Theme(
@@ -808,30 +753,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
                         SizedBox(height: 2.h),
 
-                        // NEXT STOP - Most prominent section
-                        NextStopWidget(
-                          nextStudent: _nextStudent,
-                          remainingStops: _remainingStops,
-                          onMarkPickedUp: _markNextStudentPickedUp,
-                        ),
-
-                        SizedBox(height: 3.h),
-
-                        // Upcoming stops preview
-                        UpcomingStopsWidget(
-                          upcomingStudents: _upcomingStudents,
-                          onViewAll: () {
-                            // Scroll to full student list
-                            // Can implement smooth scroll if needed
-                          },
-                        ),
-
-                        SizedBox(height: 3.h),
-
-                        // Full student list - For reference
+                        // Sleek, read-only student list driven by attendance
                         StudentListWidget(
                           students: _students,
-                          onPickupStatusChanged: _onPickupStatusChanged,
                         ),
 
                         SizedBox(height: 10.h), // Space for bottom button
