@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
+import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/app_export.dart';
 import '../widgets/custom_error_widget.dart';
+import '../config/supabase_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Load environment variables (cached after first load)
   await dotenv.load();
+
+  // Initialize Supabase for magic link authentication
+  await Supabase.initialize(
+    url: SupabaseConfig.supabaseUrl,
+    anonKey: SupabaseConfig.supabasePublishableKey,
+  );
 
   bool _hasShownError = false;
 

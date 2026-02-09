@@ -16,17 +16,17 @@ import 'config/supabase_config.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load env first so other services can read configuration safely
+  // Load .env before starting the app
   await dotenv.load();
 
-  // Initialize remaining core services in parallel to reduce startup time
-  await Future.wait([
-    Supabase.initialize(
-      url: SupabaseConfig.supabaseUrl,
-      anonKey: SupabaseConfig.supabasePublishableKey,
-    ),
-    ThemeService().initialize(),
-  ]);
+  // Initialize Supabase for magic link authentication
+  await Supabase.initialize(
+    url: SupabaseConfig.supabaseUrl,
+    anonKey: SupabaseConfig.supabasePublishableKey,
+  );
+
+  // Initialize theme service
+  await ThemeService().initialize();
 
   runApp(MyApp());
 
@@ -49,13 +49,13 @@ void _setupErrorWidget() {
     if (!_hasShownError) {
       _hasShownError = true;
 
-      Future.delayed(Duration(seconds: 5), () {
+      Future.delayed(const Duration(seconds: 5), () {
         _hasShownError = false;
       });
 
       return CustomErrorWidget(errorDetails: details);
     }
-    return SizedBox.shrink();
+    return const SizedBox.shrink();
   };
 }
 
@@ -75,13 +75,16 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
 
-    // Delay WebSocket initialization until the first frame renders
+    // Delay heavy initialization until after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _webSocketService.connect();
-      // Temporarily disable parent notifications WebSocket in staging
-      // to avoid crashes when the backend WebSocket endpoint is not
-      // available. The rest of the app will continue to work normally.
-      // _notificationsService.connect();
+      // Delay WebSocket connection even further to improve startup
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _webSocketService.connect();
+        // Temporarily disable parent notifications WebSocket in staging
+        // to avoid crashes when the backend WebSocket endpoint is not
+        // available. The rest of the app will continue to work normally.
+        // _notificationsService.connect();
+      });
     });
   }
 
@@ -93,30 +96,34 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return Sizer(builder: (context, orientation, screenType) {
-      // Listen to theme changes and rebuild MaterialApp when theme changes
-      return ValueListenableBuilder<ThemeMode>(
-        valueListenable: _themeService.themeModeNotifier,
-        builder: (context, themeMode, child) {
-          return MaterialApp(
-            title: 'ApoBasi',
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: themeMode,
-            builder: (context, child) {
-              return MediaQuery(
-                data: MediaQuery.of(context).copyWith(
-                  textScaler: TextScaler.linear(1.0),
-                ),
-                child: child!,
-              );
-            },
-            debugShowCheckedModeBanner: false,
-            routes: AppRoutes.routes,
-            initialRoute: AppRoutes.initial,
-          );
-        },
-      );
-    });
+    return Sizer(
+      builder: (context, orientation, screenType) {
+        return ValueListenableBuilder<ThemeMode>(
+          valueListenable: _themeService.themeModeNotifier,
+          builder: (context, themeMode, _) {
+            // Only MaterialApp rebuilds, not entire widget tree
+            return MaterialApp(
+              title: 'ApoBasi',
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              themeMode: themeMode,
+              themeAnimationDuration: const Duration(milliseconds: 400),
+              themeAnimationCurve: Curves.easeInOutCubicEmphasized,
+              builder: (context, child) {
+                return MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    textScaler: const TextScaler.linear(1.0),
+                  ),
+                  child: child!,
+                );
+              },
+              debugShowCheckedModeBanner: false,
+              routes: AppRoutes.routes,
+              initialRoute: AppRoutes.initial,
+            );
+          },
+        );
+      },
+    );
   }
 }

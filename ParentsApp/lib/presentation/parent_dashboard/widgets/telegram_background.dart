@@ -30,28 +30,18 @@ class TelegramBackgroundPainter extends CustomPainter {
     _drawRoadPattern(canvas, roadPaint, size);
 
     // Draw school bus icons at various positions
-    _drawBusIcon(
-        canvas, busPaint, Offset(size.width * 0.15, size.height * 0.15), 30);
-    _drawBusIcon(
-        canvas, busPaint, Offset(size.width * 0.75, size.height * 0.25), 25);
-    _drawBusIcon(
-        canvas, busPaint, Offset(size.width * 0.25, size.height * 0.45), 28);
-    _drawBusIcon(
-        canvas, busPaint, Offset(size.width * 0.85, size.height * 0.55), 26);
-    _drawBusIcon(
-        canvas, busPaint, Offset(size.width * 0.2, size.height * 0.75), 27);
-    _drawBusIcon(
-        canvas, busPaint, Offset(size.width * 0.8, size.height * 0.85), 29);
+    _drawBusIcon(canvas, busPaint, Offset(size.width * 0.15, size.height * 0.15), 30);
+    _drawBusIcon(canvas, busPaint, Offset(size.width * 0.75, size.height * 0.25), 25);
+    _drawBusIcon(canvas, busPaint, Offset(size.width * 0.25, size.height * 0.45), 28);
+    _drawBusIcon(canvas, busPaint, Offset(size.width * 0.85, size.height * 0.55), 26);
+    _drawBusIcon(canvas, busPaint, Offset(size.width * 0.2, size.height * 0.75), 27);
+    _drawBusIcon(canvas, busPaint, Offset(size.width * 0.8, size.height * 0.85), 29);
 
     // Draw location pins
-    _drawLocationPin(
-        canvas, pinPaint, Offset(size.width * 0.35, size.height * 0.2), 20);
-    _drawLocationPin(
-        canvas, pinPaint, Offset(size.width * 0.65, size.height * 0.4), 18);
-    _drawLocationPin(
-        canvas, pinPaint, Offset(size.width * 0.45, size.height * 0.65), 22);
-    _drawLocationPin(
-        canvas, pinPaint, Offset(size.width * 0.15, size.height * 0.9), 19);
+    _drawLocationPin(canvas, pinPaint, Offset(size.width * 0.35, size.height * 0.2), 20);
+    _drawLocationPin(canvas, pinPaint, Offset(size.width * 0.65, size.height * 0.4), 18);
+    _drawLocationPin(canvas, pinPaint, Offset(size.width * 0.45, size.height * 0.65), 22);
+    _drawLocationPin(canvas, pinPaint, Offset(size.width * 0.15, size.height * 0.9), 19);
   }
 
   void _drawRoadPattern(Canvas canvas, Paint paint, Size size) {
@@ -87,13 +77,11 @@ class TelegramBackgroundPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final window1 = RRect.fromRectAndRadius(
-      Rect.fromLTWH(center.dx - size * 0.6, center.dy - size * 0.35,
-          size * 0.45, size * 0.35),
+      Rect.fromLTWH(center.dx - size * 0.6, center.dy - size * 0.35, size * 0.45, size * 0.35),
       const Radius.circular(2),
     );
     final window2 = RRect.fromRectAndRadius(
-      Rect.fromLTWH(center.dx + size * 0.15, center.dy - size * 0.35,
-          size * 0.45, size * 0.35),
+      Rect.fromLTWH(center.dx + size * 0.15, center.dy - size * 0.35, size * 0.45, size * 0.35),
       const Radius.circular(2),
     );
     canvas.drawRRect(window1, windowPaint);
@@ -103,14 +91,11 @@ class TelegramBackgroundPainter extends CustomPainter {
     final wheelPaint = Paint()
       ..color = paint.color
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(center.dx - size * 0.5, center.dy + size * 0.55),
-        size * 0.2, wheelPaint);
-    canvas.drawCircle(Offset(center.dx + size * 0.5, center.dy + size * 0.55),
-        size * 0.2, wheelPaint);
+    canvas.drawCircle(Offset(center.dx - size * 0.5, center.dy + size * 0.55), size * 0.2, wheelPaint);
+    canvas.drawCircle(Offset(center.dx + size * 0.5, center.dy + size * 0.55), size * 0.2, wheelPaint);
   }
 
-  void _drawLocationPin(
-      Canvas canvas, Paint paint, Offset center, double size) {
+  void _drawLocationPin(Canvas canvas, Paint paint, Offset center, double size) {
     final path = Path();
 
     // Draw pin shape
@@ -131,7 +116,7 @@ class TelegramBackgroundPainter extends CustomPainter {
 
     // Draw center dot
     canvas.drawCircle(Offset(center.dx, center.dy - size * 0.7), size * 0.2,
-        Paint()..color = paint.color);
+      Paint()..color = paint.color);
   }
 
   @override

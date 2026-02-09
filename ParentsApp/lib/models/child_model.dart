@@ -6,7 +6,8 @@ class Child {
   final Bus? assignedBus;
   final String? currentStatus;  // This is the locationStatus from backend
   final DateTime? lastUpdated;
-  final String? address;  // Child's home address
+  final String? routeName;  // Route name from backend
+  final String? routeCode;  // Route code from backend
 
   Child({
     required this.id,
@@ -16,7 +17,8 @@ class Child {
     this.assignedBus,
     this.currentStatus = 'At Home',  // Default to 'At Home'
     this.lastUpdated,
-    this.address,
+    this.routeName,
+    this.routeCode,
   });
 
   String get fullName => '$firstName $lastName';
@@ -41,7 +43,9 @@ class Child {
       lastUpdated: json['last_updated'] != null
           ? DateTime.parse(json['last_updated'])
           : null,
-      address: json['address'],
+      // Parse route information
+      routeName: json['routeName'] ?? json['route_name'] ?? json['route'],
+      routeCode: json['routeCode'] ?? json['route_code'],
     );
   }
 
@@ -54,7 +58,8 @@ class Child {
       'assigned_bus': assignedBus?.toJson(),
       'location_status': currentStatus,
       'last_updated': lastUpdated?.toIso8601String(),
-      'address': address,
+      'route_name': routeName,
+      'route_code': routeCode,
     };
   }
 }
@@ -62,27 +67,17 @@ class Child {
 class Bus {
   final int id;
   final String numberPlate;
-  final String? driverName;
-  final String? route;
 
   Bus({
     required this.id,
     required this.numberPlate,
-    this.driverName,
-    this.route,
   });
 
   factory Bus.fromJson(Map<String, dynamic> json) {
     return Bus(
       id: json['id'],
       // Handle both snake_case and camelCase
-      numberPlate: json['number_plate'] ??
-          json['numberPlate'] ??
-          json['licensePlate'] ??
-          json['busNumber'] ??
-          '',
-      driverName: json['driver_name'] ?? json['driverName'],
-      route: json['route_name'] ?? json['routeName'] ?? json['route'],
+      numberPlate: json['number_plate'] ?? json['numberPlate'] ?? json['licensePlate'] ?? json['busNumber'] ?? '',
     );
   }
 
@@ -90,8 +85,6 @@ class Bus {
     return {
       'id': id,
       'number_plate': numberPlate,
-      'driver_name': driverName,
-      'route': route,
     };
   }
 }

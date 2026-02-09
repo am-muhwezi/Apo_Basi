@@ -5,13 +5,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/api_config.dart';
 import '../config/supabase_config.dart';
 
-/// Authentication Service for Magic Link Flow
+/// Authentication Service for Driver Magic Link Flow
 ///
 /// Handles the complete authentication flow:
 /// 1. Send magic link email via Supabase
-/// 2. Listen for deep link callback when user clicks link
+/// 2. Listen for deep link callback when driver clicks link
 /// 3. Exchange Supabase token for Django JWT tokens
-/// 4. Store tokens and parent/children data
+/// 4. Store tokens and driver/bus/route data
 class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
@@ -26,7 +26,112 @@ class AuthService {
 
   StreamSubscription<AuthState>? _authSubscription;
 
-  /// Send magic link to email
+  /// Helper method to save driver data to SharedPreferences
+  /// Avoids code duplication across different login methods
+  Future<void> _saveDriverDataToPrefs(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Store tokens
+    await prefs.setString('access_token', data['tokens']['access']);
+    await prefs.setString('refresh_token', data['tokens']['refresh']);
+
+    // Store driver info - parse user_id to int (API may return as String)
+    final userId = data['user_id'];
+    final userIdInt = userId is int ? userId : int.parse(userId.toString());
+
+    await prefs.setInt('driver_id', userIdInt);
+    await prefs.setString('driver_name', data['name'] ?? '');
+    await prefs.setString('driver_email', data['email'] ?? '');
+    await prefs.setString('driver_phone', data['phone'] ?? '');
+    await prefs.setString('license_number', data['license_number'] ?? '');
+    await prefs.setString('license_expiry', data['license_expiry'] ?? '');
+  }
+
+  /// Phone-based login for drivers and bus minders (passwordless)
+  ///
+  /// Unified endpoint that automatically detects user type.
+  /// Returns Django JWT tokens and user/bus/route data.
+  ///
+  /// Returns:
+  /// - Map with 'success', 'message', and optional 'result' (AuthResult) keys
+  Future<Map<String, dynamic>> loginWithPhone(String phoneNumber) async {
+    try {
+      final response = await _dio.post(
+        '/api/auth/phone-login/',
+        data: {'phone_number': phoneNumber},
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        // Save driver data using helper method
+        await _saveDriverDataToPrefs(data);
+
+        return {
+          'success': true,
+          'message': 'Login successful',
+          'result': AuthResult(
+            success: true,
+            driver: {
+              'user_id': data['user_id'],
+              'name': data['name'],
+              'email': data['email'],
+              'phone': data['phone'],
+              'license_number': data['license_number'],
+              'license_expiry': data['license_expiry'],
+            },
+            bus: data['bus'],
+            route: data['route'],
+            tokens: data['tokens'],
+          ),
+        };
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Login failed',
+        };
+      }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return {
+          'success': false,
+          'message': e.response?.data['error'] ??
+              'No driver or bus assistant account found with this phone number. Please contact your administrator.',
+        };
+      } else if (e.response?.statusCode == 400) {
+        return {
+          'success': false,
+          'message': e.response?.data['error'] ?? 'Invalid phone number format.',
+        };
+      } else if (e.response?.statusCode == 403) {
+        return {
+          'success': false,
+          'message': e.response?.data['error'] ?? 'Account is inactive. Please contact your administrator.',
+        };
+      }
+      return {
+        'success': false,
+        'message': 'Connection error. Please check your internet connection.',
+      };
+    } on FormatException catch (e) {
+      return {
+        'success': false,
+        'message': 'Invalid data format received from server. Please contact your administrator.',
+      };
+    } on TypeError catch (e) {
+      return {
+        'success': false,
+        'message': 'Data type error. Please contact your administrator.',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Login failed: ${e.toString()}',
+      };
+    }
+  }
+
+  /// Send magic link to driver email
   ///
   /// First checks if email is registered in Django backend,
   /// then sends magic link via Supabase.
@@ -37,7 +142,7 @@ class AuthService {
     try {
       // Step 1: Check if email is registered in Django
       final checkResponse = await _dio.post(
-        '/api/parents/auth/check-email/',
+        '/api/drivers/auth/check-email/',
         data: {'email': email},
       );
 
@@ -46,7 +151,7 @@ class AuthService {
         return {
           'success': false,
           'message': checkResponse.data['message'] ??
-              'This email is not registered. Please contact your school administrator.',
+              'This email is not registered. Please contact your administrator.',
         };
       }
 
@@ -65,7 +170,7 @@ class AuthService {
         return {
           'success': false,
           'message': e.response?.data['message'] ??
-              'This email is not registered. Please contact your school administrator.',
+              'This email is not registered. Please contact your administrator.',
         };
       }
       return {
@@ -82,7 +187,7 @@ class AuthService {
 
   /// Listen for authentication state changes (magic link callback)
   ///
-  /// When user clicks magic link and app opens:
+  /// When driver clicks magic link and app opens:
   /// 1. Supabase automatically handles the deep link
   /// 2. Auth state changes to authenticated
   /// 3. We extract the access token
@@ -97,7 +202,7 @@ class AuthService {
         final session = authState.session;
 
         if (session != null) {
-          // User authenticated via magic link - exchange for Django tokens
+          // Driver authenticated via magic link - exchange for Django tokens
           final accessToken = session.accessToken;
 
           try {
@@ -136,29 +241,28 @@ class AuthService {
   Future<AuthResult> _exchangeTokenForDjangoAuth(String supabaseToken) async {
     try {
       final response = await _dio.post(
-        '/api/parents/auth/magic-link/',
+        '/api/drivers/auth/magic-link/',
         data: {'access_token': supabaseToken},
       );
 
       if (response.statusCode == 200) {
         final data = response.data;
 
-        // Store Django JWT tokens
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('access_token', data['tokens']['access']);
-        await prefs.setString('refresh_token', data['tokens']['refresh']);
-
-        // Store parent info
-        await prefs.setInt('parent_id', data['parent']['id']);
-        await prefs.setInt('user_id', data['parent']['id']); // Also save as user_id for API service
-        await prefs.setString('parent_first_name', data['parent']['firstName']);
-        await prefs.setString('parent_last_name', data['parent']['lastName']);
-        await prefs.setString('parent_email', data['parent']['email']);
+        // Save driver data using helper method
+        await _saveDriverDataToPrefs(data);
 
         return AuthResult(
           success: true,
-          parent: data['parent'],
-          children: data['children'],
+          driver: {
+            'user_id': data['user_id'],
+            'name': data['name'],
+            'email': data['email'],
+            'phone': data['phone'],
+            'license_number': data['license_number'],
+            'license_expiry': data['license_expiry'],
+          },
+          bus: data['bus'],
+          route: data['route'],
           tokens: data['tokens'],
         );
       } else {
@@ -172,7 +276,7 @@ class AuthService {
 
       if (e.response?.statusCode == 404) {
         errorMessage = e.response?.data['message'] ??
-            'No parent account found. Please contact your school administrator.';
+            'No driver account found. Please contact your administrator.';
       } else if (e.response?.statusCode == 401) {
         errorMessage = e.response?.data['message'] ??
             'Session expired. Please request a new magic link.';
@@ -190,7 +294,7 @@ class AuthService {
     }
   }
 
-  /// Check if user is currently authenticated (has valid tokens)
+  /// Check if driver is currently authenticated (has valid tokens)
   Future<bool> isAuthenticated() async {
     final prefs = await SharedPreferences.getInstance();
     final accessToken = prefs.getString('access_token');
@@ -245,7 +349,7 @@ class AuthService {
     }
   }
 
-  /// Sign out user
+  /// Sign out driver
   Future<void> signOut() async {
     // Sign out from Supabase
     await _supabase.auth.signOut();
@@ -254,10 +358,11 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('access_token');
     await prefs.remove('refresh_token');
-    await prefs.remove('parent_id');
-    await prefs.remove('parent_first_name');
-    await prefs.remove('parent_last_name');
-    await prefs.remove('parent_email');
+    await prefs.remove('driver_id');
+    await prefs.remove('user_id');
+    await prefs.remove('driver_name');
+    await prefs.remove('driver_email');
+    await prefs.remove('driver_phone');
   }
 
   /// Dispose resources
@@ -266,19 +371,21 @@ class AuthService {
   }
 }
 
-/// Result of authentication attempt
+/// Result of driver authentication attempt
 class AuthResult {
   final bool success;
   final String? error;
-  final Map<String, dynamic>? parent;
-  final List<dynamic>? children;
+  final Map<String, dynamic>? driver;
+  final Map<String, dynamic>? bus;
+  final Map<String, dynamic>? route;
   final Map<String, dynamic>? tokens;
 
   AuthResult({
     required this.success,
     this.error,
-    this.parent,
-    this.children,
+    this.driver,
+    this.bus,
+    this.route,
     this.tokens,
   });
 }

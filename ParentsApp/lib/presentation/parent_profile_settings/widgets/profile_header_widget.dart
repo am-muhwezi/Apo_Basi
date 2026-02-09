@@ -37,8 +37,16 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
 
   @override
   void dispose() {
-    _cameraController?.dispose();
+    _disposeCameraResources();
     super.dispose();
+  }
+
+  void _disposeCameraResources() {
+    try {
+      _cameraController?.dispose();
+    } catch (_) {}
+    _cameraController = null;
+    _isCameraInitialized = false;
   }
 
   Future<bool> _requestCameraPermission() async {
@@ -97,6 +105,7 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
         _currentImagePath = photo.path;
       });
       widget.onImageUpdated(photo.path);
+      _disposeCameraResources();
       Navigator.of(context).pop();
     } catch (e) {
       // Handle capture error silently
@@ -113,6 +122,7 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
           _currentImagePath = image.path;
         });
         widget.onImageUpdated(image.path);
+        _disposeCameraResources();
         Navigator.of(context).pop();
       }
     } catch (e) {
@@ -185,70 +195,80 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
   void _showCameraDialog() {
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.black,
-        child: StatefulBuilder(
-          builder: (context, setState) {
-            if (!_isCameraInitialized) {
-              _initializeCamera();
-              return Container(
-                height: 60.h,
-                child: Center(
-                  child: CircularProgressIndicator(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              );
-            }
-
-            return Container(
-              height: 60.h,
-              child: Column(
-                children: [
-                  Expanded(
-                    child: _cameraController != null &&
-                            _cameraController!.value.isInitialized
-                        ? CameraPreview(_cameraController!)
-                        : Center(
-                            child: Text(
-                              'Camera not available',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.all(4.w),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: CustomIconWidget(
-                            iconName: 'close',
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: _capturePhoto,
-                          child: Container(
-                            width: 16.w,
-                            height: 16.w,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.grey, width: 3),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 14.w),
-                      ],
+      builder: (dialogContext) => WillPopScope(
+        onWillPop: () async {
+          _disposeCameraResources();
+          return true;
+        },
+        child: Dialog(
+          backgroundColor: Colors.black,
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              if (!_isCameraInitialized) {
+                _initializeCamera();
+                return Container(
+                  height: 60.h,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
-                ],
-              ),
-            );
-          },
+                );
+              }
+
+              return Container(
+                height: 60.h,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: _cameraController != null &&
+                              _cameraController!.value.isInitialized
+                          ? CameraPreview(_cameraController!)
+                          : Center(
+                              child: Text(
+                                'Camera not available',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.all(4.w),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          IconButton(
+                            onPressed: () {
+                              _disposeCameraResources();
+                              Navigator.of(dialogContext).pop();
+                            },
+                            icon: CustomIconWidget(
+                              iconName: 'close',
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: _capturePhoto,
+                            child: Container(
+                              width: 16.w,
+                              height: 16.w,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: Colors.grey, width: 3),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 14.w),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -303,8 +323,9 @@ class _ProfileHeaderWidgetState extends State<ProfileHeaderWidget> {
                                     fit: BoxFit.cover,
                                   ))
                             : Container(
-                                color: AppTheme
-                                    .lightTheme.colorScheme.primaryContainer,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primaryContainer,
                                 child: Center(
                                   child: CustomIconWidget(
                                     iconName: 'person',
