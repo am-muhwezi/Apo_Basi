@@ -1,5 +1,6 @@
 """Parent views for CRUD and phone-based login flows."""
 
+import os
 import logging
 import requests
 from jose import jwt, JWTError
@@ -561,6 +562,139 @@ class SupabaseMagicLinkAuthView(APIView):
             return Response(
                 {
                     "error": "Authentication failed",
+                    "message": "Something went wrong. Please try again."
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class DemoLoginView(APIView):
+    """
+    POST /api/parents/auth/demo-login/
+    Demo account login for Apple App Store review process.
+
+    This endpoint allows password-based authentication for a specific
+    demo account, bypassing the magic link flow for review purposes.
+
+    Credentials are stored in environment variables:
+    - REVIEWER_EMAIL
+    - REVIEWER_PASSWORD
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email', '').strip().lower()
+        password = request.data.get('password', '')
+
+        # Get demo credentials from environment
+        reviewer_email = os.environ.get('REVIEWER_EMAIL', '').strip().lower()
+        reviewer_password = os.environ.get('REVIEWER_PASSWORD', '')
+
+        # Validate credentials
+        if not reviewer_email or not reviewer_password:
+            logger.error("Demo login credentials not configured in environment")
+            return Response(
+                {"error": "Demo login not available"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+        if email != reviewer_email or password != reviewer_password:
+            return Response(
+                {"error": "Invalid email or password"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        try:
+            # Look up the demo parent account
+            parent = Parent.objects.select_related('user').get(
+                user__email__iexact=email,
+                status='active'
+            )
+            user = parent.user
+
+            # Generate Django JWT tokens
+            refresh = RefreshToken.for_user(user)
+
+            # Get parent's children with bus assignments
+            children = Child.objects.filter(parent=parent)
+            children_data = []
+
+            for child in children:
+                bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
+
+                child_data = {
+                    "id": child.id,
+                    "first_name": child.first_name,
+                    "last_name": child.last_name,
+                    "class_grade": child.class_grade,
+                    "status": child.status,
+                    "assigned_bus": None
+                }
+
+                if bus_assignment:
+                    bus = bus_assignment.assigned_to
+                    driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+                    minder_assignment = Assignment.get_assignments_to(bus, 'minder_to_bus').first()
+
+                    driver_info = None
+                    if driver_assignment and driver_assignment.assignee:
+                        driver_info = {
+                            "name": f"{driver_assignment.assignee.user.first_name} {driver_assignment.assignee.user.last_name}",
+                            "phone": driver_assignment.assignee.phone_number
+                        }
+
+                    minder_info = None
+                    if minder_assignment and minder_assignment.assignee:
+                        minder_info = {
+                            "name": f"{minder_assignment.assignee.user.first_name} {minder_assignment.assignee.user.last_name}",
+                            "phone": minder_assignment.assignee.phone_number
+                        }
+
+                    child_data["assigned_bus"] = {
+                        "id": bus.id,
+                        "bus_number": bus.bus_number,
+                        "number_plate": bus.number_plate,
+                        "driver": driver_info,
+                        "minder": minder_info
+                    }
+
+                children_data.append(child_data)
+
+            logger.info(f"Demo login successful for: {email}")
+
+            return Response(
+                {
+                    "success": True,
+                    "parent": {
+                        "id": user.id,
+                        "firstName": user.first_name,
+                        "lastName": user.last_name,
+                        "email": user.email,
+                    },
+                    "children": children_data,
+                    "totalChildren": len(children_data),
+                    "tokens": {
+                        "access": str(refresh.access_token),
+                        "refresh": str(refresh),
+                    },
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except Parent.DoesNotExist:
+            logger.error(f"Demo parent account not found for email: {email}")
+            return Response(
+                {
+                    "error": "Demo account not found",
+                    "message": "The demo account has not been set up. Please contact support."
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.exception("Unexpected error during demo login")
+            return Response(
+                {
+                    "error": "Login failed",
                     "message": "Something went wrong. Please try again."
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
