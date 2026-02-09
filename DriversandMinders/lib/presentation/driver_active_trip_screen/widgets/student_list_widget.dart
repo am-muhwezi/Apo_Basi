@@ -4,15 +4,15 @@ import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
 
-/// Student list widget with pickup status toggles
+/// Student list widget - clean read-only view
 class StudentListWidget extends StatefulWidget {
   final List<Map<String, dynamic>> students;
-  final Function(int, bool) onPickupStatusChanged;
+  final Function(int, bool)? onPickupStatusChanged;
 
   const StudentListWidget({
     super.key,
     required this.students,
-    required this.onPickupStatusChanged,
+    this.onPickupStatusChanged,
   });
 
   @override
@@ -63,11 +63,10 @@ class _StudentListWidgetState extends State<StudentListWidget> {
           ),
 
           // Student list
-          ListView.separated(
+          ListView.builder(
             shrinkWrap: true,
             physics: NeverScrollableScrollPhysics(),
             itemCount: widget.students.length,
-            separatorBuilder: (context, index) => SizedBox(height: 1.h),
             itemBuilder: (context, index) {
               final student = widget.students[index];
               return _buildStudentCard(context, student, index);
@@ -85,172 +84,145 @@ class _StudentListWidgetState extends State<StudentListWidget> {
     final studentName = student["name"] as String? ?? "Unknown Student";
     final studentGrade = student["grade"] as String? ?? "N/A";
     final stopName = student["stopName"] as String? ?? "Unknown Stop";
-    final specialNotes = student["specialNotes"] as String?;
-    final parentContact = student["parentContact"] as String?;
+    final locationStatus = student["locationStatus"] as String? ??
+        student["location_status"] as String? ??
+        "home";
 
-    return Dismissible(
-      key: Key('student_$index'),
-      direction: DismissDirection.startToEnd,
-      confirmDismiss: (direction) async {
-        if (!isPickedUp) {
-          HapticFeedback.mediumImpact();
-          widget.onPickupStatusChanged(index, true);
-          return false; // Don't actually dismiss
-        }
-        return false;
-      },
-      background: Container(
-        padding: EdgeInsets.symmetric(horizontal: 4.w),
-        decoration: BoxDecoration(
-          color: AppTheme.successAction,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            CustomIconWidget(
-              iconName: 'check_circle',
-              color: AppTheme.textOnPrimary,
-              size: 24,
-            ),
-            SizedBox(width: 2.w),
-            Text(
-              'Mark Picked Up',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppTheme.textOnPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+    // Distinct color coding based on location_status
+    Color statusColor;
+    String statusText;
+    IconData statusIcon;
+
+    switch (locationStatus.toLowerCase()) {
+      case 'on-bus':
+      case 'on_bus':
+        statusColor = Color(0xFF3B82F6); // Blue for on bus
+        statusText = 'On Bus';
+        statusIcon = Icons.directions_bus;
+        break;
+      case 'at-school':
+      case 'at_school':
+        statusColor = Color(0xFF10B981); // Green for at school
+        statusText = 'At School';
+        statusIcon = Icons.school;
+        break;
+      case 'home':
+        statusColor = Color(0xFF6B7280); // Gray for at home
+        statusText = 'At Home';
+        statusIcon = Icons.home;
+        break;
+      case 'picked-up':
+      case 'picked_up':
+        statusColor = Color(0xFFF59E0B); // Orange/Amber for picked up
+        statusText = 'Picked Up';
+        statusIcon = Icons.check_circle;
+        break;
+      case 'dropped-off':
+      case 'dropped_off':
+        statusColor = Color(0xFF8B5CF6); // Purple for dropped off
+        statusText = 'Dropped Off';
+        statusIcon = Icons.check_circle;
+        break;
+      default:
+        statusColor = Color(0xFF9CA3AF); // Light gray for unknown
+        statusText = 'Unknown';
+        statusIcon = Icons.help_outline;
+    }
+
+    // Use isPickedUp as fallback if locationStatus not available
+    if (isPickedUp && locationStatus.toLowerCase() == 'home') {
+      statusColor = Color(0xFFF59E0B);
+      statusText = 'Picked Up';
+      statusIcon = Icons.check_circle;
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 0.5.h),
+      padding: EdgeInsets.all(3.w),
+      decoration: BoxDecoration(
+        color: AppTheme.backgroundSecondary,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.borderLight,
+          width: 1,
         ),
       ),
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.all(3.w),
-        decoration: BoxDecoration(
-          color: isPickedUp
-              ? AppTheme.successAction.withValues(alpha: 0.1)
-              : AppTheme.backgroundSecondary,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isPickedUp
-                ? AppTheme.successAction.withValues(alpha: 0.3)
-                : AppTheme.borderLight,
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.shadowLight,
-              offset: Offset(0, 1),
-              blurRadius: 4,
-              spreadRadius: 0,
+      child: Row(
+        children: [
+          // Student avatar with status color
+          Container(
+            width: 12.w,
+            height: 12.w,
+            decoration: BoxDecoration(
+              color: statusColor,
+              borderRadius: BorderRadius.circular(8),
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Student avatar
-            Container(
-              width: 12.w,
-              height: 12.w,
-              decoration: BoxDecoration(
-                color: isPickedUp
-                    ? AppTheme.successAction
-                    : AppTheme.primaryDriver,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Text(
-                  studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: AppTheme.textOnPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
+            child: Center(
+              child: Text(
+                studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: AppTheme.textOnPrimary,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
+          ),
 
-            SizedBox(width: 3.w),
+          SizedBox(width: 3.w),
 
-            // Student information
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          studentName,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (isPickedUp)
-                        CustomIconWidget(
-                          iconName: 'check_circle',
-                          color: AppTheme.successAction,
-                          size: 20,
-                        ),
-                    ],
+          // Student information
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  studentName,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textPrimary,
+                    fontWeight: FontWeight.w600,
                   ),
-                  SizedBox(height: 0.5.h),
-                  Text(
-                    'Grade $studentGrade • $stopName',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: 0.5.h),
+                Text(
+                  'Grade $studentGrade • $stopName',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondary,
                   ),
-                  if (specialNotes != null && specialNotes.isNotEmpty) ...[
-                    SizedBox(height: 0.5.h),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 2.w, vertical: 0.5.h),
-                      decoration: BoxDecoration(
-                        color: AppTheme.warningState.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        specialNotes,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppTheme.warningState,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 2,
-                      ),
-                    ),
-                  ],
-                  if (parentContact != null && parentContact.isNotEmpty) ...[
-                    SizedBox(height: 0.5.h),
-                    Text(
-                      'Contact: $parentContact',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
+          ),
 
-            // Pickup toggle
-            Switch(
-              value: isPickedUp,
-              onChanged: (value) {
-                HapticFeedback.lightImpact();
-                widget.onPickupStatusChanged(index, value);
-              },
-              activeColor: AppTheme.successAction,
-              inactiveThumbColor: AppTheme.textSecondary,
-              inactiveTrackColor: AppTheme.textSecondary.withValues(alpha: 0.3),
+          // Status indicator
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 2.w, vertical: 0.5.h),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
             ),
-          ],
-        ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  statusIcon,
+                  color: statusColor,
+                  size: 16,
+                ),
+                SizedBox(width: 1.w),
+                Text(
+                  statusText,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: statusColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

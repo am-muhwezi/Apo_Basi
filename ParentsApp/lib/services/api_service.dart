@@ -1,14 +1,18 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/child_model.dart';
-import '../models/parent_model.dart';
 import '../config/api_config.dart';
 import 'auth_service.dart';
+import 'cache_service.dart';
+import 'connectivity_service.dart';
 
 class ApiService {
   late Dio _dio;
   String? _accessToken;
   final AuthService _authService = AuthService();
+  final CacheService _cacheService = CacheService();
+  final ConnectivityService _connectivityService = ConnectivityService();
   bool _isRefreshing = false;
 
   ApiService() {
@@ -232,22 +236,32 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = response.data;
+        // Handle both response structures:
+        // 1. Nested: { "parent": {...}, "children": [...] }
+        // 2. Flat: { "id": ..., "firstName": ..., ... }
+        final parentData = data['parent'] ?? data;
 
         // Return in a format that matches what the app expects
         return {
           'user': {
-            'id': data['id'] ?? userId,
-            'username': data['firstName'] ?? '',
-            'email': data['email'] ?? '',
-            'first_name': data['firstName'] ?? '',
-            'last_name': data['lastName'] ?? '',
+            'id': parentData['id'] ?? userId,
+            'username':
+                parentData['firstName'] ?? parentData['first_name'] ?? '',
+            'email': parentData['email'] ?? '',
+            'first_name':
+                parentData['firstName'] ?? parentData['first_name'] ?? '',
+            'last_name':
+                parentData['lastName'] ?? parentData['last_name'] ?? '',
           },
           'parent': {
-            'user': data['id'] ?? userId,
-            'contact_number': data['phone'] ?? '',
-            'address': data['address'] ?? '',
-            'emergency_contact': data['emergencyContact'] ?? '',
-            'status': data['status'] ?? 'active',
+            'user': parentData['id'] ?? userId,
+            'contact_number':
+                parentData['phone'] ?? parentData['contact_number'] ?? '',
+            'address': parentData['address'] ?? '',
+            'emergency_contact': parentData['emergencyContact'] ??
+                parentData['emergency_contact'] ??
+                '',
+            'status': parentData['status'] ?? 'active',
           }
         };
       } else {
@@ -257,6 +271,86 @@ class ApiService {
       throw Exception(
         _extractErrorMessage(e, 'Failed to load profile'),
       );
+    }
+  }
+
+  // Get consolidated dashboard data (parent + children + notifications)
+  // Implements cache-first strategy with background refresh
+  Future<Map<String, dynamic>> getDashboardData({
+    bool forceRefresh = false,
+  }) async {
+    try {
+      await loadToken();
+
+      // Get saved user ID
+      final userId = await _getSavedUserId();
+      if (userId == null) {
+        throw Exception('User not logged in. Please login again.');
+      }
+
+      // Check connectivity
+      final isOnline = await _connectivityService.checkConnection();
+
+      // If not forcing refresh, try to get cached data first
+      if (!forceRefresh) {
+        final cachedData = await _cacheService.getCachedDashboard();
+        if (cachedData != null) {
+          // Return cached data immediately
+          // Refresh in background if online
+          if (isOnline) {
+            _refreshDashboardInBackground(userId);
+          }
+          return cachedData;
+        }
+      }
+
+      // If offline and no cache, try to get stale cache
+      if (!isOnline) {
+        final staleData = await _cacheService.getStaleDashboard();
+        if (staleData != null) {
+          return staleData;
+        }
+        throw Exception('No internet connection. Please check your network.');
+      }
+
+      // Fetch from API - using the enhanced /api/parents/{id}/ endpoint
+      final response = await _dio.get('/api/parents/$userId/');
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        // Cache the response
+        await _cacheService.cacheDashboard(data);
+
+        return data;
+      } else {
+        throw Exception('Failed to load dashboard data');
+      }
+    } on DioException catch (e) {
+      // If API fails but we have stale cache, return it
+      final staleData = await _cacheService.getStaleDashboard();
+      if (staleData != null) {
+        return staleData;
+      }
+
+      throw Exception(
+        _extractErrorMessage(e, 'Failed to load dashboard data'),
+      );
+    }
+  }
+
+  // Refresh dashboard data in background without blocking UI
+  Future<void> _refreshDashboardInBackground(int userId) async {
+    try {
+      final response = await _dio.get('/api/parents/$userId/');
+      if (response.statusCode == 200) {
+        await _cacheService.cacheDashboard(response.data);
+      }
+    } catch (e) {
+      // Silent fail for background refresh (only log in debug mode)
+      if (kDebugMode) {
+        debugPrint('Background dashboard refresh failed: $e');
+      }
     }
   }
 

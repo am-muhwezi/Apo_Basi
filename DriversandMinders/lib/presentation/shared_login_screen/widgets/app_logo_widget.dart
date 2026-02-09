@@ -14,14 +14,14 @@ class AppLogoWidget extends StatelessWidget {
 
     return Container(
       width: 70.w,
-      padding: EdgeInsets.symmetric(vertical: 3.h),
+      padding: EdgeInsets.symmetric(vertical: 1.h),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Logo Container
           Container(
-            width: 25.w,
-            height: 25.w,
+            width: 18.w,
+            height: 18.w,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -31,12 +31,12 @@ class AppLogoWidget extends StatelessWidget {
                   colorScheme.primary.withValues(alpha: 0.8),
                 ],
               ),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
                   color: colorScheme.primary.withValues(alpha: 0.3),
-                  offset: const Offset(0, 8),
-                  blurRadius: 24,
+                  offset: const Offset(0, 4),
+                  blurRadius: 16,
                   spreadRadius: 0,
                 ),
               ],
@@ -45,17 +45,17 @@ class AppLogoWidget extends StatelessWidget {
               child: CustomIconWidget(
                 iconName: 'directions_bus',
                 color: colorScheme.onPrimary,
-                size: 12.w,
+                size: 9.w,
               ),
             ),
           ),
 
-          SizedBox(height: 2.h),
+          SizedBox(height: 1.5.h),
 
           // App Name
           Text(
             'ApoBasi',
-            style: theme.textTheme.headlineMedium?.copyWith(
+            style: theme.textTheme.headlineSmall?.copyWith(
               color: colorScheme.onSurface,
               fontWeight: FontWeight.w700,
               letterSpacing: -0.5,
@@ -63,19 +63,17 @@ class AppLogoWidget extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
 
-          SizedBox(height: 0.5.h),
+          SizedBox(height: 0.3.h),
 
           // App Tagline
           Text(
             'School Bus Tracking & Management',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurface.withValues(alpha: 0.7),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurface.withValues(alpha: 0.6),
               fontWeight: FontWeight.w400,
             ),
             textAlign: TextAlign.center,
           ),
-
-          SizedBox(height: 1.h),
         ],
       ),
     );

@@ -411,7 +411,7 @@ class _DataPrivacyWidgetState extends State<DataPrivacyWidget> {
           ),
 
           SizedBox(height: 2.h),
-          Divider(color: Theme.of(context).colorScheme.outline),
+          Divider(color: AppTheme.lightTheme.colorScheme.outline),
           SizedBox(height: 2.h),
 
           // Privacy Policy Access
@@ -419,22 +419,22 @@ class _DataPrivacyWidgetState extends State<DataPrivacyWidget> {
             contentPadding: EdgeInsets.zero,
             leading: CustomIconWidget(
               iconName: 'policy',
-              color: Theme.of(context).colorScheme.primary,
+              color: AppTheme.lightTheme.colorScheme.primary,
               size: 24,
             ),
             title: Text(
               'Privacy Policy',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
+              style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
             ),
             subtitle: Text(
               'View our complete privacy policy',
-              style: Theme.of(context).textTheme.bodySmall,
+              style: AppTheme.lightTheme.textTheme.bodySmall,
             ),
             trailing: CustomIconWidget(
               iconName: 'arrow_forward_ios',
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
               size: 16,
             ),
             onTap: _showPrivacyPolicy,
@@ -445,22 +445,22 @@ class _DataPrivacyWidgetState extends State<DataPrivacyWidget> {
             contentPadding: EdgeInsets.zero,
             leading: CustomIconWidget(
               iconName: 'download',
-              color: Theme.of(context).colorScheme.primary,
+              color: AppTheme.lightTheme.colorScheme.primary,
               size: 24,
             ),
             title: Text(
               'Export My Data',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
+              style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
             ),
             subtitle: Text(
               'Download a copy of your data',
-              style: Theme.of(context).textTheme.bodySmall,
+              style: AppTheme.lightTheme.textTheme.bodySmall,
             ),
             trailing: CustomIconWidget(
               iconName: 'arrow_forward_ios',
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
               size: 16,
             ),
             onTap: () {

@@ -34,7 +34,7 @@ class QuickActionGrid extends StatelessWidget {
             title: 'Live Map',
             subtitle: 'Track bus location',
             iconName: 'location_on',
-            color: Theme.of(context).colorScheme.primary,
+            color: AppTheme.lightTheme.colorScheme.primary,
             onTap: onLiveMapTap,
           ),
           _buildActionCard(
@@ -79,15 +79,16 @@ class QuickActionGrid extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.all(4.w),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
+          color: AppTheme.lightTheme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+            color:
+                AppTheme.lightTheme.colorScheme.outline.withValues(alpha: 0.2),
           ),
           boxShadow: [
             BoxShadow(
-              color:
-                  Theme.of(context).colorScheme.shadow.withValues(alpha: 0.05),
+              color: AppTheme.lightTheme.colorScheme.shadow
+                  .withValues(alpha: 0.05),
               blurRadius: 4,
               offset: const Offset(0, 1),
             ),
@@ -114,18 +115,18 @@ class QuickActionGrid extends StatelessWidget {
             SizedBox(height: 2.h),
             Text(
               title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+              style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppTheme.lightTheme.colorScheme.onSurface,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
             SizedBox(height: 0.5.h),
             Text(
               subtitle,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+              style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+                color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+              ),
               overflow: TextOverflow.ellipsis,
               maxLines: 2,
             ),
