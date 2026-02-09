@@ -24,12 +24,16 @@ class ParentLoginScreenV2 extends StatefulWidget {
 class _ParentLoginScreenV2State extends State<ParentLoginScreenV2>
     with SingleTickerProviderStateMixin {
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
 
   bool _isLoading = false;
   bool _magicLinkSent = false;
   String? _emailError;
+  String? _passwordError;
   bool _isEmailValid = false;
+  bool _isReviewerAccount = false;
+  bool _obscurePassword = true;
   StreamSubscription<AuthResult>? _authSubscription;
 
   late AnimationController _fadeController;
@@ -39,6 +43,7 @@ class _ParentLoginScreenV2State extends State<ParentLoginScreenV2>
   void initState() {
     super.initState();
     _emailController.addListener(_validateEmail);
+    _passwordController.addListener(_onPasswordChanged);
     _listenForAuthCallback();
 
     // Fade-in animation
@@ -53,9 +58,17 @@ class _ParentLoginScreenV2State extends State<ParentLoginScreenV2>
     _fadeController.forward();
   }
 
+  void _onPasswordChanged() {
+    // Trigger rebuild to update button state
+    setState(() {
+      _passwordError = null;
+    });
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
+    _passwordController.dispose();
     _authSubscription?.cancel();
     _fadeController.dispose();
     super.dispose();
@@ -67,12 +80,16 @@ class _ParentLoginScreenV2State extends State<ParentLoginScreenV2>
       if (email.isEmpty) {
         _emailError = null;
         _isEmailValid = false;
+        _isReviewerAccount = false;
       } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
         _emailError = 'Please enter a valid email address';
         _isEmailValid = false;
+        _isReviewerAccount = false;
       } else {
         _emailError = null;
         _isEmailValid = true;
+        // Check if this is the reviewer demo account
+        _isReviewerAccount = _authService.isReviewerAccount(email);
       }
     });
   }
@@ -162,6 +179,63 @@ class _ParentLoginScreenV2State extends State<ParentLoginScreenV2>
     }
   }
 
+  /// Handle password login for reviewer demo account
+  Future<void> _handlePasswordLogin() async {
+    if (!_isEmailValid || !_isReviewerAccount) return;
+
+    final password = _passwordController.text;
+    if (password.isEmpty) {
+      setState(() {
+        _passwordError = 'Please enter password';
+      });
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+
+    setState(() {
+      _isLoading = true;
+      _emailError = null;
+      _passwordError = null;
+    });
+
+    HapticFeedback.lightImpact();
+
+    try {
+      final email = _emailController.text.trim();
+      final result = await _authService.loginWithPassword(email, password);
+
+      if (result.success) {
+        HapticFeedback.mediumImpact();
+
+        final firstName = result.parent?['firstName'] ?? 'Reviewer';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Welcome, $firstName!'),
+            backgroundColor: AppTheme.secondaryLight,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        Navigator.pushReplacementNamed(context, '/parent-dashboard');
+      } else {
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _passwordError = result.error ?? 'Login failed';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _passwordError = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Set status bar for light background
@@ -225,17 +299,38 @@ class _ParentLoginScreenV2State extends State<ParentLoginScreenV2>
                 ),
               ],
 
+              // Password field for reviewer account
+              if (_isReviewerAccount) ...[
+                SizedBox(height: 2.h),
+                _buildPasswordInputField(),
+                if (_passwordError != null) ...[
+                  SizedBox(height: 1.h),
+                  Text(
+                    _passwordError!,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      color: AppTheme.errorLight,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+
               SizedBox(height: 3.h),
 
-              // Send Login Link Button
-              _buildContinueButton(),
+              // Send Login Link Button (or Sign In for reviewer)
+              _isReviewerAccount
+                  ? _buildPasswordLoginButton()
+                  : _buildContinueButton(),
 
               SizedBox(height: 4.h),
 
               // Footer info
               Center(
                 child: Text(
-                  'Please use email address registered with school',
+                  _isReviewerAccount
+                      ? 'Demo account for App Store review'
+                      : 'Please use email address registered with school',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 12.sp,
@@ -419,6 +514,110 @@ class _ParentLoginScreenV2State extends State<ParentLoginScreenV2>
                 )
               : SizedBox(width: 10.w),
           suffixIconConstraints: BoxConstraints(minWidth: 10.w),
+        ),
+      ),
+    );
+  }
+
+  /// Password Input Field - For reviewer demo account
+  Widget _buildPasswordInputField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: _passwordError != null
+              ? AppTheme.errorLight
+              : AppTheme.dividerLight,
+          width: 1.5,
+        ),
+      ),
+      child: TextField(
+        controller: _passwordController,
+        obscureText: _obscurePassword,
+        textAlign: TextAlign.center,
+        style: GoogleFonts.inter(
+          fontSize: 15.sp,
+          fontWeight: FontWeight.w400,
+          color: AppTheme.textPrimaryLight,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Password',
+          hintStyle: GoogleFonts.inter(
+            color: AppTheme.textSecondaryLight,
+            fontWeight: FontWeight.w400,
+          ),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: 6.w,
+            vertical: 2.h,
+          ),
+          border: InputBorder.none,
+          prefixIcon: Padding(
+            padding: EdgeInsets.only(left: 4.w),
+            child: Icon(
+              Icons.lock_outlined,
+              color: AppTheme.textSecondaryLight,
+              size: 5.w,
+            ),
+          ),
+          prefixIconConstraints: BoxConstraints(minWidth: 10.w),
+          suffixIcon: Padding(
+            padding: EdgeInsets.only(right: 2.w),
+            child: IconButton(
+              icon: Icon(
+                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                color: AppTheme.textSecondaryLight,
+                size: 5.w,
+              ),
+              onPressed: () {
+                setState(() {
+                  _obscurePassword = !_obscurePassword;
+                });
+              },
+            ),
+          ),
+          suffixIconConstraints: BoxConstraints(minWidth: 10.w),
+        ),
+      ),
+    );
+  }
+
+  /// Password Login Button - For reviewer demo account
+  Widget _buildPasswordLoginButton() {
+    final isValid = _isEmailValid && _passwordController.text.isNotEmpty;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton(
+        onPressed: isValid && !_isLoading ? _handlePasswordLogin : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.apobasiYellow,
+          disabledBackgroundColor: AppTheme.apobasiYellow.withOpacity(0.5),
+          foregroundColor: AppTheme.apobasiNavy,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.login_rounded,
+              size: 18.sp,
+            ),
+            SizedBox(width: 2.w),
+            Text(
+              'Sign In',
+              style: GoogleFonts.inter(
+                fontSize: 15.sp,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
         ),
       ),
     );
