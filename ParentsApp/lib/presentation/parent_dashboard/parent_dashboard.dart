@@ -107,7 +107,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
       final homeAddress = await _homeLocationService.getHomeAddress();
 
       // If neither coordinates nor address are set, show prompt
-      if (homeLocation == null && (homeAddress == null || homeAddress.isEmpty)) {
+      if (homeLocation == null &&
+          (homeAddress == null || homeAddress.isEmpty)) {
         _hasShownLocationPrompt = true;
 
         if (mounted) {
@@ -271,11 +272,11 @@ class _ParentDashboardState extends State<ParentDashboard> {
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
-          : _children.isEmpty && _error != null
-            ? _buildErrorView()
-            : _children.isEmpty
-              ? _buildEmptyView()
-              : RefreshIndicator(
+            : _children.isEmpty && _error != null
+                ? _buildErrorView()
+                : _children.isEmpty
+                    ? _buildEmptyView()
+                    : RefreshIndicator(
                         onRefresh: _loadChildren,
                         child: CustomScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
@@ -399,7 +400,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
       "busNumber": child.assignedBus?.numberPlate,
       "driverName": child.assignedBus?.driverName,
       "route": child.assignedBus?.route,
-      "routeName": child.assignedBus?.route,  // Add explicit routeName field
+      "routeName": child.assignedBus?.route, // Add explicit routeName field
       "address": child.address,
       "homeAddress": _parentAddress, // Parent's home address for map
     };
