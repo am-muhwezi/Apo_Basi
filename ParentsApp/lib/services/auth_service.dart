@@ -190,6 +190,57 @@ class AuthService {
     }
   }
 
+  /// The hardcoded email Apple reviewers use to trigger the password login flow
+  static const String _reviewerEmail = 'applereviewer@apobasi.com';
+
+  /// Returns true when the typed email matches the Apple reviewer account.
+  /// The login screen uses this to show a password field instead of magic link.
+  bool isReviewerAccount(String email) =>
+      email.trim().toLowerCase() == _reviewerEmail;
+
+  /// Password-based login used exclusively by the Apple reviewer demo account.
+  /// Calls POST /api/parents/auth/demo-login/ and stores tokens on success.
+  Future<AuthResult> loginWithPassword(String email, String password) async {
+    try {
+      final response = await _dio.post(
+        '/api/parents/auth/demo-login/',
+        data: {'email': email.trim().toLowerCase(), 'password': password},
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('access_token', data['tokens']['access']);
+        await prefs.setString('refresh_token', data['tokens']['refresh']);
+        await prefs.setInt('parent_id', data['parent']['id']);
+        await prefs.setInt('user_id', data['parent']['id']);
+        await prefs.setString('parent_first_name', data['parent']['firstName']);
+        await prefs.setString('parent_last_name', data['parent']['lastName']);
+        await prefs.setString('parent_email', data['parent']['email']);
+        return AuthResult(
+          success: true,
+          parent: data['parent'],
+          children: data['children'],
+          tokens: data['tokens'],
+        );
+      }
+      return AuthResult(
+        success: false,
+        error: response.data['error'] ?? 'Login failed',
+      );
+    } on DioException catch (e) {
+      String msg = 'Login failed';
+      if (e.response?.statusCode == 401) msg = 'Invalid email or password';
+      if (e.response?.statusCode == 404) {
+        msg = e.response?.data['message'] ?? 'Demo account not configured';
+      }
+      if (e.response?.statusCode == 503) msg = 'Demo login not available';
+      return AuthResult(success: false, error: msg);
+    } catch (e) {
+      return AuthResult(success: false, error: 'Unexpected error: $e');
+    }
+  }
+
   /// Check if user is currently authenticated (has valid tokens)
   Future<bool> isAuthenticated() async {
     final prefs = await SharedPreferences.getInstance();

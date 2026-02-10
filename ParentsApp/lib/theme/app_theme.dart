@@ -51,6 +51,12 @@ class AppTheme {
   static const Color shadowLight = Color(0x33000000); // 20% opacity black
   static const Color shadowDark = Color(0x33FFFFFF); // 20% opacity white
 
+  // ApoBasi Brand Colors (from official logo — APO BASI LOGO-01.svg)
+  static const Color apobasiNavy   = Color(0xFF001C3F); // Logo navy background
+  static const Color apobasiYellow = Color(0xFFECCA4E); // Logo gold bus/text
+  static const Color apobasiDark   = Color(0xFF001C3F); // Same as navy for splash
+  static const Color apobasiPurple = Color(0xFF6C63FF); // Secondary accent
+
   /// Light theme optimized for outdoor mobile usage and parent-facing interfaces
   static ThemeData lightTheme = ThemeData(
     brightness: Brightness.light,
