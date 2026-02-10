@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:sizer/sizer.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -95,9 +96,9 @@ class _SplashScreenState extends State<SplashScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Logo Image
-                      Image.asset(
-                        'assets/AB_logo2.png',
-                        width: 60.w,
+                      SvgPicture.asset(
+                        'assets/images/apobasi_logo.svg',
+                        width: 55.w,
                         fit: BoxFit.contain,
                       ),
 
