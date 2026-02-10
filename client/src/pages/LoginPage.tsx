@@ -109,6 +109,18 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-slate-600">
+              Don't have an account?{' '}
+              <button
+                onClick={() => navigate('/admin/signup')}
+                className="text-blue-600 font-medium hover:text-blue-700"
+              >
+                Sign up
+              </button>
+            </p>
+          </div>
         </div>
 
       </div>

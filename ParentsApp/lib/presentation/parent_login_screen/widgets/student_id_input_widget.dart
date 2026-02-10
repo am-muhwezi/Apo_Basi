@@ -51,34 +51,34 @@ class _StudentIdInputWidgetState extends State<StudentIdInputWidget> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: widget.errorText != null
-                  ? Theme.of(context).colorScheme.error
+                  ? AppTheme.lightTheme.colorScheme.error
                   : _isFocused
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.outline,
+                      ? AppTheme.lightTheme.colorScheme.primary
+                      : AppTheme.lightTheme.colorScheme.outline,
               width: _isFocused ? 2 : 1,
             ),
-            color: Theme.of(context).colorScheme.surface,
+            color: AppTheme.lightTheme.colorScheme.surface,
           ),
           child: TextFormField(
             controller: widget.controller,
             focusNode: _focusNode,
             onChanged: widget.onChanged,
             keyboardType: TextInputType.number,
-            style: Theme.of(context).textTheme.bodyLarge,
+            style: AppTheme.lightTheme.textTheme.bodyLarge,
             decoration: InputDecoration(
               hintText: 'Enter student ID',
-              hintStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+              hintStyle: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
+                color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+              ),
               prefixIcon: Padding(
                 padding: EdgeInsets.all(3.w),
                 child: CustomIconWidget(
                   iconName: 'person',
                   color: widget.errorText != null
-                      ? Theme.of(context).colorScheme.error
+                      ? AppTheme.lightTheme.colorScheme.error
                       : _isFocused
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                          ? AppTheme.lightTheme.colorScheme.primary
+                          : AppTheme.lightTheme.colorScheme.onSurfaceVariant,
                   size: 6.w,
                 ),
               ),
@@ -87,7 +87,7 @@ class _StudentIdInputWidgetState extends State<StudentIdInputWidget> {
                       padding: EdgeInsets.all(3.w),
                       child: CustomIconWidget(
                         iconName: 'check_circle',
-                        color: Theme.of(context).colorScheme.secondary,
+                        color: AppTheme.lightTheme.colorScheme.secondary,
                         size: 6.w,
                       ),
                     )
@@ -108,16 +108,16 @@ class _StudentIdInputWidgetState extends State<StudentIdInputWidget> {
               children: [
                 CustomIconWidget(
                   iconName: 'error_outline',
-                  color: Theme.of(context).colorScheme.error,
+                  color: AppTheme.lightTheme.colorScheme.error,
                   size: 4.w,
                 ),
                 SizedBox(width: 2.w),
                 Expanded(
                   child: Text(
                     widget.errorText!,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                    style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+                      color: AppTheme.lightTheme.colorScheme.error,
+                    ),
                   ),
                 ),
               ],

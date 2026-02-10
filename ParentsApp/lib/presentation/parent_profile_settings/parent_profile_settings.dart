@@ -1,12 +1,16 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/theme_service.dart';
 import '../../services/home_location_service.dart';
+import '../../services/connectivity_service.dart';
+import '../../services/cache_service.dart';
 import '../../models/child_model.dart';
 import '../../models/parent_model.dart';
 import './widgets/child_information_widget.dart';
@@ -27,8 +31,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   final ApiService _apiService = ApiService();
   final ThemeService _themeService = ThemeService();
   final HomeLocationService _homeLocationService = HomeLocationService();
+  final AuthService _authService = AuthService();
+  final ConnectivityService _connectivityService = ConnectivityService();
   bool _isLoading = true;
-  String? _error;
 
   // Parent data from API
   User? _user;
@@ -38,10 +43,28 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   @override
   void initState() {
     super.initState();
-    // Defer data loading to after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadProfileData();
+    // Load profile data immediately from cache
+    _loadProfileData();
+
+    // Defer connectivity initialization
+    Future.microtask(() {
+      _initializeConnectivity();
     });
+  }
+
+  Future<void> _initializeConnectivity() async {
+    await _connectivityService.initialize();
+    _connectivityService.onConnectionRestored = () {
+      if (mounted) {
+        // Don't show toast on profile page, home dashboard handles it
+        _loadProfileData(forceRefresh: true);
+      }
+    };
+    _connectivityService.onConnectionLost = () {
+      if (mounted) {
+        _showToast('Currently offline', isError: true);
+      }
+    };
   }
 
   // Helper to clean up address formatting (remove double commas, extra spaces)
@@ -51,444 +74,529 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
     // Remove multiple consecutive commas and spaces
     return address
         .replaceAll(RegExp(r',\s*,+'), ',') // Replace ", ," with ","
-        .replaceAll(RegExp(r'\s+'), ' ') // Replace multiple spaces with single space
+        .replaceAll(
+            RegExp(r'\s+'), ' ') // Replace multiple spaces with single space
         .replaceAll(RegExp(r',\s+,'), ',') // Replace ", ," with ","
         .trim();
   }
 
-  Future<void> _loadProfileData() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  void _showToast(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor:
+            isError ? const Color(0xFFFF9500) : const Color(0xFF34C759),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _loadProfileData({bool forceRefresh = false}) async {
+    if (!mounted) return;
+
+    // First, try to load from cache immediately (without showing loading)
+    if (!forceRefresh) {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedFirstName = prefs.getString('parent_first_name') ?? '';
+      final cachedLastName = prefs.getString('parent_last_name') ?? '';
+      final cachedEmail = prefs.getString('parent_email') ?? '';
+      final userId = prefs.getInt('user_id') ?? 0;
+
+      // Also load cached children
+      final cacheService = CacheService();
+      final cachedChildren = await cacheService.getStaleChildren();
+
+      if (cachedFirstName.isNotEmpty || cachedEmail.isNotEmpty) {
+        setState(() {
+          _user = User(
+            id: userId,
+            username: cachedEmail,
+            email: cachedEmail,
+            firstName: cachedFirstName,
+            lastName: cachedLastName,
+          );
+          // Load cached children
+          if (cachedChildren != null && cachedChildren.isNotEmpty) {
+            _children =
+                cachedChildren.map((json) => Child.fromJson(json)).toList();
+          }
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = true;
+        });
+      }
+    } else {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
-      // Load profile and children data in parallel
-      final results = await Future.wait([
-        _apiService.getParentProfile(),
-        _apiService.getMyChildren(),
-      ]);
+      // Clear cache if force refreshing to ensure fresh data
+      if (forceRefresh) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('dashboard_data');
+        await prefs.remove('dashboard_timestamp');
+      }
 
-      final profileData = results[0] as Map<String, dynamic>;
-      final childrenData = results[1] as List<Child>;
+      // Load parent profile data with timeout
+      final parentProfile = await _apiService.getParentProfile().timeout(
+            const Duration(seconds: 8),
+            onTimeout: () => throw Exception('Currently offline'),
+          );
 
-      setState(() {
-        _user = User.fromJson(profileData['user']);
-        _parent = Parent.fromJson(profileData['parent']);
-        _children = childrenData;
-        _isLoading = false;
-      });
+      // Load children data separately (same as home dashboard) with timeout
+      final children = await _apiService.getMyChildren().timeout(
+            const Duration(seconds: 8),
+            onTimeout: () => throw Exception('Currently offline'),
+          );
+
+      if (mounted) {
+        setState(() {
+          // Extract user data from parent profile
+          final userData = parentProfile['user'];
+
+          if (userData != null && userData['id'] != null) {
+            _user = User(
+              id: userData['id'],
+              username: userData['email'] ?? '',
+              email: userData['email'] ?? '',
+              firstName: userData['first_name'] ?? '',
+              lastName: userData['last_name'] ?? '',
+            );
+
+            // Extract parent data
+            final parentData = parentProfile['parent'];
+            _parent = Parent(
+              userId: userData['id'],
+              contactNumber: parentData['contact_number'] ?? '',
+              address: parentData['address'] ?? '',
+              emergencyContact: parentData['emergency_contact'] ?? '',
+              status: parentData['status'] ?? 'active',
+            );
+          }
+
+          // Set children data (same as home dashboard)
+          _children = children;
+
+          _isLoading = false;
+        });
+      }
 
       // Also refresh the dashboard when profile is refreshed
       widget.onRefreshDashboard?.call();
     } catch (e) {
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-        _isLoading = false;
-      });
+      // Try to get cached/existing user data as fallback
+      if (mounted && _user == null) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final firstName = prefs.getString('parent_first_name') ?? '';
+          final lastName = prefs.getString('parent_last_name') ?? '';
+          final email = prefs.getString('parent_email') ?? '';
+          final userId = prefs.getInt('user_id') ?? 0;
+
+          if (firstName.isNotEmpty || email.isNotEmpty) {
+            setState(() {
+              _user = User(
+                id: userId,
+                username: email,
+                email: email,
+                firstName: firstName,
+                lastName: lastName,
+              );
+            });
+          }
+        } catch (_) {}
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Show appropriate offline message
+        String errorMsg = e.toString().contains('offline') ||
+                e.toString().contains('TimeoutException') ||
+                e.toString().contains('SocketException')
+            ? 'Currently offline'
+            : e.toString().replaceAll('Exception: ', '');
+
+        _showToast(errorMsg, isError: true);
+      }
     }
   }
 
   // Public method to refresh data from parent widget
-  void refreshData() {
-    _loadProfileData();
+  void refreshData({bool forceRefresh = false}) {
+    _loadProfileData(forceRefresh: forceRefresh);
+  }
+
+  // Get parent name from cached data as fallback
+  Future<String> _getParentNameFallback() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final firstName = prefs.getString('parent_first_name') ?? '';
+      final lastName = prefs.getString('parent_last_name') ?? '';
+      if (firstName.isNotEmpty || lastName.isNotEmpty) {
+        return '$firstName $lastName'.trim();
+      }
+    } catch (_) {}
+    return 'Parent';
   }
 
   @override
   Widget build(BuildContext context) {
+    // Cache theme lookups
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
+    // Don't show loading if we have user data (even if it's from cache)
+    final bool showLoading = _isLoading && _user == null;
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
         automaticallyImplyLeading: false,
         title: Text(
           'Profile & Settings',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.refresh,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            onPressed: _loadProfileData,
+          style: textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onSurface,
           ),
-        ],
+        ),
       ),
-      body: _isLoading
+      body: showLoading
           ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? _buildErrorView()
-              : SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Profile Header - Sleeker Design
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 4.w, vertical: 3.h),
-                        margin: EdgeInsets.all(4.w),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.05),
-                              Theme.of(context).colorScheme.surface,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.08),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
-                            ),
+          : RefreshIndicator(
+              onRefresh: () => _loadProfileData(forceRefresh: true),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Profile Header - Sleeker Design
+                    Container(
+                      width: double.infinity,
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 4.w, vertical: 3.h),
+                      margin: EdgeInsets.all(4.w),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            colorScheme.primary.withValues(alpha: 0.05),
+                            colorScheme.surface,
                           ],
-                          border: Border.all(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withValues(alpha: 0.1),
-                            width: 1,
-                          ),
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        child: Column(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(1.w),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.2),
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.05),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                              ),
-                              child: CircleAvatar(
-                                radius: 11.w,
-                                backgroundColor:
-                                    Theme.of(context).colorScheme.surface,
-                                child: Text(
-                                  _user?.fullName
-                                          .substring(0, 1)
-                                          .toUpperCase() ??
-                                      'P',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineMedium
-                                      ?.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(height: 1.8.h),
-                            Text(
-                              _user?.fullName ?? 'Parent Name',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color:
-                                        Theme.of(context).colorScheme.onSurface,
-                                    letterSpacing: -0.5,
-                                  ),
-                            ),
-                            SizedBox(height: 0.8.h),
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 3.w, vertical: 0.5.h),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.email_outlined,
-                                    size: 14,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                  ),
-                                  SizedBox(width: 1.5.w),
-                                  Text(
-                                    _user?.email ?? 'email@example.com',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(height: 1.h),
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 3.w, vertical: 0.5.h),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.phone_outlined,
-                                    size: 14,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                  ),
-                                  SizedBox(width: 1.5.w),
-                                  Text(
-                                    _parent?.contactNumber ?? 'N/A',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colorScheme.primary.withValues(alpha: 0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        border: Border.all(
+                          color: colorScheme.primary.withValues(alpha: 0.1),
+                          width: 1,
                         ),
                       ),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(1.w),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [
+                                  colorScheme.primary.withValues(alpha: 0.2),
+                                  colorScheme.primary.withValues(alpha: 0.05),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: CircleAvatar(
+                              radius: 11.w,
+                              backgroundColor: colorScheme.surface,
+                              child: Text(
+                                _user?.fullName.substring(0, 1).toUpperCase() ??
+                                    'P',
+                                style: textTheme.headlineMedium?.copyWith(
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 1.8.h),
+                          FutureBuilder<String>(
+                            future: _getParentNameFallback(),
+                            builder: (context, snapshot) {
+                              return Text(
+                                _user?.fullName ?? snapshot.data ?? 'Parent',
+                                style: textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: colorScheme.onSurface,
+                                  letterSpacing: -0.5,
+                                ),
+                              );
+                            },
+                          ),
+                          SizedBox(height: 0.8.h),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 3.w, vertical: 0.5.h),
+                            decoration: BoxDecoration(
+                              color:
+                                  colorScheme.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.email_outlined,
+                                  size: 14,
+                                  color: colorScheme.primary,
+                                ),
+                                SizedBox(width: 1.5.w),
+                                Text(
+                                  _user?.email ?? 'email@example.com',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: 1.h),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 3.w, vertical: 0.5.h),
+                            decoration: BoxDecoration(
+                              color:
+                                  colorScheme.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.phone_outlined,
+                                  size: 14,
+                                  color: colorScheme.primary,
+                                ),
+                                SizedBox(width: 1.5.w),
+                                Text(
+                                  _parent?.contactNumber ?? 'N/A',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
-                      // Home Location Section
+                    // Home Location Section
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4.w),
+                      child: Text(
+                        'Home Location',
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 1.5.h),
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(3.5.w),
+                      margin: EdgeInsets.symmetric(horizontal: 4.w),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            colorScheme.surface,
+                            colorScheme.surface.withValues(alpha: 0.95),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colorScheme.shadow.withValues(alpha: 0.06),
+                            blurRadius: 12,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                        border: Border.all(
+                          color: colorScheme.outline.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(2.8.w),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  colorScheme.primary.withValues(alpha: 0.15),
+                                  colorScheme.primary.withValues(alpha: 0.08),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(
+                              Icons.location_on_rounded,
+                              color: colorScheme.primary,
+                              size: 5.5.w,
+                            ),
+                          ),
+                          SizedBox(width: 3.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Home Location',
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12.sp,
+                                  ),
+                                ),
+                                SizedBox(height: 0.4.h),
+                                Text(
+                                  _cleanAddress(_parent?.address),
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurface,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.3,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(width: 2.w),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: IconButton(
+                              onPressed: () => _showUpdateAddressDialog(),
+                              icon: Icon(
+                                Icons.edit_rounded,
+                                color: colorScheme.primary,
+                                size: 5.w,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: 4.h),
+
+                    // Children Information Section
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4.w),
+                      child: Text(
+                        'Children Information',
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 1.5.h),
+
+                    // Children Cards
+                    if (_children.isEmpty)
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4.w),
-                        child: Text(
-                          'Home Location',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: Theme.of(context).colorScheme.onSurface,
-                                letterSpacing: -0.3,
+                        padding: EdgeInsets.all(4.w),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 48,
+                                color: colorScheme.onSurfaceVariant,
                               ),
-                        ),
-                      ),
-                      SizedBox(height: 1.5.h),
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.all(3.5.w),
-                        margin: EdgeInsets.symmetric(horizontal: 4.w),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Theme.of(context).colorScheme.surface,
-                              Theme.of(context)
-                                  .colorScheme
-                                  .surface
-                                  .withValues(alpha: 0.95),
+                              SizedBox(height: 2.h),
+                              Text(
+                                'No children registered',
+                                style: textTheme.titleMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              SizedBox(height: 1.h),
+                              Text(
+                                'Contact your school admin to add children to your account',
+                                textAlign: TextAlign.center,
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
                             ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .shadow
-                                  .withValues(alpha: 0.06),
-                              blurRadius: 12,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                          border: Border.all(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outline
-                                .withValues(alpha: 0.08),
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(2.8.w),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.15),
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.08),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Icon(
-                                Icons.location_on_rounded,
-                                color: Theme.of(context).colorScheme.primary,
-                                size: 5.5.w,
-                              ),
-                            ),
-                            SizedBox(width: 3.w),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Current Address',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurfaceVariant,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 10.sp,
-                                        ),
-                                  ),
-                                  SizedBox(height: 0.4.h),
-                                  Text(
-                                    _cleanAddress(_parent?.address),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurface,
-                                          fontWeight: FontWeight.w600,
-                                          height: 1.3,
-                                        ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(width: 2.w),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: IconButton(
-                                onPressed: () => _showUpdateAddressDialog(),
-                                icon: Icon(
-                                  Icons.edit_rounded,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  size: 5.w,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      SizedBox(height: 4.h),
-
-                      // Children Information Section
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4.w),
-                        child: Text(
-                          'Children Information',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: Theme.of(context).colorScheme.onSurface,
-                                letterSpacing: -0.3,
-                              ),
-                        ),
-                      ),
-                      SizedBox(height: 1.5.h),
-
-                      // Children Cards
+                      )
+                    else
                       ..._children
-                          .map((child) => ChildInformationWidget(
-                                childData: _childToCardData(child),
+                          .map((child) => RepaintBoundary(
+                                child: ChildInformationWidget(
+                                  childData: _childToCardData(child),
+                                ),
                               ))
                           .toList(),
 
-                      SizedBox(height: 4.h),
+                    SizedBox(height: 4.h),
 
-                      // App Settings Section
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4.w),
-                        child: Text(
-                          'Settings',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: Theme.of(context).colorScheme.onSurface,
-                                letterSpacing: -0.3,
-                              ),
+                    // App Settings Section
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4.w),
+                      child: Text(
+                        'Settings',
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                          letterSpacing: -0.3,
                         ),
                       ),
-                      SizedBox(height: 1.5.h),
+                    ),
+                    SizedBox(height: 1.5.h),
 
-                      // Dark Mode Toggle
-                      Container(
+                    // Dark Mode Toggle
+                    RepaintBoundary(
+                      child: Container(
                         margin: EdgeInsets.symmetric(
                             horizontal: 4.w, vertical: 1.h),
                         padding: EdgeInsets.all(3.5.w),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Theme.of(context).colorScheme.surface,
-                              Theme.of(context)
-                                  .colorScheme
-                                  .surface
-                                  .withValues(alpha: 0.95),
+                              colorScheme.surface,
+                              colorScheme.surface.withValues(alpha: 0.95),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -496,19 +604,13 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .shadow
-                                  .withValues(alpha: 0.06),
+                              color: colorScheme.shadow.withValues(alpha: 0.06),
                               blurRadius: 12,
                               offset: const Offset(0, 3),
                             ),
                           ],
                           border: Border.all(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outline
-                                .withValues(alpha: 0.08),
+                            color: colorScheme.outline.withValues(alpha: 0.08),
                           ),
                         ),
                         child: Row(
@@ -518,14 +620,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.15),
-                                    Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.08),
+                                    colorScheme.primary.withValues(alpha: 0.15),
+                                    colorScheme.primary.withValues(alpha: 0.08),
                                   ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
@@ -534,7 +630,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                               ),
                               child: Icon(
                                 Icons.dark_mode_rounded,
-                                color: Theme.of(context).colorScheme.primary,
+                                color: colorScheme.primary,
                                 size: 5.5.w,
                               ),
                             ),
@@ -545,28 +641,18 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                                 children: [
                                   Text(
                                     'Dark Mode',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurface,
-                                        ),
+                                    style: textTheme.bodyLarge?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: colorScheme.onSurface,
+                                    ),
                                   ),
                                   SizedBox(height: 0.3.h),
                                   Text(
                                     'Enable dark theme',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurfaceVariant,
-                                          fontSize: 10.sp,
-                                        ),
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                      fontSize: 10.sp,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -587,26 +673,25 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                           ],
                         ),
                       ),
+                    ),
 
-                      SizedBox(height: 0.5.h),
+                    SizedBox(height: 0.5.h),
 
-                      // "Dark mode coming soon" message removed - it's working now!
+                    // "Dark mode coming soon" message removed - it's working now!
 
-                      SizedBox(height: 1.h),
+                    SizedBox(height: 1.h),
 
-                      // Privacy Policy and Terms & Conditions
-                      Container(
+                    // Privacy Policy and Terms & Conditions
+                    RepaintBoundary(
+                      child: Container(
                         margin: EdgeInsets.symmetric(
                             horizontal: 4.w, vertical: 1.h),
                         padding: EdgeInsets.all(3.5.w),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Theme.of(context).colorScheme.surface,
-                              Theme.of(context)
-                                  .colorScheme
-                                  .surface
-                                  .withValues(alpha: 0.95),
+                              colorScheme.surface,
+                              colorScheme.surface.withValues(alpha: 0.95),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -614,19 +699,13 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .shadow
-                                  .withValues(alpha: 0.06),
+                              color: colorScheme.shadow.withValues(alpha: 0.06),
                               blurRadius: 12,
                               offset: const Offset(0, 3),
                             ),
                           ],
                           border: Border.all(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outline
-                                .withValues(alpha: 0.08),
+                            color: colorScheme.outline.withValues(alpha: 0.08),
                           ),
                         ),
                         child: Column(
@@ -643,13 +722,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
                                           colors: [
-                                            Theme.of(context)
-                                                .colorScheme
-                                                .primary
+                                            colorScheme.primary
                                                 .withValues(alpha: 0.15),
-                                            Theme.of(context)
-                                                .colorScheme
-                                                .primary
+                                            colorScheme.primary
                                                 .withValues(alpha: 0.08),
                                           ],
                                           begin: Alignment.topLeft,
@@ -659,9 +734,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                                       ),
                                       child: Icon(
                                         Icons.privacy_tip_outlined,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
+                                        color: colorScheme.primary,
                                         size: 5.5.w,
                                       ),
                                     ),
@@ -669,22 +742,15 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                                     Expanded(
                                       child: Text(
                                         'Privacy Policy',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyLarge
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface,
-                                            ),
+                                        style: textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: colorScheme.onSurface,
+                                        ),
                                       ),
                                     ),
                                     Icon(
                                       Icons.chevron_right,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
+                                      color: colorScheme.onSurfaceVariant,
                                     ),
                                   ],
                                 ),
@@ -692,10 +758,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                             ),
                             Divider(
                               height: 1,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .outline
-                                  .withValues(alpha: 0.1),
+                              color: colorScheme.outline.withValues(alpha: 0.1),
                             ),
                             InkWell(
                               onTap: () => _openTermsAndConditions(),
@@ -709,13 +772,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
                                           colors: [
-                                            Theme.of(context)
-                                                .colorScheme
-                                                .primary
+                                            colorScheme.primary
                                                 .withValues(alpha: 0.15),
-                                            Theme.of(context)
-                                                .colorScheme
-                                                .primary
+                                            colorScheme.primary
                                                 .withValues(alpha: 0.08),
                                           ],
                                           begin: Alignment.topLeft,
@@ -725,9 +784,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                                       ),
                                       child: Icon(
                                         Icons.description_outlined,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
+                                        color: colorScheme.primary,
                                         size: 5.5.w,
                                       ),
                                     ),
@@ -735,22 +792,15 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                                     Expanded(
                                       child: Text(
                                         'Terms & Conditions',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyLarge
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface,
-                                            ),
+                                        style: textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: colorScheme.onSurface,
+                                        ),
                                       ),
                                     ),
                                     Icon(
                                       Icons.chevron_right,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
+                                      color: colorScheme.onSurfaceVariant,
                                     ),
                                   ],
                                 ),
@@ -759,47 +809,46 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                           ],
                         ),
                       ),
+                    ),
 
-                      SizedBox(height: 2.h),
+                    SizedBox(height: 2.h),
 
-                      // Logout Button
-                      Container(
-                        width: double.infinity,
-                        margin: EdgeInsets.symmetric(horizontal: 4.w),
-                        child: ElevatedButton(
-                          onPressed: () => _showLogoutDialog(),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF3B30),
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.symmetric(vertical: 2.h),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.logout, size: 5.w),
-                              SizedBox(width: 2.w),
-                              Text(
-                                'Logout',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                            ],
+                    // Logout Button
+                    Container(
+                      width: double.infinity,
+                      margin: EdgeInsets.symmetric(horizontal: 4.w),
+                      child: ElevatedButton(
+                        onPressed: () => _showLogoutDialog(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF3B30),
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 2.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.logout, size: 5.w),
+                            SizedBox(width: 2.w),
+                            Text(
+                              'Logout',
+                              style: textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                    ),
 
-                      SizedBox(height: 10.h), // Space for bottom navigation
-                    ],
-                  ),
+                    SizedBox(height: 10.h), // Space for bottom navigation
+                  ],
                 ),
+              ),
+            ),
     );
   }
 
@@ -808,50 +857,13 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
       "id": child.id,
       "name": child.fullName,
       "grade": child.classGrade,
-      "school": "School Name", // TODO: Add school name to backend
-      "studentId": "STU${child.id}",
+      "childId": "AB${child.id}",
       "class": child.classGrade,
       "homeAddress": _parent?.address ?? 'Not set',
       "status": child.currentStatus ?? 'no record today',
       "busId": child.assignedBus?.id,
       "busNumber": child.assignedBus?.numberPlate,
     };
-  }
-
-  Widget _buildErrorView() {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(5.w),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline,
-                size: 64, color: Theme.of(context).colorScheme.error),
-            SizedBox(height: 2.h),
-            Text(
-              'Error Loading Profile',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            SizedBox(height: 1.h),
-            Text(
-              _error!,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            SizedBox(height: 3.h),
-            ElevatedButton.icon(
-              onPressed: _loadProfileData,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<void> _useCurrentLocation() async {
@@ -922,7 +934,6 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
         return;
       }
 
-
       // Use reverse geocoding to get human-readable address
       String locationAddress;
       try {
@@ -932,28 +943,88 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
         );
         if (placemarks.isNotEmpty) {
           final placemark = placemarks.first;
-          // Build address parts with comprehensive location data
-          final addressParts = [
-            placemark.street,
-            placemark.subLocality,
-            placemark.locality,
-            placemark.subAdministrativeArea,
-            placemark.administrativeArea,
-          ].where((part) => part != null && part.isNotEmpty).toList();
 
-          // If we got a good address, use it
-          if (addressParts.isNotEmpty) {
-            locationAddress = addressParts.join(', ');
+          // Build a more user-friendly address with actual place names
+          final addressParts = <String>[];
+
+          // Helper function to check if string is a Plus Code (e.g., PQJR+H4F)
+          bool isPlusCode(String text) {
+            return RegExp(r'^[A-Z0-9]{4}\+[A-Z0-9]{2,3}$')
+                .hasMatch(text.trim());
+          }
+
+          // Helper function to check if string is meaningful (not just numbers or codes)
+          bool isMeaningfulName(String? text) {
+            if (text == null || text.isEmpty) return false;
+            // Reject pure numbers, Plus Codes, and very short strings
+            if (text.contains(RegExp(r'^\d+$'))) return false;
+            if (isPlusCode(text)) return false;
+            if (text.length < 3) return false;
+            return true;
+          }
+
+          // Prioritize street name over generic name
+          if (isMeaningfulName(placemark.street)) {
+            addressParts.add(placemark.street!);
+          }
+
+          // Add subLocality for neighborhood/area (e.g., "Westlands", "Kilimani")
+          if (isMeaningfulName(placemark.subLocality) &&
+              !addressParts.contains(placemark.subLocality)) {
+            addressParts.add(placemark.subLocality!);
+          }
+
+          // Add thoroughfare (main road name) if available and different
+          if (isMeaningfulName(placemark.thoroughfare) &&
+              !addressParts.contains(placemark.thoroughfare) &&
+              placemark.thoroughfare != placemark.street) {
+            addressParts.add(placemark.thoroughfare!);
+          }
+
+          // Add locality (city/town - e.g., "Nairobi")
+          if (isMeaningfulName(placemark.locality) &&
+              !addressParts.contains(placemark.locality)) {
+            addressParts.add(placemark.locality!);
+          }
+
+          // Only add name if it's meaningful and not already included
+          if (isMeaningfulName(placemark.name) &&
+              !addressParts.contains(placemark.name)) {
+            addressParts.add(placemark.name!);
+          }
+
+          // Remove duplicates and filter out Plus Codes from final address
+          final uniqueParts = <String>[];
+          for (final part in addressParts) {
+            // Skip Plus Codes in final address
+            if (isPlusCode(part)) continue;
+
+            // Check for duplicates (case-insensitive, substring match)
+            bool isDuplicate = uniqueParts.any((existing) =>
+                existing.toLowerCase() == part.toLowerCase() ||
+                existing.toLowerCase().contains(part.toLowerCase()) ||
+                part.toLowerCase().contains(existing.toLowerCase()));
+
+            if (!isDuplicate) {
+              uniqueParts.add(part);
+            }
+          }
+
+          // Build final address with meaningful parts
+          if (uniqueParts.isNotEmpty) {
+            locationAddress = uniqueParts.join(', ');
           } else {
-            // Try to use just name and locality as fallback
-            final simpleParts = [
-              placemark.name,
-              placemark.locality,
-              placemark.country,
-            ].where((part) => part != null && part.isNotEmpty).toList();
+            // Fallback: Try to construct from administrative areas
+            final fallbackParts = <String>[];
+            if (isMeaningfulName(placemark.administrativeArea)) {
+              fallbackParts.add(placemark.administrativeArea!);
+            }
+            if (isMeaningfulName(placemark.locality)) {
+              fallbackParts.add(placemark.locality!);
+            }
 
-            locationAddress = simpleParts.isNotEmpty
-                ? simpleParts.join(', ')
+            locationAddress = fallbackParts.isNotEmpty
+                ? fallbackParts.join(', ')
                 : '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
           }
         } else {
@@ -1014,191 +1085,326 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
     final TextEditingController addressController =
         TextEditingController(text: _parent?.address ?? '');
 
+    // Cache theme for dialog
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Text(
-            'Update Home Address',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Enter your new home address:',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
               ),
-              SizedBox(height: 2.h),
-              TextField(
-                controller: addressController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Enter your full address',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  contentPadding: EdgeInsets.all(3.w),
-                ),
-              ),
-              SizedBox(height: 2.h),
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: TextButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _useCurrentLocation();
-                  },
-                  icon: Icon(
-                    Icons.my_location,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  label: Text(
-                    'Use Current Location',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  final newAddress = addressController.text.trim();
-
-                  if (newAddress.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please enter an address'),
-                        backgroundColor: Color(0xFFFF3B30),
+              titlePadding: EdgeInsets.fromLTRB(4.w, 2.h, 4.w, 0.5.h),
+              contentPadding: EdgeInsets.fromLTRB(4.w, 1.h, 4.w, 1.5.h),
+              title: Row(
+                children: [
+                  Container(
+                    width: 10.w,
+                    height: 10.w,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          colorScheme.primary.withValues(alpha: 0.15),
+                          colorScheme.primary.withValues(alpha: 0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    );
-                    return;
-                  }
-
-                  // Show loading
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => const Center(
-                      child: CircularProgressIndicator(),
+                      shape: BoxShape.circle,
                     ),
-                  );
-
-                  // Geocode the address FIRST to get coordinates
-                  bool geocodeSuccess = false;
-                  if (newAddress.isNotEmpty) {
-                    geocodeSuccess = await _homeLocationService.setHomeLocationFromAddress(newAddress);
-                  }
-
-                  // Save to backend
-                  await _apiService.updateParentProfile(
-                    address: newAddress,
-                  );
-
-                  setState(() {
-                    _parent = Parent(
-                      userId: _parent!.userId,
-                      contactNumber: _parent!.contactNumber,
-                      address: newAddress,
-                      emergencyContact: _parent!.emergencyContact,
-                      status: _parent!.status,
-                    );
-                  });
-
-                  Navigator.of(context).pop(); // Close loading
-                  Navigator.of(context).pop(); // Close dialog
-
-                  if (geocodeSuccess) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Home Location Updated successfully'),
-                        backgroundColor: Color(0xFF34C759),
-                      ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Address saved, but location not found on map.\n'
-                          'Please use "Use Current Location" button or enter a more complete address (e.g., "Riverside Drive 104, Nairobi")',
+                    child: Icon(
+                      Icons.edit_location_rounded,
+                      color: colorScheme.primary,
+                      size: 5.w,
+                    ),
+                  ),
+                  SizedBox(width: 3.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Update home address',
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 18.sp,
+                          ),
                         ),
-                        backgroundColor: const Color(0xFFFF9500),
-                        duration: const Duration(seconds: 5),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  // Close loading if still open
-                  if (Navigator.of(context).canPop()) {
-                    Navigator.of(context).pop();
-                  }
-                  // Close dialog if still open
-                  if (Navigator.of(context).canPop()) {
-                    Navigator.of(context).pop();
-                  }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                          'Failed to update: ${e.toString().replaceAll('Exception: ', '')}'),
-                      backgroundColor: const Color(0xFFFF3B30),
+                        SizedBox(height: 0.3.h),
+                        Text(
+                          'Change your home location',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 11.sp,
+                          ),
+                        ),
+                      ],
                     ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                  ),
+                ],
               ),
-              child: const Text('Update'),
-            ),
-          ],
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // GPS accuracy badge
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 2.5.w, vertical: 0.6.h),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.gps_fixed,
+                          size: 3.5.w,
+                          color: colorScheme.primary,
+                        ),
+                        SizedBox(width: 1.5.w),
+                        Text(
+                          'Best accuracy with GPS',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11.sp,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 1.5.h),
+
+                  // Use Current Location button
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _useCurrentLocation();
+                      },
+                      icon: Icon(Icons.my_location, size: 4.5.w),
+                      label: Text(
+                        'Use current location',
+                        style: TextStyle(
+                            fontSize: 13.sp, fontWeight: FontWeight.w600),
+                      ),
+                      style: FilledButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 1.2.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: 1.5.h),
+
+                  // Divider with "OR"
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Divider(
+                          color: colorScheme.outline.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 2.w),
+                        child: Text(
+                          'OR',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11.sp,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Divider(
+                          color: colorScheme.outline.withValues(alpha: 0.3),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: 1.5.h),
+
+                  // Manual address input
+                  Text(
+                    'Type address manually',
+                    style: textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12.sp,
+                    ),
+                  ),
+                  SizedBox(height: 0.8.h),
+                  TextField(
+                    controller: addressController,
+                    maxLines: 1,
+                    style: TextStyle(fontSize: 13.sp),
+                    decoration: InputDecoration(
+                      hintText: 'Enter your address',
+                      hintStyle: TextStyle(fontSize: 12.sp),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 3.w,
+                        vertical: 1.2.h,
+                      ),
+                      isDense: true,
+                    ),
+                  ),
+                ],
+              ),
+              actionsPadding: EdgeInsets.fromLTRB(4.w, 0.5.h, 4.w, 1.5.h),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(fontSize: 12.sp),
+                  ),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    try {
+                      final newAddress = addressController.text.trim();
+
+                      if (newAddress.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please enter an address'),
+                            backgroundColor: Color(0xFFFF3B30),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                        return;
+                      }
+
+                      // Show loading
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      );
+
+                      // Geocode the address FIRST to get coordinates
+                      bool geocodeSuccess = false;
+                      if (newAddress.isNotEmpty) {
+                        geocodeSuccess = await _homeLocationService
+                            .setHomeLocationFromAddress(newAddress);
+                      }
+
+                      // Save to backend
+                      await _apiService.updateParentProfile(
+                        address: newAddress,
+                      );
+
+                      if (mounted) {
+                        setState(() {
+                          _parent = Parent(
+                            userId: _parent!.userId,
+                            contactNumber: _parent!.contactNumber,
+                            address: newAddress,
+                            emergencyContact: _parent!.emergencyContact,
+                            status: _parent!.status,
+                          );
+                        });
+
+                        Navigator.of(context).pop(); // Close loading
+                        Navigator.of(context).pop(); // Close dialog
+
+                        if (geocodeSuccess) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content:
+                                  Text('✓ Home location updated successfully'),
+                              backgroundColor: Color(0xFF34C759),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Address saved but coordinates not found.\nUse GPS for better accuracy.',
+                              ),
+                              backgroundColor: Color(0xFFFF9500),
+                              duration: Duration(seconds: 4),
+                            ),
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      // Close loading if still open
+                      if (mounted && Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      }
+                      // Close dialog if still open
+                      if (mounted && Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      }
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                                'Failed to update: ${e.toString().replaceAll('Exception: ', '')}'),
+                            backgroundColor: const Color(0xFFFF3B30),
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  style: FilledButton.styleFrom(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    'Update',
+                    style:
+                        TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
   }
 
   void _showLogoutDialog() {
+    // Cache theme for dialog
+    final textTheme = Theme.of(context).textTheme;
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text(
             'Logout',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFFFF3B30),
-                ),
+            style: textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFFFF3B30),
+            ),
           ),
           content: Text(
             'Are you sure you want to logout?',
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: textTheme.bodyMedium,
           ),
           actions: [
             TextButton(
@@ -1245,6 +1451,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   }
 
   void _openPrivacyPolicy() {
+    // Cache theme for dialog
+    final textTheme = Theme.of(context).textTheme;
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1254,9 +1463,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
           ),
           title: Text(
             'Privacy Policy',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            style: textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           content: SingleChildScrollView(
             child: Text(
@@ -1270,7 +1479,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
               '• School safety compliance\n\n'
               'We do not share your data with third parties without consent.\n\n'
               'For questions, contact your school administrator.',
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: textTheme.bodyMedium,
             ),
           ),
           actions: [
@@ -1285,6 +1494,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   }
 
   void _openTermsAndConditions() {
+    // Cache theme for dialog
+    final textTheme = Theme.of(context).textTheme;
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1294,9 +1506,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
           ),
           title: Text(
             'Terms & Conditions',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            style: textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           content: SingleChildScrollView(
             child: Text(
@@ -1312,7 +1524,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
               '• Update terms as needed\n\n'
               'Continued use indicates acceptance of these terms.\n\n'
               'For support, contact your school administrator.',
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: textTheme.bodyMedium,
             ),
           ),
           actions: [
@@ -1324,5 +1536,11 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
         );
       },
     );
+  }
+
+  @override
+  void dispose() {
+    _connectivityService.dispose();
+    super.dispose();
   }
 }

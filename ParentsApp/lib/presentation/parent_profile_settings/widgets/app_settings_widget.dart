@@ -107,13 +107,11 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
                         child: Center(
                           child: Text(
                             language['code']!.toUpperCase(),
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelMedium
+                            style: AppTheme.lightTheme.textTheme.labelMedium
                                 ?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                           ),
                         ),
                       ),
@@ -218,7 +216,7 @@ class _AppSettingsWidgetState extends State<AppSettingsWidget> {
           children: [
             Text(
               'Help us improve BusTracker Africa by sharing your thoughts and suggestions.',
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: AppTheme.lightTheme.textTheme.bodyMedium,
             ),
             SizedBox(height: 2.h),
             TextFormField(

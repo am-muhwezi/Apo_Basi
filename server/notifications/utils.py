@@ -68,12 +68,16 @@ def send_trip_started_notification(parent_id, trip, bus, child=None):
     """
     child_name = f"{child.first_name} {child.last_name}" if child else "Your child"
 
-    title = f"{child_name} Pickup Trip Started" if trip.trip_type == 'pickup' else f"Bus {bus.bus_number} Started Trip"
-    message = (
-        f"{child_name}'s bus has started the pickup trip. The bus will be arriving shortly."
-        if trip.trip_type == 'pickup'
-        else f"The {trip.trip_type} trip has started."
-    )
+    if trip.trip_type == 'pickup':
+        title = f"{child_name} Pickup Trip Started"
+        message = f"{child_name}'s bus has started the pickup trip. The bus will be arriving shortly."
+    elif trip.trip_type == 'dropoff':
+        title = f"Bus {bus.bus_number} Started Trip"
+        message = f"Bus {bus.bus_number} started Trip, {child_name} will be home soon"
+    else:
+        title = f"Bus {bus.bus_number} Started Trip"
+        message = f"The {trip.trip_type} trip has started."
+
     full_message = message
 
     # Save to database

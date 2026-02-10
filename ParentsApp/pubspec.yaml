@@ -49,6 +49,9 @@ dev_dependencies:
     sdk: flutter   # CRITICAL: Required for Flutter project testing - DO NOT REMOVE
   flutter_lints: ^6.0.0 # CRITICAL: Required for code quality - DO NOT REMOVE
 
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.3
+
   # Testing dependencies
   mockito: ^5.4.4           # Mocking framework for unit tests
   build_runner: ^2.4.13      # Code generation for mocks
@@ -68,6 +71,26 @@ flutter:
   # - DO NOT ADD NEW ASSET DIRECTORIES (assets/svg/, assets/icons/, etc.)
   # - ONLY USE EXISTING AND ITEMS AVAILABLE IN THE DIRECTORIES LISTED ABOVE (assets/, assets/images/)
   
-  # CRITICAL FONTS RULE: 
+  # CRITICAL FONTS RULE:
   # - THIS PROJECT USES GOOGLE FONTS INSTEAD OF LOCAL FONTS
   # - DO NOT ADD ANY LOCAL FONTS SECTION OR FONT FILES
+
+flutter_native_splash:
+  color: "#001c3f"
+  image: assets/images/apobasi_logo_1024.png
+  android_gravity: center
+  ios_content_mode: center
+  android_12:
+    image: assets/images/apobasi_logo_1024.png
+    color: "#001c3f"
+    icon_background_color: "#001c3f"
+  web: false
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  web:
+    generate: true
+    image_path: "assets/images/apobasi_logo_1024.png"
+  image_path: "assets/images/apobasi_logo_1024.png"
+  min_sdk_android: 21

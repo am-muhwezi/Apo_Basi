@@ -74,11 +74,11 @@ class LocationConfig {
   // Map Configuration
   // ============================================================================
 
-  /// Default map zoom level when showing bus location
-  static const double defaultMapZoom = 15.0;
+  /// Default map zoom level when showing bus location (highest zoom for detailed view)
+  static const double defaultMapZoom = 19.0;
 
   /// Map zoom level when tracking multiple buses (admin view)
-  static const double multipleBusesZoom = 12.0;
+  static const double multipleBusesZoom = 14.0;
 
   /// Animation duration for map marker movements
   static const Duration markerAnimationDuration = Duration(milliseconds: 500);

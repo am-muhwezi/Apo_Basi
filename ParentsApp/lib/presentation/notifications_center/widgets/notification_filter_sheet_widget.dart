@@ -28,36 +28,42 @@ class _NotificationFilterSheetWidgetState
       'label': 'Bus Approaching',
       'icon': 'directions_bus',
       'color': Color(0xFF2B5CE6),
+      'bgColor': Color(0xFF2B5CE6),
     },
     {
       'type': 'pickup_confirmed',
       'label': 'Pickup Confirmed',
       'icon': 'check_circle',
       'color': Color(0xFF34C759),
+      'bgColor': Color(0xFF0F4C25),
     },
     {
       'type': 'dropoff_complete',
       'label': 'Dropoff Complete',
-      'icon': 'check_circle',
-      'color': Color(0xFF34C759),
+      'icon': 'verified',
+      'color': Color(0xFF22C55E),
+      'bgColor': Color(0xFF0F4C25),
     },
     {
       'type': 'route_change',
       'label': 'Route Changes',
       'icon': 'alt_route',
       'color': Color(0xFFFF9500),
+      'bgColor': Color(0xFF663D00),
     },
     {
       'type': 'emergency',
       'label': 'Emergency Alerts',
       'icon': 'warning',
       'color': Color(0xFFFF3B30),
+      'bgColor': Color(0xFF5C0A05),
     },
     {
       'type': 'major_delay',
       'label': 'Major Delays',
       'icon': 'schedule',
-      'color': Color(0xFFFF3B30),
+      'color': Color(0xFFEF4444),
+      'bgColor': Color(0xFF5C0A05),
     },
   ];
 
@@ -69,103 +75,90 @@ class _NotificationFilterSheetWidgetState
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      bottom: true,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: SingleChildScrollView(
-          padding:
-              EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                margin: EdgeInsets.only(top: 2.h),
-                width: 12.w,
-                height: 0.5.h,
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurfaceVariant
-                      .withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: EdgeInsets.all(4.w),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: EdgeInsets.only(top: 2.h),
+            width: 12.w,
+            height: 0.5.h,
+            decoration: BoxDecoration(
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurfaceVariant
+                  .withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(4.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Filter Notifications',
-                          style:
-                              Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _selectedTypes.clear();
-                            });
-                          },
-                          child: Text(
-                            'Clear All',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelLarge
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 2.h),
                     Text(
-                      'Notification Types',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+                      'Filter Notifications',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
                           ),
                     ),
-                    SizedBox(height: 2.h),
-                    ..._filterOptions
-                        .map((option) => _buildFilterOption(option)),
-                    SizedBox(height: 3.h),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: Text('Cancel'),
-                          ),
-                        ),
-                        SizedBox(width: 4.w),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              widget.onFiltersChanged(_selectedTypes);
-                              Navigator.pop(context);
-                            },
-                            child: Text('Apply Filters'),
-                          ),
-                        ),
-                      ],
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedTypes.clear();
+                        });
+                      },
+                      child: Text(
+                        'Clear All',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                      ),
                     ),
-                    SizedBox(height: 2.h),
                   ],
                 ),
-              ),
-            ],
+                SizedBox(height: 2.h),
+                Text(
+                  'Notification Types',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                SizedBox(height: 2.h),
+                ..._filterOptions.map((option) => _buildFilterOption(option)),
+                SizedBox(height: 3.h),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text('Cancel'),
+                      ),
+                    ),
+                    SizedBox(width: 4.w),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          widget.onFiltersChanged(_selectedTypes);
+                          Navigator.pop(context);
+                        },
+                        child: Text('Apply Filters'),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 2.h),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -210,8 +203,12 @@ class _NotificationFilterSheetWidgetState
                 Container(
                   padding: EdgeInsets.all(2.w),
                   decoration: BoxDecoration(
-                    color: option['color'].withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    color: option['color'].withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: option['color'].withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
                   ),
                   child: CustomIconWidget(
                     iconName: option['icon'],

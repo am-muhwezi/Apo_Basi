@@ -13,6 +13,7 @@ import TripsPage from './pages/TripsPage';
 import AdminsPage from './pages/AdminsPage';
 import AssignmentsPage from './pages/AssignmentsPage';
 import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
 import { useAuth } from './contexts/AuthContext';
 import HomePage from './pages/landing/HomePage';
 import DownloadPage from './pages/landing/DownloadPage';
@@ -44,6 +45,10 @@ function App() {
       <Route
         path="/admin/login"
         element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />}
+      />
+      <Route
+        path="/admin/signup"
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <SignupPage />}
       />
 
       {/* Protected routes */}

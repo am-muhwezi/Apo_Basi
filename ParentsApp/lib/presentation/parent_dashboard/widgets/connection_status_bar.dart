@@ -24,7 +24,8 @@ class ConnectionStatusBar extends StatelessWidget {
             : const Color(0xFFFF9500).withValues(alpha: 0.1),
         border: Border(
           bottom: BorderSide(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+            color:
+                AppTheme.lightTheme.colorScheme.outline.withValues(alpha: 0.2),
             width: 1,
           ),
         ),
@@ -47,12 +48,12 @@ class ConnectionStatusBar extends StatelessWidget {
               isConnected
                   ? 'Live tracking active'
                   : 'Last updated: $lastUpdated',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: isConnected
-                        ? const Color(0xFF34C759)
-                        : const Color(0xFFFF9500),
-                    fontWeight: FontWeight.w500,
-                  ),
+              style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+                color: isConnected
+                    ? const Color(0xFF34C759)
+                    : const Color(0xFFFF9500),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           if (!isConnected)
