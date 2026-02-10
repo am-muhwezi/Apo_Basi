@@ -90,6 +90,11 @@ class TripStartView(APIView):
         trip.start_time = timezone.now()
         trip.save()
 
+        # Update children location_status when dropoff trip starts
+        if trip.trip_type == 'dropoff':
+            # Mark all children on this dropoff trip as 'on-bus'
+            trip.children.update(location_status='on-bus')
+
         # Trip start notifications to parents are handled by the
         # notifications.signals.trip_status_changed signal, which triggers on
         # the status transition into 'in-progress'. This keeps notification
@@ -136,6 +141,11 @@ class TripCompleteView(APIView):
             trip.students_pending = request.data.get('studentsPending')
 
         trip.save()
+
+        # Update children location_status when pickup trip ends
+        if trip.trip_type == 'pickup':
+            # Mark all children on this pickup trip as 'at-school'
+            trip.children.update(location_status='at-school')
 
         serializer = TripSerializer(trip)
         return Response(serializer.data)

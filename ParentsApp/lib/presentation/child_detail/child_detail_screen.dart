@@ -240,10 +240,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           if (_busLocation != null) {
             _mapController.move(
               LatLng(_busLocation!.latitude, _busLocation!.longitude),
-              17.5,
+              19.5,
             );
           } else {
-            _mapController.move(finalHomeCoords, 17.0);
+            _mapController.move(finalHomeCoords, 19.0);
           }
         } catch (e) {
           // Map not yet ready, ignore
@@ -261,29 +261,59 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   String _getTripStatus() {
     final String childName = _childData?['name'] ?? 'Child';
+    final String? status = _childData?['status']?.toString().toLowerCase();
 
-    // No bus location means no active trip
-    if (_busLocation == null) {
-      return '$childName is Home';
-    }
+    // Use child's actual location_status from backend
+    if (status == 'on-bus' || status == 'on_bus' || status == 'picked-up' || status == 'picked_up') {
+      // Child is on the bus
+      if (_busLocation != null) {
+        final isMoving = (_busLocation!.speed ?? 0) > 0.5;
 
-    // Check if bus is moving (speed > 0.5 m/s)
-    final isMoving = (_busLocation!.speed ?? 0) > 0.5;
+        if (!isMoving) {
+          return 'Bus Stopped';
+        }
 
-    if (!isMoving) {
-      return 'Bus Stopped';
-    }
+        // Check ETA
+        if (_etaMinutes != null) {
+          if (_etaMinutes! <= 5) {
+            return 'Driver arrives soon';
+          } else if (_etaMinutes! <= 15) {
+            return 'Driver on the way';
+          }
+        }
 
-    // Check ETA
-    if (_etaMinutes != null) {
-      if (_etaMinutes! <= 5) {
-        return 'Driver arrives soon';
-      } else if (_etaMinutes! <= 15) {
         return 'Driver on the way';
       }
+      return '$childName is on the bus';
+    } else if (status == 'at-school' || status == 'at_school') {
+      return '$childName is at school';
+    } else if (status == 'dropped-off' || status == 'dropped_off' || status == 'home') {
+      return '$childName is Home';
+    } else {
+      // Default fallback
+      return '$childName is Home';
+    }
+  }
+
+  String _getRouteDisplay() {
+    // Try to get route name from various possible fields
+    final routeName = _childData?['routeName'] ??
+                      _childData?['route_name'] ??
+                      _childData?['route'];
+
+    // If route name exists and is not empty
+    if (routeName != null && routeName.toString().trim().isNotEmpty) {
+      return routeName.toString();
     }
 
-    return 'Driver on the way';
+    // Try to get route code as fallback
+    final routeCode = _childData?['routeCode'] ?? _childData?['route_code'];
+    if (routeCode != null && routeCode.toString().trim().isNotEmpty) {
+      return routeCode.toString();
+    }
+
+    // If no route name or code, show "Route not yet assigned"
+    return 'Route not yet assigned';
   }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
@@ -298,6 +328,11 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Cache theme to avoid 40+ repeated lookups
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     if (_childData == null) {
       return Scaffold(
         appBar: AppBar(),
@@ -313,23 +348,24 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     final bool isTrackable = hasAssignedBus && _busLocation != null;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Stack(
         children: [
-          // Mapbox Map via flutter_map
-          _isLoadingLocation
-              ? const Center(child: CircularProgressIndicator())
-              : _homeLocation != null
-                  ? FlutterMap(
+          // Mapbox Map via flutter_map - wrapped in RepaintBoundary for performance
+          RepaintBoundary(
+            child: _isLoadingLocation
+                ? const Center(child: CircularProgressIndicator())
+                : _homeLocation != null
+                    ? FlutterMap(
                       mapController: _mapController,
                       options: MapOptions(
                         initialCenter: LatLng(
                           _homeLocation!.latitude,
                           _homeLocation!.longitude,
                         ),
-                        initialZoom: 17.0,
+                        initialZoom: 19.0,
                         minZoom: 5.0,
-                        maxZoom: 18.0,
+                        maxZoom: 19.0,
                       ),
                       children: [
                         // Mapbox Tile Layer - uses default caching
@@ -401,21 +437,22 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                           Icon(
                             Icons.location_off,
                             size: 64,
-                            color: Theme.of(context).colorScheme.error,
+                            color: colorScheme.error,
                           ),
                           SizedBox(height: 2.h),
                           Text(
                             'Unable to get location',
-                            style: Theme.of(context).textTheme.titleLarge,
+                            style: textTheme.titleLarge,
                           ),
                           SizedBox(height: 1.h),
                           Text(
                             'Please enable location permissions',
-                            style: Theme.of(context).textTheme.bodyMedium,
+                            style: textTheme.bodyMedium,
                           ),
                         ],
                       ),
                     ),
+          ),
 
           // Clean top UI - only back button and recenter button
           SafeArea(
@@ -469,14 +506,14 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                           _mapController.move(
                             LatLng(_busLocation!.latitude,
                                 _busLocation!.longitude),
-                            17.5,
+                            19.5,
                           );
                         } else if (_homeLocation != null) {
                           // Center on home location
                           _mapController.move(
                             LatLng(_homeLocation!.latitude,
                                 _homeLocation!.longitude),
-                            17.0,
+                            19.0,
                           );
                         }
                       },
@@ -490,8 +527,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
           // Modern DraggableScrollableSheet
           DraggableScrollableSheet(
-            initialChildSize: 0.18,
-            minChildSize: 0.15,
+            initialChildSize: 0.20,
+            minChildSize: 0.18,
             maxChildSize: 0.50,
             builder: (context, scrollController) {
               return Container(
@@ -582,79 +619,39 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
                     SizedBox(height: 1.5.h),
 
-                    // Driver Photo Circle with Bus Badge (removed phone button)
+                    // Driver Photo Circle (clean, no badge)
                     Row(
                       children: [
-                        Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            // Driver photo circle
-                            Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Theme.of(context)
+                        // Driver photo circle - clean design
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                Theme.of(context)
                                     .colorScheme
                                     .primary
-                                    .withValues(alpha: 0.1),
-                                border: Border.all(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  width: 2,
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.person,
-                                size: 32,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
+                                    .withValues(alpha: 0.15),
+                                Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.05),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                            // Bus badge - made larger and more visible
-                            Positioned(
-                              left: -4,
-                              top: -4,
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 3.w,
-                                  vertical: 0.6.h,
-                                ),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      const Color(0xFF34C759),
-                                      const Color(0xFF30D158),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color:
-                                        Theme.of(context).colorScheme.surface,
-                                    width: 2.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF34C759)
-                                          .withValues(alpha: 0.4),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Text(
-                                  _childData?['busNumber'] ?? 'N/A',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .labelMedium
-                                      ?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 10.sp,
-                                        letterSpacing: 0.5,
-                                      ),
-                                ),
-                              ),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.primary,
+                              width: 2.5,
                             ),
-                          ],
+                          ),
+                          child: Icon(
+                            Icons.person,
+                            size: 32,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
                         ),
                         SizedBox(width: 3.w),
                         // Driver and Route Information
@@ -662,65 +659,100 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Driver Name
-                              Row(
+                              // Driver Name or Bus Assignment Status
+                              Text(
+                                _childData?['busId'] == null
+                                    ? 'Not yet assigned to a bus'
+                                    : (_childData?['driverName'] ?? 'Driver'),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15.sp,
+                                      color: _childData?['busId'] == null
+                                          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
+                                          : Theme.of(context).colorScheme.onSurface,
+                                    ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              // Only show bus number and route if child has a bus assigned
+                              if (_childData?['busId'] != null) ...[
+                                SizedBox(height: 0.5.h),
+                                // Bus Number Plate - theme-aware colors
+                                if (_childData?['busNumber'] != null &&
+                                    _childData!['busNumber'] != 'N/A')
+                                  Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 2.5.w,
+                                    vertical: 0.4.h,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).brightness == Brightness.dark
+                                        ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)
+                                        : Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.directions_bus,
+                                        size: 14,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                      SizedBox(width: 1.w),
+                                      Text(
+                                        _childData!['busNumber'],
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelMedium
+                                            ?.copyWith(
+                                              color: Theme.of(context).colorScheme.primary,
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 11.sp,
+                                              letterSpacing: 0.8,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                  ),
+                                SizedBox(height: 0.5.h),
+                                // Route Information with fallback
+                                Row(
                                 children: [
                                   Icon(
-                                    Icons.person,
-                                    size: 18,
+                                    Icons.route,
+                                    size: 16,
                                     color: Theme.of(context)
                                         .colorScheme
                                         .onSurface
-                                        .withValues(alpha: 0.7),
+                                        .withValues(alpha: 0.6),
                                   ),
                                   SizedBox(width: 1.5.w),
                                   Expanded(
                                     child: Text(
-                                      _childData?['driverName'] ?? 'Driver',
+                                      _getRouteDisplay(),
                                       style: Theme.of(context)
                                           .textTheme
-                                          .titleMedium
+                                          .bodySmall
                                           ?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 15.sp,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.6),
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: 11.sp,
                                           ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],
                               ),
-                              // Route (if available)
-                              if (_childData?['route'] != null) ...[
-                                SizedBox(height: 0.4.h),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.route,
-                                      size: 16,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface
-                                          .withValues(alpha: 0.6),
-                                    ),
-                                    SizedBox(width: 1.5.w),
-                                    Expanded(
-                                      child: Text(
-                                        _childData!['route'],
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface
-                                                  .withValues(alpha: 0.6),
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
                               ],
                             ],
                           ),

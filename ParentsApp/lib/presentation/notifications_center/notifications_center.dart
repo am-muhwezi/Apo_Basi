@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/app_export.dart';
 import '../../services/api_service.dart';
 import '../../services/parent_notifications_service.dart';
+import '../../services/connectivity_service.dart';
 import './widgets/empty_notifications_widget.dart';
 import './widgets/notification_card_widget.dart';
 import './widgets/notification_filter_sheet_widget.dart';
@@ -47,27 +48,50 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   // Local storage key for notifications
   static const _notificationsKey = 'cached_notifications';
 
-  // Flag to prevent concurrent setState calls
-  bool _isUpdatingState = false;
+  final ConnectivityService _connectivityService = ConnectivityService();
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    // Defer heavy operations to after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadNotificationsFromAPI(); // Load from API first
+    _loadNotificationsFromAPI(); // Load from API first
+
+    // Defer heavy initialization
+    Future.microtask(() {
       _setupNotificationListeners();
+      _initializeConnectivity();
     });
+  }
+
+  Future<void> _initializeConnectivity() async {
+    await _connectivityService.initialize();
+    _connectivityService.onConnectionRestored = () {
+      if (mounted) {
+        // Only show toast if this is the first restoration notification
+        if (_connectivityService.shouldShowRestoredToast) {
+          _showToast('Connection restored');
+        }
+        _loadNotificationsFromAPI();
+      }
+    };
+    _connectivityService.onConnectionLost = () {
+      if (mounted) {
+        _showToast('Currently offline');
+      }
+    };
   }
 
   // Load notifications from API
   Future<void> _loadNotificationsFromAPI() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    // First, load from cache immediately
+    final cachedNotifications = await _loadCachedNotifications();
+    if (cachedNotifications) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
 
+    // Then fetch fresh data in background
     try {
       final response = await _apiService.getNotifications();
 
@@ -84,87 +108,106 @@ class _NotificationsCenterState extends State<NotificationsCenter>
         notificationsList = [];
       }
 
-      setState(() {
-        _allNotifications = notificationsList.map((notification) {
-          return {
-            'id': notification['id'].toString(),
-            'type': _normalizeType(notification['notification_type']),
-            'title': notification['title'] ?? '',
-            'message': notification['message'] ?? '',
-            'fullMessage': notification['full_message'],
-            'isRead': notification['is_read'] ?? false,
-            'timestamp': DateTime.parse(notification['created_at']),
-            'expanded': false,
-            // Additional data
-            'child_name': notification['child_name'],
-            'bus_number': notification['bus_number'],
-            'additional_data': notification['additional_data'],
-          };
-        }).toList();
+      if (mounted) {
+        setState(() {
+          _allNotifications = notificationsList.map((notification) {
+            return {
+              'id': notification['id'].toString(),
+              'type': notification['notification_type'] ?? 'general',
+              'title': notification['title'] ?? '',
+              'message': notification['message'] ?? '',
+              'fullMessage': notification['full_message'],
+              'isRead': notification['is_read'] ?? false,
+              'timestamp': DateTime.parse(notification['created_at']),
+              'expanded': false,
+              // Additional data
+              'child_name': notification['child_name'],
+              'bus_number': notification['bus_number'],
+              'additional_data': notification['additional_data'],
+            };
+          }).toList();
 
-        _groupNotificationsByDate();
-        _isLoading = false;
-      });
+          _groupNotificationsByDate();
+          _isLoading = false;
+          _errorMessage = null;
+        });
 
-      // Cache the notifications
-      await _saveNotifications();
+        // Cache the notifications
+        await _saveNotifications();
+      }
     } catch (e) {
-      // Fall back to cached notifications
-      await _loadCachedNotifications();
-      setState(() {
-        _errorMessage = 'Failed to load notifications. Showing cached data.';
-      });
+      // If we have cached data, just show a toast
+      if (_allNotifications.isNotEmpty) {
+        if (mounted) {
+          _showToast('Currently offline');
+          setState(() {
+            _isLoading = false;
+            _errorMessage = null;
+          });
+        }
+      } else {
+        // No cached data available
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = null;
+          });
+          _showToast('Failed to load notifications');
+        }
+      }
     }
   }
 
+  void _showToast(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFFF9500),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   // Start auto-refresh timer
-  // Auto-refresh is currently disabled; enable when backend rate limits permit
-  // void _startAutoRefresh() {
-  //   _refreshTimer = Timer.periodic(_refreshInterval, (_) {
-  //     _loadNotificationsFromAPI();
-  //   });
-  // }
+  void _startAutoRefresh() {
+    _refreshTimer = Timer.periodic(_refreshInterval, (_) {
+      _loadNotificationsFromAPI();
+    });
+  }
 
   // Load cached notifications from local storage (fallback)
-  Future<void> _loadCachedNotifications() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
+  Future<bool> _loadCachedNotifications() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedData = prefs.getString(_notificationsKey);
 
       if (cachedData != null) {
         final List<dynamic> notifications = jsonDecode(cachedData);
-        setState(() {
-          _allNotifications = notifications.map((notification) {
-            return {
-              'id': notification['id'] ??
-                  DateTime.now().millisecondsSinceEpoch.toString(),
-              'type': notification['type'] ?? 'general',
-              'title': notification['title'] ?? '',
-              'message': notification['message'] ?? '',
-              'isRead': notification['isRead'] ?? false,
-              'timestamp': DateTime.parse(notification['timestamp']),
-              'expanded': false,
-            };
-          }).toList();
+        if (mounted) {
+          setState(() {
+            _allNotifications = notifications.map((notification) {
+              return {
+                'id': notification['id'] ??
+                    DateTime.now().millisecondsSinceEpoch.toString(),
+                'type': notification['type'] ?? 'general',
+                'title': notification['title'] ?? '',
+                'message': notification['message'] ?? '',
+                'isRead': notification['isRead'] ?? false,
+                'timestamp': DateTime.parse(notification['timestamp']),
+                'expanded': false,
+              };
+            }).toList();
 
-          _groupNotificationsByDate();
-          _isLoading = false;
-        });
-      } else {
-        // No cached notifications
-        setState(() {
-          _isLoading = false;
-        });
+            _groupNotificationsByDate();
+          });
+        }
+        return true;
       }
+      return false;
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      return false;
     }
   }
 
@@ -173,27 +216,24 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     // Listen for all incoming notifications from WebSocket
     _notificationsSubscription =
         _notificationsService.allNotificationsStream.listen((data) {
-      // Only add notification if widget is mounted and not updating
-      if (mounted && !_isUpdatingState) {
-        _addNotification({
-          'id': data['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-          'type': _normalizeType(data['notification_type']),
-          'title': data['title'] ?? 'Notification',
-          'message': data['message'] ?? '',
-          'fullMessage': data['full_message'],
-          'isRead': false,
-          'timestamp': data['timestamp'] != null
-              ? DateTime.parse(data['timestamp'])
-              : DateTime.now(),
-          'expanded': false,
-          // Store additional data
-          'bus_id': data['bus_id'],
-          'bus_number': data['bus_number'],
-          'child_id': data['child_id'],
-          'child_name': data['child_name'],
-          'trip_id': data['trip_id'],
-        });
-      }
+      _addNotification({
+        'id': data['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        'type': data['notification_type'] ?? 'general',
+        'title': data['title'] ?? 'Notification',
+        'message': data['message'] ?? '',
+        'fullMessage': data['full_message'],
+        'isRead': false,
+        'timestamp': data['timestamp'] != null
+            ? DateTime.parse(data['timestamp'])
+            : DateTime.now(),
+        'expanded': false,
+        // Store additional data
+        'bus_id': data['bus_id'],
+        'bus_number': data['bus_number'],
+        'child_id': data['child_id'],
+        'child_name': data['child_name'],
+        'trip_id': data['trip_id'],
+      });
     }, onError: (error) {});
   }
 
@@ -201,34 +241,27 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   void _addNotification(Map<String, dynamic> notification) {
     // Use post-frame callback to avoid setState during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _isUpdatingState) {
+      if (!mounted) {
         return;
       }
 
-      _isUpdatingState = true;
-      try {
-        setState(() {
-          _allNotifications.insert(
-              0, notification); // Add to beginning (newest first)
-          _groupNotificationsByDate();
-        });
+      setState(() {
+        _allNotifications.insert(
+            0, notification); // Add to beginning (newest first)
+        _groupNotificationsByDate();
+      });
 
-        // Save to local storage
-        _saveNotifications();
+      // Save to local storage
+      _saveNotifications();
 
-        // Show a snackbar for new notification
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(notification['title']),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      } finally {
-        _isUpdatingState = false;
-      }
+      // Show a snackbar for new notification
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(notification['title']),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     });
   }
 
@@ -335,68 +368,51 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   }
 
   void _markAllAsRead() async {
-    if (_isUpdatingState) return;
-
-    _isUpdatingState = true;
+    // Call API to mark all as read
     try {
-      // Call API to mark all as read
-      try {
-        await _apiService.markNotificationsAsRead();
-      } catch (e) {}
+      await _apiService.markNotificationsAsRead();
+    } catch (e) {}
 
-      if (mounted) {
-        setState(() {
-          for (var notification in _allNotifications) {
-            notification['isRead'] = true;
-          }
-          _groupNotificationsByDate();
-        });
-        await _saveNotifications();
-
-        HapticFeedback.lightImpact();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('All notifications marked as read'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
+    setState(() {
+      for (var notification in _allNotifications) {
+        notification['isRead'] = true;
       }
-    } finally {
-      _isUpdatingState = false;
+    });
+    _groupNotificationsByDate();
+    await _saveNotifications();
+
+    HapticFeedback.lightImpact();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('All notifications marked as read'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
   }
 
   void _toggleSearch() {
-    if (!_isUpdatingState && mounted) {
-      _isUpdatingState = true;
-      try {
-        setState(() {
-          _isSearchVisible = !_isSearchVisible;
-          if (!_isSearchVisible) {
-            _searchQuery = '';
-            _groupNotificationsByDate();
-          }
-        });
-      } finally {
-        _isUpdatingState = false;
+    setState(() {
+      _isSearchVisible = !_isSearchVisible;
+      if (!_isSearchVisible) {
+        _searchQuery = '';
+        _groupNotificationsByDate();
       }
-    }
+    });
   }
 
   void _onSearchChanged(String query) {
-    if (!_isUpdatingState && mounted) {
-      _isUpdatingState = true;
-      try {
+    // Defer setState to avoid calling during build
+    if (!mounted) return;
+    _searchQuery = query;
+    Future.microtask(() {
+      if (mounted) {
         setState(() {
-          _searchQuery = query;
           _groupNotificationsByDate();
         });
-      } finally {
-        _isUpdatingState = false;
       }
-    }
+    });
   }
 
   void _showFilterSheet() {
@@ -407,19 +423,9 @@ class _NotificationsCenterState extends State<NotificationsCenter>
       builder: (context) => NotificationFilterSheetWidget(
         selectedTypes: _selectedFilters,
         onFiltersChanged: (filters) {
-          // Delay state update to ensure sheet is fully dismissed
-          Future.delayed(const Duration(milliseconds: 100), () {
-            if (mounted && !_isUpdatingState) {
-              _isUpdatingState = true;
-              try {
-                setState(() {
-                  _selectedFilters = filters;
-                  _groupNotificationsByDate();
-                });
-              } finally {
-                _isUpdatingState = false;
-              }
-            }
+          setState(() {
+            _selectedFilters = filters;
+            _groupNotificationsByDate();
           });
         },
       ),
@@ -525,8 +531,8 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   Widget build(BuildContext context) {
     final hasNotifications = _groupedNotifications.isNotEmpty;
 
-    // Show loading indicator
-    if (_isLoading) {
+    // Show loading indicator only if no cached data
+    if (_isLoading && _allNotifications.isEmpty) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
@@ -534,31 +540,6 @@ class _NotificationsCenterState extends State<NotificationsCenter>
         ),
         body: Center(
           child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    // Show error message if any
-    if (_errorMessage != null) {
-      return Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: Text('Notifications'),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: Colors.red),
-              SizedBox(height: 16),
-              Text('Failed to load notifications'),
-              SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: _loadCachedNotifications,
-                child: Text('Retry'),
-              ),
-            ],
-          ),
         ),
       );
     }
@@ -704,7 +685,13 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                                     ),
                               ),
                             ),
-                            ...notifications.map((notification) => Slidable(
+                            ...notifications.map((notification) {
+                              final theme = Theme.of(context);
+                              final colorScheme = theme.colorScheme;
+
+                              return RepaintBoundary(
+                                key: ValueKey('notif_${notification['id']}'),
+                                child: Slidable(
                                   key: ValueKey(notification['id']),
                                   startActionPane: ActionPane(
                                     motion: const ScrollMotion(),
@@ -713,20 +700,22 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                                         SlidableAction(
                                           onPressed: (_) =>
                                               _markAsRead(notification),
-                                          backgroundColor: AppTheme
-                                              .lightTheme.colorScheme.secondary,
+                                          backgroundColor:
+                                              colorScheme.secondary,
                                           foregroundColor: Colors.white,
                                           icon: Icons.mark_email_read,
                                           label: 'Read',
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                         ),
                                       SlidableAction(
                                         onPressed: (_) =>
                                             _shareNotification(notification),
-                                        backgroundColor: AppTheme
-                                            .lightTheme.colorScheme.primary,
+                                        backgroundColor: colorScheme.primary,
                                         foregroundColor: Colors.white,
                                         icon: Icons.share,
                                         label: 'Share',
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                     ],
                                   ),
@@ -737,11 +726,12 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                                         SlidableAction(
                                           onPressed: (_) =>
                                               _deleteNotification(notification),
-                                          backgroundColor: AppTheme
-                                              .lightTheme.colorScheme.error,
+                                          backgroundColor: colorScheme.error,
                                           foregroundColor: Colors.white,
                                           icon: Icons.delete,
                                           label: 'Delete',
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                         ),
                                     ],
                                   ),
@@ -757,7 +747,9 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                                     onContactSchool: _contactSchool,
                                     onViewOnMap: _viewOnMap,
                                   ),
-                                )),
+                                ),
+                              );
+                            }),
                             if (index == _groupedNotifications.length - 1)
                               SizedBox(height: 4.h),
                           ],
@@ -791,46 +783,12 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     }
   }
 
-  String _normalizeType(dynamic rawType) {
-    if (rawType == null) return 'general';
-    final t = rawType.toString().toLowerCase().replaceAll('-', '_');
-    switch (t) {
-      case 'bus_approaching':
-      case 'busapproaching':
-      case 'bus_coming':
-      case 'approaching':
-        return 'bus_approaching';
-      case 'pickup_confirmed':
-      case 'pickupcomplete':
-      case 'pickup_done':
-      case 'picked_up':
-        return 'pickup_confirmed';
-      case 'dropoff_complete':
-      case 'dropoffconfirmed':
-      case 'dropped_off':
-        return 'dropoff_complete';
-      case 'route_change':
-      case 'routechanged':
-      case 'route_update':
-        return 'route_change';
-      case 'emergency':
-      case 'alert_emergency':
-      case 'critical':
-        return 'emergency';
-      case 'major_delay':
-      case 'delay_major':
-      case 'delayed':
-        return 'major_delay';
-      default:
-        return 'general';
-    }
-  }
-
   @override
   void dispose() {
     _scrollController.dispose();
     _notificationsSubscription?.cancel();
     _refreshTimer?.cancel();
+    _connectivityService.dispose();
     super.dispose();
   }
 }

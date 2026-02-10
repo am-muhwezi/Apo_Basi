@@ -82,16 +82,12 @@ class _NotificationSearchBarWidgetState
               color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: Theme.of(context)
-                    .colorScheme
-                    .outline
+                color: Theme.of(context).colorScheme.outline
                     .withValues(alpha: 0.3),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .shadow
+                  color: Theme.of(context).colorScheme.shadow
                       .withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
@@ -112,13 +108,10 @@ class _NotificationSearchBarWidgetState
                     onChanged: widget.onSearchChanged,
                     decoration: InputDecoration(
                       hintText: 'Search notifications...',
-                      hintStyle: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                      hintStyle:
+                          Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
@@ -147,9 +140,7 @@ class _NotificationSearchBarWidgetState
                   child: Container(
                     padding: EdgeInsets.all(1.w),
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary
+                      color: Theme.of(context).colorScheme.primary
                           .withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),

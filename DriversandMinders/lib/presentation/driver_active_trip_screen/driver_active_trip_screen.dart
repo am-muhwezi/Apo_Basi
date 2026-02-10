@@ -2,24 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
-import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 
 import '../../core/app_export.dart';
 import '../../config/api_config.dart';
 import '../../services/api_service.dart';
-import '../../services/socket_service.dart';
 import '../../services/driver_location_service.dart';
 import '../../services/native_location_service.dart';
 import '../../services/trip_state_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/driver_drawer_widget.dart';
-import './widgets/socket_status_widget.dart';
 import './widgets/student_list_widget.dart';
-import './widgets/trip_statistics_widget.dart';
-import './widgets/trip_status_header_widget.dart';
-import './widgets/next_stop_widget.dart';
-import './widgets/upcoming_stops_widget.dart';
 
 class DriverActiveTripScreen extends StatefulWidget {
   const DriverActiveTripScreen({super.key});
@@ -33,7 +26,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   final ApiService _apiService = ApiService();
-  final SocketService _socketService = SocketService();
   final DriverLocationService _locationService = DriverLocationService();
   final NativeLocationService _nativeLocationService = NativeLocationService();
   final TripStateService _tripStateService = TripStateService();
@@ -41,7 +33,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   // Trip data
   DateTime _tripStartTime = DateTime.now();
   String _elapsedTime = "00:00:00";
-  String _currentStop = "";
   bool _isLoadingData = true;
   String? _errorMessage;
   int? _currentTripId;
@@ -50,7 +41,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   // Real trip data from API
   Map<String, dynamic> _tripData = {};
   List<Map<String, dynamic>> _students = [];
-  Map<String, dynamic>? _routeDetails;
   Map<String, dynamic>? _busData;
 
   @override
@@ -249,9 +239,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
               ? busResponse['buses'][0] as Map<String, dynamic>
               : null);
 
-      // Extract route data
-      _routeDetails = routeResponse;
-
       // Get trip type from SharedPreferences
       final tripType = prefs.getString('current_trip_type') ?? 'pickup';
 
@@ -301,11 +288,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
         }
 
         _students = byId.values.toList();
-
-        // Set current stop to first student's address if available
-        if (_students.isNotEmpty) {
-          _currentStop = _students[0]['stopName'] ?? '';
-        }
       }
 
       setState(() {
@@ -384,16 +366,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     // Update local state immediately for responsiveness
     setState(() {
       _students[index]["isPickedUp"] = isPickedUp;
-
-      // Update current stop to next unpicked student
-      if (isPickedUp) {
-        final nextStudent = _nextStudent;
-        if (nextStudent != null) {
-          _currentStop = nextStudent["stopName"] as String? ?? '';
-        } else {
-          _currentStop = 'All students picked up';
-        }
-      }
     });
 
     // Sync with backend
@@ -672,45 +644,41 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
   int get _studentsPickedUp =>
       _students.where((s) => s["isPickedUp"] as bool? ?? false).length;
-  int get _remainingStops => _tripData["stops"] != null
-      ? (_tripData["stops"] as List)
-          .where((s) => !(s["isCompleted"] as bool? ?? false))
-          .length
-      : _students.length - _studentsPickedUp;
 
-  /// Get the next student to pick up (first not-picked-up student)
-  Map<String, dynamic>? get _nextStudent {
-    try {
-      return _students.firstWhere(
-        (s) => !(s["isPickedUp"] as bool? ?? false),
-      );
-    } catch (e) {
-      return null; // All students picked up
-    }
-  }
-
-  /// Get upcoming students (all not-picked-up students after the next one)
-  List<Map<String, dynamic>> get _upcomingStudents {
-    final notPickedUp =
-        _students.where((s) => !(s["isPickedUp"] as bool? ?? false)).toList();
-
-    if (notPickedUp.length <= 1) {
-      return [];
-    }
-
-    // Return all except the first one (which is the next stop)
-    return notPickedUp.sublist(1);
-  }
-
-  /// Mark the next student as picked up
-  void _markNextStudentPickedUp() {
-    final nextStudent = _nextStudent;
-    if (nextStudent == null) return;
-
-    final index = _students.indexOf(nextStudent);
-    if (index != -1) {
-      _onPickupStatusChanged(index, true);
-    }
+  Widget _buildStatItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          color: color,
+          size: 7.w,
+        ),
+        SizedBox(height: 1.h),
+        Text(
+          value,
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontSize: 20.sp,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        SizedBox(height: 0.5.h),
+        Text(
+          label,
+          style: TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 11.sp,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -732,7 +700,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
           title: _tripData["trip_type"] == 'pickup'
               ? 'Pickup Trip'
               : 'Dropoff Trip',
-          subtitle: '${_studentsPickedUp}/${_students.length} • $_elapsedTime',
+          subtitle: '$_studentsPickedUp/${_students.length} • $_elapsedTime',
           leading: Builder(
             builder: (context) => IconButton(
               icon: Icon(Icons.menu, color: AppTheme.textOnPrimary),
@@ -806,35 +774,72 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
                             ),
                           ),
 
+                        // Trip summary card
+                        Container(
+                          margin: EdgeInsets.symmetric(
+                              horizontal: 4.w, vertical: 2.h),
+                          padding: EdgeInsets.all(4.w),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.primaryDriver.withValues(alpha: 0.1),
+                                AppTheme.primaryDriver.withValues(alpha: 0.05),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color:
+                                  AppTheme.primaryDriver.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildStatItem(
+                                icon: Icons.people_outline,
+                                label: 'Total',
+                                value: _students.length.toString(),
+                                color: AppTheme.primaryDriver,
+                              ),
+                              Container(
+                                width: 1,
+                                height: 8.h,
+                                color: AppTheme.borderLight,
+                              ),
+                              _buildStatItem(
+                                icon: Icons.check_circle_outline,
+                                label: 'Completed',
+                                value: _studentsPickedUp.toString(),
+                                color: AppTheme.successAction,
+                              ),
+                              Container(
+                                width: 1,
+                                height: 8.h,
+                                color: AppTheme.borderLight,
+                              ),
+                              _buildStatItem(
+                                icon: Icons.pending_outlined,
+                                label: 'Remaining',
+                                value: (_students.length - _studentsPickedUp)
+                                    .toString(),
+                                color: AppTheme.warningState,
+                              ),
+                            ],
+                          ),
+                        ),
+
                         SizedBox(height: 2.h),
 
-                        // NEXT STOP - Most prominent section
-                        NextStopWidget(
-                          nextStudent: _nextStudent,
-                          remainingStops: _remainingStops,
-                          onMarkPickedUp: _markNextStudentPickedUp,
-                        ),
-
-                        SizedBox(height: 3.h),
-
-                        // Upcoming stops preview
-                        UpcomingStopsWidget(
-                          upcomingStudents: _upcomingStudents,
-                          onViewAll: () {
-                            // Scroll to full student list
-                            // Can implement smooth scroll if needed
-                          },
-                        ),
-
-                        SizedBox(height: 3.h),
-
-                        // Full student list - For reference
+                        // Student list
                         StudentListWidget(
                           students: _students,
                           onPickupStatusChanged: _onPickupStatusChanged,
                         ),
 
-                        SizedBox(height: 10.h), // Space for bottom button
+                        SizedBox(height: 12.h), // Space for bottom button
                       ],
                     ),
                   ),

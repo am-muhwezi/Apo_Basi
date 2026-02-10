@@ -14,7 +14,7 @@ class ActivityFeed extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (activities.isEmpty) {
-      return _buildEmptyState(context);
+      return _buildEmptyState();
     }
 
     return Container(
@@ -24,10 +24,10 @@ class ActivityFeed extends StatelessWidget {
         children: [
           Text(
             'Recent Activity',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
+            style: AppTheme.lightTheme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppTheme.lightTheme.colorScheme.onSurface,
+            ),
           ),
           SizedBox(height: 2.h),
           ListView.separated(
@@ -37,7 +37,7 @@ class ActivityFeed extends StatelessWidget {
             separatorBuilder: (context, index) => SizedBox(height: 1.5.h),
             itemBuilder: (context, index) {
               final activity = activities[index];
-              return _buildActivityItem(context, activity);
+              return _buildActivityItem(activity);
             },
           ),
           if (activities.length > 5) ...[
@@ -49,9 +49,9 @@ class ActivityFeed extends StatelessWidget {
                 },
                 child: Text(
                   'View All Activities',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+                  style: AppTheme.lightTheme.textTheme.labelLarge?.copyWith(
+                    color: AppTheme.lightTheme.colorScheme.primary,
+                  ),
                 ),
               ),
             ),
@@ -61,7 +61,7 @@ class ActivityFeed extends StatelessWidget {
     );
   }
 
-  Widget _buildActivityItem(BuildContext context, Map<String, dynamic> activity) {
+  Widget _buildActivityItem(Map<String, dynamic> activity) {
     final String type = activity['type'] ?? '';
     final String message = activity['message'] ?? '';
     final String timestamp = activity['timestamp'] ?? '';
@@ -69,10 +69,10 @@ class ActivityFeed extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(3.w),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: AppTheme.lightTheme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+          color: AppTheme.lightTheme.colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
       child: Row(
@@ -81,13 +81,13 @@ class ActivityFeed extends StatelessWidget {
             width: 10.w,
             height: 10.w,
             decoration: BoxDecoration(
-              color: _getActivityColor(context, type).withValues(alpha: 0.1),
+              color: _getActivityColor(type).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
               child: CustomIconWidget(
                 iconName: _getActivityIcon(type),
-                color: _getActivityColor(context, type),
+                color: _getActivityColor(type),
                 size: 5.w,
               ),
             ),
@@ -99,26 +99,26 @@ class ActivityFeed extends StatelessWidget {
               children: [
                 Text(
                   message,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w500,
-                      ),
+                  style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.lightTheme.colorScheme.onSurface,
+                    fontWeight: FontWeight.w500,
+                  ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 2,
                 ),
                 SizedBox(height: 0.5.h),
                 Text(
                   timestamp,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                  style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+                    color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
           ),
           CustomIconWidget(
             iconName: 'chevron_right',
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
             size: 4.w,
           ),
         ],
@@ -126,38 +126,38 @@ class ActivityFeed extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState() {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 4.w),
       padding: EdgeInsets.all(8.w),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: AppTheme.lightTheme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+          color: AppTheme.lightTheme.colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
       child: Column(
         children: [
           CustomIconWidget(
             iconName: 'history',
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
             size: 12.w,
           ),
           SizedBox(height: 2.h),
           Text(
             'No Recent Activity',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
+            style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+              color: AppTheme.lightTheme.colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           SizedBox(height: 1.h),
           Text(
             'Activity updates will appear here when your child uses the bus service.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+            style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
+              color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -165,18 +165,18 @@ class ActivityFeed extends StatelessWidget {
     );
   }
 
-  Color _getActivityColor(BuildContext context, String type) {
+  Color _getActivityColor(String type) {
     switch (type.toLowerCase()) {
       case 'pickup':
         return const Color(0xFF34C759);
       case 'dropoff':
-        return Theme.of(context).colorScheme.primary;
+        return AppTheme.lightTheme.colorScheme.primary;
       case 'attendance':
         return const Color(0xFFFF9500);
       case 'alert':
         return const Color(0xFFFF3B30);
       default:
-        return Theme.of(context).colorScheme.onSurfaceVariant;
+        return AppTheme.lightTheme.colorScheme.onSurfaceVariant;
     }
   }
 
@@ -195,3 +195,4 @@ class ActivityFeed extends StatelessWidget {
     }
   }
 }
+

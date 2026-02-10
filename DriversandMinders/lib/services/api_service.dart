@@ -313,6 +313,53 @@ class ApiService {
     }
   }
 
+  /// Get today's attendance records for a specific bus and trip type.
+  ///
+  /// Backend endpoint: GET /api/attendance/
+  /// Query params:
+  /// - date (YYYY-MM-DD, defaults to today on backend)
+  /// - bus_id
+  /// - trip_type (pickup|dropoff)
+  Future<List<dynamic>> getTodayAttendance({
+    int? busId,
+    String? tripType,
+    DateTime? date,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{};
+
+      final filterDate = date ?? DateTime.now();
+      queryParams['date'] =
+          '${filterDate.year.toString().padLeft(4, '0')}-${filterDate.month.toString().padLeft(2, '0')}-${filterDate.day.toString().padLeft(2, '0')}';
+
+      if (busId != null) {
+        queryParams['bus_id'] = busId;
+      }
+      if (tripType != null) {
+        queryParams['trip_type'] = tripType;
+      }
+
+      final response = await _dio.get(
+        '/api/attendance/',
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        if (data is List) {
+          return data;
+        }
+        return [];
+      } else {
+        throw Exception('Failed to load attendance');
+      }
+    } on DioException catch (e) {
+      throw Exception(
+        _extractErrorMessage(e, 'Failed to load attendance'),
+      );
+    }
+  }
+
   // Check if user is logged in
   Future<bool> isLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();

@@ -22,6 +22,9 @@ from children.models import Child
 from attendance.models import Attendance
 from users.permissions import IsParent
 from assignments.models import Assignment
+from notifications.models import Notification
+from notifications.serializers import NotificationSerializer
+from trips.models import Trip
 from datetime import date
 
 User = get_user_model()
@@ -52,6 +55,115 @@ class ParentViewSet(viewsets.ModelViewSet):
 
     queryset = Parent.objects.select_related('user').all()
     permission_classes = [IsAuthenticated]
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Enhanced retrieve to return parent profile + children + notifications in one call.
+
+        GET /api/parents/:id/
+
+        Returns consolidated dashboard data to reduce multiple API calls.
+        """
+        parent = self.get_object()
+
+        # Get parent profile data
+        parent_data = {
+            "id": parent.user.id,
+            "firstName": parent.user.first_name,
+            "lastName": parent.user.last_name,
+            "email": parent.user.email,
+            "phone": parent.contact_number,
+            "address": parent.address,
+            "emergencyContact": parent.emergency_contact,
+            "status": parent.status,
+        }
+
+        # Get all children for this parent with bus assignments
+        children = Child.objects.filter(parent=parent)
+        children_data = []
+
+        for child in children:
+            # Get child's bus assignment using Assignment API
+            bus_assignment = Assignment.get_active_assignments_for(child, 'child_to_bus').first()
+
+            child_data = {
+                "id": child.id,
+                "firstName": child.first_name,
+                "lastName": child.last_name,
+                "grade": child.class_grade,
+                "age": getattr(child, 'age', None),
+                "status": child.location_status,  # Use location_status for real-time tracking
+                "assignedBus": None,
+                "routeName": None,
+                "routeCode": None,
+            }
+
+            if bus_assignment:
+                bus = bus_assignment.assigned_to
+
+                # Get driver name
+                from assignments.models import BusRoute
+                driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+                driver_name = None
+                if driver_assignment and driver_assignment.assignee:
+                    driver = driver_assignment.assignee
+                    driver_name = f"{driver.user.first_name} {driver.user.last_name}" if hasattr(driver, 'user') else None
+
+                # Get route information from bus assignment
+                route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
+                route_name = None
+                route_code = None
+                if route_assignment and hasattr(route_assignment, 'assigned_to'):
+                    route = route_assignment.assigned_to
+                    if isinstance(route, BusRoute):
+                        route_name = route.name
+                        route_code = route.route_code
+                        child_data["routeName"] = route.name
+                        child_data["routeCode"] = route.route_code
+
+                # Get active trip for this bus to show route on parent's map
+                active_trip = Trip.objects.filter(
+                    bus=bus,
+                    status='in-progress'
+                ).first()
+
+                trip_data = None
+                if active_trip:
+                    from trips.serializers import TripSerializer
+                    trip_data = TripSerializer(active_trip).data
+
+                child_data["assignedBus"] = {
+                    "id": bus.id,
+                    "busNumber": bus.bus_number,
+                    "licensePlate": bus.number_plate,
+                    "driverName": driver_name,
+                    "routeName": route_name,
+                    "route": route_name,  # Add route field for backward compatibility
+                    "activeTrip": trip_data,  # Include active trip with route data for map display
+                }
+
+            children_data.append(child_data)
+
+        # Get recent notifications (last 10 unread)
+        notifications = Notification.objects.filter(
+            parent=parent,
+            is_read=False
+        ).order_by('-created_at')[:10]
+
+        notifications_data = NotificationSerializer(notifications, many=True).data
+        unread_count = Notification.objects.filter(parent=parent, is_read=False).count()
+
+        return Response(
+            {
+                "success": True,
+                "parent": parent_data,
+                "children": children_data,
+                "totalChildren": len(children_data),
+                "notifications": notifications_data,
+                "unreadNotificationsCount": unread_count,
+            },
+            status=status.HTTP_200_OK
+        )
 
     def get_serializer_class(self):
         """
@@ -227,16 +339,54 @@ class ParentViewSet(viewsets.ModelViewSet):
                 "lastName": child.last_name,
                 "grade": child.class_grade,
                 "age": getattr(child, 'age', None),
-                "status": child.status,
-                "assignedBus": None
+                "status": child.location_status,  # Use location_status for real-time tracking
+                "assignedBus": None,
+                "routeName": None,
+                "routeCode": None,
             }
 
             if bus_assignment:
                 bus = bus_assignment.assigned_to
+
+                # Get driver name
+                from assignments.models import BusRoute
+                driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+                driver_name = None
+                if driver_assignment and driver_assignment.assignee:
+                    driver = driver_assignment.assignee
+                    driver_name = f"{driver.user.first_name} {driver.user.last_name}" if hasattr(driver, 'user') else None
+
+                # Get route information from bus assignment
+                route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
+                route_name = None
+                route_code = None
+                if route_assignment and hasattr(route_assignment, 'assigned_to'):
+                    route = route_assignment.assigned_to
+                    if isinstance(route, BusRoute):
+                        route_name = route.name
+                        route_code = route.route_code
+                        child_data["routeName"] = route.name
+                        child_data["routeCode"] = route.route_code
+
+                # Get active trip for this bus to show route on parent's map
+                active_trip = Trip.objects.filter(
+                    bus=bus,
+                    status='in-progress'
+                ).first()
+
+                trip_data = None
+                if active_trip:
+                    from trips.serializers import TripSerializer
+                    trip_data = TripSerializer(active_trip).data
+
                 child_data["assignedBus"] = {
                     "id": bus.id,
                     "busNumber": bus.bus_number,
                     "licensePlate": bus.number_plate,
+                    "driverName": driver_name,
+                    "routeName": route_name,
+                    "route": route_name,  # Add route field for backward compatibility
+                    "activeTrip": trip_data,  # Include active trip with route data for map display
                 }
 
             children_data.append(child_data)
@@ -254,7 +404,6 @@ class ParentViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK
         )
-
 
 class ParentLoginView(APIView):
     """
@@ -300,7 +449,7 @@ class ParentLoginView(APIView):
                     "first_name": child.first_name,
                     "last_name": child.last_name,
                     "class_grade": child.class_grade,
-                    "status": child.status,
+                    "status": child.location_status,  # Use location_status for real-time tracking
                     "assigned_bus": None
                 }
 
@@ -490,7 +639,7 @@ class SupabaseMagicLinkAuthView(APIView):
                     "first_name": child.first_name,
                     "last_name": child.last_name,
                     "class_grade": child.class_grade,
-                    "status": child.status,
+                    "status": child.location_status,  # Use location_status for real-time tracking
                     "assigned_bus": None
                 }
 
@@ -586,11 +735,9 @@ class DemoLoginView(APIView):
         email = request.data.get('email', '').strip().lower()
         password = request.data.get('password', '')
 
-        # Get demo credentials from environment
         reviewer_email = os.environ.get('REVIEWER_EMAIL', '').strip().lower()
         reviewer_password = os.environ.get('REVIEWER_PASSWORD', '')
 
-        # Validate credentials
         if not reviewer_email or not reviewer_password:
             logger.error("Demo login credentials not configured in environment")
             return Response(
@@ -605,17 +752,14 @@ class DemoLoginView(APIView):
             )
 
         try:
-            # Look up the demo parent account
             parent = Parent.objects.select_related('user').get(
                 user__email__iexact=email,
                 status='active'
             )
             user = parent.user
 
-            # Generate Django JWT tokens
             refresh = RefreshToken.for_user(user)
 
-            # Get parent's children with bus assignments
             children = Child.objects.filter(parent=parent)
             children_data = []
 

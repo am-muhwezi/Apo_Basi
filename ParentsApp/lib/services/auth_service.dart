@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/api_config.dart';
@@ -13,25 +12,12 @@ import '../config/supabase_config.dart';
 /// 2. Listen for deep link callback when user clicks link
 /// 3. Exchange Supabase token for Django JWT tokens
 /// 4. Store tokens and parent/children data
-///
-/// Also supports demo account for Apple App Store Review
 class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
   AuthService._internal();
 
   final SupabaseClient _supabase = Supabase.instance.client;
-
-  // Demo account credentials from environment
-  String get _reviewerEmail => dotenv.env['REVIEWER_EMAIL'] ?? '';
-  String get _reviewerPassword => dotenv.env['REVIEWER_PASSWORD'] ?? '';
-
-  /// Check if email is the Apple reviewer demo account
-  bool isReviewerAccount(String email) {
-    final reviewerEmail = _reviewerEmail;
-    if (reviewerEmail.isEmpty) return false;
-    return email.trim().toLowerCase() == reviewerEmail.toLowerCase();
-  }
   final Dio _dio = Dio(BaseOptions(
     baseUrl: ApiConfig.apiBaseUrl,
     connectTimeout: const Duration(seconds: 10),
@@ -39,69 +25,6 @@ class AuthService {
   ));
 
   StreamSubscription<AuthState>? _authSubscription;
-
-  /// Authenticate demo/reviewer account with password
-  ///
-  /// Used for Apple App Store review process.
-  /// Returns AuthResult with demo data on success.
-  Future<AuthResult> loginWithPassword(String email, String password) async {
-    // Validate credentials
-    if (email.trim().toLowerCase() != _reviewerEmail.toLowerCase() ||
-        password != _reviewerPassword) {
-      return AuthResult(
-        success: false,
-        error: 'Invalid email or password',
-      );
-    }
-
-    try {
-      // Call backend demo login endpoint
-      final response = await _dio.post(
-        '/api/parents/auth/demo-login/',
-        data: {
-          'email': email,
-          'password': password,
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = response.data;
-
-        // Store Django JWT tokens
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('access_token', data['tokens']['access']);
-        await prefs.setString('refresh_token', data['tokens']['refresh']);
-
-        // Store parent info
-        await prefs.setInt('parent_id', data['parent']['id']);
-        await prefs.setString('parent_first_name', data['parent']['firstName']);
-        await prefs.setString('parent_last_name', data['parent']['lastName']);
-        await prefs.setString('parent_email', data['parent']['email']);
-
-        return AuthResult(
-          success: true,
-          parent: data['parent'],
-          children: data['children'],
-          tokens: data['tokens'],
-        );
-      } else {
-        return AuthResult(
-          success: false,
-          error: response.data['message'] ?? 'Demo login failed',
-        );
-      }
-    } on DioException catch (e) {
-      return AuthResult(
-        success: false,
-        error: e.response?.data['message'] ?? 'Connection error. Please try again.',
-      );
-    } catch (e) {
-      return AuthResult(
-        success: false,
-        error: 'Demo login failed: ${e.toString()}',
-      );
-    }
-  }
 
   /// Send magic link to email
   ///
@@ -227,6 +150,7 @@ class AuthService {
 
         // Store parent info
         await prefs.setInt('parent_id', data['parent']['id']);
+        await prefs.setInt('user_id', data['parent']['id']); // Also save as user_id for API service
         await prefs.setString('parent_first_name', data['parent']['firstName']);
         await prefs.setString('parent_last_name', data['parent']['lastName']);
         await prefs.setString('parent_email', data['parent']['email']);
@@ -263,6 +187,57 @@ class AuthService {
         success: false,
         error: 'Unexpected error: ${e.toString()}',
       );
+    }
+  }
+
+  /// The hardcoded email Apple reviewers use to trigger the password login flow
+  static const String _reviewerEmail = 'applereviewer@apobasi.com';
+
+  /// Returns true when the typed email matches the Apple reviewer account.
+  /// The login screen uses this to show a password field instead of magic link.
+  bool isReviewerAccount(String email) =>
+      email.trim().toLowerCase() == _reviewerEmail;
+
+  /// Password-based login used exclusively by the Apple reviewer demo account.
+  /// Calls POST /api/parents/auth/demo-login/ and stores tokens on success.
+  Future<AuthResult> loginWithPassword(String email, String password) async {
+    try {
+      final response = await _dio.post(
+        '/api/parents/auth/demo-login/',
+        data: {'email': email.trim().toLowerCase(), 'password': password},
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('access_token', data['tokens']['access']);
+        await prefs.setString('refresh_token', data['tokens']['refresh']);
+        await prefs.setInt('parent_id', data['parent']['id']);
+        await prefs.setInt('user_id', data['parent']['id']);
+        await prefs.setString('parent_first_name', data['parent']['firstName']);
+        await prefs.setString('parent_last_name', data['parent']['lastName']);
+        await prefs.setString('parent_email', data['parent']['email']);
+        return AuthResult(
+          success: true,
+          parent: data['parent'],
+          children: data['children'],
+          tokens: data['tokens'],
+        );
+      }
+      return AuthResult(
+        success: false,
+        error: response.data['error'] ?? 'Login failed',
+      );
+    } on DioException catch (e) {
+      String msg = 'Login failed';
+      if (e.response?.statusCode == 401) msg = 'Invalid email or password';
+      if (e.response?.statusCode == 404) {
+        msg = e.response?.data['message'] ?? 'Demo account not configured';
+      }
+      if (e.response?.statusCode == 503) msg = 'Demo login not available';
+      return AuthResult(success: false, error: msg);
+    } catch (e) {
+      return AuthResult(success: false, error: 'Unexpected error: $e');
     }
   }
 

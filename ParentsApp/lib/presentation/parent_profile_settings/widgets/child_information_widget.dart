@@ -22,6 +22,11 @@ class ChildInformationWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Cache theme to avoid repeated lookups
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     return Container(
       width: double.infinity,
       margin: EdgeInsets.only(left: 4.w, right: 4.w, bottom: 1.5.h),
@@ -29,8 +34,8 @@ class ChildInformationWidget extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Theme.of(context).colorScheme.surface,
-            Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
+            colorScheme.surface,
+            colorScheme.surface.withValues(alpha: 0.95),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -38,14 +43,13 @@ class ChildInformationWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color:
-                Theme.of(context).colorScheme.primary.withValues(alpha: 0.06),
+            color: colorScheme.primary.withValues(alpha: 0.06),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+          color: colorScheme.primary.withValues(alpha: 0.08),
           width: 1,
         ),
       ),
@@ -60,14 +64,8 @@ class ChildInformationWidget extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
                     colors: [
-                      Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.25),
-                      Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.1),
+                      colorScheme.primary.withValues(alpha: 0.25),
+                      colorScheme.primary.withValues(alpha: 0.1),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -78,15 +76,15 @@ class ChildInformationWidget extends StatelessWidget {
                   height: 13.w,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Theme.of(context).colorScheme.surface,
+                    color: colorScheme.surface,
                   ),
                   child: Center(
                     child: Text(
                       _getInitials(childData['name'] ?? 'Child Name'),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.primary,
+                      ),
                     ),
                   ),
                 ),
@@ -98,10 +96,10 @@ class ChildInformationWidget extends StatelessWidget {
                   children: [
                     Text(
                       childData['name'] ?? 'Child Name',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                      ),
                     ),
                     SizedBox(height: 0.3.h),
                     Row(
@@ -109,19 +107,16 @@ class ChildInformationWidget extends StatelessWidget {
                         Icon(
                           Icons.school_outlined,
                           size: 13,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                         SizedBox(width: 1.w),
                         Expanded(
                           child: Text(
                             childData['class'] ?? 'Class Unknown',
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                      fontSize: 11.sp,
-                                    ),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              fontSize: 11.sp,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -140,25 +135,22 @@ class ChildInformationWidget extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.04),
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.02),
+                  colorScheme.primary.withValues(alpha: 0.04),
+                  colorScheme.primary.withValues(alpha: 0.02),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: Theme.of(context)
-                    .colorScheme
-                    .primary
-                    .withValues(alpha: 0.06),
+                color: colorScheme.primary.withValues(alpha: 0.06),
                 width: 1,
               ),
             ),
             child: Column(
               children: [
-                _buildCompactInfoRow(context, Icons.badge_outlined,
-                    'Student ID', childData['studentId'] ?? 'N/A'),
+                _buildCompactInfoRow(context, Icons.badge_outlined, 'Child ID',
+                    childData['childId'] ?? 'N/A'),
                 SizedBox(height: 1.2.h),
                 _buildCompactInfoRow(context, Icons.class_outlined, 'Grade',
                     childData['grade'] ?? 'N/A'),
@@ -173,12 +165,15 @@ class ChildInformationWidget extends StatelessWidget {
   Widget _buildCompactInfoRow(
       BuildContext context, IconData icon, String label, String value,
       {bool isAddress = false}) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Row(
       children: [
         Icon(
           icon,
           size: 18,
-          color: Theme.of(context).colorScheme.primary,
+          color: colorScheme.primary,
         ),
         SizedBox(width: 2.w),
         Expanded(
@@ -187,18 +182,18 @@ class ChildInformationWidget extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
-                    ),
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               SizedBox(height: 0.3.h),
               Text(
                 value,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
                 maxLines: isAddress ? 2 : 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -218,27 +213,27 @@ class ChildInformationWidget extends StatelessWidget {
           width: 25.w,
           child: Text(
             label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
-                ),
+            style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
         SizedBox(width: 2.w),
         Text(
           ':',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+          style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         SizedBox(width: 2.w),
         Expanded(
           child: Text(
             value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.w500,
-                ),
+            style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.w500,
+            ),
             maxLines: isAddress ? 3 : 1,
             overflow: TextOverflow.ellipsis,
           ),

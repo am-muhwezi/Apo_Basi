@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:sizer/sizer.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
@@ -275,8 +276,8 @@ class _ParentLoginScreenV2State extends State<ParentLoginScreenV2>
 
               // Logo
               Center(
-                child: Image.asset(
-                  'assets/AB_logo2.png',
+                child: SvgPicture.asset(
+                  'assets/images/apobasi_logo.svg',
                   width: 45.w,
                   fit: BoxFit.contain,
                 ),
@@ -366,8 +367,8 @@ class _ParentLoginScreenV2State extends State<ParentLoginScreenV2>
 
           // Logo
           Center(
-            child: Image.asset(
-              'assets/AB_logo2.png',
+            child: SvgPicture.asset(
+              'assets/images/apobasi_logo.svg',
               width: 35.w,
               fit: BoxFit.contain,
             ),

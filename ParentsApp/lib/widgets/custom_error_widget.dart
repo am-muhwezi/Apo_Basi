@@ -66,7 +66,7 @@ class CustomErrorWidget extends StatelessWidget {
                     const Icon(Icons.arrow_back, size: 18, color: Colors.white),
                 label: const Text('Back'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
+                  backgroundColor: AppTheme.lightTheme.primaryColor,
                   foregroundColor: Colors.white,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
