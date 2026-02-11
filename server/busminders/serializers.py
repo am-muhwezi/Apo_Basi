@@ -50,13 +50,20 @@ class BusMinderCreateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=['active', 'inactive'], default='active', write_only=True)
 
     def validate_phone(self, value):
-        """Check that phone number is unique among bus minders"""
+        """Check that phone number is unique across all roles"""
+        from parents.models import Parent
+        from drivers.models import Driver
+
         instance = getattr(self, 'instance', None)
-        qs = BusMinder.objects.filter(phone_number=value)
+        own_qs = BusMinder.objects.filter(phone_number=value)
         if instance:
-            qs = qs.exclude(pk=instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError(f"A bus minder with phone number '{value}' already exists.")
+            own_qs = own_qs.exclude(pk=instance.pk)
+        if own_qs.exists():
+            raise serializers.ValidationError(f"Phone number '{value}' is already registered as a Bus Minder.")
+        if Parent.objects.filter(contact_number=value).exists():
+            raise serializers.ValidationError(f"Phone number '{value}' is already registered as a Parent.")
+        if Driver.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError(f"Phone number '{value}' is already registered as a Driver.")
         return value
 
     def validate_email(self, value):

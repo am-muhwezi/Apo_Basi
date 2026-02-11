@@ -91,18 +91,6 @@ export default function MindersPage() {
     if (selectedMinder) {
       result = await busMinderService.updateBusMinder(selectedMinder.id, formData);
     } else {
-      // Cross-role uniqueness check
-      const checkResult = await busMinderService.checkPhoneOrEmailExists(formData.phone, formData.email);
-      if (checkResult.exists) {
-        setFormError(
-          checkResult.role === 'driver'
-            ? 'This phone/email is already registered as a Driver.'
-            : checkResult.role === 'parent'
-            ? 'This phone/email is already registered as a Parent.'
-            : 'This phone/email is already registered.'
-        );
-        return;
-      }
       result = await busMinderService.createBusMinder(formData);
     }
 
