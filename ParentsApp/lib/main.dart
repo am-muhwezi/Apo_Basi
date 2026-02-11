@@ -107,8 +107,7 @@ class _MyAppState extends State<MyApp> {
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,
               themeMode: themeMode,
-              themeAnimationDuration: const Duration(milliseconds: 400),
-              themeAnimationCurve: Curves.easeInOutCubicEmphasized,
+              themeAnimationDuration: Duration.zero,
               builder: (context, child) {
                 return MediaQuery(
                   data: MediaQuery.of(context).copyWith(
