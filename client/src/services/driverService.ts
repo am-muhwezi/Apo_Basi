@@ -41,9 +41,9 @@ function getErrorMessage(error: unknown): string {
       const data = error.response.data;
       if (data.detail) return data.detail;
       if (typeof data === 'object') {
-        const firstError = Object.values(data)[0];
-        if (Array.isArray(firstError) && firstError.length > 0) {
-          return firstError[0];
+        for (const value of Object.values(data)) {
+          if (Array.isArray(value) && value.length > 0) return String(value[0]);
+          if (typeof value === 'string' && value) return value;
         }
       }
       if (data.error) return data.error;
