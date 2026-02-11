@@ -29,6 +29,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
 
   // Debounce timer — prevents setState on every keystroke
   Timer? _debounce;
+  final FocusNode _emailFocusNode = FocusNode();
 
   StreamSubscription<AuthResult>? _authSubscription;
 
@@ -36,6 +37,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
   void initState() {
     super.initState();
     _emailController.addListener(_onEmailChanged);
+    _emailFocusNode.addListener(_onEmailFocusChanged);
     _listenForAuthCallback();
     _checkAuthAndAutoNavigate();
   }
@@ -45,6 +47,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
     _debounce?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
+    _emailFocusNode.dispose();
     _authSubscription?.cancel();
     super.dispose();
   }
@@ -74,10 +77,18 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
     }
     final valid = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
     setState(() {
-      _emailError = valid ? null : 'Please enter a valid email address';
+      // Clear error as soon as the email becomes valid; never add it here.
+      if (valid) _emailError = null;
       _isEmailValid = valid;
-      _isReviewerAccount = valid && _authService.isReviewerAccount(email);
+      _isReviewerAccount = valid && AuthService.isReviewerAccount(email);
     });
+  }
+
+  // Show error only when the field loses focus with an incomplete address.
+  void _onEmailFocusChanged() {
+    if (!_emailFocusNode.hasFocus && !_isEmailValid && _emailController.text.trim().isNotEmpty) {
+      if (mounted) setState(() => _emailError = 'Please enter a valid email address');
+    }
   }
 
   void _listenForAuthCallback() {
@@ -107,7 +118,11 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
   }
 
   Future<void> _handleSendMagicLink() async {
-    if (!_isEmailValid || _isLoading) return;
+    if (!_isEmailValid) {
+      setState(() => _emailError = 'Please enter a valid email address');
+      return;
+    }
+    if (_isLoading) return;
     FocusScope.of(context).unfocus();
     setState(() { _isLoading = true; _emailError = null; });
     HapticFeedback.lightImpact();
@@ -350,6 +365,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
       ),
       child: TextField(
         controller: _emailController,
+        focusNode: _emailFocusNode,
         keyboardType: TextInputType.emailAddress,
         autofillHints: const [AutofillHints.email],
         style: TextStyle(fontSize: 13.sp, color: isDark ? Colors.white : Colors.black87),
