@@ -192,17 +192,23 @@ if not CORS_ALLOW_ALL_ORIGINS:
         default=[],
     )
 
-# Redis Configuration for real-time location tracking
-REDIS_HOST = config("REDIS_HOST", default="localhost")
-REDIS_PORT = config("REDIS_PORT", default=6379, cast=int)
-REDIS_DB = config("REDIS_DB", default=0, cast=int)
+# Redis — use REDIS_URL as the single source of truth.
+# REDIS_HOST/PORT/DB kept for any code that still references them directly.
+REDIS_URL = config("REDIS_URL", default="redis://localhost:6379/0")
 REDIS_PASSWORD = config("REDIS_PASSWORD", default=None)
+
+# Parse individual components from REDIS_URL for legacy references.
+import urllib.parse as _urlparse
+_r = _urlparse.urlparse(REDIS_URL)
+REDIS_HOST = _r.hostname or "localhost"
+REDIS_PORT = _r.port or 6379
+REDIS_DB   = int((_r.path or "/0").lstrip("/") or 0)
 
 # Django-Redis cache configuration
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}",
+        "LOCATION": REDIS_URL,
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "PASSWORD": REDIS_PASSWORD,
@@ -221,11 +227,12 @@ SUPABASE_PUBLISHABLE_KEY = config("SUPABASE_PUBLISHABLE_KEY", default="")
 SUPABASE_SECRET_KEY = config("SUPABASE_SECRET_KEY", default="")
 SUPABASE_JWKS_URL = config("SUPABASE_JWKS_URL", default="")
 
+# channels_redis accepts a URL string directly.
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(REDIS_HOST, REDIS_PORT)],
+            "hosts": [REDIS_URL],
         },
     },
 }
