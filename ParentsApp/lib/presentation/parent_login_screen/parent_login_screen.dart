@@ -16,18 +16,23 @@ class ParentLoginScreen extends StatefulWidget {
 
 class _ParentLoginScreenState extends State<ParentLoginScreen> {
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
 
   bool _isLoading = false;
   bool _magicLinkSent = false;
   String? _emailError;
+  String? _passwordError;
   bool _isEmailValid = false;
+  bool _isReviewerAccount = false;
+  bool _obscurePassword = true;
   StreamSubscription<AuthResult>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
     _emailController.addListener(_validateEmail);
+    _passwordController.addListener(() => setState(() {}));
     _listenForAuthCallback();
     _checkAuthAndAutoNavigate();
   }
@@ -44,6 +49,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
   @override
   void dispose() {
     _emailController.dispose();
+    _passwordController.dispose();
     _authSubscription?.cancel();
     super.dispose();
   }
@@ -60,6 +66,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
       } else {
         _emailError = null;
         _isEmailValid = true;
+        _isReviewerAccount = _authService.isReviewerAccount(email);
       }
     });
   }
@@ -142,6 +149,53 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
       HapticFeedback.heavyImpact();
       setState(() {
         _emailError = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _handlePasswordLogin() async {
+    if (!_isEmailValid || !_isReviewerAccount) return;
+
+    final password = _passwordController.text;
+    if (password.isEmpty) {
+      setState(() => _passwordError = 'Please enter password');
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isLoading = true;
+      _passwordError = null;
+    });
+
+    HapticFeedback.lightImpact();
+
+    try {
+      final result = await _authService.loginWithPassword(
+        _emailController.text.trim(),
+        password,
+      );
+
+      if (result.success) {
+        HapticFeedback.selectionClick();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Welcome, ${result.parent?['firstName'] ?? 'Reviewer'}!'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ));
+        Navigator.pushReplacementNamed(context, '/parent-dashboard');
+      } else {
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _passwordError = result.error ?? 'Login failed';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _passwordError = e.toString().replaceAll('Exception: ', '');
         _isLoading = false;
       });
     }
@@ -255,6 +309,31 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
                       SizedBox(height: 1.h),
                       _buildEmailInput(),
 
+                      // Password field for reviewer demo account
+                      if (_isReviewerAccount) ...[
+                        SizedBox(height: 2.h),
+                        Text(
+                          'Password',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white : Colors.grey.shade700,
+                              ),
+                        ),
+                        SizedBox(height: 1.h),
+                        _buildPasswordInput(),
+                        if (_passwordError != null) ...[
+                          SizedBox(height: 1.h),
+                          Text(
+                            _passwordError!,
+                            style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ],
+
                       // Error Message (if any)
                       if (_emailError != null) ...[
                         SizedBox(height: 1.h),
@@ -295,8 +374,10 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
 
                       SizedBox(height: 2.5.h),
 
-                      // Send Login Link Button
-                      _buildSendLinkButton(),
+                      // Button: password login for reviewer, magic link for everyone else
+                      _isReviewerAccount
+                          ? _buildSignInButton()
+                          : _buildSendLinkButton(),
                     ],
 
                     SizedBox(height: 3.h),
@@ -363,6 +444,86 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
               ? Icon(Icons.check_circle, color: Colors.green, size: 20)
               : null,
         ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordInput() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _passwordError != null
+              ? Colors.red.shade700
+              : isDark
+                  ? Colors.grey.shade700
+                  : Colors.grey.shade300,
+          width: _passwordError != null ? 2 : 1.5,
+        ),
+        color: isDark ? Colors.grey.shade900 : Colors.white,
+      ),
+      child: TextField(
+        controller: _passwordController,
+        obscureText: _obscurePassword,
+        style: TextStyle(
+          fontSize: 13.sp,
+          color: isDark ? Colors.white : Colors.black87,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Password',
+          hintStyle: TextStyle(
+            color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+            fontSize: 13.sp,
+          ),
+          contentPadding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.8.h),
+          border: InputBorder.none,
+          suffixIcon: IconButton(
+            icon: Icon(
+              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+              size: 20,
+            ),
+            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSignInButton() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isReady = _isEmailValid && _passwordController.text.isNotEmpty && !_isLoading;
+    return ElevatedButton.icon(
+      onPressed: isReady ? _handlePasswordLogin : null,
+      icon: _isLoading
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            )
+          : Icon(Icons.login_rounded, size: 20),
+      label: Text(
+        _isLoading ? 'Signing in...' : 'Sign In',
+        style: TextStyle(
+          fontSize: 14.sp,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.3,
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isReady
+            ? AppTheme.primaryLight
+            : (isDark ? Colors.grey.shade800 : Colors.grey.shade300),
+        foregroundColor: isReady
+            ? Colors.white
+            : (isDark ? Colors.grey.shade600 : Colors.grey.shade500),
+        padding: EdgeInsets.symmetric(vertical: 1.8.h),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: isReady ? 2 : 0,
       ),
     );
   }
