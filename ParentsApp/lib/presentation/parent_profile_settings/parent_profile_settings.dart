@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:sizer/sizer.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
@@ -279,129 +280,86 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Profile Header - Sleeker Design
+                    // Profile Header - Compact horizontal layout
                     Container(
                       width: double.infinity,
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 4.w, vertical: 3.h),
-                      margin: EdgeInsets.all(4.w),
+                      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
+                      margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            colorScheme.primary.withValues(alpha: 0.05),
-                            colorScheme.surface,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(24),
+                        color: colorScheme.surface,
+                        borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: colorScheme.primary.withValues(alpha: 0.08),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
+                            color: colorScheme.shadow.withValues(alpha: 0.06),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                         border: Border.all(
-                          color: colorScheme.primary.withValues(alpha: 0.1),
-                          width: 1,
+                          color: colorScheme.outline.withValues(alpha: 0.08),
                         ),
                       ),
-                      child: Column(
+                      child: Row(
                         children: [
-                          Container(
-                            padding: EdgeInsets.all(1.w),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                colors: [
-                                  colorScheme.primary.withValues(alpha: 0.2),
-                                  colorScheme.primary.withValues(alpha: 0.05),
+                          CircleAvatar(
+                            radius: 7.w,
+                            backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
+                            child: Text(
+                              _user?.fullName.isNotEmpty == true
+                                  ? _user!.fullName.substring(0, 1).toUpperCase()
+                                  : 'P',
+                              style: textTheme.titleLarge?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 3.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _user?.fullName ?? 'Parent',
+                                  style: textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                SizedBox(height: 0.4.h),
+                                Row(
+                                  children: [
+                                    Icon(Icons.email_outlined, size: 12, color: colorScheme.onSurfaceVariant),
+                                    SizedBox(width: 1.w),
+                                    Expanded(
+                                      child: Text(
+                                        _user?.email ?? '',
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (_parent?.contactNumber.isNotEmpty == true) ...[
+                                  SizedBox(height: 0.3.h),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.phone_outlined, size: 12, color: colorScheme.onSurfaceVariant),
+                                      SizedBox(width: 1.w),
+                                      Text(
+                                        _parent!.contactNumber,
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                            ),
-                            child: CircleAvatar(
-                              radius: 11.w,
-                              backgroundColor: colorScheme.surface,
-                              child: Text(
-                                _user?.fullName.substring(0, 1).toUpperCase() ??
-                                    'P',
-                                style: textTheme.headlineMedium?.copyWith(
-                                  color: colorScheme.primary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: 1.8.h),
-                          FutureBuilder<String>(
-                            future: _getParentNameFallback(),
-                            builder: (context, snapshot) {
-                              return Text(
-                                _user?.fullName ?? snapshot.data ?? 'Parent',
-                                style: textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: colorScheme.onSurface,
-                                  letterSpacing: -0.5,
-                                ),
-                              );
-                            },
-                          ),
-                          SizedBox(height: 0.8.h),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 3.w, vertical: 0.5.h),
-                            decoration: BoxDecoration(
-                              color:
-                                  colorScheme.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.email_outlined,
-                                  size: 14,
-                                  color: colorScheme.primary,
-                                ),
-                                SizedBox(width: 1.5.w),
-                                Text(
-                                  _user?.email ?? 'email@example.com',
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.primary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: 1.h),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 3.w, vertical: 0.5.h),
-                            decoration: BoxDecoration(
-                              color:
-                                  colorScheme.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.phone_outlined,
-                                  size: 14,
-                                  color: colorScheme.primary,
-                                ),
-                                SizedBox(width: 1.5.w),
-                                Text(
-                                  _parent?.contactNumber ?? 'N/A',
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.primary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
                               ],
                             ),
                           ),
@@ -414,33 +372,26 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                       padding: EdgeInsets.symmetric(horizontal: 4.w),
                       child: Text(
                         'Home Location',
-                        style: textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onSurface,
-                          letterSpacing: -0.3,
+                        style: textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurfaceVariant,
+                          letterSpacing: 0.3,
                         ),
                       ),
                     ),
-                    SizedBox(height: 1.5.h),
+                    SizedBox(height: 0.8.h),
                     Container(
                       width: double.infinity,
-                      padding: EdgeInsets.all(3.5.w),
+                      padding: EdgeInsets.symmetric(horizontal: 3.5.w, vertical: 1.5.h),
                       margin: EdgeInsets.symmetric(horizontal: 4.w),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            colorScheme.surface,
-                            colorScheme.surface.withValues(alpha: 0.95),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
+                        color: colorScheme.surface,
+                        borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
                             color: colorScheme.shadow.withValues(alpha: 0.06),
-                            blurRadius: 12,
-                            offset: const Offset(0, 3),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                         border: Border.all(
@@ -450,22 +401,15 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                       child: Row(
                         children: [
                           Container(
-                            padding: EdgeInsets.all(2.8.w),
+                            padding: EdgeInsets.all(2.w),
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  colorScheme.primary.withValues(alpha: 0.15),
-                                  colorScheme.primary.withValues(alpha: 0.08),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(14),
+                              color: colorScheme.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Icon(
                               Icons.location_on_rounded,
                               color: colorScheme.primary,
-                              size: 5.5.w,
+                              size: 4.5.w,
                             ),
                           ),
                           SizedBox(width: 3.w),
@@ -514,21 +458,21 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                       ),
                     ),
 
-                    SizedBox(height: 4.h),
+                    SizedBox(height: 2.5.h),
 
                     // Children Information Section
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4.w),
                       child: Text(
-                        'Children Information',
-                        style: textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onSurface,
-                          letterSpacing: -0.3,
+                        'Children',
+                        style: textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurfaceVariant,
+                          letterSpacing: 0.3,
                         ),
                       ),
                     ),
-                    SizedBox(height: 1.5.h),
+                    SizedBox(height: 0.8.h),
 
                     // Children Cards
                     if (_children.isEmpty)
@@ -570,43 +514,36 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                               ))
                           .toList(),
 
-                    SizedBox(height: 4.h),
+                    SizedBox(height: 2.5.h),
 
                     // App Settings Section
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4.w),
                       child: Text(
                         'Settings',
-                        style: textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onSurface,
-                          letterSpacing: -0.3,
+                        style: textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurfaceVariant,
+                          letterSpacing: 0.3,
                         ),
                       ),
                     ),
-                    SizedBox(height: 1.5.h),
+                    SizedBox(height: 0.8.h),
 
                     // Dark Mode Toggle
                     RepaintBoundary(
                       child: Container(
                         margin: EdgeInsets.symmetric(
-                            horizontal: 4.w, vertical: 1.h),
-                        padding: EdgeInsets.all(3.5.w),
+                            horizontal: 4.w, vertical: 0.5.h),
+                        padding: EdgeInsets.symmetric(horizontal: 3.5.w, vertical: 0.5.h),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              colorScheme.surface,
-                              colorScheme.surface.withValues(alpha: 0.95),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
+                          color: colorScheme.surface,
+                          borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
                               color: colorScheme.shadow.withValues(alpha: 0.06),
-                              blurRadius: 12,
-                              offset: const Offset(0, 3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                           border: Border.all(
@@ -616,22 +553,15 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                         child: Row(
                           children: [
                             Container(
-                              padding: EdgeInsets.all(2.8.w),
+                              padding: EdgeInsets.all(2.w),
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    colorScheme.primary.withValues(alpha: 0.15),
-                                    colorScheme.primary.withValues(alpha: 0.08),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(14),
+                                color: colorScheme.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               child: Icon(
                                 Icons.dark_mode_rounded,
                                 color: colorScheme.primary,
-                                size: 5.5.w,
+                                size: 4.5.w,
                               ),
                             ),
                             SizedBox(width: 3.w),
@@ -679,29 +609,20 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
 
                     // "Dark mode coming soon" message removed - it's working now!
 
-                    SizedBox(height: 1.h),
-
                     // Privacy Policy and Terms & Conditions
                     RepaintBoundary(
                       child: Container(
                         margin: EdgeInsets.symmetric(
-                            horizontal: 4.w, vertical: 1.h),
-                        padding: EdgeInsets.all(3.5.w),
+                            horizontal: 4.w, vertical: 0.5.h),
+                        padding: EdgeInsets.symmetric(horizontal: 3.5.w, vertical: 0.h),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              colorScheme.surface,
-                              colorScheme.surface.withValues(alpha: 0.95),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
+                          color: colorScheme.surface,
+                          borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
                               color: colorScheme.shadow.withValues(alpha: 0.06),
-                              blurRadius: 12,
-                              offset: const Offset(0, 3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                           border: Border.all(
@@ -714,28 +635,19 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                               onTap: () => _openPrivacyPolicy(),
                               borderRadius: BorderRadius.circular(12),
                               child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 1.2.h),
+                                padding: EdgeInsets.symmetric(vertical: 1.h),
                                 child: Row(
                                   children: [
                                     Container(
-                                      padding: EdgeInsets.all(2.8.w),
+                                      padding: EdgeInsets.all(2.w),
                                       decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            colorScheme.primary
-                                                .withValues(alpha: 0.15),
-                                            colorScheme.primary
-                                                .withValues(alpha: 0.08),
-                                          ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                        borderRadius: BorderRadius.circular(14),
+                                        color: colorScheme.primary.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Icon(
                                         Icons.privacy_tip_outlined,
                                         color: colorScheme.primary,
-                                        size: 5.5.w,
+                                        size: 4.5.w,
                                       ),
                                     ),
                                     SizedBox(width: 3.w),
@@ -764,28 +676,19 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                               onTap: () => _openTermsAndConditions(),
                               borderRadius: BorderRadius.circular(12),
                               child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 1.2.h),
+                                padding: EdgeInsets.symmetric(vertical: 1.h),
                                 child: Row(
                                   children: [
                                     Container(
-                                      padding: EdgeInsets.all(2.8.w),
+                                      padding: EdgeInsets.all(2.w),
                                       decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            colorScheme.primary
-                                                .withValues(alpha: 0.15),
-                                            colorScheme.primary
-                                                .withValues(alpha: 0.08),
-                                          ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                        borderRadius: BorderRadius.circular(14),
+                                        color: colorScheme.primary.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Icon(
                                         Icons.description_outlined,
                                         color: colorScheme.primary,
-                                        size: 5.5.w,
+                                        size: 4.5.w,
                                       ),
                                     ),
                                     SizedBox(width: 3.w),
@@ -811,7 +714,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                       ),
                     ),
 
-                    SizedBox(height: 2.h),
+                    SizedBox(height: 1.5.h),
 
                     // Logout Button
                     Container(
@@ -844,7 +747,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                       ),
                     ),
 
-                    SizedBox(height: 10.h), // Space for bottom navigation
+                    SizedBox(height: 6.h), // Space for bottom navigation
                   ],
                 ),
               ),
@@ -866,229 +769,97 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
     };
   }
 
-  Future<void> _useCurrentLocation() async {
+  // ── Location helpers ────────────────────────────────────────────────────
+
+  bool _ok(String? s) {
+    if (s == null || s.length < 3) return false;
+    if (RegExp(r'^\d+$').hasMatch(s)) return false;
+    if (RegExp(r'^[A-Z0-9]{4,}\+[A-Z0-9]{2,}$').hasMatch(s.trim())) return false;
+    return true;
+  }
+
+  /// Builds the best human-readable address from a Placemark.
+  /// Order: road → neighbourhood → city → country
+  String _buildReadableAddress(Placemark p) {
+    final parts = <String>[];
+    if (_ok(p.thoroughfare)) parts.add(p.thoroughfare!);
+    else if (_ok(p.street)) parts.add(p.street!);
+    if (_ok(p.subLocality)) parts.add(p.subLocality!);
+    if (_ok(p.locality)) parts.add(p.locality!);
+    if (_ok(p.country)) parts.add(p.country!);
+    // Deduplicate (case-insensitive)
+    final seen = <String>{};
+    final unique = parts.where((s) => seen.add(s.toLowerCase())).toList();
+    return unique.join(', ');
+  }
+
+  /// Detects the current GPS position and reverse-geocodes it to a readable
+  /// address. Returns null and toasts on failure.
+  Future<({Position position, String address})?> _detectGpsLocation() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.deniedForever) {
+      _showToast('Location permissions are permanently denied', isError: true);
+      return null;
+    }
     try {
-      // Show loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-
-      // Check and request location permissions
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Location permissions are permanently denied'),
-            backgroundColor: Color(0xFFFF3B30),
-          ),
-        );
-        return;
-      }
-
-      // Get current position with high accuracy and timeout
-      // This waits for GPS to acquire a good satellite fix
-      Position position = await Geolocator.getCurrentPosition(
+      final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.best,
         timeLimit: const Duration(seconds: 30),
       );
 
-      // Check if accuracy is good enough (less than 50 meters)
-      if (position.accuracy > 50) {
-        Navigator.of(context).pop();
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Low GPS Accuracy'),
-            content: Text(
-              'GPS accuracy is ${position.accuracy.toStringAsFixed(0)}m.\n\n'
-              'For best results:\n'
-              '• Go outside or near a window\n'
-              '• Wait a few seconds for GPS to lock\n'
-              '• Try again\n\n'
-              'Or manually enter your address instead.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _useCurrentLocation(); // Retry
-                },
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        );
-        return;
-      }
-
-      // Use reverse geocoding to get human-readable address
-      String locationAddress;
+      String address;
       try {
-        List<Placemark> placemarks = await placemarkFromCoordinates(
+        final marks = await placemarkFromCoordinates(
           position.latitude,
           position.longitude,
         );
-        if (placemarks.isNotEmpty) {
-          final placemark = placemarks.first;
-
-          // Build a more user-friendly address with actual place names
-          final addressParts = <String>[];
-
-          // Helper function to check if string is a Plus Code (e.g., PQJR+H4F)
-          bool isPlusCode(String text) {
-            return RegExp(r'^[A-Z0-9]{4}\+[A-Z0-9]{2,3}$')
-                .hasMatch(text.trim());
-          }
-
-          // Helper function to check if string is meaningful (not just numbers or codes)
-          bool isMeaningfulName(String? text) {
-            if (text == null || text.isEmpty) return false;
-            // Reject pure numbers, Plus Codes, and very short strings
-            if (text.contains(RegExp(r'^\d+$'))) return false;
-            if (isPlusCode(text)) return false;
-            if (text.length < 3) return false;
-            return true;
-          }
-
-          // Prioritize street name over generic name
-          if (isMeaningfulName(placemark.street)) {
-            addressParts.add(placemark.street!);
-          }
-
-          // Add subLocality for neighborhood/area (e.g., "Westlands", "Kilimani")
-          if (isMeaningfulName(placemark.subLocality) &&
-              !addressParts.contains(placemark.subLocality)) {
-            addressParts.add(placemark.subLocality!);
-          }
-
-          // Add thoroughfare (main road name) if available and different
-          if (isMeaningfulName(placemark.thoroughfare) &&
-              !addressParts.contains(placemark.thoroughfare) &&
-              placemark.thoroughfare != placemark.street) {
-            addressParts.add(placemark.thoroughfare!);
-          }
-
-          // Add locality (city/town - e.g., "Nairobi")
-          if (isMeaningfulName(placemark.locality) &&
-              !addressParts.contains(placemark.locality)) {
-            addressParts.add(placemark.locality!);
-          }
-
-          // Only add name if it's meaningful and not already included
-          if (isMeaningfulName(placemark.name) &&
-              !addressParts.contains(placemark.name)) {
-            addressParts.add(placemark.name!);
-          }
-
-          // Remove duplicates and filter out Plus Codes from final address
-          final uniqueParts = <String>[];
-          for (final part in addressParts) {
-            // Skip Plus Codes in final address
-            if (isPlusCode(part)) continue;
-
-            // Check for duplicates (case-insensitive, substring match)
-            bool isDuplicate = uniqueParts.any((existing) =>
-                existing.toLowerCase() == part.toLowerCase() ||
-                existing.toLowerCase().contains(part.toLowerCase()) ||
-                part.toLowerCase().contains(existing.toLowerCase()));
-
-            if (!isDuplicate) {
-              uniqueParts.add(part);
-            }
-          }
-
-          // Build final address with meaningful parts
-          if (uniqueParts.isNotEmpty) {
-            locationAddress = uniqueParts.join(', ');
+        if (marks.isNotEmpty) {
+          final built = _buildReadableAddress(marks.first);
+          // If geocoding only returned 1 part (e.g. just "Nairobi"), include
+          // the subAdministrativeArea or fall back to a named coordinate string.
+          if (built.contains(',')) {
+            address = built;
           } else {
-            // Fallback: Try to construct from administrative areas
-            final fallbackParts = <String>[];
-            if (isMeaningfulName(placemark.administrativeArea)) {
-              fallbackParts.add(placemark.administrativeArea!);
-            }
-            if (isMeaningfulName(placemark.locality)) {
-              fallbackParts.add(placemark.locality!);
-            }
-
-            locationAddress = fallbackParts.isNotEmpty
-                ? fallbackParts.join(', ')
-                : '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+            // Try adding subAdministrativeArea for a second part
+            final sub = marks.first.subAdministrativeArea;
+            address = (_ok(sub) && built.isNotEmpty)
+                ? '$built, $sub'
+                : built.isNotEmpty
+                    ? built
+                    : '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
           }
         } else {
-          locationAddress =
-              '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+          address = '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
         }
-      } catch (e) {
-        // Fallback to coordinates if geocoding fails
-        locationAddress =
-            '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+      } catch (_) {
+        address = '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
       }
 
-      // FIRST: Clear old cached coordinates
-      await _homeLocationService.clearHomeLocation();
-
-      // SECOND: Save fresh GPS coordinates to cache
-      await _homeLocationService.setHomeLocation(
-        latitude: position.latitude,
-        longitude: position.longitude,
-        address: locationAddress,
-      );
-
-      // THIRD: Update on server
-      await _apiService.updateParentProfile(
-        address: locationAddress,
-      );
-
-      setState(() {
-        _parent = Parent(
-          userId: _parent!.userId,
-          contactNumber: _parent!.contactNumber,
-          address: locationAddress,
-          emergencyContact: _parent!.emergencyContact,
-          status: _parent!.status,
-        );
-      });
-
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Home Location Updated successfully'),
-          backgroundColor: Color(0xFF34C759),
-          duration: Duration(seconds: 3),
-        ),
-      );
+      return (position: position, address: address);
     } catch (e) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to get location: ${e.toString()}'),
-          backgroundColor: const Color(0xFFFF3B30),
-        ),
+      _showToast(
+        'Could not get location: ${e.toString().replaceAll('Exception: ', '')}',
+        isError: true,
       );
+      return null;
     }
   }
 
   void _showUpdateAddressDialog() {
-    final TextEditingController addressController =
+    final addressController =
         TextEditingController(text: _parent?.address ?? '');
 
-    // Cache theme for dialog
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
+
+    // GPS position captured when parent taps "Detect my location".
+    // Stored so we save actual GPS coords rather than re-geocoding the text.
+    Position? gpsPosition;
+    bool detecting = false;
 
     showDialog(
       context: context,
@@ -1107,14 +878,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                     width: 10.w,
                     height: 10.w,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          colorScheme.primary.withValues(alpha: 0.15),
-                          colorScheme.primary.withValues(alpha: 0.05),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: colorScheme.primary.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -1152,47 +916,33 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // GPS accuracy badge
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 2.5.w, vertical: 0.6.h),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.gps_fixed,
-                          size: 3.5.w,
-                          color: colorScheme.primary,
-                        ),
-                        SizedBox(width: 1.5.w),
-                        Text(
-                          'Best accuracy with GPS',
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 11.sp,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 1.5.h),
-
-                  // Use Current Location button
+                  // ── GPS button — stays in dialog, fills text field ──────
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        _useCurrentLocation();
-                      },
-                      icon: Icon(Icons.my_location, size: 4.5.w),
+                      onPressed: detecting
+                          ? null
+                          : () async {
+                              setDialogState(() => detecting = true);
+                              final result = await _detectGpsLocation();
+                              if (result != null) {
+                                gpsPosition = result.position;
+                                addressController.text = result.address;
+                              }
+                              setDialogState(() => detecting = false);
+                            },
+                      icon: detecting
+                          ? SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Icon(Icons.my_location, size: 4.5.w),
                       label: Text(
-                        'Use current location',
+                        detecting ? 'Detecting…' : 'Detect my location',
                         style: TextStyle(
                             fontSize: 13.sp, fontWeight: FontWeight.w600),
                       ),
@@ -1207,51 +957,25 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
 
                   SizedBox(height: 1.5.h),
 
-                  // Divider with "OR"
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Divider(
-                          color: colorScheme.outline.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 2.w),
-                        child: Text(
-                          'OR',
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 11.sp,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Divider(
-                          color: colorScheme.outline.withValues(alpha: 0.3),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  SizedBox(height: 1.5.h),
-
-                  // Manual address input
+                  // ── Address text field ───────────────────────────────────
                   Text(
-                    'Type address manually',
+                    'Confirm or type address',
                     style: textTheme.bodySmall?.copyWith(
                       fontWeight: FontWeight.w600,
-                      fontSize: 12.sp,
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 11.sp,
                     ),
                   ),
                   SizedBox(height: 0.8.h),
                   TextField(
                     controller: addressController,
-                    maxLines: 1,
+                    maxLines: 2,
                     style: TextStyle(fontSize: 13.sp),
                     decoration: InputDecoration(
-                      hintText: 'Enter your address',
-                      hintStyle: TextStyle(fontSize: 12.sp),
+                      hintText: 'e.g. Ngong Road, Karen, Nairobi',
+                      hintStyle: TextStyle(
+                          fontSize: 11.sp,
+                          color: colorScheme.onSurfaceVariant),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -1268,47 +992,39 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(fontSize: 12.sp),
-                  ),
+                  child: Text('Cancel', style: TextStyle(fontSize: 12.sp)),
                 ),
                 FilledButton(
                   onPressed: () async {
+                    final newAddress = addressController.text.trim();
+                    if (newAddress.isEmpty) {
+                      _showToast('Please enter an address', isError: true);
+                      return;
+                    }
                     try {
-                      final newAddress = addressController.text.trim();
-
-                      if (newAddress.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please enter an address'),
-                            backgroundColor: Color(0xFFFF3B30),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                        return;
-                      }
-
                       // Show loading
                       showDialog(
                         context: context,
                         barrierDismissible: false,
-                        builder: (context) => const Center(
-                          child: CircularProgressIndicator(),
-                        ),
+                        builder: (_) =>
+                            const Center(child: CircularProgressIndicator()),
                       );
 
-                      // Geocode the address FIRST to get coordinates
-                      bool geocodeSuccess = false;
-                      if (newAddress.isNotEmpty) {
-                        geocodeSuccess = await _homeLocationService
+                      // If parent used GPS, we already have precise coordinates.
+                      // Otherwise geocode the typed address for coordinates.
+                      if (gpsPosition != null) {
+                        await _homeLocationService.clearHomeLocation();
+                        await _homeLocationService.setHomeLocation(
+                          latitude: gpsPosition!.latitude,
+                          longitude: gpsPosition!.longitude,
+                          address: newAddress,
+                        );
+                      } else {
+                        await _homeLocationService
                             .setHomeLocationFromAddress(newAddress);
                       }
 
-                      // Save to backend
-                      await _apiService.updateParentProfile(
-                        address: newAddress,
-                      );
+                      await _apiService.updateParentProfile(address: newAddress);
 
                       if (mounted) {
                         setState(() {
@@ -1320,50 +1036,21 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                             status: _parent!.status,
                           );
                         });
-
-                        Navigator.of(context).pop(); // Close loading
-                        Navigator.of(context).pop(); // Close dialog
-
-                        if (geocodeSuccess) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content:
-                                  Text('✓ Home location updated successfully'),
-                              backgroundColor: Color(0xFF34C759),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Address saved but coordinates not found.\nUse GPS for better accuracy.',
-                              ),
-                              backgroundColor: Color(0xFFFF9500),
-                              duration: Duration(seconds: 4),
-                            ),
-                          );
-                        }
+                        Navigator.of(context).pop(); // close loading
+                        Navigator.of(context).pop(); // close dialog
+                        _showToast('Home location updated');
                       }
                     } catch (e) {
-                      // Close loading if still open
                       if (mounted && Navigator.of(context).canPop()) {
                         Navigator.of(context).pop();
                       }
-                      // Close dialog if still open
                       if (mounted && Navigator.of(context).canPop()) {
                         Navigator.of(context).pop();
                       }
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                                'Failed to update: ${e.toString().replaceAll('Exception: ', '')}'),
-                            backgroundColor: const Color(0xFFFF3B30),
-                            duration: const Duration(seconds: 3),
-                          ),
-                        );
-                      }
+                      _showToast(
+                        'Failed: ${e.toString().replaceAll('Exception: ', '')}',
+                        isError: true,
+                      );
                     }
                   },
                   style: FilledButton.styleFrom(
@@ -1374,7 +1061,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                     ),
                   ),
                   child: Text(
-                    'Update',
+                    'Save location',
                     style:
                         TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
                   ),
@@ -1450,92 +1137,18 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
     );
   }
 
-  void _openPrivacyPolicy() {
-    // Cache theme for dialog
-    final textTheme = Theme.of(context).textTheme;
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Text(
-            'Privacy Policy',
-            style: textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          content: SingleChildScrollView(
-            child: Text(
-              'Your privacy is important to us. This app collects and processes:\n\n'
-              '• Child location data for safety and tracking\n'
-              '• Parent contact information\n'
-              '• School and bus assignment details\n\n'
-              'Data is used solely for:\n'
-              '• Real-time student tracking\n'
-              '• Parent notifications\n'
-              '• School safety compliance\n\n'
-              'We do not share your data with third parties without consent.\n\n'
-              'For questions, contact your school administrator.',
-              style: textTheme.bodyMedium,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
+  Future<void> _openPrivacyPolicy() async {
+    final uri = Uri.parse('https://www.apobasi.com/privacy');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
-  void _openTermsAndConditions() {
-    // Cache theme for dialog
-    final textTheme = Theme.of(context).textTheme;
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Text(
-            'Terms & Conditions',
-            style: textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          content: SingleChildScrollView(
-            child: Text(
-              'By using this app, you agree to:\n\n'
-              '1. Provide accurate information\n'
-              '2. Use the app for legitimate school-related purposes only\n'
-              '3. Not attempt to access unauthorized data\n'
-              '4. Report any security concerns immediately\n\n'
-              'The app is provided "as is" without warranties.\n\n'
-              'School administration reserves the right to:\n'
-              '• Monitor app usage\n'
-              '• Suspend accounts for misuse\n'
-              '• Update terms as needed\n\n'
-              'Continued use indicates acceptance of these terms.\n\n'
-              'For support, contact your school administrator.',
-              style: textTheme.bodyMedium,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
+  Future<void> _openTermsAndConditions() async {
+    final uri = Uri.parse('https://www.apobasi.com/terms');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   @override

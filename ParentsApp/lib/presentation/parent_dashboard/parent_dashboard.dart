@@ -22,6 +22,7 @@ class ParentDashboard extends StatefulWidget {
 
 class _ParentDashboardState extends State<ParentDashboard> {
   int _currentIndex = 0;
+  final Set<int> _visitedTabs = {0}; // Only build tabs when first visited
   bool _isConnected = true;
   String _lastUpdated = '2 min ago';
 
@@ -185,13 +186,17 @@ class _ParentDashboardState extends State<ParentDashboard> {
             key: const ValueKey('home'),
             child: _buildHomeScreen(),
           ),
-          const RepaintBoundary(
-            key: ValueKey('notifications'),
-            child: NotificationsCenter(),
+          RepaintBoundary(
+            key: const ValueKey('notifications'),
+            child: _visitedTabs.contains(1)
+                ? const NotificationsCenter()
+                : const SizedBox.shrink(),
           ),
-          const RepaintBoundary(
-            key: ValueKey('profile'),
-            child: ParentProfileSettings(),
+          RepaintBoundary(
+            key: const ValueKey('profile'),
+            child: _visitedTabs.contains(2)
+                ? const ParentProfileSettings()
+                : const SizedBox.shrink(),
           ),
         ],
       ),
@@ -200,6 +205,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
         onTap: (index) {
           setState(() {
             _currentIndex = index;
+            _visitedTabs.add(index);
           });
         },
         type: BottomNavigationBarType.fixed,
