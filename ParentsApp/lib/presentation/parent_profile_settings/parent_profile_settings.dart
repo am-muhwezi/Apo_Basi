@@ -805,14 +805,37 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   }
 
   /// Builds the best human-readable address from a Placemark.
-  /// Order: road → neighbourhood → city → country
+  /// Order: name/road → neighbourhood → city → country
+  ///
+  /// On Android `name` often carries the specific location (e.g. "Riverside")
+  /// when thoroughfare / subLocality are empty — common in East Africa.
   String _buildReadableAddress(Placemark p) {
     final parts = <String>[];
-    if (_ok(p.thoroughfare)) parts.add(p.thoroughfare!);
-    else if (_ok(p.street)) parts.add(p.street!);
-    if (_ok(p.subLocality)) parts.add(p.subLocality!);
+
+    // Most-specific part: prefer thoroughfare, then name (if it isn't just the
+    // city or country repeated), then street.
+    if (_ok(p.thoroughfare)) {
+      parts.add(p.thoroughfare!);
+    } else if (_ok(p.name) &&
+        p.name != p.locality &&
+        p.name != p.country &&
+        p.name != p.administrativeArea) {
+      parts.add(p.name!);
+    } else if (_ok(p.street)) {
+      parts.add(p.street!);
+    }
+
+    // Neighbourhood: subLocality first, then subAdministrativeArea as fallback.
+    if (_ok(p.subLocality)) {
+      parts.add(p.subLocality!);
+    } else if (_ok(p.subAdministrativeArea)) {
+      parts.add(p.subAdministrativeArea!);
+    }
+
     if (_ok(p.locality)) parts.add(p.locality!);
-    if (_ok(p.country)) parts.add(p.country!);
+    // Omit country when we already have locality — keeps the string concise.
+    if (!_ok(p.locality) && _ok(p.country)) parts.add(p.country!);
+
     // Deduplicate (case-insensitive)
     final seen = <String>{};
     final unique = parts.where((s) => seen.add(s.toLowerCase())).toList();
@@ -951,6 +974,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                           : () async {
                               setDialogState(() => detecting = true);
                               final result = await _detectGpsLocation();
+                              if (!context.mounted) return;
                               if (result != null) {
                                 gpsPosition = result.position;
                                 addressController.text = result.address;
