@@ -50,13 +50,20 @@ class DriverCreateSerializer(serializers.Serializer):
     assignedBusId = serializers.IntegerField(required=False, allow_null=True, write_only=True)
 
     def validate_phone(self, value):
-        """Check that phone number is unique among drivers"""
+        """Check that phone number is unique across all roles"""
+        from parents.models import Parent
+        from busminders.models import BusMinder
+
         instance = getattr(self, 'instance', None)
-        qs = Driver.objects.filter(phone_number=value)
+        own_qs = Driver.objects.filter(phone_number=value)
         if instance:
-            qs = qs.exclude(pk=instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError(f"A driver with phone number '{value}' already exists.")
+            own_qs = own_qs.exclude(pk=instance.pk)
+        if own_qs.exists():
+            raise serializers.ValidationError(f"Phone number '{value}' is already registered as a Driver.")
+        if Parent.objects.filter(contact_number=value).exists():
+            raise serializers.ValidationError(f"Phone number '{value}' is already registered as a Parent.")
+        if BusMinder.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError(f"Phone number '{value}' is already registered as a Bus Minder.")
         return value
 
     def validate_licenseNumber(self, value):
@@ -82,6 +89,8 @@ class DriverCreateSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
+        from django.db import IntegrityError
+
         # Extract user data
         first_name = validated_data.pop('firstName')
         last_name = validated_data.pop('lastName')
@@ -92,25 +101,37 @@ class DriverCreateSerializer(serializers.Serializer):
         username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
 
         # Create User
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            first_name=first_name,
-            last_name=last_name,
-            user_type='driver'
-        )
+        try:
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                user_type='driver'
+            )
+        except IntegrityError as e:
+            raise serializers.ValidationError({'non_field_errors': [str(e)]})
 
         # Extract assigned_bus if provided
         assigned_bus_id = validated_data.pop('assignedBusId', None)
 
         # Create Driver with remaining fields
-        driver = Driver.objects.create(
-            user=user,
-            phone_number=validated_data.get('phone'),
-            license_number=validated_data.get('licenseNumber'),
-            license_expiry=validated_data.get('licenseExpiry'),
-            status=validated_data.get('status', 'active'),
-        )
+        try:
+            driver = Driver.objects.create(
+                user=user,
+                phone_number=validated_data.get('phone'),
+                license_number=validated_data.get('licenseNumber'),
+                license_expiry=validated_data.get('licenseExpiry'),
+                status=validated_data.get('status', 'active'),
+            )
+        except IntegrityError as e:
+            try:
+                user.delete()
+            except Exception:
+                pass
+            if 'already in use' in str(e):
+                raise serializers.ValidationError({'phone': str(e)})
+            raise serializers.ValidationError({'non_field_errors': [str(e)]})
 
         # Assign bus if provided (using Assignment API)
         if assigned_bus_id:
