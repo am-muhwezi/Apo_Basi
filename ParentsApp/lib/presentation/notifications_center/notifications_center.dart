@@ -118,7 +118,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
               'message': notification['message'] ?? '',
               'fullMessage': notification['full_message'],
               'isRead': notification['is_read'] ?? false,
-              'timestamp': DateTime.parse(notification['created_at']),
+              'timestamp': DateTime.tryParse(notification['created_at']?.toString() ?? '') ?? DateTime.now(),
               'expanded': false,
               // Additional data
               'child_name': notification['child_name'],
@@ -195,7 +195,7 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                 'title': notification['title'] ?? '',
                 'message': notification['message'] ?? '',
                 'isRead': notification['isRead'] ?? false,
-                'timestamp': DateTime.parse(notification['timestamp']),
+                'timestamp': DateTime.tryParse(notification['timestamp']?.toString() ?? '') ?? DateTime.now(),
                 'expanded': false,
               };
             }).toList();
