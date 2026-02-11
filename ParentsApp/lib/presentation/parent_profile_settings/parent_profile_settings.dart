@@ -103,6 +103,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
       final cachedFirstName = prefs.getString('parent_first_name') ?? '';
       final cachedLastName = prefs.getString('parent_last_name') ?? '';
       final cachedEmail = prefs.getString('parent_email') ?? '';
+      final cachedPhone = prefs.getString('parent_phone') ?? '';
+      final cachedAddress = prefs.getString('parent_address') ?? '';
       final userId = prefs.getInt('user_id') ?? 0;
 
       // Also load cached children
@@ -117,6 +119,13 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
             email: cachedEmail,
             firstName: cachedFirstName,
             lastName: cachedLastName,
+          );
+          _parent = Parent(
+            userId: userId,
+            contactNumber: cachedPhone,
+            address: cachedAddress,
+            emergencyContact: '',
+            status: 'active',
           );
           // Load cached children
           if (cachedChildren != null && cachedChildren.isNotEmpty) {
@@ -188,6 +197,14 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
         });
       }
 
+      // Cache fresh parent data for offline use
+      final cachePrefs = await SharedPreferences.getInstance();
+      await cachePrefs.setString('parent_first_name', _user?.firstName ?? '');
+      await cachePrefs.setString('parent_last_name', _user?.lastName ?? '');
+      await cachePrefs.setString('parent_email', _user?.email ?? '');
+      await cachePrefs.setString('parent_phone', _parent?.contactNumber ?? '');
+      await cachePrefs.setString('parent_address', _parent?.address ?? '');
+
       // Also refresh the dashboard when profile is refreshed
       widget.onRefreshDashboard?.call();
     } catch (e) {
@@ -198,6 +215,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
           final firstName = prefs.getString('parent_first_name') ?? '';
           final lastName = prefs.getString('parent_last_name') ?? '';
           final email = prefs.getString('parent_email') ?? '';
+          final phone = prefs.getString('parent_phone') ?? '';
+          final address = prefs.getString('parent_address') ?? '';
           final userId = prefs.getInt('user_id') ?? 0;
 
           if (firstName.isNotEmpty || email.isNotEmpty) {
@@ -208,6 +227,13 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                 email: email,
                 firstName: firstName,
                 lastName: lastName,
+              );
+              _parent = Parent(
+                userId: userId,
+                contactNumber: phone,
+                address: address,
+                emergencyContact: '',
+                status: 'active',
               );
             });
           }

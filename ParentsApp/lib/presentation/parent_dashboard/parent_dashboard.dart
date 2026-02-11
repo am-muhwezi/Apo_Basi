@@ -87,10 +87,13 @@ class _ParentDashboardState extends State<ParentDashboard> {
     if (cachedChildren != null && cachedChildren.isNotEmpty) {
       setState(() {
         _children = cachedChildren.map((json) => Child.fromJson(json)).toList();
-        if (cachedParentName.isNotEmpty) {
-          _parentName = cachedParentName;
-        }
+        if (cachedParentName.isNotEmpty) _parentName = cachedParentName;
         _isLoading = false;
+      });
+    } else if (cachedParentName.isNotEmpty) {
+      // No cached children yet but name is known — show it without waiting for API
+      setState(() {
+        _parentName = cachedParentName;
       });
     }
 
