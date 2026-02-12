@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus,
   Search,
@@ -124,6 +124,7 @@ export default function AssignmentsPage() {
 
   // Loading state
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMoreAssignments, setHasMoreAssignments] = useState(false);
 
   // Load data on mount
@@ -143,6 +144,7 @@ export default function AssignmentsPage() {
 
   async function loadAllData() {
     setIsLoading(true);
+    assignmentsOffsetRef.current = 0;
     try {
       await Promise.all([
         loadAssignments(),
@@ -154,31 +156,35 @@ export default function AssignmentsPage() {
     }
   }
 
+  // Stable ref to track offset for append loads (avoids stale closure)
+  const assignmentsOffsetRef = useRef(0);
+
   async function loadAssignments(append = false) {
+    if (append && isLoadingMore) return;
     try {
-      const offset = append ? assignments.length : 0;
+      if (append) setIsLoadingMore(true);
+      const offset = append ? assignmentsOffsetRef.current : 0;
       const data = await assignmentService.loadAssignments({ limit: 20, offset });
-      
-      // Use functional update to ensure we work with latest state
+
       setAssignments(prevAssignments => {
         if (append) {
-          // Filter out any duplicates by ID before appending
           const existingIds = new Set(prevAssignments.map(a => a.id));
           const newAssignments = data.filter(a => !existingIds.has(a.id));
           return [...prevAssignments, ...newAssignments];
         }
         return data;
       });
-      
-      // Only show "Load More" if we got a full page (20 items)
-      // If we got less than 20, we've reached the end
+
+      assignmentsOffsetRef.current = append ? offset + data.length : data.length;
       setHasMoreAssignments(data.length === 20);
     } catch (error) {
+    } finally {
+      if (append) setIsLoadingMore(false);
     }
   }
 
   function loadMoreAssignments() {
-    if (!isLoading && hasMoreAssignments) {
+    if (!isLoading && !isLoadingMore && hasMoreAssignments) {
       loadAssignments(true);
     }
   }
@@ -811,11 +817,11 @@ export default function AssignmentsPage() {
                 {hasMoreAssignments && (
                   <Button
                     onClick={loadMoreAssignments}
-                    disabled={isLoading}
+                    disabled={isLoading || isLoadingMore}
                     variant="secondary"
                     size="sm"
                   >
-                    {isLoading ? 'Loading...' : 'Load More'}
+                    {isLoadingMore ? 'Loading...' : 'Load More'}
                   </Button>
                 )}
               </div>
@@ -910,12 +916,12 @@ export default function AssignmentsPage() {
                   {hasMoreAssignments && (
                     <Button
                       onClick={loadMoreAssignments}
-                      disabled={isLoading}
+                      disabled={isLoading || isLoadingMore}
                       variant="secondary"
                       size="sm"
                       className="w-full"
                     >
-                      {isLoading ? 'Loading...' : 'Load More'}
+                      {isLoadingMore ? 'Loading...' : 'Load More'}
                     </Button>
                   )}
                 </div>

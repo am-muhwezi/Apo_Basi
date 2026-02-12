@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserPlus, Users, Baby, UserCheck, Phone } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
@@ -19,6 +19,7 @@ export default function ParentsPage() {
   const [parents, setParents] = useState<Parent[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const offsetRef = useRef(0);
 
   // State for parent-specific children (loaded on-demand)
   const [parentChildren, setParentChildren] = useState<Child[]>([]);
@@ -30,14 +31,16 @@ export default function ParentsPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadParents(append = false) {
+    if (loading) return;
     try {
       setLoading(true);
-      const offset = append ? parents.length : 0;
+      const offset = append ? offsetRef.current : 0;
       const result = await parentService.loadParents({ limit: 20, offset });
 
       if (result.success && result.data) {
         const newParents = result.data.parents || [];
-        setParents(append ? [...parents, ...newParents] : newParents);
+        setParents((prev) => (append ? [...prev, ...newParents] : newParents));
+        offsetRef.current = offset + newParents.length;
         setHasMore(result.data.hasNext || false);
       }
     } catch (error) {
@@ -124,11 +127,22 @@ export default function ParentsPage() {
   };
 
   const handleDelete = async (id: string) => {
+    const confirmed = await confirmDialog({
+      title: 'Delete Parent',
+      message: 'Are you sure you want to delete this parent?',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
+
     // First attempt - check if parent has children
     const result = await parentService.deleteParent(id);
 
     if (result.success) {
       toast.success('Parent deleted successfully');
+      offsetRef.current = 0;
       loadParents();
       return;
     }
@@ -151,6 +165,7 @@ export default function ParentsPage() {
       const message = result.data?.message || 'Parent deleted successfully';
       toast.success(message);
       setShowDeleteOptionsModal(false);
+      offsetRef.current = 0;
       loadParents();
     } else {
       toast.error(result.error?.message || 'Failed to delete parent');

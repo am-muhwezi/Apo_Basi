@@ -9,7 +9,7 @@
  * - Handles UI-specific concerns (loading states, pagination)
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { childService } from '../services/childService';
 import type { Child } from '../types';
 
@@ -31,53 +31,55 @@ export function useChildren(): UseChildrenReturn {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState(0);
+  // Use a ref for offset to avoid stale closures in useCallback
+  const offsetRef = useRef(0);
+  const loadingRef = useRef(false);
   const LIMIT = 20;
 
-  const loadChildren = useCallback(
-    async (append = false) => {
-      try {
-        setLoading(true);
-        setError(null);
+  const loadChildren = useCallback(async (append = false) => {
+    if (loadingRef.current) return;
+    try {
+      loadingRef.current = true;
+      setLoading(true);
+      setError(null);
 
-        const currentOffset = append ? offset : 0;
-        const result = await childService.loadChildren({
-          limit: LIMIT,
-          offset: currentOffset,
-        });
+      const currentOffset = append ? offsetRef.current : 0;
+      const result = await childService.loadChildren({
+        limit: LIMIT,
+        offset: currentOffset,
+      });
 
-        if (result.success && result.data) {
-          const { children: newChildren, hasNext } = result.data;
+      if (result.success && result.data) {
+        const { children: newChildren, hasNext } = result.data;
 
-          setChildren((prev) => (append ? [...prev, ...newChildren] : newChildren));
-          setHasMore(hasNext);
-          setOffset(currentOffset + newChildren.length);
-        } else {
-          setError(result.error?.message || 'Failed to load children');
-          if (!append) {
-            setChildren([]);
-          }
-        }
-      } catch (err) {
-        setError('An unexpected error occurred');
+        setChildren((prev) => (append ? [...prev, ...newChildren] : newChildren));
+        setHasMore(hasNext);
+        offsetRef.current = currentOffset + newChildren.length;
+      } else {
+        setError(result.error?.message || 'Failed to load children');
         if (!append) {
           setChildren([]);
         }
-      } finally {
-        setLoading(false);
       }
-    },
-    [offset]
-  );
+    } catch (err) {
+      setError('An unexpected error occurred');
+      if (!append) {
+        setChildren([]);
+      }
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, []); // No deps — uses refs instead of captured state
 
   const loadMore = useCallback(() => {
-    if (!loading && hasMore) {
+    if (!loadingRef.current && hasMore) {
       loadChildren(true);
     }
-  }, [loading, hasMore, loadChildren]);
+  }, [hasMore, loadChildren]);
 
   const refreshChildren = useCallback(async () => {
-    setOffset(0);
+    offsetRef.current = 0;
     await loadChildren(false);
   }, [loadChildren]);
 
