@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, Bus } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import { useAuth } from '../contexts/AuthContext';
@@ -50,15 +50,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #001c3f 0%, #04373e 60%, #031a29 100%)' }}>
       <div className="max-w-md w-full">
         {/* Logo and Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
-            <Bus className="text-white" size={32} />
+          <div className="flex justify-center mb-4">
+            <img src="/logo.svg" alt="ApoBasi" className="h-28 w-auto rounded-2xl shadow-lg" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">School Bus Admin</h1>
-          <p className="text-slate-600">Sign in to manage your bus system</p>
+          <p className="text-slate-300">Sign in to manage your bus system</p>
         </div>
 
         {/* Login Form */}

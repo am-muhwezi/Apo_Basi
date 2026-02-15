@@ -250,8 +250,9 @@ class BusWebSocketService {
 
   /// Get WebSocket base URL from API config
   String _getWebSocketBaseUrl() {
-    // Convert HTTP URL to WebSocket URL
-    final baseUrl = ApiConfig.apiBaseUrl;
+    // Strip trailing slashes before converting scheme to avoid double-slash
+    // in the final URL (e.g. wss://api.apobasi.com//ws/bus/1/).
+    final baseUrl = ApiConfig.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
     if (baseUrl.startsWith('https://')) {
       return baseUrl.replaceFirst('https://', 'wss://');
     } else if (baseUrl.startsWith('http://')) {

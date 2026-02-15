@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:sizer/sizer.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../config/api_config.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/theme_service.dart';
@@ -309,8 +311,10 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                     // Profile Header - Compact horizontal layout
                     Container(
                       width: double.infinity,
-                      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
-                      margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
+                      margin:
+                          EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
                       decoration: BoxDecoration(
                         color: colorScheme.surface,
                         borderRadius: BorderRadius.circular(16),
@@ -329,10 +333,13 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                         children: [
                           CircleAvatar(
                             radius: 7.w,
-                            backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
+                            backgroundColor:
+                                colorScheme.primary.withValues(alpha: 0.12),
                             child: Text(
                               _user?.fullName.isNotEmpty == true
-                                  ? _user!.fullName.substring(0, 1).toUpperCase()
+                                  ? _user!.fullName
+                                      .substring(0, 1)
+                                      .toUpperCase()
                                   : 'P',
                               style: textTheme.titleLarge?.copyWith(
                                 color: colorScheme.primary,
@@ -357,7 +364,9 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                                 SizedBox(height: 0.4.h),
                                 Row(
                                   children: [
-                                    Icon(Icons.email_outlined, size: 12, color: colorScheme.onSurfaceVariant),
+                                    Icon(Icons.email_outlined,
+                                        size: 12,
+                                        color: colorScheme.onSurfaceVariant),
                                     SizedBox(width: 1.w),
                                     Expanded(
                                       child: Text(
@@ -371,11 +380,14 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                                     ),
                                   ],
                                 ),
-                                if (_parent?.contactNumber.isNotEmpty == true) ...[
+                                if (_parent?.contactNumber.isNotEmpty ==
+                                    true) ...[
                                   SizedBox(height: 0.3.h),
                                   Row(
                                     children: [
-                                      Icon(Icons.phone_outlined, size: 12, color: colorScheme.onSurfaceVariant),
+                                      Icon(Icons.phone_outlined,
+                                          size: 12,
+                                          color: colorScheme.onSurfaceVariant),
                                       SizedBox(width: 1.w),
                                       Text(
                                         _parent!.contactNumber,
@@ -408,7 +420,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                     SizedBox(height: 0.8.h),
                     Container(
                       width: double.infinity,
-                      padding: EdgeInsets.symmetric(horizontal: 3.5.w, vertical: 1.5.h),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 3.5.w, vertical: 1.5.h),
                       margin: EdgeInsets.symmetric(horizontal: 4.w),
                       decoration: BoxDecoration(
                         color: colorScheme.surface,
@@ -429,7 +442,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                           Container(
                             padding: EdgeInsets.all(2.w),
                             decoration: BoxDecoration(
-                              color: colorScheme.primary.withValues(alpha: 0.12),
+                              color:
+                                  colorScheme.primary.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Icon(
@@ -561,7 +575,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                       child: Container(
                         margin: EdgeInsets.symmetric(
                             horizontal: 4.w, vertical: 0.5.h),
-                        padding: EdgeInsets.symmetric(horizontal: 3.5.w, vertical: 0.5.h),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 3.5.w, vertical: 0.5.h),
                         decoration: BoxDecoration(
                           color: colorScheme.surface,
                           borderRadius: BorderRadius.circular(16),
@@ -581,7 +596,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                             Container(
                               padding: EdgeInsets.all(2.w),
                               decoration: BoxDecoration(
-                                color: colorScheme.primary.withValues(alpha: 0.12),
+                                color:
+                                    colorScheme.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Icon(
@@ -640,7 +656,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                       child: Container(
                         margin: EdgeInsets.symmetric(
                             horizontal: 4.w, vertical: 0.5.h),
-                        padding: EdgeInsets.symmetric(horizontal: 3.5.w, vertical: 0.h),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 3.5.w, vertical: 0.h),
                         decoration: BoxDecoration(
                           color: colorScheme.surface,
                           borderRadius: BorderRadius.circular(16),
@@ -667,7 +684,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                                     Container(
                                       padding: EdgeInsets.all(2.w),
                                       decoration: BoxDecoration(
-                                        color: colorScheme.primary.withValues(alpha: 0.12),
+                                        color: colorScheme.primary
+                                            .withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Icon(
@@ -708,7 +726,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                                     Container(
                                       padding: EdgeInsets.all(2.w),
                                       decoration: BoxDecoration(
-                                        color: colorScheme.primary.withValues(alpha: 0.12),
+                                        color: colorScheme.primary
+                                            .withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Icon(
@@ -800,23 +819,225 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   bool _ok(String? s) {
     if (s == null || s.length < 3) return false;
     if (RegExp(r'^\d+$').hasMatch(s)) return false;
-    if (RegExp(r'^[A-Z0-9]{4,}\+[A-Z0-9]{2,}$').hasMatch(s.trim())) return false;
+    if (RegExp(r'^[A-Z0-9]{4,}\+[A-Z0-9]{2,}$').hasMatch(s.trim()))
+      return false;
     return true;
   }
 
   /// Builds the best human-readable address from a Placemark.
-  /// Order: road → neighbourhood → city → country
+  /// Order: street number + street/road → neighbourhood → city → country
+  ///
+  /// On Android `name` often carries the specific location (e.g. "Riverside")
+  /// when thoroughfare / subLocality are empty — common in East Africa.
   String _buildReadableAddress(Placemark p) {
     final parts = <String>[];
-    if (_ok(p.thoroughfare)) parts.add(p.thoroughfare!);
-    else if (_ok(p.street)) parts.add(p.street!);
-    if (_ok(p.subLocality)) parts.add(p.subLocality!);
-    if (_ok(p.locality)) parts.add(p.locality!);
-    if (_ok(p.country)) parts.add(p.country!);
+
+    // Try to build street address with number
+    String? streetAddress;
+    if (_ok(p.subThoroughfare) && _ok(p.thoroughfare)) {
+      // e.g. "104" + "Riverside Drive" = "104 Riverside Drive"
+      streetAddress = '${p.subThoroughfare} ${p.thoroughfare}';
+    } else if (_ok(p.thoroughfare)) {
+      streetAddress = p.thoroughfare;
+    } else if (_ok(p.street)) {
+      streetAddress = p.street;
+    } else if (_ok(p.name) &&
+        p.name != p.locality &&
+        p.name != p.country &&
+        p.name != p.administrativeArea &&
+        p.name != p.subAdministrativeArea &&
+        p.name != p.subLocality) {
+      streetAddress = p.name;
+    }
+
+    if (streetAddress != null) parts.add(streetAddress);
+
+    // Neighbourhood: try multiple fields for area-level detail
+    if (_ok(p.subLocality)) {
+      parts.add(p.subLocality!);
+    } else if (_ok(p.subAdministrativeArea) &&
+        p.subAdministrativeArea != p.locality) {
+      parts.add(p.subAdministrativeArea!);
+    }
+
+    // City/locality
+    if (_ok(p.locality)) {
+      parts.add(p.locality!);
+    } else if (_ok(p.administrativeArea)) {
+      parts.add(p.administrativeArea!);
+    }
+
+    // Only add country if we don't have enough detail
+    if (parts.length < 2 && _ok(p.country)) {
+      parts.add(p.country!);
+    }
+
     // Deduplicate (case-insensitive)
     final seen = <String>{};
     final unique = parts.where((s) => seen.add(s.toLowerCase())).toList();
     return unique.join(', ');
+  }
+
+  /// Fallback: native platform geocoder.
+  Future<String?> _nativeGeocode(Position position) async {
+    try {
+      final marks =
+          await placemarkFromCoordinates(position.latitude, position.longitude);
+      if (marks.isEmpty) return null;
+
+      // Try all placemarks to find the most detailed one
+      String? bestAddress;
+      int maxParts = 0;
+
+      for (final mark in marks) {
+        final built = _buildReadableAddress(mark);
+        if (built.isNotEmpty) {
+          final parts = built.split(',').length;
+          if (parts > maxParts) {
+            maxParts = parts;
+            bestAddress = built;
+          }
+        }
+      }
+
+      return bestAddress;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Reverse-geocodes [lat]/[lon] via the Mapbox Geocoding API.
+  /// Returns a human-readable address string, or null on failure.
+  /// Mapbox has far better East Africa street coverage than the native geocoder.
+  Future<String?> _reverseGeocodeMapbox(double lat, double lon) async {
+    try {
+      final token = ApiConfig.mapboxAccessToken;
+      if (token.isEmpty) return null;
+
+      // Strategy 1: Get ALL nearby features to find the most specific address
+      var uri = Uri.parse(
+        'https://api.mapbox.com/geocoding/v5/mapbox.places/$lon,$lat.json'
+        '?access_token=$token&types=address,poi&limit=5&language=en',
+      );
+      var response = await http.get(uri, headers: {
+        'Accept': 'application/json'
+      }).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final features = data['features'] as List?;
+        if (features != null && features.isNotEmpty) {
+          // Try each feature, preferring those with address numbers
+          for (final feature in features) {
+            final featureMap = feature as Map<String, dynamic>;
+            final address =
+                _parseMapboxFeature(featureMap, preferDetailed: true);
+            if (address != null && address.isNotEmpty) {
+              // Check if it has a street number (indicates precise address)
+              if (RegExp(r'^\d+').hasMatch(address) ||
+                  address.split(',').length >= 3) {
+                return address;
+              }
+            }
+          }
+          // If no detailed address found, use the first result
+          final address =
+              _parseMapboxFeature(features.first as Map<String, dynamic>);
+          if (address != null && address.isNotEmpty) return address;
+        }
+      }
+
+      // Strategy 2: Try with neighborhood to get area name
+      uri = Uri.parse(
+        'https://api.mapbox.com/geocoding/v5/mapbox.places/$lon,$lat.json'
+        '?access_token=$token&types=neighborhood,locality&limit=3&language=en',
+      );
+      response = await http.get(uri, headers: {
+        'Accept': 'application/json'
+      }).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final features = data['features'] as List?;
+        if (features != null && features.isNotEmpty) {
+          final feature = features.first as Map<String, dynamic>;
+          return _parseMapboxFeature(feature);
+        }
+      }
+
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Parses a Mapbox feature into a readable address
+  String? _parseMapboxFeature(Map<String, dynamic> feature,
+      {bool preferDetailed = false}) {
+    final placeName = feature['place_name'] as String? ?? '';
+    final text = feature['text'] as String? ?? '';
+    final address = feature['address'] as String? ?? '';
+    final placeType = (feature['place_type'] as List?)?.cast<String>() ?? [];
+    final context =
+        (feature['context'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final properties = feature['properties'] as Map<String, dynamic>? ?? {};
+
+    String streetNumber = '';
+    String street = '';
+    String suburb = '';
+    String city = '';
+
+    // Extract street number/address number if available
+    if (address.isNotEmpty) {
+      streetNumber = address;
+    }
+
+    // For address type, combine street number + street name
+    if (placeType.contains('address')) {
+      if (streetNumber.isNotEmpty && text.isNotEmpty) {
+        street = '$streetNumber $text';
+      } else if (text.isNotEmpty) {
+        street = text;
+      } else if (placeName.isNotEmpty) {
+        // Use place_name which often contains full street address
+        final parts = placeName.split(',').map((s) => s.trim()).toList();
+        if (parts.isNotEmpty) street = parts.first;
+      }
+    } else if (placeType.contains('poi')) {
+      // For POI, use the POI name as the street/location
+      street = text;
+    } else if (placeType.contains('neighborhood') ||
+        placeType.contains('locality')) {
+      suburb = text;
+    }
+
+    // Extract suburb and city from context
+    for (final c in context) {
+      final id = c['id'] as String? ?? '';
+      final contextText = c['text'] as String? ?? '';
+
+      if (id.startsWith('neighborhood') && suburb.isEmpty) {
+        suburb = contextText;
+      } else if (id.startsWith('locality') &&
+          suburb.isEmpty &&
+          !placeType.contains('locality')) {
+        suburb = contextText;
+      } else if (id.startsWith('place') && city.isEmpty) {
+        city = contextText;
+      }
+    }
+
+    // Build address from parts, removing duplicates
+    final parts = <String>[];
+    if (street.isNotEmpty) parts.add(street);
+    if (suburb.isNotEmpty) parts.add(suburb);
+    if (city.isNotEmpty) parts.add(city);
+
+    // Deduplicate (case-insensitive)
+    final seen = <String>{};
+    final unique = parts.where((s) => seen.add(s.toLowerCase())).toList();
+
+    return unique.isEmpty ? null : unique.join(', ');
   }
 
   /// Detects the current GPS position and reverse-geocodes it to a readable
@@ -831,37 +1052,24 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
       return null;
     }
     try {
+      // Use high accuracy for better street-level precision
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best,
-        timeLimit: const Duration(seconds: 30),
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 20),
       );
 
-      String address;
-      try {
-        final marks = await placemarkFromCoordinates(
-          position.latitude,
-          position.longitude,
-        );
-        if (marks.isNotEmpty) {
-          final built = _buildReadableAddress(marks.first);
-          // If geocoding only returned 1 part (e.g. just "Nairobi"), include
-          // the subAdministrativeArea or fall back to a named coordinate string.
-          if (built.contains(',')) {
-            address = built;
-          } else {
-            // Try adding subAdministrativeArea for a second part
-            final sub = marks.first.subAdministrativeArea;
-            address = (_ok(sub) && built.isNotEmpty)
-                ? '$built, $sub'
-                : built.isNotEmpty
-                    ? built
-                    : '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
-          }
-        } else {
-          address = '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
-        }
-      } catch (_) {
-        address = '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
+      // Try Mapbox first (has better East Africa street data),
+      // then native geocoder, finally raw coordinates as last resort
+      String? address =
+          await _reverseGeocodeMapbox(position.latitude, position.longitude);
+
+      if (address == null || address.isEmpty) {
+        address = await _nativeGeocode(position);
+      }
+
+      if (address == null || address.isEmpty) {
+        address =
+            '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
       }
 
       return (position: position, address: address);
@@ -951,9 +1159,38 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                           : () async {
                               setDialogState(() => detecting = true);
                               final result = await _detectGpsLocation();
+                              if (!context.mounted) return;
                               if (result != null) {
                                 gpsPosition = result.position;
                                 addressController.text = result.address;
+
+                                // Check if address is too generic (just city or coordinates)
+                                final hasComma = result.address.contains(',');
+                                final isCoordinates =
+                                    result.address.contains('.');
+                                final parts = result.address
+                                    .split(',')
+                                    .map((e) => e.trim())
+                                    .toList();
+
+                                if (isCoordinates ||
+                                    (!hasComma) ||
+                                    parts.length == 1) {
+                                  _showToast(
+                                    'Please add your street name or area for accuracy',
+                                    isError: true,
+                                  );
+                                } else if (parts.length == 2) {
+                                  _showToast(
+                                    'Location detected. Please verify or add more details',
+                                    isError: false,
+                                  );
+                                } else {
+                                  _showToast(
+                                    'Location detected successfully',
+                                    isError: false,
+                                  );
+                                }
                               }
                               setDialogState(() => detecting = false);
                             },
@@ -1000,8 +1237,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                     decoration: InputDecoration(
                       hintText: 'e.g. Ngong Road, Karen, Nairobi',
                       hintStyle: TextStyle(
-                          fontSize: 11.sp,
-                          color: colorScheme.onSurfaceVariant),
+                          fontSize: 11.sp, color: colorScheme.onSurfaceVariant),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -1050,7 +1286,8 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                             .setHomeLocationFromAddress(newAddress);
                       }
 
-                      await _apiService.updateParentProfile(address: newAddress);
+                      await _apiService.updateParentProfile(
+                          address: newAddress);
 
                       if (mounted) {
                         setState(() {
