@@ -56,7 +56,7 @@ export default function Layout() {
           >
             {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
-          <img src="/logo.svg" alt="ApoBasi" className="w-8 h-8 mr-3" />
+          <img src="/logo.svg" alt="ApoBasi" className="h-11 w-auto mr-3 rounded-lg" />
           <h1 className="text-xl font-bold text-slate-900">ApoBasi</h1>
         </div>
         <div className="flex items-center gap-4">

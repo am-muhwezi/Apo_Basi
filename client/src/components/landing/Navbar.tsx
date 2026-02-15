@@ -19,11 +19,8 @@ export default function Navbar() {
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-lg group-hover:scale-105 transition-transform">
-              AB
-            </div>
-            <span className="font-bold text-lg text-gray-900 dark:text-white tracking-tight">ApoBasi</span>
+          <Link to="/" className="flex items-center group">
+            <img src="/logo.svg" alt="ApoBasi" className="h-12 w-auto rounded-lg group-hover:scale-105 transition-transform" />
           </Link>
 
           {/* Desktop Navigation */}

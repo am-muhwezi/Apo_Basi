@@ -26,6 +26,18 @@ class AuthService {
 
   StreamSubscription<AuthState>? _authSubscription;
 
+  /// Persists tokens and parent info returned by any login endpoint.
+  Future<void> _saveSession(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('access_token', data['tokens']['access']);
+    await prefs.setString('refresh_token', data['tokens']['refresh']);
+    await prefs.setInt('parent_id', data['parent']['id']);
+    await prefs.setInt('user_id', data['parent']['id']);
+    await prefs.setString('parent_first_name', data['parent']['firstName']);
+    await prefs.setString('parent_last_name', data['parent']['lastName']);
+    await prefs.setString('parent_email', data['parent']['email']);
+  }
+
   /// Send magic link to email
   ///
   /// First checks if email is registered in Django backend,
@@ -42,7 +54,6 @@ class AuthService {
       );
 
       if (checkResponse.statusCode != 200) {
-        // Email not registered
         return {
           'success': false,
           'message': checkResponse.data['message'] ??
@@ -97,11 +108,9 @@ class AuthService {
         final session = authState.session;
 
         if (session != null) {
-          // User authenticated via magic link - exchange for Django tokens
-          final accessToken = session.accessToken;
-
           try {
-            final result = await _exchangeTokenForDjangoAuth(accessToken);
+            final result =
+                await _exchangeTokenForDjangoAuth(session.accessToken);
             controller.add(result);
           } catch (e) {
             controller.add(AuthResult(
@@ -112,7 +121,6 @@ class AuthService {
         }
       },
       onError: (error) {
-        // Handle Supabase auth errors (expired links, invalid tokens, etc.)
         String errorMessage = 'Authentication failed';
 
         if (error.toString().contains('otp_expired') ||
@@ -122,11 +130,9 @@ class AuthService {
           errorMessage = 'Invalid magic link. Please request a new one.';
         }
 
-        controller.add(AuthResult(
-          success: false,
-          error: errorMessage,
-        ));
+        controller.add(AuthResult(success: false, error: errorMessage));
       },
+      onDone: controller.close,
     );
 
     return controller.stream;
@@ -141,32 +147,19 @@ class AuthService {
       );
 
       if (response.statusCode == 200) {
-        final data = response.data;
-
-        // Store Django JWT tokens
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('access_token', data['tokens']['access']);
-        await prefs.setString('refresh_token', data['tokens']['refresh']);
-
-        // Store parent info
-        await prefs.setInt('parent_id', data['parent']['id']);
-        await prefs.setInt('user_id', data['parent']['id']); // Also save as user_id for API service
-        await prefs.setString('parent_first_name', data['parent']['firstName']);
-        await prefs.setString('parent_last_name', data['parent']['lastName']);
-        await prefs.setString('parent_email', data['parent']['email']);
-
+        await _saveSession(response.data);
         return AuthResult(
           success: true,
-          parent: data['parent'],
-          children: data['children'],
-          tokens: data['tokens'],
-        );
-      } else {
-        return AuthResult(
-          success: false,
-          error: response.data['message'] ?? 'Authentication failed',
+          parent: response.data['parent'],
+          children: response.data['children'],
+          tokens: response.data['tokens'],
         );
       }
+
+      return AuthResult(
+        success: false,
+        error: response.data['message'] ?? 'Authentication failed',
+      );
     } on DioException catch (e) {
       String errorMessage = 'Authentication failed';
 
@@ -178,7 +171,8 @@ class AuthService {
             'Session expired. Please request a new magic link.';
       } else if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.receiveTimeout) {
-        errorMessage = 'Connection timeout. Please check your internet connection.';
+        errorMessage =
+            'Connection timeout. Please check your internet connection.';
       }
 
       return AuthResult(success: false, error: errorMessage);
@@ -190,12 +184,12 @@ class AuthService {
     }
   }
 
-  /// The hardcoded email Apple reviewers use to trigger the password login flow
-  static const String _reviewerEmail = 'applereviewer@apobasi.com';
+  /// The hardcoded email Apple reviewers use to trigger the password login flow.
+  static const String _reviewerEmail = 'reviewer@apobasi.com';
 
   /// Returns true when the typed email matches the Apple reviewer account.
   /// The login screen uses this to show a password field instead of magic link.
-  bool isReviewerAccount(String email) =>
+  static bool isReviewerAccount(String email) =>
       email.trim().toLowerCase() == _reviewerEmail;
 
   /// Password-based login used exclusively by the Apple reviewer demo account.
@@ -208,25 +202,18 @@ class AuthService {
       );
 
       if (response.statusCode == 200) {
-        final data = response.data;
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('access_token', data['tokens']['access']);
-        await prefs.setString('refresh_token', data['tokens']['refresh']);
-        await prefs.setInt('parent_id', data['parent']['id']);
-        await prefs.setInt('user_id', data['parent']['id']);
-        await prefs.setString('parent_first_name', data['parent']['firstName']);
-        await prefs.setString('parent_last_name', data['parent']['lastName']);
-        await prefs.setString('parent_email', data['parent']['email']);
+        await _saveSession(response.data);
         return AuthResult(
           success: true,
-          parent: data['parent'],
-          children: data['children'],
-          tokens: data['tokens'],
+          parent: response.data['parent'],
+          children: response.data['children'],
+          tokens: response.data['tokens'],
         );
       }
+
       return AuthResult(
         success: false,
-        error: response.data['error'] ?? 'Login failed',
+        error: response.data['error'] ?? response.data['message'] ?? 'Login failed',
       );
     } on DioException catch (e) {
       String msg = 'Login failed';
@@ -260,16 +247,14 @@ class AuthService {
     return prefs.getString('refresh_token');
   }
 
-  /// Refresh access token using refresh token
-  /// Returns new access token if successful, null otherwise
+  /// Refresh access token using refresh token.
+  /// Returns new access token if successful, null otherwise.
   Future<String?> refreshAccessToken() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final refreshToken = prefs.getString('refresh_token');
 
-      if (refreshToken == null || refreshToken.isEmpty) {
-        return null;
-      }
+      if (refreshToken == null || refreshToken.isEmpty) return null;
 
       final response = await _dio.post(
         '/api/token/refresh/',
@@ -278,15 +263,10 @@ class AuthService {
 
       if (response.statusCode == 200) {
         final newAccessToken = response.data['access'];
-
-        // Store new access token
         await prefs.setString('access_token', newAccessToken);
-
-        // If a new refresh token is provided, update it too
         if (response.data['refresh'] != null) {
           await prefs.setString('refresh_token', response.data['refresh']);
         }
-
         return newAccessToken;
       }
 
@@ -298,14 +278,13 @@ class AuthService {
 
   /// Sign out user
   Future<void> signOut() async {
-    // Sign out from Supabase
     await _supabase.auth.signOut();
 
-    // Clear local storage
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('access_token');
     await prefs.remove('refresh_token');
     await prefs.remove('parent_id');
+    await prefs.remove('user_id');
     await prefs.remove('parent_first_name');
     await prefs.remove('parent_last_name');
     await prefs.remove('parent_email');

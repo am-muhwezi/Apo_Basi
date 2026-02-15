@@ -73,13 +73,20 @@ class ParentCreateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=['active', 'inactive'], default='active', write_only=True)
 
     def validate_phone(self, value):
-        """Check that phone number is unique among parents"""
+        """Check that phone number is unique across all roles"""
+        from drivers.models import Driver
+        from busminders.models import BusMinder
+
         instance = getattr(self, 'instance', None)
-        qs = Parent.objects.filter(contact_number=value)
+        own_qs = Parent.objects.filter(contact_number=value)
         if instance:
-            qs = qs.exclude(pk=instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError(f"A parent with phone number '{value}' already exists.")
+            own_qs = own_qs.exclude(pk=instance.pk)
+        if own_qs.exists():
+            raise serializers.ValidationError(f"Phone number '{value}' is already registered as a Parent.")
+        if Driver.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError(f"Phone number '{value}' is already registered as a Driver.")
+        if BusMinder.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError(f"Phone number '{value}' is already registered as a Bus Minder.")
         return value
 
     def validate_email(self, value):
@@ -98,6 +105,7 @@ class ParentCreateSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         from django.contrib.auth import get_user_model
+        from django.db import IntegrityError
         User = get_user_model()
         import uuid
 
@@ -110,22 +118,34 @@ class ParentCreateSerializer(serializers.Serializer):
         username = email if email else f"{first_name.lower()}.{last_name.lower()}.{uuid.uuid4().hex[:8]}"
 
         # Create User
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            first_name=first_name,
-            last_name=last_name,
-            user_type='parent'
-        )
+        try:
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                user_type='parent'
+            )
+        except IntegrityError as e:
+            raise serializers.ValidationError({'non_field_errors': [str(e)]})
 
         # Create Parent
-        parent = Parent.objects.create(
-            user=user,
-            contact_number=validated_data.get('phone'),
-            address=validated_data.get('address', ''),
-            emergency_contact=validated_data.get('emergencyContact', ''),
-            status=validated_data.get('status', 'active'),
-        )
+        try:
+            parent = Parent.objects.create(
+                user=user,
+                contact_number=validated_data.get('phone'),
+                address=validated_data.get('address', ''),
+                emergency_contact=validated_data.get('emergencyContact', ''),
+                status=validated_data.get('status', 'active'),
+            )
+        except IntegrityError as e:
+            try:
+                user.delete()
+            except Exception:
+                pass
+            if 'already in use' in str(e):
+                raise serializers.ValidationError({'phone': str(e)})
+            raise serializers.ValidationError({'non_field_errors': [str(e)]})
 
         return parent
 

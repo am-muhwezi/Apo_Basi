@@ -27,11 +27,8 @@ export default function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
-            <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
-                AB
-              </div>
-              <span className="font-bold text-lg text-gray-900 dark:text-white">ApoBasi</span>
+            <Link to="/" className="inline-block mb-4">
+              <img src="/logo.svg" alt="ApoBasi" className="h-12 w-auto rounded-lg" />
             </Link>
             <p className="text-gray-600 text-sm leading-relaxed mb-4 dark:text-gray-400">
               Safe, transparent school transport for Africa. Built for schools, parents, and students.
