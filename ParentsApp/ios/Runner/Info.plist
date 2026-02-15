@@ -46,9 +46,21 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 
-	<!-- Location Permission - Only for "Use Current Location" feature -->
+	<!-- Location Permissions -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>ApoBasi needs your location to set your home address for accurate bus tracking.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>ApoBasi needs background location access to notify you when your child's bus is approaching.</string>
+
+	<!-- Camera Permission -->
+	<key>NSCameraUsageDescription</key>
+	<string>ApoBasi needs camera access to take profile photos.</string>
+
+	<!-- Photo Library Permission -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ApoBasi needs access to your photo library to select profile photos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>ApoBasi needs access to save photos to your library.</string>
 
 	<!-- Notifications Permission -->
 	<key>NSUserNotificationsUsageDescription</key>
