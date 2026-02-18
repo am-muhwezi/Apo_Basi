@@ -4,6 +4,7 @@ import type { Minder } from '../types';
 
 interface UseMindersParams {
   search?: string;
+  ordering?: string;
 }
 
 interface UseMindersReturn {
@@ -28,6 +29,7 @@ export function useMinders(params?: UseMindersParams): UseMindersReturn {
   const offsetRef = useRef(0);
   const loadingRef = useRef(false);
   const searchRef = useRef(params?.search ?? '');
+  const orderingRef = useRef(params?.ordering ?? '');
 
   const loadMinders = useCallback(async (append = false) => {
     if (loadingRef.current) return;
@@ -41,6 +43,7 @@ export function useMinders(params?: UseMindersParams): UseMindersReturn {
         limit: LIMIT,
         offset: currentOffset,
         search: searchRef.current || undefined,
+        ordering: orderingRef.current || undefined,
       });
 
       if (result.success && result.data) {

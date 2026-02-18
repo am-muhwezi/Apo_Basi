@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserCircle, Bus as BusIcon, CheckCircle, Users, Phone, Mail, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserCircle, Bus as BusIcon, CheckCircle, Users, Phone, Mail } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -16,8 +16,7 @@ export default function MindersPage() {
   const confirm = useConfirm();
   const [formError, setFormError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [ordering, setOrdering] = useState('user__first_name');
-  const { minders, loading, hasMore, totalCount, loadMinders, loadMore: loadMoreMinders } = useMinders({ search: searchTerm, ordering });
+  const { minders, loading, hasMore, totalCount, loadMinders, loadMore: loadMoreMinders } = useMinders({ search: searchTerm });
   const [selectedMinder, setSelectedMinder] = useState<BusMinder | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -59,8 +58,8 @@ export default function MindersPage() {
 
   const handleDelete = async (id: string) => {
     const confirmed = await confirm({
-      title: 'Delete Bus Minder',
-      message: 'Are you sure you want to delete this bus minder? This action cannot be undone.',
+      title: 'Delete Bus Assistant',
+      message: 'Are you sure you want to delete this bus assistant? This action cannot be undone.',
       confirmText: 'Delete',
       cancelText: 'Cancel',
       variant: 'danger',
@@ -69,10 +68,10 @@ export default function MindersPage() {
     if (confirmed) {
       const result = await busMinderService.deleteBusMinder(id);
       if (result.success) {
-        toast.success('Bus minder deleted successfully');
+        toast.success('Bus assistant deleted successfully');
         loadMinders();
       } else {
-        toast.error(result.error?.message || 'Failed to delete bus minder');
+        toast.error(result.error?.message || 'Failed to delete bus assistant');
       }
     }
   };
@@ -88,11 +87,11 @@ export default function MindersPage() {
     }
 
     if (result.success) {
-      toast.success(`Bus minder ${selectedMinder ? 'updated' : 'created'} successfully`);
+      toast.success(`Bus assistant ${selectedMinder ? 'updated' : 'created'} successfully`);
       loadMinders();
       setShowModal(false);
     } else {
-      setFormError(result.error?.message || `Failed to ${selectedMinder ? 'update' : 'create'} bus minder`);
+      setFormError(result.error?.message || `Failed to ${selectedMinder ? 'update' : 'create'} bus assistant`);
     }
   };
 
@@ -104,10 +103,10 @@ export default function MindersPage() {
   return (
     <div>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 mb-4 md:mb-0">Bus Minders</h1>
+        <h1 className="text-2xl font-bold text-slate-900 mb-4 md:mb-0">Bus Assistants</h1>
         <Button onClick={handleCreate}>
           <Plus size={20} className="mr-2 inline" />
-          Add Bus Minder
+          Add Bus Assistant
         </Button>
       </div>
 
@@ -119,7 +118,7 @@ export default function MindersPage() {
               <UserCircle className="w-5 h-5 text-blue-600" />
             </div>
           </div>
-          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Minders</h3>
+          <h3 className="text-sm font-medium text-slate-600 mb-1">Total Assistants</h3>
           <p className="text-2xl font-bold text-slate-900">{totalMinders}</p>
         </div>
 
@@ -166,13 +165,6 @@ export default function MindersPage() {
               className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <button
-            onClick={() => setOrdering(o => o === 'user__first_name' ? '-user__first_name' : 'user__first_name')}
-            className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-600 whitespace-nowrap"
-          >
-            <ArrowUpDown size={16} />
-            <span className="text-sm font-medium hidden sm:inline">{ordering.startsWith('-') ? 'Z → A' : 'A → Z'}</span>
-          </button>
         </div>
       </div>
 
@@ -203,6 +195,18 @@ export default function MindersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
+              {filteredMinders.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-16 text-center">
+                    <p className="text-slate-500 font-medium">
+                      {searchTerm ? 'No bus assistants match your search' : 'No bus assistants yet'}
+                    </p>
+                    {!searchTerm && (
+                      <p className="text-slate-400 text-sm mt-1">Click "Add Bus Assistant" to get started</p>
+                    )}
+                  </td>
+                </tr>
+              )}
               {filteredMinders.map((minder) => (
                 <tr key={minder.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -274,6 +278,16 @@ export default function MindersPage() {
 
       {/* Minders Cards - Mobile */}
       <div className="md:hidden space-y-4">
+        {filteredMinders.length === 0 && !loading && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+            <p className="text-slate-500 font-medium">
+              {searchTerm ? 'No bus assistants match your search' : 'No bus assistants yet'}
+            </p>
+            {!searchTerm && (
+              <p className="text-slate-400 text-sm mt-1">Click "Add Bus Assistant" to get started</p>
+            )}
+          </div>
+        )}
         {filteredMinders.map((minder) => (
           <div key={minder.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex items-start justify-between mb-3">
@@ -358,7 +372,7 @@ export default function MindersPage() {
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        title={selectedMinder ? 'Edit Bus Minder' : 'Add New Bus Minder'}
+        title={selectedMinder ? 'Edit Bus Assistant' : 'Add New Bus Assistant'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <FormError message={formError} onDismiss={() => setFormError(null)} />
@@ -410,7 +424,7 @@ export default function MindersPage() {
       <Modal
         isOpen={showDetailModal}
         onClose={() => setShowDetailModal(false)}
-        title="Bus Minder Details"
+        title="Bus Assistant Details"
       >
         {selectedMinder && (
           <div className="space-y-4">
