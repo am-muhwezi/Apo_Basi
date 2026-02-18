@@ -39,6 +39,14 @@ class AuthService {
     final userId = data['user_id'];
     final userIdInt = userId is int ? userId : int.parse(userId.toString());
 
+    // New unified keys used across the app
+    await prefs.setInt('user_id', userIdInt);
+    await prefs.setString('user_name', data['name'] ?? '');
+    await prefs.setString('user_email', data['email'] ?? '');
+    await prefs.setString('user_phone', data['phone'] ?? '');
+    await prefs.setString('user_role', data['user_type'] ?? 'driver');
+
+    // Backwards‑compatible driver-specific keys used by some older screens
     await prefs.setInt('driver_id', userIdInt);
     await prefs.setString('driver_name', data['name'] ?? '');
     await prefs.setString('driver_email', data['email'] ?? '');
@@ -101,12 +109,14 @@ class AuthService {
       } else if (e.response?.statusCode == 400) {
         return {
           'success': false,
-          'message': e.response?.data['error'] ?? 'Invalid phone number format.',
+          'message':
+              e.response?.data['error'] ?? 'Invalid phone number format.',
         };
       } else if (e.response?.statusCode == 403) {
         return {
           'success': false,
-          'message': e.response?.data['error'] ?? 'Account is inactive. Please contact your administrator.',
+          'message': e.response?.data['error'] ??
+              'Account is inactive. Please contact your administrator.',
         };
       }
       return {
@@ -116,7 +126,8 @@ class AuthService {
     } on FormatException catch (e) {
       return {
         'success': false,
-        'message': 'Invalid data format received from server. Please contact your administrator.',
+        'message':
+            'Invalid data format received from server. Please contact your administrator.',
       };
     } on TypeError catch (e) {
       return {
@@ -282,7 +293,8 @@ class AuthService {
             'Session expired. Please request a new magic link.';
       } else if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.receiveTimeout) {
-        errorMessage = 'Connection timeout. Please check your internet connection.';
+        errorMessage =
+            'Connection timeout. Please check your internet connection.';
       }
 
       return AuthResult(success: false, error: errorMessage);

@@ -178,7 +178,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     );
   }
 
-  Future<void> _loadDriverData() async {
+  Future<void> _loadDriverData({bool forceRemote = false}) async {
     setState(() {
       _isLoadingData = true;
       _errorMessage = null;
@@ -186,13 +186,19 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userName = prefs.getString('user_name') ?? 'Driver';
-      final userId = prefs.getInt('user_id')?.toString() ?? 'N/A';
+      final userName = prefs.getString('driver_name') ??
+          prefs.getString('user_name') ??
+          'Driver';
+      final userId =
+          (prefs.getInt('driver_id') ?? prefs.getInt('user_id'))?.toString() ??
+              'N/A';
 
       final cachedBusData = prefs.getString('cached_bus_data');
       final cachedRouteData = prefs.getString('cached_route_data');
 
-      if (cachedBusData != null && cachedRouteData != null) {
+      // Use cached data only on initial load; for explicit refresh we
+      // always hit the backend to get the latest assignments.
+      if (!forceRemote && cachedBusData != null && cachedRouteData != null) {
         try {
           final busDataJson = jsonDecode(cachedBusData);
           final routeDataJson = jsonDecode(cachedRouteData);
@@ -224,12 +230,26 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
             "driverName": userName,
             "busNumber": _busData?['bus_number'] ?? 'No Bus',
             "busPlate": _busData?['number_plate'] ?? 'N/A',
-            "routeName": _routeDetails?['route_name'] ?? 'No Route',
+            // Unified auth may cache a minimal route object with only a `name`.
+            // Prefer full `route_name` when present, otherwise fall back to `name`.
+            "routeName": _routeDetails?['route_name'] ??
+                _routeDetails?['name'] ??
+                'No Route',
             "estimatedDuration": _routeDetails?['estimated_duration'] ?? "N/A",
-            "studentCount": _assignedChildren.length,
+            "studentCount":
+                _routeDetails?['total_children'] ?? _assignedChildren.length,
           };
-          setState(() => _isLoadingData = false);
-          return;
+
+          final bool hasRouteName =
+              (_routeDetails?['route_name'] as String?)?.isNotEmpty ?? false;
+          final bool hasChildren = _assignedChildren.isNotEmpty;
+
+          // Only short-circuit when we have a full route with children.
+          // Otherwise fall through and hydrate from /api/drivers/my-route/.
+          if (hasRouteName && hasChildren) {
+            setState(() => _isLoadingData = false);
+            return;
+          }
         } catch (_) {}
       }
 
@@ -299,8 +319,12 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
   Future<void> _initializeFallbackData() async {
     final prefs = await SharedPreferences.getInstance();
-    final userName = prefs.getString('user_name') ?? 'Driver';
-    final userId = prefs.getInt('user_id')?.toString() ?? 'N/A';
+    final userName = prefs.getString('driver_name') ??
+        prefs.getString('user_name') ??
+        'Driver';
+    final userId =
+        (prefs.getInt('driver_id') ?? prefs.getInt('user_id'))?.toString() ??
+            'N/A';
 
     setState(() {
       _driverData = {
@@ -315,6 +339,10 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
       };
       _assignedChildren = [];
     });
+  }
+
+  Future<void> _refreshDriverData() async {
+    return _loadDriverData(forceRemote: true);
   }
 
   @override
@@ -508,10 +536,13 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
+        final message = e.toString().replaceFirst('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Failed to start trip'),
-              backgroundColor: AppTheme.criticalAlert),
+            content:
+                Text(message.isNotEmpty ? message : 'Failed to start trip'),
+            backgroundColor: AppTheme.criticalAlert,
+          ),
         );
       }
     }
@@ -748,12 +779,19 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   }
 
   Widget _buildLoadingState() {
-    return Container(
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      CircularProgressIndicator(color: AppTheme.primaryDriver, strokeWidth: 3),
-      SizedBox(height: 2.h),
-      Text('Loading...', style: TextStyle(color: AppTheme.textSecondary)),
-    ]));
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+              color: AppTheme.primaryDriver, strokeWidth: 3),
+          SizedBox(height: 2.h),
+          Text('Loading...', style: TextStyle(color: AppTheme.textSecondary)),
+        ],
+      ),
+    );
   }
 
   Widget _buildMainContent() {
@@ -763,30 +801,42 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         child: Column(children: [
       _buildTopBar(name),
       Expanded(
+        child: RefreshIndicator(
+          onRefresh: _refreshDriverData,
+          color: AppTheme.primaryDriver,
           child: SingleChildScrollView(
-        physics: BouncingScrollPhysics(),
-        padding: EdgeInsets.symmetric(horizontal: 5.w),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(height: 2.h),
-          _buildGreetingCard(name),
-          SizedBox(height: 3.h),
-          if (_driverData?['routeAssignment'] == 'Not Assigned Yet')
-            _buildNotAssignedCard()
-          else ...[_buildAssignmentCard(), SizedBox(height: 3.h)],
-          _buildSectionTitle('Location Status', Icons.location_on_outlined),
-          SizedBox(height: 1.5.h),
-          _buildLocationCard(),
-          SizedBox(height: 3.h),
-          _buildSectionTitle('Trip Type', Icons.swap_vert_rounded),
-          SizedBox(height: 1.5.h),
-          _buildTripTypeSelector(),
-          SizedBox(height: 3.h),
-          _buildSectionTitle('Pre-Trip Checklist', Icons.checklist_rounded),
-          SizedBox(height: 1.5.h),
-          _buildChecklistCard(),
-          SizedBox(height: 4.h),
-        ]),
-      )),
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: EdgeInsets.symmetric(horizontal: 5.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: 2.h),
+                _buildGreetingCard(name),
+                SizedBox(height: 3.h),
+                if (_driverData?['routeAssignment'] == 'Not Assigned Yet')
+                  _buildNotAssignedCard()
+                else ...[_buildAssignmentCard(), SizedBox(height: 3.h)],
+                _buildSectionTitle(
+                    'Location Status', Icons.location_on_outlined),
+                SizedBox(height: 1.5.h),
+                _buildLocationCard(),
+                SizedBox(height: 3.h),
+                _buildSectionTitle('Trip Type', Icons.swap_vert_rounded),
+                SizedBox(height: 1.5.h),
+                _buildTripTypeSelector(),
+                SizedBox(height: 3.h),
+                _buildSectionTitle(
+                    'Pre-Trip Checklist', Icons.checklist_rounded),
+                SizedBox(height: 1.5.h),
+                _buildChecklistCard(),
+                SizedBox(height: 4.h),
+              ],
+            ),
+          ),
+        ),
+      ),
       _buildBottomButton(),
     ]));
   }
