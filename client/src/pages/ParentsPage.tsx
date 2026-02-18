@@ -334,6 +334,18 @@ export default function ParentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
+              {filteredParents.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-16 text-center">
+                    <p className="text-slate-500 font-medium">
+                      {searchTerm ? 'No parents match your search' : 'No parents yet'}
+                    </p>
+                    {!searchTerm && (
+                      <p className="text-slate-400 text-sm mt-1">Click "Add Parent" to get started</p>
+                    )}
+                  </td>
+                </tr>
+              )}
               {filteredParents.map((parent) => (
                 <tr key={parent.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -414,6 +426,16 @@ export default function ParentsPage() {
 
       {/* Parents Cards - Mobile */}
       <div className="md:hidden space-y-4">
+        {filteredParents.length === 0 && !loading && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+            <p className="text-slate-500 font-medium">
+              {searchTerm ? 'No parents match your search' : 'No parents yet'}
+            </p>
+            {!searchTerm && (
+              <p className="text-slate-400 text-sm mt-1">Click "Add Parent" to get started</p>
+            )}
+          </div>
+        )}
         {filteredParents.map((parent) => (
           <div key={parent.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex items-start justify-between mb-3">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2, Baby, Users, Bus as BusIcon, UserCheck, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, Baby, Users, Bus as BusIcon, UserCheck } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -18,7 +18,6 @@ export default function ChildrenPage() {
   const confirm = useConfirm();
   const [formError, setFormError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [ordering, setOrdering] = useState('first_name');
   const [gradeFilter, setGradeFilter] = useState('all');
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -37,7 +36,7 @@ export default function ChildrenPage() {
     loadChildren,
     loadMore: loadMoreChildren,
     refreshChildren
-  } = useChildren({ search: searchTerm, ordering });
+  } = useChildren({ search: searchTerm });
 
   React.useEffect(() => { loadChildren(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -208,13 +207,6 @@ export default function ChildrenPage() {
                 className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <button
-              onClick={() => setOrdering(ordering === 'first_name' ? '-first_name' : 'first_name')}
-              className="flex items-center gap-1 px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50"
-              title="Toggle sort order"
-            >
-              <ArrowUpDown size={16} />
-            </button>
           </div>
           <Select
             value={gradeFilter}
@@ -257,6 +249,18 @@ export default function ChildrenPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
+              {filteredChildren.length === 0 && !childrenLoading && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <p className="text-slate-500 font-medium">
+                      {searchTerm || gradeFilter !== 'all' ? 'No children match your search' : 'No children yet'}
+                    </p>
+                    {!searchTerm && gradeFilter === 'all' && (
+                      <p className="text-slate-400 text-sm mt-1">Click "Add Child" to get started</p>
+                    )}
+                  </td>
+                </tr>
+              )}
               {filteredChildren.map((child) => (
                 <tr key={child.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -333,6 +337,16 @@ export default function ChildrenPage() {
 
       {/* Children Cards - Mobile */}
       <div className="md:hidden space-y-4">
+        {filteredChildren.length === 0 && !childrenLoading && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+            <p className="text-slate-500 font-medium">
+              {searchTerm || gradeFilter !== 'all' ? 'No children match your search' : 'No children yet'}
+            </p>
+            {!searchTerm && gradeFilter === 'all' && (
+              <p className="text-slate-400 text-sm mt-1">Click "Add Child" to get started</p>
+            )}
+          </div>
+        )}
         {filteredChildren.map((child) => (
           <div key={child.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex items-start justify-between mb-3">

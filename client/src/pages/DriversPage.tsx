@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserCircle, Bus as BusIcon, CheckCircle, Users, Phone, CreditCard, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserCircle, Bus as BusIcon, CheckCircle, Users, Phone, CreditCard } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -16,8 +16,7 @@ export default function DriversPage() {
   const confirm = useConfirm();
   const [formError, setFormError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [ordering, setOrdering] = useState('user__first_name');
-  const { drivers, loading, hasMore, totalCount, loadDrivers, loadMore: loadMoreDrivers } = useDrivers({ search: searchTerm, ordering });
+  const { drivers, loading, hasMore, totalCount, loadDrivers, loadMore: loadMoreDrivers } = useDrivers({ search: searchTerm });
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -168,13 +167,6 @@ export default function DriversPage() {
               className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <button
-            onClick={() => setOrdering(o => o === 'user__first_name' ? '-user__first_name' : 'user__first_name')}
-            className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-600 whitespace-nowrap"
-          >
-            <ArrowUpDown size={16} />
-            <span className="text-sm font-medium hidden sm:inline">{ordering.startsWith('-') ? 'Z → A' : 'A → Z'}</span>
-          </button>
         </div>
       </div>
 
@@ -208,6 +200,18 @@ export default function DriversPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
+              {filteredDrivers.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <p className="text-slate-500 font-medium">
+                      {searchTerm ? 'No drivers match your search' : 'No drivers yet'}
+                    </p>
+                    {!searchTerm && (
+                      <p className="text-slate-400 text-sm mt-1">Click "Add Driver" to get started</p>
+                    )}
+                  </td>
+                </tr>
+              )}
               {filteredDrivers.map((driver) => (
                 <tr key={driver.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -282,6 +286,16 @@ export default function DriversPage() {
 
       {/* Drivers Cards - Mobile */}
       <div className="md:hidden space-y-4">
+        {filteredDrivers.length === 0 && !loading && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+            <p className="text-slate-500 font-medium">
+              {searchTerm ? 'No drivers match your search' : 'No drivers yet'}
+            </p>
+            {!searchTerm && (
+              <p className="text-slate-400 text-sm mt-1">Click "Add Driver" to get started</p>
+            )}
+          </div>
+        )}
         {filteredDrivers.map((driver) => (
           <div key={driver.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex items-start justify-between mb-3">

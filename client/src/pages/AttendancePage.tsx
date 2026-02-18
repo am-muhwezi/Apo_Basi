@@ -466,8 +466,12 @@ export default function AttendancePage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                    No attendance records found
+                  <td colSpan={6} className="px-6 py-16 text-center">
+                    <p className="text-slate-500 font-medium">
+                      {searchQuery || statusFilter !== 'all'
+                        ? 'No records match your filters'
+                        : 'No attendance records for this date'}
+                    </p>
                   </td>
                 </tr>
               )}
@@ -518,9 +522,12 @@ export default function AttendancePage() {
             );
           })
         ) : (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
-            <Users className="w-12 h-12 text-slate-400 mx-auto mb-2" />
-            <p className="text-slate-600">No attendance records found</p>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+            <p className="text-slate-500 font-medium">
+              {searchQuery || statusFilter !== 'all'
+                ? 'No records match your filters'
+                : 'No attendance records for this date'}
+            </p>
           </div>
         )}
       </div>

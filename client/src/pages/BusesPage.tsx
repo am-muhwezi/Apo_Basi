@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2, Users, Bus as BusIcon, AlertTriangle, CheckCircle, UserCircle, UserCheck, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, Users, Bus as BusIcon, AlertTriangle, CheckCircle, UserCircle, UserCheck } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -19,8 +19,7 @@ export default function BusesPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [busOrdering, setBusOrdering] = useState('bus_number');
-  const { buses, loadBuses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren, hasMore: busesHasMore, loadMore: loadMoreBuses, loading: busesLoading, totalCount: busesTotal } = useBuses({ search: searchTerm, ordering: busOrdering });
+  const { buses, loadBuses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren, hasMore: busesHasMore, loadMore: loadMoreBuses, loading: busesLoading, totalCount: busesTotal } = useBuses({ search: searchTerm });
 
   // Lazy load drivers, minders, children only when needed
   const { drivers, loadDrivers, hasMore: driversHasMore, loadMore: loadMoreDrivers } = useDrivers();
@@ -261,13 +260,6 @@ export default function BusesPage() {
               className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <button
-            onClick={() => setBusOrdering(busOrdering === 'bus_number' ? '-bus_number' : 'bus_number')}
-            className="flex items-center gap-1 px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50"
-            title="Toggle sort order"
-          >
-            <ArrowUpDown size={16} />
-          </button>
         </div>
       </div>
 
@@ -287,7 +279,7 @@ export default function BusesPage() {
                   Driver
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
-                  Minder
+                  Bus Assistant
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
                   Children
@@ -301,6 +293,18 @@ export default function BusesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
+              {filteredBuses.length === 0 && !busesLoading && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <p className="text-slate-500 font-medium">
+                      {searchTerm ? 'No buses match your search' : 'No buses yet'}
+                    </p>
+                    {!searchTerm && (
+                      <p className="text-slate-400 text-sm mt-1">Click "Add Bus" to get started</p>
+                    )}
+                  </td>
+                </tr>
+              )}
               {filteredBuses.map((bus) => (
                 <tr key={bus.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -384,6 +388,16 @@ export default function BusesPage() {
 
       {/* Buses Cards - Mobile */}
       <div className="md:hidden space-y-4">
+        {filteredBuses.length === 0 && !busesLoading && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+            <p className="text-slate-500 font-medium">
+              {searchTerm ? 'No buses match your search' : 'No buses yet'}
+            </p>
+            {!searchTerm && (
+              <p className="text-slate-400 text-sm mt-1">Click "Add Bus" to get started</p>
+            )}
+          </div>
+        )}
         {filteredBuses.map((bus) => (
           <div key={bus.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex items-start justify-between mb-3">
@@ -412,7 +426,7 @@ export default function BusesPage() {
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <UserCheck className="w-4 h-4 text-slate-400" />
-                <span className="text-slate-600">Minder:</span>
+                <span className="text-slate-600">Bus Assistant:</span>
                 <span className="font-medium text-slate-900">{bus.minderName || 'Not Assigned'}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
@@ -572,7 +586,7 @@ export default function BusesPage() {
               ]}
             />
             <Select
-              label="Bus Minder"
+              label="Bus Assistant"
               value={assignData.minderId}
               onChange={(e) => setAssignData({ ...assignData, minderId: e.target.value })}
               options={[
@@ -668,7 +682,7 @@ export default function BusesPage() {
                 <p className="text-base text-slate-900">{selectedBus.driverName || 'Not Assigned'}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-700">Bus Minder</p>
+                <p className="text-sm font-medium text-slate-700">Bus Assistant</p>
                 <p className="text-base text-slate-900">{selectedBus.minderName || 'Not Assigned'}</p>
               </div>
               {selectedBus.lastMaintenance && (
