@@ -108,6 +108,11 @@ export default function ChildrenPage() {
     e.preventDefault();
     setFormError(null);
 
+    if (!formData.parentId) {
+      setFormError('Please select a parent before saving.');
+      return;
+    }
+
     if (selectedChild) {
       const result = await childService.updateChild(selectedChild.id, formData);
       if (result.success) {
