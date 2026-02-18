@@ -103,11 +103,12 @@ export function useBuses(params?: UseBusesParams): UseBusesReturn {
       });
 
       if (result.success && result.data) {
-        const { buses: newBuses, hasNext, count } = result.data;
+        const { buses: newBuses, count } = result.data;
+        const newOffset = currentOffset + newBuses.length;
         setBuses((prev) => (append ? [...prev, ...newBuses] : newBuses));
-        setHasMore(hasNext);
         setTotalCount(count ?? 0);
-        offsetRef.current = currentOffset + newBuses.length;
+        setHasMore(newOffset < (count ?? 0));
+        offsetRef.current = newOffset;
       } else {
         setError(result.error?.message || 'Failed to load buses');
         if (!append) setBuses([]);

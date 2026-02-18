@@ -47,11 +47,12 @@ export function useMinders(params?: UseMindersParams): UseMindersReturn {
       });
 
       if (result.success && result.data) {
-        const { minders: newMinders, hasNext, count } = result.data;
+        const { minders: newMinders, count } = result.data;
+        const newOffset = currentOffset + newMinders.length;
         setMinders((prev) => (append ? [...prev, ...newMinders] : newMinders));
-        setHasMore(hasNext);
         setTotalCount(count ?? 0);
-        offsetRef.current = currentOffset + newMinders.length;
+        setHasMore(newOffset < (count ?? 0));
+        offsetRef.current = newOffset;
       } else {
         setError(result.error?.message || 'Failed to load minders');
         if (!append) setMinders([]);

@@ -22,10 +22,8 @@ export default function MindersPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [formData, setFormData] = useState<Partial<BusMinder>>({});
 
-  React.useEffect(() => { loadMinders(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
-    const timer = setTimeout(() => loadMinders(), 400);
+    const timer = setTimeout(() => loadMinders(), searchTerm ? 400 : 0);
     return () => clearTimeout(timer);
   }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
 
