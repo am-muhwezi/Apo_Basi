@@ -1,96 +1,89 @@
-/**
- * useMinders Hook
- *
- * Custom React hook for managing bus minders state and operations.
- *
- * Architecture:
- * - Manages local state (minders, loading, error)
- * - Calls busMinderService methods (NOT API directly)
- * - Handles UI-specific concerns (loading states, pagination)
- */
-
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { busMinderService } from '../services/busMinderService';
 import type { Minder } from '../types';
+
+interface UseMindersParams {
+  search?: string;
+}
 
 interface UseMindersReturn {
   minders: Minder[];
   loading: boolean;
   error: string | null;
   hasMore: boolean;
+  totalCount: number;
   loadMinders: (append?: boolean) => Promise<void>;
   loadMore: () => void;
   refreshMinders: () => Promise<void>;
 }
 
-/**
- * Custom hook for bus minders management
- */
-export function useMinders(): UseMindersReturn {
+const LIMIT = 20;
+
+export function useMinders(params?: UseMindersParams): UseMindersReturn {
   const [minders, setMinders] = useState<Minder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState(0);
-  const LIMIT = 20;
+  const [totalCount, setTotalCount] = useState(0);
+  const offsetRef = useRef(0);
+  const loadingRef = useRef(false);
+  const searchRef = useRef(params?.search ?? '');
 
-  const loadMinders = useCallback(
-    async (append = false) => {
-      try {
-        setLoading(true);
-        setError(null);
+  const loadMinders = useCallback(async (append = false) => {
+    if (loadingRef.current) return;
+    try {
+      loadingRef.current = true;
+      setLoading(true);
+      setError(null);
 
-        const currentOffset = append ? offset : 0;
-        const result = await busMinderService.loadBusMinders({
-          limit: LIMIT,
-          offset: currentOffset,
-        });
+      const currentOffset = append ? offsetRef.current : 0;
+      const result = await busMinderService.loadBusMinders({
+        limit: LIMIT,
+        offset: currentOffset,
+        search: searchRef.current || undefined,
+      });
 
-        if (result.success && result.data) {
-          const { minders: newMinders, hasNext } = result.data;
-
-          setMinders((prev) => (append ? [...prev, ...newMinders] : newMinders));
-          setHasMore(hasNext);
-          setOffset(currentOffset + newMinders.length);
-        } else {
-          setError(result.error?.message || 'Failed to load minders');
-          if (!append) {
-            setMinders([]);
-          }
-        }
-      } catch (err) {
-        setError('An unexpected error occurred');
-        if (!append) {
-          setMinders([]);
-        }
-      } finally {
-        setLoading(false);
+      if (result.success && result.data) {
+        const { minders: newMinders, hasNext, count } = result.data;
+        setMinders((prev) => (append ? [...prev, ...newMinders] : newMinders));
+        setHasMore(hasNext);
+        setTotalCount(count ?? 0);
+        offsetRef.current = currentOffset + newMinders.length;
+      } else {
+        setError(result.error?.message || 'Failed to load minders');
+        if (!append) setMinders([]);
       }
-    },
-    [offset]
-  );
+    } catch {
+      setError('An unexpected error occurred');
+      if (!append) setMinders([]);
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, []); // No deps — uses refs
+
+  // Re-fetch when search or ordering changes
+  useEffect(() => {
+    const newSearch = params?.search ?? '';
+    const newOrdering = params?.ordering ?? '';
+    if (searchRef.current !== newSearch || orderingRef.current !== newOrdering) {
+      searchRef.current = newSearch;
+      orderingRef.current = newOrdering;
+      offsetRef.current = 0;
+      loadMinders(false);
+    }
+  }, [params?.search, params?.ordering, loadMinders]);
 
   const loadMore = useCallback(() => {
-    if (!loading && hasMore) {
+    if (!loadingRef.current && hasMore) {
       loadMinders(true);
     }
-  }, [loading, hasMore, loadMinders]);
+  }, [hasMore, loadMinders]);
 
   const refreshMinders = useCallback(async () => {
-    setOffset(0);
+    offsetRef.current = 0;
     await loadMinders(false);
   }, [loadMinders]);
 
-  // NOTE: Minders do NOT auto-load on mount
-  // Each page decides when to call loadMinders()
-
-  return {
-    minders,
-    loading,
-    error,
-    hasMore,
-    loadMinders,
-    loadMore,
-    refreshMinders,
-  };
+  return { minders, loading, error, hasMore, totalCount, loadMinders, loadMore, refreshMinders };
 }

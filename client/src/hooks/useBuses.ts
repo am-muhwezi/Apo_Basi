@@ -17,10 +17,15 @@
  * - Return consistent interface for components
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { busService } from '../services/busService';
 import type { Bus } from '../types';
 import type { ApiResponse } from '../types/api';
+
+interface UseBusesParams {
+  search?: string;
+  ordering?: string;
+}
 
 interface UseBusesReturn {
   // State
@@ -28,6 +33,7 @@ interface UseBusesReturn {
   loading: boolean;
   error: string | null;
   hasMore: boolean;
+  totalCount: number;
 
   // Actions
   loadBuses: (append?: boolean) => Promise<void>;
@@ -64,68 +70,80 @@ interface UseBusesReturn {
  * }
  * ```
  */
-export function useBuses(): UseBusesReturn {
+const LIMIT = 20;
+
+export function useBuses(params?: UseBusesParams): UseBusesReturn {
   const [buses, setBuses] = useState<Bus[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState(0);
-  const LIMIT = 20;
+  const [totalCount, setTotalCount] = useState(0);
+  const offsetRef = useRef(0);
+  const loadingRef = useRef(false);
+  const searchRef = useRef(params?.search ?? '');
+  const orderingRef = useRef(params?.ordering ?? '');
 
   /**
    * Load buses with optional pagination
    * @param append - If true, append to existing buses; if false, replace
    */
-  const loadBuses = useCallback(
-    async (append = false) => {
-      try {
-        setLoading(true);
-        setError(null);
+  const loadBuses = useCallback(async (append = false) => {
+    if (loadingRef.current) return;
+    try {
+      loadingRef.current = true;
+      setLoading(true);
+      setError(null);
 
-        const currentOffset = append ? offset : 0;
-        const result = await busService.loadBuses({
-          limit: LIMIT,
-          offset: currentOffset,
-        });
+      const currentOffset = append ? offsetRef.current : 0;
+      const result = await busService.loadBuses({
+        limit: LIMIT,
+        offset: currentOffset,
+        search: searchRef.current || undefined,
+        ordering: orderingRef.current || undefined,
+      });
 
-        if (result.success && result.data) {
-          const { buses: newBuses, hasNext } = result.data;
-
-          setBuses((prev) => (append ? [...prev, ...newBuses] : newBuses));
-          setHasMore(hasNext);
-          setOffset(currentOffset + newBuses.length);
-        } else {
-          setError(result.error?.message || 'Failed to load buses');
-          if (!append) {
-            setBuses([]);
-          }
-        }
-      } catch (err) {
-        setError('An unexpected error occurred');
-        if (!append) {
-          setBuses([]);
-        }
-      } finally {
-        setLoading(false);
+      if (result.success && result.data) {
+        const { buses: newBuses, hasNext, count } = result.data;
+        setBuses((prev) => (append ? [...prev, ...newBuses] : newBuses));
+        setHasMore(hasNext);
+        setTotalCount(count ?? 0);
+        offsetRef.current = currentOffset + newBuses.length;
+      } else {
+        setError(result.error?.message || 'Failed to load buses');
+        if (!append) setBuses([]);
       }
-    },
-    [offset]
-  );
+    } catch {
+      setError('An unexpected error occurred');
+      if (!append) setBuses([]);
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, []); // No deps — uses refs
+
+  // Re-fetch when search or ordering changes
+  useEffect(() => {
+    const newSearch = params?.search ?? '';
+    const newOrdering = params?.ordering ?? '';
+    if (searchRef.current !== newSearch || orderingRef.current !== newOrdering) {
+      searchRef.current = newSearch;
+      orderingRef.current = newOrdering;
+      offsetRef.current = 0;
+      loadBuses(false);
+    }
+  }, [params?.search, params?.ordering, loadBuses]);
 
   /**
    * Load more buses (pagination)
    */
   const loadMore = useCallback(() => {
-    if (!loading && hasMore) {
+    if (!loadingRef.current && hasMore) {
       loadBuses(true);
     }
-  }, [loading, hasMore, loadBuses]);
+  }, [hasMore, loadBuses]);
 
-  /**
-   * Refresh buses from scratch
-   */
   const refreshBuses = useCallback(async () => {
-    setOffset(0);
+    offsetRef.current = 0;
     await loadBuses(false);
   }, [loadBuses]);
 
@@ -248,6 +266,7 @@ export function useBuses(): UseBusesReturn {
     loading,
     error,
     hasMore,
+    totalCount,
 
     // Actions
     loadBuses,
