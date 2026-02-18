@@ -10,7 +10,7 @@ class ChildListCreateView(generics.ListCreateAPIView):
     POST /api/children/ - Create new child
     """
     permission_classes = [IsAuthenticated]
-    queryset = Child.objects.select_related('parent__user', 'assigned_bus').all()
+    queryset = Child.objects.select_related('parent__user', 'assigned_bus').order_by('id')
     filter_backends = [filters.SearchFilter]
     search_fields = ['first_name', 'last_name', 'parent__user__first_name', 'parent__user__last_name']
 

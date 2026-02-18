@@ -53,7 +53,7 @@ class ParentViewSet(viewsets.ModelViewSet):
         - Returns: {count, next, previous, results}
     """
 
-    queryset = Parent.objects.select_related('user').all()
+    queryset = Parent.objects.select_related('user').order_by('id')
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields = ['user__first_name', 'user__last_name', 'user__email', 'contact_number']

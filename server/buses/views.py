@@ -93,7 +93,7 @@ class BusViewSet(viewsets.ModelViewSet):
 
     # Query optimization: Reduce database queries
     # Note: Assignments are now handled via Assignment model, not direct ForeignKeys
-    queryset = Bus.objects.all()
+    queryset = Bus.objects.order_by('id')
     filter_backends = [filters.SearchFilter]
     search_fields = ['bus_number', 'number_plate']
 
