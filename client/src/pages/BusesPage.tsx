@@ -195,6 +195,42 @@ export default function BusesPage() {
   const maintenanceBuses = buses.filter((b) => b.status === 'maintenance').length;
   const totalCapacity = buses.reduce((sum, b) => sum + (b.capacity || 0), 0);
 
+  if (busesLoading && buses.length === 0) {
+    return (
+      <div>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+          <div className="h-8 w-24 bg-slate-200 rounded animate-pulse mb-4 md:mb-0" />
+          <div className="h-10 w-28 bg-slate-200 rounded-lg animate-pulse" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <div className="h-9 w-9 bg-slate-200 rounded-lg animate-pulse mb-3" />
+              <div className="h-4 w-24 bg-slate-200 rounded animate-pulse mb-2" />
+              <div className="h-7 w-12 bg-slate-200 rounded animate-pulse" />
+            </div>
+          ))}
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-4 border-b border-slate-200">
+            <div className="h-10 bg-slate-100 rounded-lg animate-pulse" />
+          </div>
+          <div className="divide-y divide-slate-200">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="px-6 py-4 flex gap-4">
+                <div className="h-4 w-20 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 w-28 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 w-24 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 w-24 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 w-12 bg-slate-200 rounded animate-pulse ml-auto" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
