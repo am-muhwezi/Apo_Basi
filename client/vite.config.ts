@@ -68,10 +68,9 @@ export default defineConfig({
     })
   ],
   optimizeDeps: {
-    exclude: ['lucide-react'],
+    include: ['lucide-react'],
   },
   build: {
-    // Keep the current bundle but silence the size warning
     chunkSizeWarningLimit: 1024,
   },
 });
