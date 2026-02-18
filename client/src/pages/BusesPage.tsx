@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2, Users, Bus as BusIcon, AlertTriangle, CheckCircle, UserCircle, UserCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, Users, Bus as BusIcon, AlertTriangle, CheckCircle, UserCircle, UserCheck, ArrowUpDown } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -18,7 +18,9 @@ export default function BusesPage() {
   const confirm = useConfirm();
   const [formError, setFormError] = useState<string | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
-  const { buses, loadBuses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren, hasMore: busesHasMore, loadMore: loadMoreBuses, loading: busesLoading } = useBuses();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [busOrdering, setBusOrdering] = useState('bus_number');
+  const { buses, loadBuses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren, hasMore: busesHasMore, loadMore: loadMoreBuses, loading: busesLoading, totalCount: busesTotal } = useBuses({ search: searchTerm, ordering: busOrdering });
 
   // Lazy load drivers, minders, children only when needed
   const { drivers, loadDrivers, hasMore: driversHasMore, loadMore: loadMoreDrivers } = useDrivers();
@@ -32,7 +34,10 @@ export default function BusesPage() {
     loadBuses();
   }, []);
 
-  const [searchTerm, setSearchTerm] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => loadBuses(), 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
   const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -40,12 +45,7 @@ export default function BusesPage() {
   const [formData, setFormData] = useState<Partial<Bus>>({});
   const [assignData, setAssignData] = useState({ driverId: '', minderId: '', childrenIds: [] as string[] });
 
-  const filteredBuses = buses.filter((bus) => {
-    const matchesSearch =
-      bus.busNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bus.licensePlate?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+  const filteredBuses = buses; // search is server-side
 
   const handleCreate = () => {
     setSelectedBus(null);
@@ -250,15 +250,24 @@ export default function BusesPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
-          <input
-            type="text"
-            placeholder="Search by bus number or license plate..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search by bus number or license plate..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <button
+            onClick={() => setBusOrdering(busOrdering === 'bus_number' ? '-bus_number' : 'bus_number')}
+            className="flex items-center gap-1 px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50"
+            title="Toggle sort order"
+          >
+            <ArrowUpDown size={16} />
+          </button>
         </div>
       </div>
 
@@ -357,7 +366,7 @@ export default function BusesPage() {
         <div className="p-4 border-t border-slate-200">
           <div className="flex flex-col items-center gap-3">
             <span className="text-sm text-slate-600">
-              Loaded {filteredBuses.length} of {filteredBuses.length}{busesHasMore ? '+' : ''} buses
+              Loaded {buses.length} of {busesTotal} buses
             </span>
             {busesHasMore && (
               <Button
@@ -451,7 +460,7 @@ export default function BusesPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex flex-col items-center gap-3">
               <span className="text-sm text-slate-600">
-                Loaded {filteredBuses.length} of {filteredBuses.length}{busesHasMore ? '+' : ''} buses
+                Loaded {buses.length} of {busesTotal} buses
               </span>
               {busesHasMore && (
                 <Button
