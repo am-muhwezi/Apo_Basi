@@ -42,10 +42,11 @@ export default function ParentsPage() {
 
       if (result.success && result.data) {
         const newParents = result.data.parents || [];
+        const newOffset = offset + newParents.length;
         setParents((prev) => (append ? [...prev, ...newParents] : newParents));
-        offsetRef.current = offset + newParents.length;
-        setHasMore(result.data.hasNext || false);
         setTotalCount(result.data.count || 0);
+        setHasMore(newOffset < (result.data.count || 0));
+        offsetRef.current = newOffset;
       }
     } catch {
     } finally {
@@ -234,8 +235,8 @@ export default function ParentsPage() {
     }
   };
 
-  // Calculate stats from parent data (no need to load all children)
-  const totalParents = parents.length;
+  // Calculate stats — use server count for total, loaded array for derived stats
+  const totalParents = totalCount || parents.length;
   const activeParents = parents.filter((p) => p.status === 'active').length;
   const totalChildren = parents.reduce((sum, p) => sum + (p.childrenCount || 0), 0);
   const parentsWithChildren = parents.filter((p) => p.childrenIds && p.childrenIds.length > 0).length;

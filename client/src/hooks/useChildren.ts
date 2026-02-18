@@ -47,11 +47,12 @@ export function useChildren(params?: UseChildrenParams): UseChildrenReturn {
       });
 
       if (result.success && result.data) {
-        const { children: newChildren, hasNext, count } = result.data;
+        const { children: newChildren, count } = result.data;
+        const newOffset = currentOffset + newChildren.length;
         setChildren((prev) => (append ? [...prev, ...newChildren] : newChildren));
-        setHasMore(hasNext);
         setTotalCount(count ?? 0);
-        offsetRef.current = currentOffset + newChildren.length;
+        setHasMore(newOffset < (count ?? 0));
+        offsetRef.current = newOffset;
       } else {
         setError(result.error?.message || 'Failed to load children');
         if (!append) setChildren([]);
