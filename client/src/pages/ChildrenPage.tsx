@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2, Baby, Users, Bus as BusIcon, UserCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, Baby, Users, Bus as BusIcon, UserCheck, ArrowUpDown } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -17,24 +17,8 @@ export default function ChildrenPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const [formError, setFormError] = useState<string | null>(null);
-
-  // Use hooks for data management
-  const {
-    children,
-    loading: childrenLoading,
-    error: childrenError,
-    hasMore: childrenHasMore,
-    loadChildren,
-    loadMore: loadMoreChildren,
-    refreshChildren
-  } = useChildren();
-
-  // Load children on mount (assignedBusNumber and parentName are included in children response)
-  React.useEffect(() => {
-    loadChildren();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const [searchTerm, setSearchTerm] = useState('');
+  const [ordering, setOrdering] = useState('first_name');
   const [gradeFilter, setGradeFilter] = useState('all');
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -44,13 +28,28 @@ export default function ChildrenPage() {
 
   const grades = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6'];
 
-  const filteredChildren = children.filter((child) => {
-    const matchesSearch =
-      child.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      child.lastName?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesGrade = gradeFilter === 'all' || child.grade === gradeFilter;
-    return matchesSearch && matchesGrade;
-  });
+  const {
+    children,
+    loading: childrenLoading,
+    error: childrenError,
+    hasMore: childrenHasMore,
+    totalCount: childrenTotal,
+    loadChildren,
+    loadMore: loadMoreChildren,
+    refreshChildren
+  } = useChildren({ search: searchTerm, ordering });
+
+  React.useEffect(() => { loadChildren(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const timer = setTimeout(() => loadChildren(), 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Grade filter stays client-side (exact enum match)
+  const filteredChildren = gradeFilter === 'all'
+    ? children
+    : children.filter((child) => child.grade === gradeFilter);
 
   // Calculate stats
   const totalChildren = children.length;
@@ -198,15 +197,24 @@ export default function ChildrenPage() {
       {/* Search and Filter */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search by name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
+              <input
+                type="text"
+                placeholder="Search by name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              onClick={() => setOrdering(ordering === 'first_name' ? '-first_name' : 'first_name')}
+              className="flex items-center gap-1 px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50"
+              title="Toggle sort order"
+            >
+              <ArrowUpDown size={16} />
+            </button>
           </div>
           <Select
             value={gradeFilter}
@@ -307,7 +315,7 @@ export default function ChildrenPage() {
         <div className="p-4 border-t border-slate-200">
           <div className="flex flex-col items-center gap-3">
             <span className="text-sm text-slate-600">
-              Loaded {filteredChildren.length} of {filteredChildren.length}{childrenHasMore ? '+' : ''} children
+              Loaded {children.length} of {childrenTotal} children
             </span>
             {childrenHasMore && (
               <Button
@@ -388,7 +396,7 @@ export default function ChildrenPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex flex-col items-center gap-3">
               <span className="text-sm text-slate-600">
-                Loaded {filteredChildren.length} of {filteredChildren.length}{childrenHasMore ? '+' : ''} children
+                Loaded {children.length} of {childrenTotal} children
               </span>
               {childrenHasMore && (
                 <Button

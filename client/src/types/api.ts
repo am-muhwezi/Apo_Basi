@@ -39,6 +39,8 @@ export interface ApiResponse<T = void> {
 export interface PaginationParams {
   limit?: number;
   offset?: number;
+  search?: string;
+  ordering?: string;
 }
 
 // ============================================

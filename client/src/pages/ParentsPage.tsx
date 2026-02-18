@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserPlus, Users, Baby, UserCheck, Phone } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
@@ -19,43 +19,56 @@ export default function ParentsPage() {
   const [parents, setParents] = useState<Parent[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
   const offsetRef = useRef(0);
+  const loadingRef = useRef(false);
 
   // State for parent-specific children (loaded on-demand)
   const [parentChildren, setParentChildren] = useState<Child[]>([]);
   const [loadingChildren, setLoadingChildren] = useState(false);
 
-  // Fetch parents from backend on mount
-  React.useEffect(() => {
-    loadParents();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function loadParents(append = false) {
-    if (loading) return;
+  const loadParents = useCallback(async (append = false, search = '') => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
       setLoading(true);
       const offset = append ? offsetRef.current : 0;
-      const result = await parentService.loadParents({ limit: 20, offset });
+      const result = await parentService.loadParents({
+        limit: 20,
+        offset,
+        search: search || undefined,
+        ordering: 'user__first_name',
+      });
 
       if (result.success && result.data) {
         const newParents = result.data.parents || [];
         setParents((prev) => (append ? [...prev, ...newParents] : newParents));
         offsetRef.current = offset + newParents.length;
         setHasMore(result.data.hasNext || false);
+        setTotalCount(result.data.count || 0);
       }
-    } catch (error) {
+    } catch {
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
-  }
+  }, []); // No deps — uses refs for mutable values
+
+  // Initial load + debounced search (400ms). Cleanup cancels pending timer on rapid typing.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadParents(false, searchTerm);
+    }, searchTerm ? 400 : 0);
+    return () => clearTimeout(timer);
+  }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function loadMoreParents() {
     if (!loading && hasMore) {
-      loadParents(true);
+      loadParents(true, searchTerm);
     }
   }
 
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedParent, setSelectedParent] = useState<Parent | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -66,13 +79,8 @@ export default function ParentsPage() {
   const [formData, setFormData] = useState<Partial<Parent>>({});
   const [childFormData, setChildFormData] = useState<Partial<Child>>({});
 
-  const filteredParents = parents.filter((parent) => {
-    const matchesSearch =
-      parent.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parent.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parent.email.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+  // Search is server-side — parents already filtered by backend
+  const filteredParents = parents;
 
   const handleCreate = () => {
     setSelectedParent(null);
@@ -388,7 +396,7 @@ export default function ParentsPage() {
         <div className="p-4 border-t border-slate-200">
           <div className="flex flex-col items-center gap-3">
             <span className="text-sm text-slate-600">
-              Loaded {filteredParents.length} of {filteredParents.length}{hasMore ? '+' : ''} parents
+              Loaded {parents.length} of {totalCount} parents
             </span>
             {hasMore && (
               <Button
@@ -479,7 +487,7 @@ export default function ParentsPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex flex-col items-center gap-3">
               <span className="text-sm text-slate-600">
-                Loaded {filteredParents.length} of {filteredParents.length}{hasMore ? '+' : ''} parents
+                Loaded {parents.length} of {totalCount} parents
               </span>
               {hasMore && (
                 <Button

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserCircle, Bus as BusIcon, CheckCircle, Users, Phone, Mail } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserCircle, Bus as BusIcon, CheckCircle, Users, Phone, Mail, ArrowUpDown } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -15,29 +15,22 @@ export default function MindersPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const [formError, setFormError] = useState<string | null>(null);
-  // Use hooks for minders
-  const { minders, loading, hasMore, loadMinders, loadMore: loadMoreMinders } = useMinders();
-
-  // Load minders on mount (assignedBusNumber is included in minders response)
-  React.useEffect(() => {
-    loadMinders();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // loadMoreMinders is already available from the hook
-
   const [searchTerm, setSearchTerm] = useState('');
+  const [ordering, setOrdering] = useState('user__first_name');
+  const { minders, loading, hasMore, totalCount, loadMinders, loadMore: loadMoreMinders } = useMinders({ search: searchTerm, ordering });
   const [selectedMinder, setSelectedMinder] = useState<BusMinder | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [formData, setFormData] = useState<Partial<BusMinder>>({});
 
-  const filteredMinders = minders.filter((minder) => {
-    const matchesSearch =
-      minder.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      minder.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      minder.email.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+  React.useEffect(() => { loadMinders(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const timer = setTimeout(() => loadMinders(), 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filteredMinders = minders; // search is server-side
 
   const handleCreate = () => {
     setSelectedMinder(null);
@@ -162,15 +155,24 @@ export default function MindersPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
-          <input
-            type="text"
-            placeholder="Search by name or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+        <div className="flex gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <button
+            onClick={() => setOrdering(o => o === 'user__first_name' ? '-user__first_name' : 'user__first_name')}
+            className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-600 whitespace-nowrap"
+          >
+            <ArrowUpDown size={16} />
+            <span className="text-sm font-medium hidden sm:inline">{ordering.startsWith('-') ? 'Z → A' : 'A → Z'}</span>
+          </button>
         </div>
       </div>
 
@@ -254,7 +256,7 @@ export default function MindersPage() {
         <div className="p-4 border-t border-slate-200">
           <div className="flex flex-col items-center gap-3">
             <span className="text-sm text-slate-600">
-              Loaded {filteredMinders.length} of {filteredMinders.length}{hasMore ? '+' : ''} minders
+              Loaded {minders.length} of {totalCount} minders
             </span>
             {hasMore && (
               <Button
@@ -335,7 +337,7 @@ export default function MindersPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex flex-col items-center gap-3">
               <span className="text-sm text-slate-600">
-                Loaded {filteredMinders.length} of {filteredMinders.length}{hasMore ? '+' : ''} minders
+                Loaded {minders.length} of {totalCount} minders
               </span>
               {hasMore && (
                 <Button
