@@ -38,10 +38,8 @@ export default function ChildrenPage() {
     refreshChildren
   } = useChildren({ search: searchTerm });
 
-  React.useEffect(() => { loadChildren(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
-    const timer = setTimeout(() => loadChildren(), 400);
+    const timer = setTimeout(() => loadChildren(), searchTerm ? 400 : 0);
     return () => clearTimeout(timer);
   }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -319,7 +317,7 @@ export default function ChildrenPage() {
         <div className="p-4 border-t border-slate-200">
           <div className="flex flex-col items-center gap-3">
             <span className="text-sm text-slate-600">
-              Loaded {children.length} of {childrenTotal} children
+              Loaded {Math.min(children.length, childrenTotal)} of {childrenTotal} children
             </span>
             {childrenHasMore && (
               <Button
@@ -410,7 +408,7 @@ export default function ChildrenPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex flex-col items-center gap-3">
               <span className="text-sm text-slate-600">
-                Loaded {children.length} of {childrenTotal} children
+                Loaded {Math.min(children.length, childrenTotal)} of {childrenTotal} children
               </span>
               {childrenHasMore && (
                 <Button
