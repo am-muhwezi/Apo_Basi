@@ -5,7 +5,7 @@ import logging
 import requests
 from jose import jwt, JWTError
 
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -55,6 +55,8 @@ class ParentViewSet(viewsets.ModelViewSet):
 
     queryset = Parent.objects.select_related('user').all()
     permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['user__first_name', 'user__last_name', 'user__email', 'contact_number']
 
     def retrieve(self, request, *args, **kwargs):
         """
