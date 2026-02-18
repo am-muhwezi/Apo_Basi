@@ -38,7 +38,6 @@ export default function ParentsPage() {
         limit: 20,
         offset,
         search: search || undefined,
-        ordering: 'user__first_name',
       });
 
       if (result.success && result.data) {
@@ -408,7 +407,7 @@ export default function ParentsPage() {
         <div className="p-4 border-t border-slate-200">
           <div className="flex flex-col items-center gap-3">
             <span className="text-sm text-slate-600">
-              Loaded {parents.length} of {totalCount} parents
+              Loaded {Math.min(parents.length, totalCount)} of {totalCount} parents
             </span>
             {hasMore && (
               <Button
@@ -509,7 +508,7 @@ export default function ParentsPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex flex-col items-center gap-3">
               <span className="text-sm text-slate-600">
-                Loaded {parents.length} of {totalCount} parents
+                Loaded {Math.min(parents.length, totalCount)} of {totalCount} parents
               </span>
               {hasMore && (
                 <Button
