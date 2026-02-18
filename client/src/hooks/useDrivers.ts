@@ -45,11 +45,12 @@ export function useDrivers(params?: UseDriversParams): UseDriversReturn {
       });
 
       if (result.success && result.data) {
-        const { drivers: newDrivers, hasNext, count } = result.data;
+        const { drivers: newDrivers, count } = result.data;
+        const newOffset = currentOffset + newDrivers.length;
         setDrivers((prev) => (append ? [...prev, ...newDrivers] : newDrivers));
-        setHasMore(hasNext);
         setTotalCount(count ?? 0);
-        offsetRef.current = currentOffset + newDrivers.length;
+        setHasMore(newOffset < (count ?? 0));
+        offsetRef.current = newOffset;
       } else {
         setError(result.error?.message || 'Failed to load drivers');
         if (!append) setDrivers([]);

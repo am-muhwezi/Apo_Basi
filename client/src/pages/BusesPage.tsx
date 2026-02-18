@@ -28,13 +28,8 @@ export default function BusesPage() {
 
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  // Load buses on mount (driver/minder names are included in buses response)
-  React.useEffect(() => {
-    loadBuses();
-  }, []);
-
   useEffect(() => {
-    const timer = setTimeout(() => loadBuses(), 400);
+    const timer = setTimeout(() => loadBuses(), searchTerm ? 400 : 0);
     return () => clearTimeout(timer);
   }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
   const [selectedBus, setSelectedBus] = useState<Bus | null>(null);

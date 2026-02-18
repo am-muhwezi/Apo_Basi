@@ -22,10 +22,8 @@ export default function DriversPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [formData, setFormData] = useState<Partial<Driver>>({});
 
-  React.useEffect(() => { loadDrivers(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
-    const timer = setTimeout(() => loadDrivers(), 400);
+    const timer = setTimeout(() => loadDrivers(), searchTerm ? 400 : 0);
     return () => clearTimeout(timer);
   }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
 
