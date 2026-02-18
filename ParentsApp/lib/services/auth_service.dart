@@ -29,13 +29,16 @@ class AuthService {
   /// Persists tokens and parent info returned by any login endpoint.
   Future<void> _saveSession(Map<String, dynamic> data) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('access_token', data['tokens']['access']);
-    await prefs.setString('refresh_token', data['tokens']['refresh']);
-    await prefs.setInt('parent_id', data['parent']['id']);
-    await prefs.setInt('user_id', data['parent']['id']);
-    await prefs.setString('parent_first_name', data['parent']['firstName']);
-    await prefs.setString('parent_last_name', data['parent']['lastName']);
-    await prefs.setString('parent_email', data['parent']['email']);
+    final tokens = data['tokens'] as Map<String, dynamic>;
+    final parent = data['parent'] as Map<String, dynamic>;
+
+    await prefs.setString('access_token', tokens['access']);
+    await prefs.setString('refresh_token', tokens['refresh']);
+    await prefs.setInt('parent_id', parent['id']);
+    await prefs.setInt('user_id', parent['id']);
+    await prefs.setString('parent_first_name', parent['firstName'] ?? '');
+    await prefs.setString('parent_last_name', parent['lastName'] ?? '');
+    await prefs.setString('parent_email', parent['email'] ?? '');
   }
 
   /// Send magic link to email

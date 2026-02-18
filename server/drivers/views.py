@@ -5,7 +5,7 @@ from jose import jwt, JWTError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
-from rest_framework import status, generics
+from rest_framework import status, generics, filters
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
@@ -31,6 +31,8 @@ class DriverListCreateView(generics.ListCreateAPIView):
     """
     permission_classes = [IsAuthenticated]
     queryset = Driver.objects.select_related('user').all()
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['user__first_name', 'user__last_name', 'user__email', 'phone']
 
     def get_serializer_class(self):
         if self.request.method == 'POST':

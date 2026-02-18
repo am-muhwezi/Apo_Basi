@@ -2,7 +2,7 @@ import logging
 import requests
 from jose import jwt, JWTError
 
-from rest_framework import status, generics
+from rest_framework import status, generics, filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -24,6 +24,8 @@ class BusMinderListCreateView(generics.ListCreateAPIView):
     """
     permission_classes = [IsAuthenticated]
     queryset = BusMinder.objects.select_related('user').prefetch_related('user__managed_buses').all()
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['user__first_name', 'user__last_name', 'user__email', 'phone']
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
