@@ -48,8 +48,8 @@ export default function ChildrenPage() {
     ? children
     : children.filter((child) => child.grade === gradeFilter);
 
-  // Calculate stats
-  const totalChildren = children.length;
+  // Calculate stats — use server count for total, loaded array for derived stats
+  const totalChildren = childrenTotal || children.length;
   const activeChildren = children.filter((c) => c.status === 'active').length;
   const childrenWithBus = children.filter((c) => c.busId).length;
   const childrenByGrade = filteredChildren.length;
