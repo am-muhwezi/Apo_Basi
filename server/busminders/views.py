@@ -23,7 +23,7 @@ class BusMinderListCreateView(generics.ListCreateAPIView):
     POST /api/busminders/ - Create new bus minder
     """
     permission_classes = [IsAuthenticated]
-    queryset = BusMinder.objects.select_related('user').prefetch_related('user__managed_buses').all()
+    queryset = BusMinder.objects.select_related('user').prefetch_related('user__managed_buses').order_by('id')
     filter_backends = [filters.SearchFilter]
     search_fields = ['user__first_name', 'user__last_name', 'user__email', 'phone']
 

@@ -30,7 +30,7 @@ class DriverListCreateView(generics.ListCreateAPIView):
     POST /api/drivers/ - Create new driver
     """
     permission_classes = [IsAuthenticated]
-    queryset = Driver.objects.select_related('user').all()
+    queryset = Driver.objects.select_related('user').order_by('id')
     filter_backends = [filters.SearchFilter]
     search_fields = ['user__first_name', 'user__last_name', 'user__email', 'phone']
 
