@@ -239,7 +239,6 @@ class MyRouteView(APIView):
             })
 
         # Look up actual route name: try bus_to_route Assignment first, then BusRoute.default_bus FK
-        from assignments.models import BusRoute
         route_name = f"Bus {bus.bus_number} Route"  # fallback
         route_id = None
         estimated_duration = "45 minutes"
@@ -708,7 +707,6 @@ def start_trip(request):
         }, status=status.HTTP_400_BAD_REQUEST)
 
     # Get the actual route assignment from the bus: try bus_to_route Assignment first, then BusRoute.default_bus FK
-    from assignments.models import BusRoute
     route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
     route_name = None
     if route_assignment:
