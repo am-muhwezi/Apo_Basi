@@ -136,7 +136,9 @@ class MyBusView(APIView):
 
         return Response({
             "buses": bus_data,
-            "count": 1
+            "count": 1,
+            "driver_name": driver.user.get_full_name() or driver.user.username,
+            "driver_id": driver.user.id,
         })
 
 
@@ -236,9 +238,32 @@ class MyRouteView(APIView):
                 "emergency_contact": child.parent.emergency_contact if child.parent else "N/A",
             })
 
+        # Look up actual route name: try bus_to_route Assignment first, then BusRoute.default_bus FK
+        from assignments.models import BusRoute
+        route_name = f"Bus {bus.bus_number} Route"  # fallback
+        route_id = None
+        estimated_duration = "45 minutes"
+
+        route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
+        if route_assignment:
+            route_obj = route_assignment.assigned_to
+            if hasattr(route_obj, 'name') and route_obj.name:
+                route_name = route_obj.name
+            if hasattr(route_obj, 'estimated_duration') and route_obj.estimated_duration:
+                estimated_duration = f"{route_obj.estimated_duration} minutes"
+            route_id = route_obj.id
+        else:
+            route_obj = BusRoute.objects.filter(default_bus=bus, is_active=True).first()
+            if route_obj:
+                route_name = route_obj.name
+                if route_obj.estimated_duration:
+                    estimated_duration = f"{route_obj.estimated_duration} minutes"
+                route_id = route_obj.id
+
         return Response({
             "bus_number": bus.bus_number,
             "route_name": route_name,
+            "route_id": route_id,
             "estimated_duration": estimated_duration,
             "bus": {
                 "id": bus.id,
@@ -682,12 +707,18 @@ def start_trip(request):
             "message": "Your profile is incomplete. Please contact the administrator to set your full name."
         }, status=status.HTTP_400_BAD_REQUEST)
 
-    # Get the actual route assignment from the bus
+    # Get the actual route assignment from the bus: try bus_to_route Assignment first, then BusRoute.default_bus FK
+    from assignments.models import BusRoute
     route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
     route_name = None
     if route_assignment:
         route_obj = route_assignment.assigned_to
         route_name = route_obj.name if hasattr(route_obj, 'name') else None
+
+    if not route_name:
+        route_obj = BusRoute.objects.filter(default_bus=bus, is_active=True).first()
+        if route_obj:
+            route_name = route_obj.name
 
     # Validate route is assigned
     if not route_name:

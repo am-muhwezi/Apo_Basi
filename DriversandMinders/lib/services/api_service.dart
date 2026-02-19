@@ -450,11 +450,7 @@ class ApiService {
       );
       return response.data;
     } on DioException catch (e) {
-      throw Exception(
-        _extractErrorMessage(e, 'Failed to start trip'),
-      );
-    } catch (e) {
-      throw Exception('Failed to start trip');
+      throw Exception(_extractErrorMessage(e, 'Failed to start trip'));
     }
   }
 

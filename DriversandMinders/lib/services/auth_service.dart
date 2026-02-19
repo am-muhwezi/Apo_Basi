@@ -48,7 +48,10 @@ class AuthService {
 
     // Backwards‑compatible driver-specific keys used by some older screens
     await prefs.setInt('driver_id', userIdInt);
+    await prefs.setInt('user_id', userIdInt);
     await prefs.setString('driver_name', data['name'] ?? '');
+    await prefs.setString('user_name', data['name'] ?? '');  // dashboard reads this key
+    await prefs.setString('user_role', 'driver');
     await prefs.setString('driver_email', data['email'] ?? '');
     await prefs.setString('driver_phone', data['phone'] ?? '');
     await prefs.setString('license_number', data['license_number'] ?? '');
