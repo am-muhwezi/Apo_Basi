@@ -5,7 +5,7 @@ from jose import jwt, JWTError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
-from rest_framework import status, generics
+from rest_framework import status, generics, filters
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
@@ -16,7 +16,7 @@ from users.permissions import IsDriver
 from buses.models import Bus
 from children.models import Child
 from attendance.models import Attendance
-from assignments.models import Assignment
+from assignments.models import Assignment, BusRoute
 from datetime import date
 from django.contrib.contenttypes.models import ContentType
 
@@ -30,7 +30,9 @@ class DriverListCreateView(generics.ListCreateAPIView):
     POST /api/drivers/ - Create new driver
     """
     permission_classes = [IsAuthenticated]
-    queryset = Driver.objects.select_related('user').all()
+    queryset = Driver.objects.select_related('user').order_by('user_id')
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['user__first_name', 'user__last_name', 'user__email', 'phone']
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -134,7 +136,9 @@ class MyBusView(APIView):
 
         return Response({
             "buses": bus_data,
-            "count": 1
+            "count": 1,
+            "driver_name": driver.user.get_full_name() or driver.user.username,
+            "driver_id": driver.user.id,
         })
 
 
@@ -172,6 +176,27 @@ class MyRouteView(APIView):
 
         # Get the assigned bus
         bus = driver_assignment.assigned_to
+
+        # Resolve the driver's active route for this bus using BusRoute
+        route_name = None
+        estimated_duration = None
+
+        # Prefer explicit bus_to_route assignments
+        route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
+        if route_assignment:
+            route_obj = route_assignment.assigned_to
+            route_name = getattr(route_obj, 'name', None)
+            duration_minutes = getattr(route_obj, 'estimated_duration', None)
+            if duration_minutes is not None:
+                estimated_duration = f"{duration_minutes} min"
+
+        # Fallback to BusRoute.default_bus in case explicit assignment is missing
+        if not route_name:
+            fallback_route = BusRoute.objects.filter(default_bus=bus, is_active=True).first()
+            if fallback_route:
+                route_name = fallback_route.name
+                if fallback_route.estimated_duration is not None:
+                    estimated_duration = f"{fallback_route.estimated_duration} min"
 
         # Get all children assigned to this bus using Assignment API
         child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
@@ -213,10 +238,32 @@ class MyRouteView(APIView):
                 "emergency_contact": child.parent.emergency_contact if child.parent else "N/A",
             })
 
+        # Look up actual route name: try bus_to_route Assignment first, then BusRoute.default_bus FK
+        route_name = f"Bus {bus.bus_number} Route"  # fallback
+        route_id = None
+        estimated_duration = "45 minutes"
+
+        route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
+        if route_assignment:
+            route_obj = route_assignment.assigned_to
+            if hasattr(route_obj, 'name') and route_obj.name:
+                route_name = route_obj.name
+            if hasattr(route_obj, 'estimated_duration') and route_obj.estimated_duration:
+                estimated_duration = f"{route_obj.estimated_duration} minutes"
+            route_id = route_obj.id
+        else:
+            route_obj = BusRoute.objects.filter(default_bus=bus, is_active=True).first()
+            if route_obj:
+                route_name = route_obj.name
+                if route_obj.estimated_duration:
+                    estimated_duration = f"{route_obj.estimated_duration} minutes"
+                route_id = route_obj.id
+
         return Response({
             "bus_number": bus.bus_number,
-            "route_name": f"Bus {bus.bus_number} Route",
-            "estimated_duration": "45 minutes",  # TODO: Calculate from actual route data
+            "route_name": route_name,
+            "route_id": route_id,
+            "estimated_duration": estimated_duration,
             "bus": {
                 "id": bus.id,
                 "bus_number": bus.bus_number,
@@ -272,6 +319,26 @@ def driver_phone_login(request):
         if assignment:
             bus = assignment.assigned_to
 
+            # Resolve the driver's active route for this bus using BusRoute
+            route_name = None
+            estimated_duration = None
+
+            route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
+            if route_assignment:
+                route_obj = route_assignment.assigned_to
+                route_name = getattr(route_obj, 'name', None)
+                duration_minutes = getattr(route_obj, 'estimated_duration', None)
+                if duration_minutes is not None:
+                    estimated_duration = f"{duration_minutes} min"
+
+            # Fallback to BusRoute.default_bus mapping if explicit assignment missing
+            if not route_name:
+                fallback_route = BusRoute.objects.filter(default_bus=bus, is_active=True).first()
+                if fallback_route:
+                    route_name = fallback_route.name
+                    if fallback_route.estimated_duration is not None:
+                        estimated_duration = f"{fallback_route.estimated_duration} min"
+
             # Get children assigned to this bus
             child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
 
@@ -324,8 +391,8 @@ def driver_phone_login(request):
 
             route_data = {
                 "bus_number": bus.bus_number,
-                "route_name": f"Bus {bus.bus_number} Route",
-                "estimated_duration": "45 minutes",
+                "route_name": route_name,
+                "estimated_duration": estimated_duration,
                 "bus": {
                     "id": bus.id,
                     "bus_number": bus.bus_number,
@@ -639,12 +706,17 @@ def start_trip(request):
             "message": "Your profile is incomplete. Please contact the administrator to set your full name."
         }, status=status.HTTP_400_BAD_REQUEST)
 
-    # Get the actual route assignment from the bus
+    # Get the actual route assignment from the bus: try bus_to_route Assignment first, then BusRoute.default_bus FK
     route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
     route_name = None
     if route_assignment:
         route_obj = route_assignment.assigned_to
         route_name = route_obj.name if hasattr(route_obj, 'name') else None
+
+    if not route_name:
+        route_obj = BusRoute.objects.filter(default_bus=bus, is_active=True).first()
+        if route_obj:
+            route_name = route_obj.name
 
     # Validate route is assigned
     if not route_name:

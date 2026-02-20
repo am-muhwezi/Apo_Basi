@@ -44,7 +44,7 @@ class BusRouteViewSet(viewsets.ModelViewSet):
     - GET /api/assignments/routes/{id}/statistics/ - Get route statistics
     """
 
-    queryset = BusRoute.objects.all()
+    queryset = BusRoute.objects.order_by('id')
     permission_classes = [IsAuthenticated]  # Secured: requires authentication
 
     def get_serializer_class(self):
@@ -85,7 +85,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     - GET /api/assignments/bus-utilization/ - Get bus utilization stats
     """
 
-    queryset = Assignment.objects.all()
+    queryset = Assignment.objects.order_by('-id')
     permission_classes = [IsAuthenticated]  # Secured: requires authentication
 
     def get_serializer_class(self):
@@ -95,7 +95,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Filter assignments based on query parameters"""
-        queryset = Assignment.objects.all()
+        queryset = Assignment.objects.order_by('-id')
 
         # Filter by assignment type
         assignment_type = self.request.query_params.get('assignmentType')
@@ -419,13 +419,13 @@ class AssignmentHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     - GET /api/assignments/history/{id}/ - Get specific history entry
     """
 
-    queryset = AssignmentHistory.objects.all()
+    queryset = AssignmentHistory.objects.order_by('-id')
     serializer_class = AssignmentHistorySerializer
     permission_classes = [IsAuthenticated]  # Secured: requires authentication
 
     def get_queryset(self):
         """Filter history based on query parameters"""
-        queryset = AssignmentHistory.objects.all()
+        queryset = AssignmentHistory.objects.order_by('-id')
 
         # Filter by assignment ID
         assignment_id = self.request.query_params.get('assignmentId')

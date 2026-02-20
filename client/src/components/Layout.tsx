@@ -33,7 +33,7 @@ export default function Layout() {
     { id: 'parents', path: '/dashboard/parents', label: 'Parents', icon: Users },
     { id: 'buses', path: '/dashboard/buses', label: 'Buses', icon: Bus },
     { id: 'drivers', path: '/dashboard/drivers', label: 'Drivers', icon: UserCircle },
-    { id: 'minders', path: '/dashboard/minders', label: 'Bus Minders', icon: UserCircle },
+    { id: 'minders', path: '/dashboard/minders', label: 'Bus Assistants', icon: UserCircle },
   ];
 
   // Check if any management item is active

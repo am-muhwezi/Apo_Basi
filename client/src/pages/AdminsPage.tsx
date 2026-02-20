@@ -265,6 +265,18 @@ export default function AdminsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
+              {filteredAdmins.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <p className="text-slate-500 font-medium">
+                      {searchTerm ? 'No admins match your search' : 'No admins yet'}
+                    </p>
+                    {!searchTerm && (
+                      <p className="text-slate-400 text-sm mt-1">Click "Add Admin" to get started</p>
+                    )}
+                  </td>
+                </tr>
+              )}
               {filteredAdmins.map((admin) => (
                 <tr key={admin.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -359,6 +371,16 @@ export default function AdminsPage() {
 
       {/* Admins Cards - Mobile */}
       <div className="md:hidden space-y-4">
+        {filteredAdmins.length === 0 && !loading && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+            <p className="text-slate-500 font-medium">
+              {searchTerm ? 'No admins match your search' : 'No admins yet'}
+            </p>
+            {!searchTerm && (
+              <p className="text-slate-400 text-sm mt-1">Click "Add Admin" to get started</p>
+            )}
+          </div>
+        )}
         {filteredAdmins.map((admin) => (
           <div key={admin.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex items-start justify-between mb-3">

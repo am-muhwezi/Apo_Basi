@@ -18,7 +18,7 @@ class TripListCreateView(generics.ListCreateAPIView):
     POST /api/trips/ - Create new trip
     """
     permission_classes = [IsAuthenticated]
-    queryset = Trip.objects.select_related('bus', 'driver', 'bus_minder').prefetch_related('children', 'stops').all()
+    queryset = Trip.objects.select_related('bus', 'driver', 'bus_minder').prefetch_related('children', 'stops').order_by('-id')
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -59,7 +59,7 @@ class TripDetailView(generics.RetrieveUpdateDestroyAPIView):
     DELETE /api/trips/{id}/ - Delete trip
     """
     permission_classes = [IsAuthenticated]
-    queryset = Trip.objects.select_related('bus', 'driver', 'bus_minder').prefetch_related('children', 'stops').all()
+    queryset = Trip.objects.select_related('bus', 'driver', 'bus_minder').prefetch_related('children', 'stops').order_by('-id')
 
     def get_serializer_class(self):
         if self.request.method in ['PUT', 'PATCH']:

@@ -44,6 +44,10 @@ yarn-debug.log*
 .DS_Store
 *.swp
 
+# Android signing keys
+*.jks
+*.keystore
+
 # Documentation
 */docs
 DriversandMinders/DriversandMinders/lib/presentation/driver_start_shift_screen/driver_start_shift_screen.dart

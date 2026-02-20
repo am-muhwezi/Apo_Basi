@@ -38,6 +38,7 @@ interface BusConnection {
   ws: WebSocket;
   reconnectAttempts: number;
   reconnectTimer?: number;
+  stopped: boolean;
 }
 
 class BusWebSocketService {
@@ -76,10 +77,11 @@ class BusWebSocketService {
   unsubscribeFromBus(busId: string): void {
     const connection = this.connections.get(busId);
     if (connection) {
+      connection.stopped = true;
       if (connection.reconnectTimer) {
         clearTimeout(connection.reconnectTimer);
       }
-      connection.ws.close();
+      connection.ws.close(1000, 'Unsubscribed');
       this.connections.delete(busId);
     }
   }
@@ -96,11 +98,12 @@ class BusWebSocketService {
    * Unsubscribe from all buses and close all connections
    */
   disconnect(): void {
-    this.connections.forEach((connection, busId) => {
+    this.connections.forEach((connection) => {
+      connection.stopped = true;
       if (connection.reconnectTimer) {
         clearTimeout(connection.reconnectTimer);
       }
-      connection.ws.close();
+      connection.ws.close(1000, 'Disconnected');
     });
     this.connections.clear();
     this.listeners.clear();
@@ -180,13 +183,14 @@ class BusWebSocketService {
   /**
    * Create WebSocket connection for a bus
    */
-  private createConnection(busId: string): void {
+  private createConnection(busId: string, previousAttempts = 0): void {
     const wsUrl = `${WS_BASE_URL}/ws/bus/${busId}/?token=${this.token}`;
     const ws = new WebSocket(wsUrl);
 
     const connection: BusConnection = {
       ws,
-      reconnectAttempts: 0
+      reconnectAttempts: previousAttempts,
+      stopped: false,
     };
 
     this.connections.set(busId, connection);
@@ -212,20 +216,26 @@ class BusWebSocketService {
       }
     };
 
-    ws.onerror = (error) => {
+    ws.onerror = (_error) => {
       // Silent error handling
     };
 
     ws.onclose = (event) => {
+      if (connection.stopped) return;
+
       // Attempt reconnection if not a normal closure and under max attempts
       if (event.code !== 1000 && connection.reconnectAttempts < this.MAX_RECONNECT_ATTEMPTS) {
-        connection.reconnectAttempts++;
+        const attempts = connection.reconnectAttempts + 1;
+        const delay = this.RECONNECT_DELAY * Math.pow(2, attempts - 1); // exponential backoff
 
         connection.reconnectTimer = window.setTimeout(() => {
-          this.connections.delete(busId);
-          this.createConnection(busId);
-        }, this.RECONNECT_DELAY);
-      } else if (connection.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
+          if (!this.connections.has(busId) || this.connections.get(busId) === connection) {
+            this.connections.delete(busId);
+            this.createConnection(busId, attempts);
+          }
+        }, delay);
+      } else {
+        // Max attempts reached — stop trying
         this.connections.delete(busId);
       }
     };

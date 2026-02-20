@@ -38,10 +38,18 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
 
       // Get driver information from SharedPreferences
       _driverInfo = {
-        'name': prefs.getString('user_name') ?? 'Driver',
-        'id': prefs.getInt('user_id')?.toString() ?? 'N/A',
-        'email': prefs.getString('user_email') ?? 'Not Available',
-        'phone': prefs.getString('user_phone') ?? 'Not Available',
+        'name': prefs.getString('driver_name') ??
+            prefs.getString('user_name') ??
+            'Driver',
+        'id': (prefs.getInt('driver_id') ?? prefs.getInt('user_id'))
+                ?.toString() ??
+            'N/A',
+        'email': prefs.getString('driver_email') ??
+            prefs.getString('user_email') ??
+            'Not Available',
+        'phone': prefs.getString('driver_phone') ??
+            prefs.getString('user_phone') ??
+            'Not Available',
         'licenseNumber': prefs.getString('license_number') ?? 'Not Available',
         'licenseExpiry': prefs.getString('license_expiry') ?? 'Not Available',
         'joinDate': prefs.getString('join_date') ?? 'Not Available',
@@ -72,6 +80,11 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                       ?.toString() ??
                   prefs.getInt('bus_capacity')?.toString() ??
                   'N/A',
+              // Children assigned directly to the bus (from unified login)
+              'childrenCount': decoded['children_count'] ??
+                  (decoded['children'] is List
+                      ? (decoded['children'] as List).length
+                      : null),
             };
           }
         } catch (e) {
@@ -87,6 +100,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
           if (decoded is Map<String, dynamic>) {
             final children = decoded['children'];
             final totalChildren = decoded['total_children'] ??
+                decoded['children_count'] ??
                 (children is List ? children.length : null);
             final totalStops = decoded['total_stops'] ??
                 decoded['total_assignments'] ??
@@ -94,12 +108,14 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
 
             _routeInfo = {
               'routeName': decoded['route_name']?.toString() ??
+                  decoded['name']?.toString() ??
                   prefs.getString('route_name') ??
                   'Not Assigned',
               'totalStops': totalStops?.toString() ??
                   prefs.getInt('total_stops')?.toString() ??
                   'N/A',
               'totalStudents': totalChildren?.toString() ??
+                  (_busInfo?['childrenCount']?.toString()) ??
                   prefs.getInt('total_students')?.toString() ??
                   'N/A',
             };
@@ -149,63 +165,142 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             : SingleChildScrollView(
                 child: Column(
                   children: [
-                    SizedBox(height: 3.h),
+                    SizedBox(height: 2.h),
 
-                    // Profile Avatar
-                    Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppTheme.primaryDriver,
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                AppTheme.primaryDriver.withValues(alpha: 0.3),
-                            offset: Offset(0, 4),
-                            blurRadius: 12,
+                    // Modern header card with avatar + summary
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4.w),
+                      child: Container(
+                        padding: EdgeInsets.all(4.w),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(24),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              AppTheme.primaryDriver,
+                              AppTheme.primaryDriver.withValues(alpha: 0.8),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          (_driverInfo['name'] as String? ?? 'D')
-                              .substring(0, 1)
-                              .toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textOnPrimary,
-                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primaryDriver
+                                  .withValues(alpha: 0.35),
+                              offset: const Offset(0, 10),
+                              blurRadius: 24,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppTheme.textOnPrimary,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  (_driverInfo['name'] as String? ?? 'D')
+                                      .substring(0, 1)
+                                      .toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primaryDriver,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 4.w),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _driverInfo['name'] as String? ?? 'Driver',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textOnPrimary,
+                                    ),
+                                  ),
+                                  SizedBox(height: 0.5.h),
+                                  Text(
+                                    'Driver ID: ${_driverInfo['id'] as String? ?? 'N/A'}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppTheme.textOnPrimary
+                                          .withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                  SizedBox(height: 1.h),
+                                  Wrap(
+                                    spacing: 1.5.w,
+                                    runSpacing: 0.5.h,
+                                    children: [
+                                      if (_busInfo != null)
+                                        _buildChip(
+                                          Icons.directions_bus,
+                                          _busInfo?['busNumber'] as String? ??
+                                              'No Bus',
+                                        ),
+                                      if (_routeInfo != null)
+                                        _buildChip(
+                                          Icons.route,
+                                          _routeInfo?['routeName'] as String? ??
+                                              'No Route',
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
 
-                    SizedBox(height: 2.h),
+                    SizedBox(height: 2.5.h),
 
-                    // Driver Name
-                    Text(
-                      _driverInfo['name'] as String? ?? 'Driver',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary,
+                    // Quick stats row
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4.w),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _buildStatCard(
+                              label: 'Students',
+                              value: _routeInfo?['totalStudents'] as String? ??
+                                  '0',
+                              icon: Icons.groups,
+                            ),
+                          ),
+                          SizedBox(width: 3.w),
+                          Expanded(
+                            child: _buildStatCard(
+                              label: 'Stops',
+                              value:
+                                  _routeInfo?['totalStops'] as String? ?? '0',
+                              icon: Icons.location_on_outlined,
+                            ),
+                          ),
+                          SizedBox(width: 3.w),
+                          Expanded(
+                            child: _buildStatCard(
+                              label: 'Bus Cap.',
+                              value: _busInfo?['capacity'] as String? ?? 'N/A',
+                              icon: Icons.airline_seat_recline_normal,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
-                    SizedBox(height: 0.5.h),
-
-                    // Driver ID
-                    Text(
-                      'Driver ID: ${_driverInfo['id'] as String? ?? 'N/A'}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppTheme.textSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-
-                    SizedBox(height: 4.h),
+                    SizedBox(height: 3.h),
 
                     // Personal Information Section
                     _buildSection(
@@ -421,6 +516,83 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             padding: EdgeInsets.all(4.w),
             child: Column(
               children: children,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChip(IconData icon, String label) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 2.5.w, vertical: 0.6.h),
+      decoration: BoxDecoration(
+        color: AppTheme.textOnPrimary.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppTheme.textOnPrimary),
+          SizedBox(width: 1.w),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textOnPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 1.8.h, horizontal: 2.w),
+      decoration: BoxDecoration(
+        color: AppTheme.backgroundSecondary,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.shadowLight,
+            offset: const Offset(0, 4),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.all(1.h),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryDriver.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 18, color: AppTheme.primaryDriver),
+          ),
+          SizedBox(height: 1.h),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          SizedBox(height: 0.3.h),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: AppTheme.textSecondary,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],

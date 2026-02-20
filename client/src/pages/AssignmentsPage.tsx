@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus,
   Search,
@@ -124,6 +124,7 @@ export default function AssignmentsPage() {
 
   // Loading state
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMoreAssignments, setHasMoreAssignments] = useState(false);
 
   // Load data on mount
@@ -143,6 +144,7 @@ export default function AssignmentsPage() {
 
   async function loadAllData() {
     setIsLoading(true);
+    assignmentsOffsetRef.current = 0;
     try {
       await Promise.all([
         loadAssignments(),
@@ -154,31 +156,35 @@ export default function AssignmentsPage() {
     }
   }
 
+  // Stable ref to track offset for append loads (avoids stale closure)
+  const assignmentsOffsetRef = useRef(0);
+
   async function loadAssignments(append = false) {
+    if (append && isLoadingMore) return;
     try {
-      const offset = append ? assignments.length : 0;
+      if (append) setIsLoadingMore(true);
+      const offset = append ? assignmentsOffsetRef.current : 0;
       const data = await assignmentService.loadAssignments({ limit: 20, offset });
-      
-      // Use functional update to ensure we work with latest state
+
       setAssignments(prevAssignments => {
         if (append) {
-          // Filter out any duplicates by ID before appending
           const existingIds = new Set(prevAssignments.map(a => a.id));
           const newAssignments = data.filter(a => !existingIds.has(a.id));
           return [...prevAssignments, ...newAssignments];
         }
         return data;
       });
-      
-      // Only show "Load More" if we got a full page (20 items)
-      // If we got less than 20, we've reached the end
+
+      assignmentsOffsetRef.current = append ? offset + data.length : data.length;
       setHasMoreAssignments(data.length === 20);
     } catch (error) {
+    } finally {
+      if (append) setIsLoadingMore(false);
     }
   }
 
   function loadMoreAssignments() {
-    if (!isLoading && hasMoreAssignments) {
+    if (!isLoading && !isLoadingMore && hasMoreAssignments) {
       loadAssignments(true);
     }
   }
@@ -488,11 +494,11 @@ export default function AssignmentsPage() {
   const assignmentTypeOptions = [
     { value: 'all', label: 'All Types' },
     { value: 'driver_to_bus', label: 'Driver to Bus' },
-    { value: 'minder_to_bus', label: 'Minder to Bus' },
+    { value: 'minder_to_bus', label: 'Bus Assistant to Bus' },
     { value: 'child_to_bus', label: 'Child to Bus' },
     { value: 'bus_to_route', label: 'Bus to Route' },
     { value: 'driver_to_route', label: 'Driver to Route' },
-    { value: 'minder_to_route', label: 'Minder to Route' },
+    { value: 'minder_to_route', label: 'Bus Assistant to Route' },
     { value: 'child_to_route', label: 'Child to Route' },
   ];
 
@@ -725,8 +731,12 @@ export default function AssignmentsPage() {
                 <tbody className="divide-y divide-slate-200">
                   {filteredAssignments.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                        No assignments found
+                      <td colSpan={6} className="px-6 py-16 text-center">
+                        <p className="text-slate-500 font-medium">
+                          {assignmentSearchTerm || assignmentTypeFilter !== 'all' || assignmentStatusFilter !== 'all'
+                            ? 'No assignments match your filters'
+                            : 'No assignments yet'}
+                        </p>
                       </td>
                     </tr>
                   ) : (
@@ -811,11 +821,11 @@ export default function AssignmentsPage() {
                 {hasMoreAssignments && (
                   <Button
                     onClick={loadMoreAssignments}
-                    disabled={isLoading}
+                    disabled={isLoading || isLoadingMore}
                     variant="secondary"
                     size="sm"
                   >
-                    {isLoading ? 'Loading...' : 'Load More'}
+                    {isLoadingMore ? 'Loading...' : 'Load More'}
                   </Button>
                 )}
               </div>
@@ -825,9 +835,12 @@ export default function AssignmentsPage() {
           {/* Assignments Cards - Mobile */}
           <div className="md:hidden space-y-4">
             {filteredAssignments.length === 0 ? (
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
-                <FileText className="w-12 h-12 text-slate-400 mx-auto mb-2" />
-                <p className="text-slate-600">No assignments found</p>
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+                <p className="text-slate-500 font-medium">
+                  {assignmentSearchTerm || assignmentTypeFilter !== 'all' || assignmentStatusFilter !== 'all'
+                    ? 'No assignments match your filters'
+                    : 'No assignments yet'}
+                </p>
               </div>
             ) : (
               filteredAssignments.map((assignment) => (
@@ -910,12 +923,12 @@ export default function AssignmentsPage() {
                   {hasMoreAssignments && (
                     <Button
                       onClick={loadMoreAssignments}
-                      disabled={isLoading}
+                      disabled={isLoading || isLoadingMore}
                       variant="secondary"
                       size="sm"
                       className="w-full"
                     >
-                      {isLoading ? 'Loading...' : 'Load More'}
+                      {isLoadingMore ? 'Loading...' : 'Load More'}
                     </Button>
                   )}
                 </div>
@@ -992,7 +1005,11 @@ export default function AssignmentsPage() {
           {/* Routes Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredRoutes.length === 0 ? (
-              <div className="col-span-full text-center py-12 text-slate-500">No routes found</div>
+              <div className="col-span-full py-16 text-center">
+                <p className="text-slate-500 font-medium">
+                  {routeSearchTerm ? 'No routes match your search' : 'No routes yet'}
+                </p>
+              </div>
             ) : (
               filteredRoutes.map((route) => (
                 <div
@@ -1088,10 +1105,10 @@ export default function AssignmentsPage() {
             >
               <option value="child_to_bus">Child to Bus</option>
               <option value="driver_to_bus">Driver to Bus</option>
-              <option value="minder_to_bus">Bus Minder to Bus</option>
+              <option value="minder_to_bus">Bus Assistant to Bus</option>
               <option value="bus_to_route">Bus to Route</option>
               <option value="driver_to_route">Driver to Route</option>
-              <option value="minder_to_route">Bus Minder to Route</option>
+              <option value="minder_to_route">Bus Assistant to Route</option>
               <option value="child_to_route">Child to Route</option>
             </select>
           </div>
@@ -1115,8 +1132,8 @@ export default function AssignmentsPage() {
                 />
               ) : assignmentFormData.assignmentType === 'minder_to_bus' || assignmentFormData.assignmentType === 'minder_to_route' ? (
                 <SearchableSelect
-                  label="Select Bus Minder"
-                  placeholder="Search for a bus minder..."
+                  label="Select Bus Assistant"
+                  placeholder="Search for a bus assistant..."
                   options={minders.map((m) => ({
                     id: m.id,
                     label: `${m.firstName} ${m.lastName}`,
@@ -1313,7 +1330,7 @@ export default function AssignmentsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Default Minder</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Default Bus Assistant</label>
               <select
                 value={routeFormData.defaultMinderId || ''}
                 onChange={(e) => setRouteFormData({ ...routeFormData, defaultMinderId: e.target.value })}

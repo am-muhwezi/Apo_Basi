@@ -198,7 +198,7 @@ export default function DashboardPage() {
             <p className="text-2xl font-bold text-slate-900">{stats.users.drivers}</p>
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-600 mb-1">Bus Minders</p>
+            <p className="text-sm font-medium text-slate-600 mb-1">Bus Assistants</p>
             <p className="text-2xl font-bold text-slate-900">{stats.users.minders}</p>
           </div>
           <div>

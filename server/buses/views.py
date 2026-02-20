@@ -15,11 +15,12 @@ Architecture Benefits:
 - Custom permissions for role-based access
 """
 
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.http import StreamingHttpResponse
@@ -92,7 +93,9 @@ class BusViewSet(viewsets.ModelViewSet):
 
     # Query optimization: Reduce database queries
     # Note: Assignments are now handled via Assignment model, not direct ForeignKeys
-    queryset = Bus.objects.all()
+    queryset = Bus.objects.order_by('id')
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['bus_number', 'number_plate']
 
     # Permissions
     permission_classes = [IsAdminOrReadOnly]
@@ -363,13 +366,20 @@ class BusViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK
             )
 
-        except Exception as e:
+        except ValidationError as e:
+            # Extract a clean human-readable message from DRF/Django ValidationError
+            detail = e.detail if hasattr(e, 'detail') else e.message_dict if hasattr(e, 'message_dict') else {}
+            if isinstance(detail, dict):
+                # Pick the first field's first message
+                first_messages = next(iter(detail.values()), [str(e)])
+                message = first_messages[0] if isinstance(first_messages, list) else str(first_messages)
+            else:
+                message = str(detail)
             return Response(
                 {
                     "success": False,
                     "error": {
-                        "message": str(e),
-                        "field": "children_ids"
+                        "message": message,
                     }
                 },
                 status=status.HTTP_400_BAD_REQUEST

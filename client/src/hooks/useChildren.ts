@@ -1,96 +1,93 @@
-/**
- * useChildren Hook
- *
- * Custom React hook for managing children state and operations.
- *
- * Architecture:
- * - Manages local state (children, loading, error)
- * - Calls childService methods (NOT API directly)
- * - Handles UI-specific concerns (loading states, pagination)
- */
-
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { childService } from '../services/childService';
 import type { Child } from '../types';
+
+interface UseChildrenParams {
+  search?: string;
+  ordering?: string;
+}
 
 interface UseChildrenReturn {
   children: Child[];
   loading: boolean;
   error: string | null;
   hasMore: boolean;
+  totalCount: number;
   loadChildren: (append?: boolean) => Promise<void>;
   loadMore: () => void;
   refreshChildren: () => Promise<void>;
 }
 
-/**
- * Custom hook for children management
- */
-export function useChildren(): UseChildrenReturn {
+const LIMIT = 20;
+
+export function useChildren(params?: UseChildrenParams): UseChildrenReturn {
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState(0);
-  const LIMIT = 20;
+  const [totalCount, setTotalCount] = useState(0);
+  const offsetRef = useRef(0);
+  const loadingRef = useRef(false);
+  const searchRef = useRef(params?.search ?? '');
+  const orderingRef = useRef(params?.ordering ?? '');
 
-  const loadChildren = useCallback(
-    async (append = false) => {
-      try {
-        setLoading(true);
-        setError(null);
+  const loadChildren = useCallback(async (append = false) => {
+    if (loadingRef.current) return;
+    try {
+      loadingRef.current = true;
+      setLoading(true);
+      setError(null);
 
-        const currentOffset = append ? offset : 0;
-        const result = await childService.loadChildren({
-          limit: LIMIT,
-          offset: currentOffset,
-        });
+      const currentOffset = append ? offsetRef.current : 0;
+      const result = await childService.loadChildren({
+        limit: LIMIT,
+        offset: currentOffset,
+        search: searchRef.current || undefined,
+        ordering: orderingRef.current || undefined,
+      });
 
-        if (result.success && result.data) {
-          const { children: newChildren, hasNext } = result.data;
-
-          setChildren((prev) => (append ? [...prev, ...newChildren] : newChildren));
-          setHasMore(hasNext);
-          setOffset(currentOffset + newChildren.length);
-        } else {
-          setError(result.error?.message || 'Failed to load children');
-          if (!append) {
-            setChildren([]);
-          }
-        }
-      } catch (err) {
-        setError('An unexpected error occurred');
-        if (!append) {
-          setChildren([]);
-        }
-      } finally {
-        setLoading(false);
+      if (result.success && result.data) {
+        const { children: newChildren, count } = result.data;
+        const newOffset = currentOffset + newChildren.length;
+        setChildren((prev) => (append ? [...prev, ...newChildren] : newChildren));
+        setTotalCount(count ?? 0);
+        setHasMore(newOffset < (count ?? 0));
+        offsetRef.current = newOffset;
+      } else {
+        setError(result.error?.message || 'Failed to load children');
+        if (!append) setChildren([]);
       }
-    },
-    [offset]
-  );
+    } catch {
+      setError('An unexpected error occurred');
+      if (!append) setChildren([]);
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, []); // No deps — uses refs
+
+  // Re-fetch when search or ordering changes
+  useEffect(() => {
+    const newSearch = params?.search ?? '';
+    const newOrdering = params?.ordering ?? '';
+    if (searchRef.current !== newSearch || orderingRef.current !== newOrdering) {
+      searchRef.current = newSearch;
+      orderingRef.current = newOrdering;
+      offsetRef.current = 0;
+      loadChildren(false);
+    }
+  }, [params?.search, params?.ordering, loadChildren]);
 
   const loadMore = useCallback(() => {
-    if (!loading && hasMore) {
+    if (!loadingRef.current && hasMore) {
       loadChildren(true);
     }
-  }, [loading, hasMore, loadChildren]);
+  }, [hasMore, loadChildren]);
 
   const refreshChildren = useCallback(async () => {
-    setOffset(0);
+    offsetRef.current = 0;
     await loadChildren(false);
   }, [loadChildren]);
 
-  // NOTE: Children do NOT auto-load on mount
-  // Each page decides when to call loadChildren()
-
-  return {
-    children,
-    loading,
-    error,
-    hasMore,
-    loadChildren,
-    loadMore,
-    refreshChildren,
-  };
+  return { children, loading, error, hasMore, totalCount, loadChildren, loadMore, refreshChildren };
 }

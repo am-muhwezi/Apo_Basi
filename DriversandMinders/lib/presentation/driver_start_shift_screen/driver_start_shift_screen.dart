@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
@@ -52,6 +53,11 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   bool _hasActiveTrip = false;
   Map<String, dynamic>? _activeTripInfo;
 
+  bool _isOnline = true;
+  bool _isServerReachable = true;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  Timer? _retryTimer;
+
   final Map<int, bool> _checklistStates = {};
 
   final List<Map<String, dynamic>> _checklistItems = [
@@ -79,9 +85,46 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     // Quick synchronous check for active trip from local storage
     _checkForActiveTripSync();
 
+    // Monitor network connectivity
+    _initConnectivity();
+
     // Defer heavy operations until after first frame is rendered
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeAsync();
+    });
+  }
+
+  Future<void> _initConnectivity() async {
+    // Check current connectivity
+    final result = await Connectivity().checkConnectivity();
+    _handleConnectivityChange(result);
+
+    // Listen for changes
+    _connectivitySubscription = Connectivity()
+        .onConnectivityChanged
+        .listen((List<ConnectivityResult> results) {
+      _handleConnectivityChange(results);
+    });
+  }
+
+  void _handleConnectivityChange(List<ConnectivityResult> results) {
+    final wasOnline = _isOnline;
+    final nowOnline = results.any((r) => r != ConnectivityResult.none);
+    if (mounted) setState(() => _isOnline = nowOnline);
+    // Silently refresh when network connection is restored
+    if (!wasOnline && nowOnline) {
+      _loadDriverData();
+    }
+  }
+
+  void _startRetryTimer() {
+    _retryTimer?.cancel();
+    // One-shot timer: schedule a single reconnect attempt in 30 seconds.
+    // If that attempt also fails, _loadDriverData will call _startRetryTimer
+    // again, keeping the cycle going.  Using Timer (not Timer.periodic) avoids
+    // phantom fires while a slow API call is already in flight.
+    _retryTimer = Timer(const Duration(seconds: 30), () {
+      if (mounted) _loadDriverData();
     });
   }
 
@@ -179,23 +222,33 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   }
 
   Future<void> _loadDriverData() async {
+    // Only show full loading spinner when there is no data yet.
+    // During pull-to-refresh (_driverData already set) keep content visible
+    // so the RefreshIndicator animation stays visible above the list.
     setState(() {
-      _isLoadingData = true;
+      if (_driverData == null) _isLoadingData = true;
       _errorMessage = null;
     });
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userName = prefs.getString('user_name') ?? 'Driver';
+      // 'user_name' is set by phone login; 'driver_name' by magic-link login.
+      // Fall back to driver_name so both auth paths show the real name.
+      final userName = (prefs.getString('user_name')?.isNotEmpty == true
+              ? prefs.getString('user_name')
+              : prefs.getString('driver_name')) ??
+          'Driver';
       final userId = prefs.getInt('user_id')?.toString() ?? 'N/A';
 
       final cachedBusData = prefs.getString('cached_bus_data');
       final cachedRouteData = prefs.getString('cached_route_data');
+      final hasCachedData =
+          cachedBusData != null && cachedRouteData != null;
 
-      if (cachedBusData != null && cachedRouteData != null) {
+      if (hasCachedData) {
         try {
-          final busDataJson = jsonDecode(cachedBusData);
-          final routeDataJson = jsonDecode(cachedRouteData);
+          final busDataJson = jsonDecode(cachedBusData!);
+          final routeDataJson = jsonDecode(cachedRouteData!);
           _busData = busDataJson is Map<String, dynamic> ? busDataJson : null;
           _routeDetails =
               routeDataJson is Map<String, dynamic> ? routeDataJson : null;
@@ -206,7 +259,6 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
             for (var child in _routeDetails!['children']) {
               final String id = child['id']?.toString() ?? '';
               if (id.isEmpty) continue;
-
               byId[id] = {
                 'id': id,
                 'name':
@@ -224,18 +276,30 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
             "driverName": userName,
             "busNumber": _busData?['bus_number'] ?? 'No Bus',
             "busPlate": _busData?['number_plate'] ?? 'N/A',
-            "routeName": _routeDetails?['route_name'] ?? 'No Route',
+            "routeName": _routeDetails?['route_name'] ??
+                _routeDetails?['name'] ??
+                'No Route',
+            "routeAssignment": _busData?['bus_number'] ?? 'No Bus',
             "estimatedDuration": _routeDetails?['estimated_duration'] ?? "N/A",
-            "studentCount": _assignedChildren.length,
+            "studentCount":
+                _routeDetails?['total_children'] ?? _assignedChildren.length,
           };
+          // Show cached data immediately, continue to fetch fresh below
           setState(() => _isLoadingData = false);
-          return;
         } catch (_) {}
       }
 
       try {
         final busResponse = await _apiService.getDriverBus();
         final routeResponse = await _apiService.getDriverRoute();
+
+        // Persist name from API so all auth paths stay fresh
+        final apiName = busResponse['driver_name'] as String?;
+        if (apiName != null && apiName.isNotEmpty) {
+          await prefs.setString('user_name', apiName);
+          await prefs.setString('driver_name', apiName);
+        }
+        final freshName = apiName?.isNotEmpty == true ? apiName! : userName;
 
         _busData = busResponse['buses'] is Map
             ? busResponse['buses'] as Map<String, dynamic>
@@ -254,7 +318,6 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
           for (var child in routeResponse['children']) {
             final String id = child['id']?.toString() ?? '';
             if (id.isEmpty) continue;
-
             byId[id] = {
               'id': id,
               'name':
@@ -269,21 +332,25 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
         _driverData = {
           "driverId": userId,
-          "driverName": userName,
+          "driverName": freshName,
           "busNumber": _busData?['bus_number'] ?? 'No Bus',
           "busPlate": _busData?['number_plate'] ?? 'N/A',
           "routeName": routeResponse['route_name'] ?? 'No Route',
-          "routeAssignment":
-              '${_busData?['bus_number'] ?? 'No Bus'}${routeResponse['route_name'] != null ? ' - ${routeResponse['route_name']}' : ''}',
+          "routeAssignment": _busData?['bus_number'] ?? 'No Bus',
           "estimatedDuration": routeResponse['estimated_duration'] ?? "N/A",
           "studentCount": _assignedChildren.length,
         };
+        // API succeeded — cancel any pending retry and mark server reachable
+        _retryTimer?.cancel();
+        _retryTimer = null;
+        if (mounted) setState(() => _isServerReachable = true);
       } catch (apiError) {
-        await _initializeFallbackData();
-        final errorString = apiError.toString();
-        if (!errorString.contains('not assigned') &&
-            !errorString.contains('404')) {
-          setState(() => _errorMessage = 'Offline mode - Using cached data');
+        // API failed — mark server unreachable and start retry timer
+        if (mounted) setState(() => _isServerReachable = false);
+        _startRetryTimer();
+        // Only fall back to "Not Assigned" when there is truly no cached data
+        if (!hasCachedData) {
+          await _initializeFallbackData();
         }
       }
 
@@ -299,8 +366,12 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
   Future<void> _initializeFallbackData() async {
     final prefs = await SharedPreferences.getInstance();
-    final userName = prefs.getString('user_name') ?? 'Driver';
-    final userId = prefs.getInt('user_id')?.toString() ?? 'N/A';
+    final userName = prefs.getString('driver_name') ??
+        prefs.getString('user_name') ??
+        'Driver';
+    final userId =
+        (prefs.getInt('driver_id') ?? prefs.getInt('user_id'))?.toString() ??
+            'N/A';
 
     setState(() {
       _driverData = {
@@ -317,10 +388,16 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     });
   }
 
+  Future<void> _refreshDriverData() async {
+    return _loadDriverData(forceRemote: true);
+  }
+
   @override
   void dispose() {
     _timeTimer?.cancel();
     _positionStream?.cancel();
+    _retryTimer?.cancel();
+    _connectivitySubscription?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -508,10 +585,15 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
+        final raw = e.toString();
+        final message = raw.startsWith('Exception: ')
+            ? raw.substring('Exception: '.length)
+            : raw;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Failed to start trip'),
-              backgroundColor: AppTheme.criticalAlert),
+              content: Text(message),
+              backgroundColor: AppTheme.criticalAlert,
+              duration: const Duration(seconds: 5)),
         );
       }
     }
@@ -607,104 +689,69 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     return name.isNotEmpty ? name[0].toUpperCase() : 'D';
   }
 
-  Widget _buildTripTypeSelector() {
-    return Row(
-      children: [
+  Widget _buildCompactTripToggle() {
+    return Container(
+      padding: EdgeInsets.all(3),
+      decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(14)),
+      child: Row(children: [
         Expanded(
-          child: _buildTripTypeChip(
-            type: 'pickup',
-            label: 'Pickup',
-            subtitle: 'Morning',
-            icon: Icons.wb_sunny_outlined,
-            color: AppTheme.primaryDriver,
-          ),
-        ),
-        SizedBox(width: 3.w),
+            child: _buildTripOption(
+                'pickup', Icons.wb_sunny_outlined, 'Pickup', 'Morning',
+                AppTheme.primaryDriver)),
         Expanded(
-          child: _buildTripTypeChip(
-            type: 'dropoff',
-            label: 'Dropoff',
-            subtitle: 'Afternoon',
-            icon: Icons.nights_stay_outlined,
-            color: const Color(0xFF10B981),
-          ),
-        ),
-      ],
+            child: _buildTripOption(
+                'dropoff', Icons.nights_stay_outlined, 'Dropoff', 'Afternoon',
+                const Color(0xFF10B981))),
+      ]),
     );
   }
 
-  Widget _buildTripTypeChip({
-    required String type,
-    required String label,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-  }) {
+  Widget _buildTripOption(String type, IconData icon, String label,
+      String sub, Color color) {
     final isSelected = _selectedTripType == type;
-
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTripType = type;
-        });
-      },
+      onTap: () => setState(() => _selectedTripType = type),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.all(3.5.w),
+        duration: const Duration(milliseconds: 150),
+        padding: EdgeInsets.symmetric(vertical: 1.4.h, horizontal: 2.w),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.08) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? color : AppTheme.borderLight,
-            width: 1.5,
-          ),
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(11),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: color.withOpacity(0.12),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
+                      color: color.withOpacity(0.12),
+                      blurRadius: 8,
+                      offset: Offset(0, 2))
                 ]
               : [],
         ),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(2.5.w),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, size: 22, color: color),
-            ),
-            SizedBox(width: 3.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 0.3.h),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (isSelected) Icon(Icons.check_circle, size: 20, color: color),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon,
+              size: 17,
+              color: isSelected ? color : AppTheme.textSecondary),
+          SizedBox(width: 7),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label,
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight:
+                        isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? color : AppTheme.textSecondary)),
+            Text(sub,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: isSelected
+                        ? color.withOpacity(0.7)
+                        : AppTheme.textSecondary)),
+          ]),
+          if (isSelected) ...[
+            SizedBox(width: 5),
+            Icon(Icons.check_circle, size: 14, color: color),
           ],
-        ),
+        ]),
       ),
     );
   }
@@ -748,12 +795,19 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   }
 
   Widget _buildLoadingState() {
-    return Container(
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      CircularProgressIndicator(color: AppTheme.primaryDriver, strokeWidth: 3),
-      SizedBox(height: 2.h),
-      Text('Loading...', style: TextStyle(color: AppTheme.textSecondary)),
-    ]));
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+              color: AppTheme.primaryDriver, strokeWidth: 3),
+          SizedBox(height: 2.h),
+          Text('Loading...', style: TextStyle(color: AppTheme.textSecondary)),
+        ],
+      ),
+    );
   }
 
   Widget _buildMainContent() {
@@ -762,33 +816,60 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     return SafeArea(
         child: Column(children: [
       _buildTopBar(name),
+      if (!_isOnline || !_isServerReachable) _buildOfflineBanner(),
       Expanded(
-          child: SingleChildScrollView(
-        physics: BouncingScrollPhysics(),
-        padding: EdgeInsets.symmetric(horizontal: 5.w),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(height: 2.h),
-          _buildGreetingCard(name),
-          SizedBox(height: 3.h),
-          if (_driverData?['routeAssignment'] == 'Not Assigned Yet')
-            _buildNotAssignedCard()
-          else ...[_buildAssignmentCard(), SizedBox(height: 3.h)],
-          _buildSectionTitle('Location Status', Icons.location_on_outlined),
-          SizedBox(height: 1.5.h),
-          _buildLocationCard(),
-          SizedBox(height: 3.h),
-          _buildSectionTitle('Trip Type', Icons.swap_vert_rounded),
-          SizedBox(height: 1.5.h),
-          _buildTripTypeSelector(),
-          SizedBox(height: 3.h),
-          _buildSectionTitle('Pre-Trip Checklist', Icons.checklist_rounded),
-          SizedBox(height: 1.5.h),
-          _buildChecklistCard(),
-          SizedBox(height: 4.h),
-        ]),
+          child: RefreshIndicator(
+        onRefresh: () async {
+          await _loadDriverData();
+          await _checkForActiveTrip();
+        },
+        color: AppTheme.primaryDriver,
+        child: SingleChildScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.symmetric(horizontal: 4.w),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SizedBox(height: 1.5.h),
+            if (_driverData?['routeAssignment'] == 'Not Assigned Yet')
+              _buildNotAssignedCard()
+            else
+              _buildHeroCard(name),
+            SizedBox(height: 1.5.h),
+            _buildCompactStatusRow(),
+            SizedBox(height: 1.5.h),
+            _buildCompactTripToggle(),
+            SizedBox(height: 2.h),
+            _buildSectionTitle('Pre-Trip Checklist', Icons.checklist_rounded),
+            SizedBox(height: 1.h),
+            _buildChecklistCard(),
+            SizedBox(height: 4.h),
+          ]),
+        ),
       )),
       _buildBottomButton(),
     ]));
+  }
+
+  Widget _buildOfflineBanner() {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 8),
+      color: Colors.orange.shade700,
+      child: Row(children: [
+        Icon(Icons.wifi_off_rounded, size: 14, color: Colors.white),
+        SizedBox(width: 6),
+        Expanded(
+            child: Text('Offline — showing cached data',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500))),
+        Text('Pull to refresh',
+            style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontSize: 11)),
+      ]),
+    );
   }
 
   Widget _buildTopBar(String name) {
@@ -867,41 +948,49 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     );
   }
 
-  Widget _buildGreetingCard(String name) {
+  Widget _buildHeroCard(String name) {
+    final primary = AppTheme.primaryDriver;
     return Container(
-      padding: EdgeInsets.all(5.w),
+      padding: EdgeInsets.all(4.w),
       decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 20,
-                offset: Offset(0, 4))
-          ]),
-      child: Row(children: [
-        Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_getGreeting(),
-              style: TextStyle(
-                  fontSize: 14,
-                  color: AppTheme.textSecondary,
-                  fontWeight: FontWeight.w500)),
-          SizedBox(height: 4),
-          Text(name.split(' ').first,
-              style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
-                  letterSpacing: -0.5)),
-          SizedBox(height: 8),
+        gradient: LinearGradient(
+          colors: [primary, primary.withOpacity(0.82)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+              color: primary.withOpacity(0.28),
+              blurRadius: 16,
+              offset: Offset(0, 6))
+        ],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Greeting row
+        Row(children: [
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(_getGreeting(),
+                    style: TextStyle(
+                        color: Colors.white.withOpacity(0.72),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500)),
+                SizedBox(height: 2),
+                Text(name.split(' ').first,
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3)),
+              ])),
+          // Status badge
           Container(
             padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-                color: _hasActiveTrip
-                    ? AppTheme.successAction.withOpacity(0.1)
-                    : AppTheme.primaryDriver.withOpacity(0.1),
+                color: Colors.white.withOpacity(0.18),
                 borderRadius: BorderRadius.circular(20)),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Container(
@@ -910,40 +999,78 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                   decoration: BoxDecoration(
                       color: _hasActiveTrip
                           ? AppTheme.successAction
-                          : AppTheme.primaryDriver,
+                          : Colors.white,
                       shape: BoxShape.circle)),
-              SizedBox(width: 6),
-              Text(_hasActiveTrip ? 'Trip Active' : 'Ready to Start',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _hasActiveTrip
-                          ? AppTheme.successAction
-                          : AppTheme.primaryDriver)),
-            ]),
-          ),
-        ])),
-        // Avatar/photo beside the name (replace truck icon)
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: AppTheme.primaryDriver,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                  color: AppTheme.primaryDriver.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: Offset(0, 3))
-            ],
-          ),
-          child: Center(
-              child: Text(_getInitials(name),
+              SizedBox(width: 5),
+              Text(_hasActiveTrip ? 'Trip Active' : 'Ready',
                   style: TextStyle(
                       color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 20))),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
+            ]),
+          ),
+        ]),
+        SizedBox(height: 2.h),
+        // Bus + Route chip
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.2.h),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.14),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(children: [
+            Icon(Icons.directions_bus_rounded,
+                color: Colors.white, size: 17),
+            SizedBox(width: 7),
+            Text(_driverData?['busNumber'] ?? 'Bus',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14)),
+            Container(
+                margin: EdgeInsets.symmetric(horizontal: 8),
+                width: 1,
+                height: 14,
+                color: Colors.white.withOpacity(0.35)),
+            Icon(Icons.route_rounded,
+                color: Colors.white.withOpacity(0.8), size: 15),
+            SizedBox(width: 5),
+            Expanded(
+                child: Text(_driverData?['routeName'] ?? 'No Route',
+                    style: TextStyle(
+                        color: Colors.white.withOpacity(0.9), fontSize: 13),
+                    overflow: TextOverflow.ellipsis)),
+          ]),
         ),
+        SizedBox(height: 1.5.h),
+        // Stats row
+        Row(children: [
+          _buildHeroStat(
+              Icons.people_outline,
+              '${_driverData?['studentCount'] ?? 0} students'),
+          SizedBox(width: 2.w),
+          _buildHeroStat(Icons.timer_outlined,
+              _driverData?['estimatedDuration'] ?? 'N/A'),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _buildHeroStat(IconData icon, String label) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 15, color: Colors.white.withOpacity(0.85)),
+        SizedBox(width: 5),
+        Text(label,
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600)),
       ]),
     );
   }
@@ -993,128 +1120,32 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     );
   }
 
-  Widget _buildAssignmentCard() {
+  Widget _buildCompactStatusRow() {
     return Container(
-      padding: EdgeInsets.all(5.w),
+      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.5.h),
       decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
                 color: Colors.black.withOpacity(0.04),
-                blurRadius: 20,
-                offset: Offset(0, 4))
+                blurRadius: 10,
+                offset: Offset(0, 2))
           ]),
-      child: Column(children: [
-        Row(children: [
-          Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [
-                    AppTheme.primaryDriver,
-                    AppTheme.primaryDriver.withOpacity(0.7)
-                  ]),
-                  borderRadius: BorderRadius.circular(12)),
-              child: Icon(Icons.directions_bus_rounded,
-                  size: 24, color: Colors.white)),
-          SizedBox(width: 4.w),
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(_driverData?['busNumber'] ?? 'Bus',
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary)),
-                Text(_driverData?['routeName'] ?? 'Route',
-                    style:
-                        TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
-              ])),
-        ]),
-        SizedBox(height: 3.h),
-        Row(children: [
-          Expanded(
-            child: _buildInfoPill(Icons.people_outline,
-                '${_driverData?['studentCount'] ?? 0}', 'Students'),
-          ),
-          SizedBox(width: 3.w),
-          Expanded(
-            child: _buildInfoPill(Icons.timer_outlined,
-                _driverData?['estimatedDuration'] ?? 'N/A', 'Duration'),
-          ),
-        ]),
-      ]),
-    );
-  }
-
-  Widget _buildInfoPill(IconData icon, String value, String label) {
-    return Container(
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-          color: AppTheme.primaryDriver.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(12)),
-      child: Row(children: [
-        Icon(icon, size: 20, color: AppTheme.primaryDriver),
-        SizedBox(width: 10),
-        Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary)),
-            Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-          ]),
-        ),
-      ]),
-    );
-  }
-
-  Widget _buildLocationCard() {
-    return GestureDetector(
-      onTap: _toggleLocationServices,
-      child: Container(
-        padding: EdgeInsets.all(5.w),
-        decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-                color: _isLocationEnabled
-                    ? AppTheme.successAction.withOpacity(0.3)
-                    : Colors.grey.shade200,
-                width: 2),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 12,
-                  offset: Offset(0, 4))
-            ]),
+      child: GestureDetector(
+        onTap: _toggleLocationServices,
         child: Row(children: [
-          Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                  color: _isLocationEnabled
-                      ? AppTheme.successAction.withOpacity(0.1)
-                      : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12)),
-              child: Icon(
-                  _isGpsConnected
-                      ? Icons.gps_fixed
-                      : (_isLocationEnabled
-                          ? Icons.gps_not_fixed
-                          : Icons.gps_off),
-                  size: 24,
-                  color: _isGpsConnected
-                      ? AppTheme.successAction
-                      : (_isLocationEnabled ? Colors.orange : Colors.grey))),
-          SizedBox(width: 4.w),
+          Icon(
+              _isGpsConnected
+                  ? Icons.gps_fixed
+                  : (_isLocationEnabled
+                      ? Icons.gps_not_fixed
+                      : Icons.gps_off),
+              size: 18,
+              color: _isGpsConnected
+                  ? AppTheme.successAction
+                  : (_isLocationEnabled ? Colors.orange : Colors.grey)),
+          SizedBox(width: 8),
           Expanded(
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1126,17 +1157,18 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                             ? 'Acquiring GPS...'
                             : 'Location Off'),
                     style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppTheme.textPrimary)),
                 Text(_accuracyText,
-                    style:
-                        TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+                    style: TextStyle(
+                        fontSize: 11, color: AppTheme.textSecondary)),
               ])),
           Switch(
               value: _isLocationEnabled,
               onChanged: (_) => _toggleLocationServices(),
-              activeThumbColor: AppTheme.successAction),
+              activeThumbColor: AppTheme.successAction,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
         ]),
       ),
     );

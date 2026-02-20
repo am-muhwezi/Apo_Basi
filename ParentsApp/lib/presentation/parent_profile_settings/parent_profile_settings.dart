@@ -1043,12 +1043,22 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   /// Detects the current GPS position and reverse-geocodes it to a readable
   /// address. Returns null and toasts on failure.
   Future<({Position position, String address})?> _detectGpsLocation() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showToast('Please enable location services on your device', isError: true);
+      return null;
+    }
+
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.deniedForever) {
-      _showToast('Location permissions are permanently denied', isError: true);
+      _showToast('Location permission permanently denied — enable it in Settings', isError: true);
+      return null;
+    }
+    if (permission == LocationPermission.denied) {
+      _showToast('Location permission is required to detect your address', isError: true);
       return null;
     }
     try {

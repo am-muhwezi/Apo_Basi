@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserCircle, Bus as BusIcon, CheckCircle, Users, Phone, CreditCard } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
@@ -15,26 +15,19 @@ export default function DriversPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const [formError, setFormError] = useState<string | null>(null);
-  // Use hooks for drivers
-  const { drivers, loading, hasMore, loadDrivers, loadMore: loadMoreDrivers } = useDrivers();
-
-  // Load drivers on mount (assignedBusNumber is included in drivers response)
-  React.useEffect(() => {
-    loadDrivers();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [searchTerm, setSearchTerm] = useState('');
+  const { drivers, loading, hasMore, totalCount, loadDrivers, loadMore: loadMoreDrivers } = useDrivers({ search: searchTerm });
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [formData, setFormData] = useState<Partial<Driver>>({});
 
-  const filteredDrivers = drivers.filter((driver) => {
-    const matchesSearch =
-      driver.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      driver.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      driver.email.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+  useEffect(() => {
+    const timer = setTimeout(() => loadDrivers(), searchTerm ? 400 : 0);
+    return () => clearTimeout(timer);
+  }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filteredDrivers = drivers; // search is server-side
 
   const handleCreate = () => {
     setSelectedDriver(null);
@@ -161,15 +154,17 @@ export default function DriversPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
-          <input
-            type="text"
-            placeholder="Search by name or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+        <div className="flex gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
         </div>
       </div>
 
@@ -203,6 +198,18 @@ export default function DriversPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
+              {filteredDrivers.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <p className="text-slate-500 font-medium">
+                      {searchTerm ? 'No drivers match your search' : 'No drivers yet'}
+                    </p>
+                    {!searchTerm && (
+                      <p className="text-slate-400 text-sm mt-1">Click "Add Driver" to get started</p>
+                    )}
+                  </td>
+                </tr>
+              )}
               {filteredDrivers.map((driver) => (
                 <tr key={driver.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -259,7 +266,7 @@ export default function DriversPage() {
         <div className="p-4 border-t border-slate-200">
           <div className="flex flex-col items-center gap-3">
             <span className="text-sm text-slate-600">
-              Loaded {filteredDrivers.length} of {filteredDrivers.length}{hasMore ? '+' : ''} drivers
+              Loaded {drivers.length} of {totalCount} drivers
             </span>
             {hasMore && (
               <Button
@@ -277,6 +284,16 @@ export default function DriversPage() {
 
       {/* Drivers Cards - Mobile */}
       <div className="md:hidden space-y-4">
+        {filteredDrivers.length === 0 && !loading && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+            <p className="text-slate-500 font-medium">
+              {searchTerm ? 'No drivers match your search' : 'No drivers yet'}
+            </p>
+            {!searchTerm && (
+              <p className="text-slate-400 text-sm mt-1">Click "Add Driver" to get started</p>
+            )}
+          </div>
+        )}
         {filteredDrivers.map((driver) => (
           <div key={driver.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex items-start justify-between mb-3">
@@ -345,7 +362,7 @@ export default function DriversPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex flex-col items-center gap-3">
               <span className="text-sm text-slate-600">
-                Loaded {filteredDrivers.length} of {filteredDrivers.length}{hasMore ? '+' : ''} drivers
+                Loaded {drivers.length} of {totalCount} drivers
               </span>
               {hasMore && (
                 <Button
