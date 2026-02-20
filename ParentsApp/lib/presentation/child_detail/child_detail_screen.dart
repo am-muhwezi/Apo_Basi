@@ -1,18 +1,15 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:flutter/services.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Position;
+import 'package:latlong2/latlong.dart' as ll;
 import 'package:sizer/sizer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/app_export.dart';
-import '../../config/mapbox_config.dart';
+import '../../config/api_config.dart';
 import '../../config/location_config.dart';
-import '../../config/cached_tile_provider.dart';
-import './widgets/home_marker_widget.dart';
-import '../../widgets/location/bus_marker_3d.dart';
-import '../../widgets/location/animated_bus_marker.dart';
+import '../../config/mapbox_helpers.dart';
 import '../../models/bus_location_model.dart';
 import '../../services/bus_websocket_service.dart';
 import '../../services/mapbox_route_service.dart';
@@ -27,15 +24,26 @@ class ChildDetailScreen extends StatefulWidget {
 
 class _ChildDetailScreenState extends State<ChildDetailScreen> {
   Map<String, dynamic>? _childData;
-  final MapController _mapController = MapController();
-  LatLng? _homeLocation; // Child's home location (static, not GPS)
+  ll.LatLng? _homeLocation; // Child's home location (static, not GPS)
   bool _isLoadingLocation = true;
   final HomeLocationService _homeLocationService = HomeLocationService();
+
+  // Mapbox Maps SDK
+  MapboxMap? _mapboxMap;
+  PointAnnotationManager? _pointAnnotationManager;
+  PolylineAnnotationManager? _polylineAnnotationManager;
+  PointAnnotation? _homeAnnotation;
+  PointAnnotation? _busAnnotation;
+  PolylineAnnotation? _routeAnnotation;
+
+  // Pre-rendered marker images
+  Uint8List? _homeMarkerImage;
+  Uint8List? _busMarkerImage;
 
   // Real-time bus tracking
   final BusWebSocketService _webSocketService = BusWebSocketService();
   BusLocation? _busLocation;
-  LatLng? _snappedBusLocation; // Road-snapped bus location
+  ll.LatLng? _snappedBusLocation; // Road-snapped bus location
   LocationConnectionState _connectionState =
       LocationConnectionState.disconnected;
   StreamSubscription? _locationSubscription;
@@ -43,13 +51,14 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   // ETA and Route Information
   int? _etaMinutes;
-  List<LatLng>? _routePoints;
+  List<ll.LatLng>? _routePoints;
   String? _distance;
   bool _isCalculatingETA = false;
 
   @override
   void initState() {
     super.initState();
+    _loadMarkerImages();
     // Defer WebSocket connection to after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeSocketConnection();
@@ -71,52 +80,221 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   void dispose() {
     _locationSubscription?.cancel();
     _connectionSubscription?.cancel();
-    // Don't disconnect WebSocket - it's a singleton shared across the app
-    // The WebSocket should remain connected for real-time notifications
     super.dispose();
+  }
+
+  /// Load marker images from assets
+  Future<void> _loadMarkerImages() async {
+    // Load bus marker image
+    try {
+      final ByteData busBytes =
+          await rootBundle.load('assets/images/Bus 2.png');
+      _busMarkerImage = busBytes.buffer.asUint8List();
+    } catch (e) {
+      // Bus image not found, will skip bus marker
+    }
+
+    // Create home marker image programmatically (blue circle with home icon)
+    _homeMarkerImage = await _createHomeMarkerImage();
+  }
+
+  /// Create a home marker icon image programmatically
+  Future<Uint8List> _createHomeMarkerImage() async {
+    const double size = 96; // 48 logical * 2 for retina
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, size, size));
+
+    // Draw blue circle
+    final paint = Paint()..color = const Color(0xFF2B5CE6);
+    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2.5, paint);
+
+    // Draw white inner circle
+    final innerPaint = Paint()..color = Colors.white;
+    canvas.drawCircle(const Offset(size / 2, size / 2), size / 3.5, innerPaint);
+
+    // Draw house icon (simple)
+    final iconPaint = Paint()
+      ..color = const Color(0xFF2B5CE6)
+      ..style = PaintingStyle.fill;
+    final path = Path();
+    // Roof
+    path.moveTo(size / 2, size * 0.3);
+    path.lineTo(size * 0.35, size * 0.48);
+    path.lineTo(size * 0.65, size * 0.48);
+    path.close();
+    canvas.drawPath(path, iconPaint);
+    // Body
+    canvas.drawRect(
+      Rect.fromLTWH(size * 0.38, size * 0.48, size * 0.24, size * 0.2),
+      iconPaint,
+    );
+
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(size.toInt(), size.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  /// Called when the Mapbox map is created and ready
+  void _onMapCreated(MapboxMap mapboxMap) async {
+    _mapboxMap = mapboxMap;
+
+    // Create annotation managers
+    _pointAnnotationManager =
+        await mapboxMap.annotations.createPointAnnotationManager();
+    _polylineAnnotationManager =
+        await mapboxMap.annotations.createPolylineAnnotationManager();
+
+    // Place initial markers
+    _updateHomeAnnotation();
+    _updateBusAnnotation();
+    _updateRouteAnnotation();
+
+    // Center on initial position
+    _centerMapOnInitialPosition();
+  }
+
+  /// Center map on bus (if available) or home location
+  void _centerMapOnInitialPosition() {
+    if (_mapboxMap == null) return;
+
+    if (_busLocation != null) {
+      _mapboxMap!.flyTo(
+        CameraOptions(
+          center: latLngToPoint(ll.LatLng(
+            _busLocation!.latitude,
+            _busLocation!.longitude,
+          )),
+          zoom: 16.0,
+        ),
+        MapAnimationOptions(duration: 500),
+      );
+    } else if (_homeLocation != null) {
+      _mapboxMap!.flyTo(
+        CameraOptions(
+          center: latLngToPoint(_homeLocation!),
+          zoom: 16.0,
+        ),
+        MapAnimationOptions(duration: 500),
+      );
+    }
+  }
+
+  /// Update the home marker annotation
+  Future<void> _updateHomeAnnotation() async {
+    if (_pointAnnotationManager == null ||
+        _homeLocation == null ||
+        _homeMarkerImage == null) return;
+
+    // Delete existing
+    if (_homeAnnotation != null) {
+      await _pointAnnotationManager!.delete(_homeAnnotation!);
+      _homeAnnotation = null;
+    }
+
+    // Create new
+    _homeAnnotation = await _pointAnnotationManager!.create(
+      PointAnnotationOptions(
+        geometry: latLngToPoint(_homeLocation!),
+        image: _homeMarkerImage,
+        iconSize: 0.5,
+        iconAnchor: IconAnchor.BOTTOM,
+      ),
+    );
+  }
+
+  /// Update the bus marker annotation
+  Future<void> _updateBusAnnotation() async {
+    if (_pointAnnotationManager == null || _busMarkerImage == null) return;
+
+    if (_busLocation == null) {
+      // Remove bus marker if no location
+      if (_busAnnotation != null) {
+        await _pointAnnotationManager!.delete(_busAnnotation!);
+        _busAnnotation = null;
+      }
+      return;
+    }
+
+    final busLatLng = _snappedBusLocation ??
+        ll.LatLng(_busLocation!.latitude, _busLocation!.longitude);
+    final heading = _busLocation!.heading ?? 0;
+
+    if (_busAnnotation != null) {
+      // Update existing annotation
+      _busAnnotation!.geometry = latLngToPoint(busLatLng);
+      _busAnnotation!.iconRotate = heading;
+      await _pointAnnotationManager!.update(_busAnnotation!);
+    } else {
+      // Create new
+      _busAnnotation = await _pointAnnotationManager!.create(
+        PointAnnotationOptions(
+          geometry: latLngToPoint(busLatLng),
+          image: _busMarkerImage,
+          iconSize: 0.4,
+          iconRotate: heading,
+          iconAnchor: IconAnchor.CENTER,
+        ),
+      );
+    }
+  }
+
+  /// Update the route polyline annotation on the map
+  Future<void> _updateRouteAnnotation() async {
+    if (_polylineAnnotationManager == null) return;
+
+    // Delete existing route
+    if (_routeAnnotation != null) {
+      await _polylineAnnotationManager!.delete(_routeAnnotation!);
+      _routeAnnotation = null;
+    }
+
+    // Create new route if we have points
+    if (_routePoints != null && _routePoints!.isNotEmpty) {
+      _routeAnnotation = await _polylineAnnotationManager!.create(
+        PolylineAnnotationOptions(
+          geometry: LineString(
+            coordinates: latLngListToPositions(_routePoints!),
+          ),
+          lineColor: const Color(0xFF5B7FFF).toARGB32(),
+          lineWidth: 5.0,
+        ),
+      );
+    }
   }
 
   /// Initialize WebSocket connection for real-time bus tracking
   Future<void> _initializeSocketConnection() async {
     try {
-      // Connect to WebSocket service (initialize)
       await _webSocketService.connect();
 
-      // Listen to connection state FIRST
       _connectionSubscription =
           _webSocketService.connectionStateStream.listen((state) {
         if (mounted) {
           setState(() {
             _connectionState = state;
           });
-
-          // Subscribe to bus when connected
           if (state == LocationConnectionState.connected) {
             _subscribeToBus();
           }
         }
       });
 
-      // Listen to location updates
       _locationSubscription =
           _webSocketService.locationUpdateStream.listen((location) {
         if (mounted) {
           setState(() {
             _busLocation = location;
           });
-
-          // Snap to road and calculate ETA when bus location updates
           _updateBusLocationWithSnapping(location);
         }
       }, onError: (error) {
         if (LocationConfig.enableSocketLogging) {}
       });
 
-      // If already connected, subscribe immediately
       if (_webSocketService.isConnected) {
         _subscribeToBus();
       } else {
-        // Subscribe anyway - this will trigger the actual WebSocket connection
         _subscribeToBus();
       }
     } catch (e) {
@@ -126,20 +304,14 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   /// Subscribe to bus location updates
   void _subscribeToBus() {
-    if (_childData == null) {
-      return;
-    }
+    if (_childData == null) return;
 
     final busValue = _childData!['busId'];
-    if (busValue == null) {
-      return;
-    }
+    if (busValue == null) return;
 
     final busId =
         busValue is int ? busValue : int.tryParse(busValue.toString());
-    if (busId == null) {
-      return;
-    }
+    if (busId == null) return;
 
     _webSocketService.subscribeToBus(busId);
   }
@@ -153,21 +325,19 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     });
 
     try {
-      final busCoord = LatLng(location.latitude, location.longitude);
+      final busCoord = ll.LatLng(location.latitude, location.longitude);
       final homeCoord =
-          LatLng(_homeLocation!.latitude, _homeLocation!.longitude);
+          ll.LatLng(_homeLocation!.latitude, _homeLocation!.longitude);
 
-      // Snap bus location to nearest road
       final snappedCoord = await MapboxRouteService.snapSinglePointToRoad(
         coordinate: busCoord,
-        radius: 25, // Search within 25 meters
+        radius: 25,
       );
 
-      // Get comprehensive trip information (route, ETA, distance)
       final tripInfo = await MapboxRouteService.getTripInformation(
         busLocation: snappedCoord ?? busCoord,
         homeLocation: homeCoord,
-        profile: 'driving-traffic', // Use real-time traffic data
+        profile: 'driving-traffic',
       );
 
       if (mounted && tripInfo != null) {
@@ -178,6 +348,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           _routePoints = tripInfo['route'];
           _isCalculatingETA = false;
         });
+        _updateBusAnnotation();
+        _updateRouteAnnotation();
       } else {
         setState(() {
           _isCalculatingETA = false;
@@ -190,39 +362,38 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     }
   }
 
-  /// Load child's home location (not parent's GPS location)
-  /// Parents don't share their location - this is the child's static home address
-  /// Uses parent's saved home location from HomeLocationService
+  /// Load child's home location
   Future<void> _loadHomeLocation() async {
     try {
-      // FIRST: Try to get parent's cached home coordinates (set in profile)
-      LatLng? homeCoords = await _homeLocationService.getHomeCoordinates();
+      ll.LatLng? homeCoords = await _homeLocationService.getHomeCoordinates();
 
-      // SECOND: Try to get the saved address and geocode if no coords
       if (homeCoords == null) {
-        final String? savedAddress = await _homeLocationService.getHomeAddress();
+        final String? savedAddress =
+            await _homeLocationService.getHomeAddress();
         if (savedAddress != null && savedAddress.isNotEmpty) {
-          // Try to geocode the saved address - wait for completion
-          bool success = await _homeLocationService.setHomeLocationFromAddress(savedAddress);
+          bool success = await _homeLocationService
+              .setHomeLocationFromAddress(savedAddress);
           if (success) {
             homeCoords = await _homeLocationService.getHomeCoordinates();
           }
         }
       }
 
-      // THIRD: Try child's address from backend as last resort
       if (homeCoords == null && _childData != null) {
-        final String? childAddress = _childData!['homeAddress'] ?? _childData!['address'];
-        if (childAddress != null && childAddress.isNotEmpty && childAddress != 'Not set') {
-          bool success = await _homeLocationService.setHomeLocationFromAddress(childAddress);
+        final String? childAddress =
+            _childData!['homeAddress'] ?? _childData!['address'];
+        if (childAddress != null &&
+            childAddress.isNotEmpty &&
+            childAddress != 'Not set') {
+          bool success = await _homeLocationService
+              .setHomeLocationFromAddress(childAddress);
           if (success) {
             homeCoords = await _homeLocationService.getHomeCoordinates();
           }
         }
       }
 
-      // Final fallback: Nairobi city center (only if no coordinates found)
-      homeCoords ??= const LatLng(-1.286389, 36.817223);
+      homeCoords ??= const ll.LatLng(-1.286389, 36.817223);
 
       if (!mounted) return;
 
@@ -231,28 +402,15 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         _isLoadingLocation = false;
       });
 
-      // Center map after it's rendered - use postFrameCallback
-      final finalHomeCoords = homeCoords; // Capture for closure
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || finalHomeCoords == null) return;
-        try {
-          // Center map on bus location if available, otherwise home
-          if (_busLocation != null) {
-            _mapController.move(
-              LatLng(_busLocation!.latitude, _busLocation!.longitude),
-              19.5,
-            );
-          } else {
-            _mapController.move(finalHomeCoords, 19.0);
-          }
-        } catch (e) {
-          // Map not yet ready, ignore
-        }
+        if (!mounted) return;
+        _updateHomeAnnotation();
+        _centerMapOnInitialPosition();
       });
     } catch (e) {
       if (mounted) {
         setState(() {
-          _homeLocation = const LatLng(-1.286389, 36.817223);
+          _homeLocation = const ll.LatLng(-1.286389, 36.817223);
           _isLoadingLocation = false;
         });
       }
@@ -263,64 +421,47 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     final String childName = _childData?['name'] ?? 'Child';
     final String? status = _childData?['status']?.toString().toLowerCase();
 
-    // Use child's actual location_status from backend
-    if (status == 'on-bus' || status == 'on_bus' || status == 'picked-up' || status == 'picked_up') {
-      // Child is on the bus
+    if (status == 'on-bus' ||
+        status == 'on_bus' ||
+        status == 'picked-up' ||
+        status == 'picked_up') {
       if (_busLocation != null) {
         final isMoving = (_busLocation!.speed ?? 0) > 0.5;
-
-        if (!isMoving) {
-          return 'Bus Stopped';
-        }
-
-        // Check ETA
+        if (!isMoving) return 'Bus Stopped';
         if (_etaMinutes != null) {
-          if (_etaMinutes! <= 5) {
-            return 'Driver arrives soon';
-          } else if (_etaMinutes! <= 15) {
-            return 'Driver on the way';
-          }
+          if (_etaMinutes! <= 5) return 'Driver arrives soon';
+          if (_etaMinutes! <= 15) return 'Driver on the way';
         }
-
         return 'Driver on the way';
       }
       return '$childName is on the bus';
     } else if (status == 'at-school' || status == 'at_school') {
       return '$childName is at school';
-    } else if (status == 'dropped-off' || status == 'dropped_off' || status == 'home') {
+    } else if (status == 'dropped-off' ||
+        status == 'dropped_off' ||
+        status == 'home') {
       return '$childName is Home';
     } else {
-      // Default fallback
       return '$childName is Home';
     }
   }
 
   String _getRouteDisplay() {
-    // Try to get route name from various possible fields
     final routeName = _childData?['routeName'] ??
-                      _childData?['route_name'] ??
-                      _childData?['route'];
-
-    // If route name exists and is not empty
+        _childData?['route_name'] ??
+        _childData?['route'];
     if (routeName != null && routeName.toString().trim().isNotEmpty) {
       return routeName.toString();
     }
-
-    // Try to get route code as fallback
     final routeCode = _childData?['routeCode'] ?? _childData?['route_code'];
     if (routeCode != null && routeCode.toString().trim().isNotEmpty) {
       return routeCode.toString();
     }
-
-    // If no route name or code, show "Route not yet assigned"
     return 'Route not yet assigned';
   }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
-    final Uri launchUri = Uri(
-      scheme: 'tel',
-      path: phoneNumber,
-    );
+    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
     if (await canLaunchUrl(launchUri)) {
       await launchUrl(launchUri);
     }
@@ -328,7 +469,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Cache theme to avoid 40+ repeated lookups
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
@@ -336,134 +476,54 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     if (_childData == null) {
       return Scaffold(
         appBar: AppBar(),
-        body: const Center(
-          child: Text('No child data available'),
-        ),
+        body: const Center(child: Text('No child data available')),
       );
     }
 
-    final String name = _childData!['name'] ?? 'Child Name';
-    final String grade = _childData!['grade'] ?? 'N/A';
     final bool hasAssignedBus = _childData!['busId'] != null;
-    final bool isTrackable = hasAssignedBus && _busLocation != null;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Stack(
         children: [
-          // Mapbox Map via flutter_map - wrapped in RepaintBoundary for performance
-          RepaintBoundary(
-            child: _isLoadingLocation
-                ? const Center(child: CircularProgressIndicator())
-                : _homeLocation != null
-                    ? FlutterMap(
-                      mapController: _mapController,
-                      options: MapOptions(
-                        initialCenter: LatLng(
-                          _homeLocation!.latitude,
-                          _homeLocation!.longitude,
-                        ),
-                        initialZoom: 19.0,
-                        minZoom: 5.0,
-                        maxZoom: 19.0,
+          // Mapbox Map - native vector rendering with Studio styles
+          _isLoadingLocation
+              ? const Center(child: CircularProgressIndicator())
+              : _homeLocation != null
+                  ? MapWidget(
+                      styleUri:
+                          'mapbox://styles/${ApiConfig.mapboxStyleId}',
+                      cameraOptions: CameraOptions(
+                        center: latLngToPoint(_homeLocation!),
+                        zoom: 16.0,
                       ),
-                      children: [
-                        // Mapbox Tile Layer - uses default caching
-                        TileLayer(
-                          urlTemplate: MapboxConfig.getTileUrl(),
-                          userAgentPackageName: 'com.apobasi.parentsapp',
-                          maxZoom: 19,
-                          // Use default tile provider for faster loading
-                        ),
-                        // Route Polyline (from bus to home)
-                        // Only show when we are actively tracking the bus.
-                        if (hasAssignedBus &&
-                            _routePoints != null &&
-                            _routePoints!.isNotEmpty)
-                          PolylineLayer(
-                            polylines: [
-                              Polyline(
-                                points: _routePoints!,
-                                strokeWidth: 5.0,
-                                color: const Color(0xFF5B7FFF),
-                              ),
-                            ],
-                          ),
-                        // Marker Layer
-                        MarkerLayer(
-                          markers: [
-                            // Home marker
-                            if (_homeLocation != null)
-                              Marker(
-                                point: LatLng(
-                                  _homeLocation!.latitude,
-                                  _homeLocation!.longitude,
-                                ),
-                                width: 48,
-                                height: 48,
-                                child: const HomeMarkerWidget(),
-                              ),
-                            // Bus marker (3D Animated) - Using SNAPPED location for accurate road position
-                            // Only show when we are actively tracking the bus.
-                            if (isTrackable && _busLocation != null)
-                              Marker(
-                                point: _snappedBusLocation ??
-                                    LatLng(
-                                      _busLocation!.latitude,
-                                      _busLocation!.longitude,
-                                    ),
-                                width: 100,
-                                height: 100,
-                                child: AnimatedBusMarker(
-                                  position: _snappedBusLocation ??
-                                      LatLng(
-                                        _busLocation!.latitude,
-                                        _busLocation!.longitude,
-                                      ),
-                                  size: 50,
-                                  heading: _busLocation!.heading ?? 0,
-                                  isMoving: (_busLocation!.speed ?? 0) > 0.5,
-                                  vehicleNumber: _childData?['busNumber'],
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
+                      onMapCreated: _onMapCreated,
                     )
                   : Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.location_off,
-                            size: 64,
-                            color: colorScheme.error,
-                          ),
+                          Icon(Icons.location_off,
+                              size: 64, color: colorScheme.error),
                           SizedBox(height: 2.h),
-                          Text(
-                            'Unable to get location',
-                            style: textTheme.titleLarge,
-                          ),
+                          Text('Unable to get location',
+                              style: textTheme.titleLarge),
                           SizedBox(height: 1.h),
-                          Text(
-                            'Please enable location permissions',
-                            style: textTheme.bodyMedium,
-                          ),
+                          Text('Please enable location permissions',
+                              style: textTheme.bodyMedium),
                         ],
                       ),
                     ),
-          ),
 
-          // Clean top UI - only back button and recenter button
+          // Clean top UI - back button and recenter button
           SafeArea(
             child: Padding(
               padding: EdgeInsets.all(3.w),
               child: Row(
                 children: [
-                  // Back button
                   Container(
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
+                      color: colorScheme.surface,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
@@ -474,18 +534,15 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                       ],
                     ),
                     child: IconButton(
-                      icon: Icon(
-                        Icons.arrow_back,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
+                      icon: Icon(Icons.arrow_back,
+                          color: colorScheme.onSurface),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
                   const Spacer(),
-                  // Recenter button
                   Container(
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
+                      color: colorScheme.surface,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
@@ -496,24 +553,27 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                       ],
                     ),
                     child: IconButton(
-                      icon: Icon(
-                        Icons.my_location,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+                      icon: Icon(Icons.my_location,
+                          color: colorScheme.primary),
                       onPressed: () {
                         if (_busLocation != null) {
-                          // Center on bus location
-                          _mapController.move(
-                            LatLng(_busLocation!.latitude,
-                                _busLocation!.longitude),
-                            19.5,
+                          _mapboxMap?.flyTo(
+                            CameraOptions(
+                              center: latLngToPoint(ll.LatLng(
+                                _busLocation!.latitude,
+                                _busLocation!.longitude,
+                              )),
+                              zoom: 16.0,
+                            ),
+                            MapAnimationOptions(duration: 800),
                           );
                         } else if (_homeLocation != null) {
-                          // Center on home location
-                          _mapController.move(
-                            LatLng(_homeLocation!.latitude,
-                                _homeLocation!.longitude),
-                            19.0,
+                          _mapboxMap?.flyTo(
+                            CameraOptions(
+                              center: latLngToPoint(_homeLocation!),
+                              zoom: 16.0,
+                            ),
+                            MapAnimationOptions(duration: 800),
                           );
                         }
                       },
@@ -533,7 +593,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
             builder: (context, scrollController) {
               return Container(
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
+                  color: colorScheme.surface,
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(24),
                     topRight: Radius.circular(24),
@@ -557,10 +617,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                         height: 4,
                         margin: EdgeInsets.only(bottom: 1.5.h),
                         decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.2),
+                          color: colorScheme.onSurface.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -572,9 +629,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                       children: [
                         Text(
                           _getTripStatus(),
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
+                          style: textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         if (_etaMinutes != null)
@@ -584,32 +639,22 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                               vertical: 0.5.h,
                             ),
                             decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.1),
+                              color:
+                                  colorScheme.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  Icons.schedule,
-                                  size: 16,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
+                                Icon(Icons.schedule,
+                                    size: 16, color: colorScheme.primary),
                                 SizedBox(width: 1.w),
                                 Text(
                                   '$_etaMinutes min',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .labelMedium
-                                      ?.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                  style: textTheme.labelMedium?.copyWith(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ],
                             ),
@@ -619,10 +664,9 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
                     SizedBox(height: 1.5.h),
 
-                    // Driver Photo Circle (clean, no badge)
+                    // Driver Photo Circle
                     Row(
                       children: [
-                        // Driver photo circle - clean design
                         Container(
                           width: 60,
                           height: 60,
@@ -630,129 +674,103 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                             shape: BoxShape.circle,
                             gradient: LinearGradient(
                               colors: [
-                                Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.15),
-                                Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.05),
+                                colorScheme.primary.withValues(alpha: 0.15),
+                                colorScheme.primary.withValues(alpha: 0.05),
                               ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
                             border: Border.all(
-                              color: Theme.of(context).colorScheme.primary,
+                              color: colorScheme.primary,
                               width: 2.5,
                             ),
                           ),
-                          child: Icon(
-                            Icons.person,
-                            size: 32,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                          child: Icon(Icons.person,
+                              size: 32, color: colorScheme.primary),
                         ),
                         SizedBox(width: 3.w),
-                        // Driver and Route Information
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Driver Name or Bus Assignment Status
                               Text(
                                 _childData?['busId'] == null
                                     ? 'Not yet assigned to a bus'
                                     : (_childData?['driverName'] ?? 'Driver'),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15.sp,
-                                      color: _childData?['busId'] == null
-                                          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
-                                          : Theme.of(context).colorScheme.onSurface,
-                                    ),
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15.sp,
+                                  color: _childData?['busId'] == null
+                                      ? colorScheme.onSurface
+                                          .withValues(alpha: 0.6)
+                                      : colorScheme.onSurface,
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              // Only show bus number and route if child has a bus assigned
                               if (_childData?['busId'] != null) ...[
                                 SizedBox(height: 0.5.h),
-                                // Bus Number Plate - theme-aware colors
                                 if (_childData?['busNumber'] != null &&
                                     _childData!['busNumber'] != 'N/A')
                                   Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 2.5.w,
-                                    vertical: 0.4.h,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).brightness == Brightness.dark
-                                        ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)
-                                        : Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
-                                      width: 1,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 2.5.w,
+                                      vertical: 0.4.h,
                                     ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.directions_bus,
-                                        size: 14,
-                                        color: Theme.of(context).colorScheme.primary,
+                                    decoration: BoxDecoration(
+                                      color: theme.brightness == Brightness.dark
+                                          ? colorScheme.primary
+                                              .withValues(alpha: 0.2)
+                                          : colorScheme.primary
+                                              .withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: colorScheme.primary
+                                            .withValues(alpha: 0.4),
+                                        width: 1,
                                       ),
-                                      SizedBox(width: 1.w),
-                                      Text(
-                                        _childData!['busNumber'],
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .labelMedium
-                                            ?.copyWith(
-                                              color: Theme.of(context).colorScheme.primary,
-                                              fontWeight: FontWeight.w900,
-                                              fontSize: 11.sp,
-                                              letterSpacing: 0.8,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.directions_bus,
+                                            size: 14,
+                                            color: colorScheme.primary),
+                                        SizedBox(width: 1.w),
+                                        Text(
+                                          _childData!['busNumber'],
+                                          style:
+                                              textTheme.labelMedium?.copyWith(
+                                            color: colorScheme.primary,
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 11.sp,
+                                            letterSpacing: 0.8,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 SizedBox(height: 0.5.h),
-                                // Route Information with fallback
                                 Row(
-                                children: [
-                                  Icon(
-                                    Icons.route,
-                                    size: 16,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withValues(alpha: 0.6),
-                                  ),
-                                  SizedBox(width: 1.5.w),
-                                  Expanded(
-                                    child: Text(
-                                      _getRouteDisplay(),
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withValues(alpha: 0.6),
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 11.sp,
-                                          ),
-                                      overflow: TextOverflow.ellipsis,
+                                  children: [
+                                    Icon(Icons.route,
+                                        size: 16,
+                                        color: colorScheme.onSurface
+                                            .withValues(alpha: 0.6)),
+                                    SizedBox(width: 1.5.w),
+                                    Expanded(
+                                      child: Text(
+                                        _getRouteDisplay(),
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: colorScheme.onSurface
+                                              .withValues(alpha: 0.6),
+                                          fontWeight: FontWeight.w500,
+                                          fontSize: 11.sp,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
+                                  ],
+                                ),
                               ],
                             ],
                           ),
@@ -762,29 +780,21 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
                     SizedBox(height: 1.5.h),
 
-                    // Divider
                     Divider(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.1),
+                      color: colorScheme.onSurface.withValues(alpha: 0.1),
                       thickness: 1,
                     ),
 
                     SizedBox(height: 1.5.h),
 
-                    // Contact School Section
                     Text(
                       'Contact School',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
+                      style: textTheme.titleSmall
                           ?.copyWith(fontWeight: FontWeight.w600),
                     ),
 
                     SizedBox(height: 1.5.h),
 
-                    // School Phone Button
                     ElevatedButton.icon(
                       onPressed: () => _makePhoneCall('+254718073907'),
                       icon: const Icon(Icons.phone, size: 20),
@@ -793,7 +803,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        backgroundColor: colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: EdgeInsets.symmetric(vertical: 1.4.h),
                         shape: RoundedRectangleBorder(
@@ -809,37 +819,5 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         ],
       ),
     );
-  }
-
-  void _callBusAssistant(BuildContext context) {
-    // Calls bus assistant/driver
-    final String assistantPhone = _childData?['assistantPhone'] ?? '';
-
-    if (assistantPhone.isNotEmpty) {
-      _makePhoneCall(assistantPhone);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Calling bus assistant...'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
-  void _callSchool(BuildContext context) {
-    // Calls school
-    final String schoolPhone = _childData?['schoolPhone'] ?? '';
-
-    if (schoolPhone.isNotEmpty) {
-      _makePhoneCall(schoolPhone);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Calling school...'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
   }
 }
