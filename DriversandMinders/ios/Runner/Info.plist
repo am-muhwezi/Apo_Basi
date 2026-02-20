@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -24,6 +26,47 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>ApoBasi needs camera access to take profile photos.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>ApoBasi needs background location access to notify you when your child's bus is approaching.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>ApoBasi needs your location to show your child's bus location and arrival time in real-time.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>ApoBasi needs access to save photos to your library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ApoBasi needs access to your photo library to select profile photos.</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>ApoBasi sends you important updates about your child's bus trips, pickups, and drop-offs.</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>UIWindowScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>flutter</string>
+					<key>UISceneDelegateClassName</key>
+					<string>FlutterSceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -41,38 +84,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	 <!-- Location Permissions (for GPS tracking) -->                                               
-        <key>NSLocationWhenInUseUsageDescription</key>                                                          
-        <string>ApoBasi needs your location to show your child's bus location and arrival time in real-time.</string>
-        <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>                                                 
-        <string>ApoBasi needs background location access to notify you when your child's bus is approaching.</string>
-                                                                                                                
-        <!-- Camera Permission (if used for profile photos) -->                                                 
-        <key>NSCameraUsageDescription</key>                                                                     
-        <string>ApoBasi needs camera access to take profile photos.</string>                                    
-                                                                                                                
-        <!-- Photo Library Permission (	to upload profile photos) -->                                          
-        <key>NSPhotoLibraryUsageDescription</key>                                                               
-        <string>ApoBasi needs access to your photo library to select profile photos.</string>                   
-        <key>NSPhotoLibraryAddUsageDescription</key>                                                            
-        <string>ApoBasi needs access to save photos to your library.</string>                                   
-                                                                                                                
-        <!-- Notifications Permission -->                                                                       
-        <key>NSUserNotificationsUsageDescription</key>                                                          
-        <string>ApoBasi sends you important updates about your child's bus trips, pickups, and drop-offs.</string>
-                                                                                                                
-        <!-- Background Modes (for location updates) -->
-        <key>UIBackgroundModes</key>
-        <array>
-                <string>location</string>
-                <string>fetch</string>
-                <string>remote-notification</string>
-        </array>
-
-
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
 </dict>
 </plist>
