@@ -380,8 +380,10 @@ export default function TripsPage() {
                 </tr>
               ) : filteredTrips.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
-                    No trips found
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <p className="text-slate-500 font-medium">
+                      {statusFilter !== 'all' ? 'No trips match your filter' : 'No trips yet'}
+                    </p>
                   </td>
                 </tr>
               ) : (
@@ -407,7 +409,7 @@ export default function TripsPage() {
                       <td className="px-6 py-4">
                         <div className="text-sm text-slate-900">{trip.driverName}</div>
                         {trip.minderName && (
-                          <div className="text-xs text-slate-500">Minder: {trip.minderName}</div>
+                          <div className="text-xs text-slate-500">Bus Assistant: {trip.minderName}</div>
                         )}
                       </td>
                       <td className="px-6 py-4">
@@ -491,9 +493,10 @@ export default function TripsPage() {
             <p className="text-slate-600">Loading trips...</p>
           </div>
         ) : filteredTrips.length === 0 ? (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
-            <AlertCircle className="w-12 h-12 text-slate-400 mx-auto mb-2" />
-            <p className="text-slate-600">No trips found</p>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+            <p className="text-slate-500 font-medium">
+              {statusFilter !== 'all' ? 'No trips match your filter' : 'No trips yet'}
+            </p>
           </div>
         ) : (
           filteredTrips.map((trip) => {

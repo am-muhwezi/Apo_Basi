@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, Eye, CreditCard as Edit, Trash2, Baby, Users, Bus as BusIcon, UserCheck } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
@@ -17,23 +17,6 @@ export default function ChildrenPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const [formError, setFormError] = useState<string | null>(null);
-
-  // Use hooks for data management
-  const {
-    children,
-    loading: childrenLoading,
-    error: childrenError,
-    hasMore: childrenHasMore,
-    loadChildren,
-    loadMore: loadMoreChildren,
-    refreshChildren
-  } = useChildren();
-
-  // Load children on mount (assignedBusNumber and parentName are included in children response)
-  React.useEffect(() => {
-    loadChildren();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const [searchTerm, setSearchTerm] = useState('');
   const [gradeFilter, setGradeFilter] = useState('all');
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
@@ -44,16 +27,29 @@ export default function ChildrenPage() {
 
   const grades = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6'];
 
-  const filteredChildren = children.filter((child) => {
-    const matchesSearch =
-      child.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      child.lastName?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesGrade = gradeFilter === 'all' || child.grade === gradeFilter;
-    return matchesSearch && matchesGrade;
-  });
+  const {
+    children,
+    loading: childrenLoading,
+    error: childrenError,
+    hasMore: childrenHasMore,
+    totalCount: childrenTotal,
+    loadChildren,
+    loadMore: loadMoreChildren,
+    refreshChildren
+  } = useChildren({ search: searchTerm });
 
-  // Calculate stats
-  const totalChildren = children.length;
+  useEffect(() => {
+    const timer = setTimeout(() => loadChildren(), searchTerm ? 400 : 0);
+    return () => clearTimeout(timer);
+  }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Grade filter stays client-side (exact enum match)
+  const filteredChildren = gradeFilter === 'all'
+    ? children
+    : children.filter((child) => child.grade === gradeFilter);
+
+  // Calculate stats — use server count for total, loaded array for derived stats
+  const totalChildren = childrenTotal || children.length;
   const activeChildren = children.filter((c) => c.status === 'active').length;
   const childrenWithBus = children.filter((c) => c.busId).length;
   const childrenByGrade = filteredChildren.length;
@@ -111,6 +107,11 @@ export default function ChildrenPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+
+    if (!formData.parentId) {
+      setFormError('Please select a parent before saving.');
+      return;
+    }
 
     if (selectedChild) {
       const result = await childService.updateChild(selectedChild.id, formData);
@@ -198,15 +199,17 @@ export default function ChildrenPage() {
       {/* Search and Filter */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search by name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
+              <input
+                type="text"
+                placeholder="Search by name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
           <Select
             value={gradeFilter}
@@ -249,6 +252,18 @@ export default function ChildrenPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
+              {filteredChildren.length === 0 && !childrenLoading && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <p className="text-slate-500 font-medium">
+                      {searchTerm || gradeFilter !== 'all' ? 'No children match your search' : 'No children yet'}
+                    </p>
+                    {!searchTerm && gradeFilter === 'all' && (
+                      <p className="text-slate-400 text-sm mt-1">Click "Add Child" to get started</p>
+                    )}
+                  </td>
+                </tr>
+              )}
               {filteredChildren.map((child) => (
                 <tr key={child.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -307,7 +322,7 @@ export default function ChildrenPage() {
         <div className="p-4 border-t border-slate-200">
           <div className="flex flex-col items-center gap-3">
             <span className="text-sm text-slate-600">
-              Loaded {filteredChildren.length} of {filteredChildren.length}{childrenHasMore ? '+' : ''} children
+              Loaded {Math.min(children.length, childrenTotal)} of {childrenTotal} children
             </span>
             {childrenHasMore && (
               <Button
@@ -325,6 +340,16 @@ export default function ChildrenPage() {
 
       {/* Children Cards - Mobile */}
       <div className="md:hidden space-y-4">
+        {filteredChildren.length === 0 && !childrenLoading && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+            <p className="text-slate-500 font-medium">
+              {searchTerm || gradeFilter !== 'all' ? 'No children match your search' : 'No children yet'}
+            </p>
+            {!searchTerm && gradeFilter === 'all' && (
+              <p className="text-slate-400 text-sm mt-1">Click "Add Child" to get started</p>
+            )}
+          </div>
+        )}
         {filteredChildren.map((child) => (
           <div key={child.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex items-start justify-between mb-3">
@@ -388,7 +413,7 @@ export default function ChildrenPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex flex-col items-center gap-3">
               <span className="text-sm text-slate-600">
-                Loaded {filteredChildren.length} of {filteredChildren.length}{childrenHasMore ? '+' : ''} children
+                Loaded {Math.min(children.length, childrenTotal)} of {childrenTotal} children
               </span>
               {childrenHasMore && (
                 <Button

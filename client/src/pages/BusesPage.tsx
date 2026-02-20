@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, Eye, CreditCard as Edit, Trash2, Users, Bus as BusIcon, AlertTriangle, CheckCircle, UserCircle, UserCheck } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
@@ -18,7 +18,8 @@ export default function BusesPage() {
   const confirm = useConfirm();
   const [formError, setFormError] = useState<string | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
-  const { buses, loadBuses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren, hasMore: busesHasMore, loadMore: loadMoreBuses, loading: busesLoading } = useBuses();
+  const [searchTerm, setSearchTerm] = useState('');
+  const { buses, loadBuses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren, hasMore: busesHasMore, loadMore: loadMoreBuses, loading: busesLoading, totalCount: busesTotal } = useBuses({ search: searchTerm });
 
   // Lazy load drivers, minders, children only when needed
   const { drivers, loadDrivers, hasMore: driversHasMore, loadMore: loadMoreDrivers } = useDrivers();
@@ -27,12 +28,10 @@ export default function BusesPage() {
 
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  // Load buses on mount (driver/minder names are included in buses response)
-  React.useEffect(() => {
-    loadBuses();
-  }, []);
-
-  const [searchTerm, setSearchTerm] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => loadBuses(), searchTerm ? 400 : 0);
+    return () => clearTimeout(timer);
+  }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
   const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -40,12 +39,7 @@ export default function BusesPage() {
   const [formData, setFormData] = useState<Partial<Bus>>({});
   const [assignData, setAssignData] = useState({ driverId: '', minderId: '', childrenIds: [] as string[] });
 
-  const filteredBuses = buses.filter((bus) => {
-    const matchesSearch =
-      bus.busNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bus.licensePlate?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+  const filteredBuses = buses; // search is server-side
 
   const handleCreate = () => {
     setSelectedBus(null);
@@ -196,6 +190,42 @@ export default function BusesPage() {
   const maintenanceBuses = buses.filter((b) => b.status === 'maintenance').length;
   const totalCapacity = buses.reduce((sum, b) => sum + (b.capacity || 0), 0);
 
+  if (busesLoading && buses.length === 0) {
+    return (
+      <div>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+          <div className="h-8 w-24 bg-slate-200 rounded animate-pulse mb-4 md:mb-0" />
+          <div className="h-10 w-28 bg-slate-200 rounded-lg animate-pulse" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <div className="h-9 w-9 bg-slate-200 rounded-lg animate-pulse mb-3" />
+              <div className="h-4 w-24 bg-slate-200 rounded animate-pulse mb-2" />
+              <div className="h-7 w-12 bg-slate-200 rounded animate-pulse" />
+            </div>
+          ))}
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-4 border-b border-slate-200">
+            <div className="h-10 bg-slate-100 rounded-lg animate-pulse" />
+          </div>
+          <div className="divide-y divide-slate-200">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="px-6 py-4 flex gap-4">
+                <div className="h-4 w-20 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 w-28 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 w-24 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 w-24 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 w-12 bg-slate-200 rounded animate-pulse ml-auto" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
@@ -250,15 +280,17 @@ export default function BusesPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
-          <input
-            type="text"
-            placeholder="Search by bus number or license plate..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search by bus number or license plate..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
         </div>
       </div>
 
@@ -278,7 +310,7 @@ export default function BusesPage() {
                   Driver
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
-                  Minder
+                  Bus Assistant
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
                   Children
@@ -292,6 +324,18 @@ export default function BusesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
+              {filteredBuses.length === 0 && !busesLoading && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <p className="text-slate-500 font-medium">
+                      {searchTerm ? 'No buses match your search' : 'No buses yet'}
+                    </p>
+                    {!searchTerm && (
+                      <p className="text-slate-400 text-sm mt-1">Click "Add Bus" to get started</p>
+                    )}
+                  </td>
+                </tr>
+              )}
               {filteredBuses.map((bus) => (
                 <tr key={bus.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -357,7 +401,7 @@ export default function BusesPage() {
         <div className="p-4 border-t border-slate-200">
           <div className="flex flex-col items-center gap-3">
             <span className="text-sm text-slate-600">
-              Loaded {filteredBuses.length} of {filteredBuses.length}{busesHasMore ? '+' : ''} buses
+              Loaded {buses.length} of {busesTotal} buses
             </span>
             {busesHasMore && (
               <Button
@@ -375,6 +419,16 @@ export default function BusesPage() {
 
       {/* Buses Cards - Mobile */}
       <div className="md:hidden space-y-4">
+        {filteredBuses.length === 0 && !busesLoading && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+            <p className="text-slate-500 font-medium">
+              {searchTerm ? 'No buses match your search' : 'No buses yet'}
+            </p>
+            {!searchTerm && (
+              <p className="text-slate-400 text-sm mt-1">Click "Add Bus" to get started</p>
+            )}
+          </div>
+        )}
         {filteredBuses.map((bus) => (
           <div key={bus.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex items-start justify-between mb-3">
@@ -403,7 +457,7 @@ export default function BusesPage() {
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <UserCheck className="w-4 h-4 text-slate-400" />
-                <span className="text-slate-600">Minder:</span>
+                <span className="text-slate-600">Bus Assistant:</span>
                 <span className="font-medium text-slate-900">{bus.minderName || 'Not Assigned'}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
@@ -451,7 +505,7 @@ export default function BusesPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex flex-col items-center gap-3">
               <span className="text-sm text-slate-600">
-                Loaded {filteredBuses.length} of {filteredBuses.length}{busesHasMore ? '+' : ''} buses
+                Loaded {buses.length} of {busesTotal} buses
               </span>
               {busesHasMore && (
                 <Button
@@ -563,7 +617,7 @@ export default function BusesPage() {
               ]}
             />
             <Select
-              label="Bus Minder"
+              label="Bus Assistant"
               value={assignData.minderId}
               onChange={(e) => setAssignData({ ...assignData, minderId: e.target.value })}
               options={[
@@ -659,7 +713,7 @@ export default function BusesPage() {
                 <p className="text-base text-slate-900">{selectedBus.driverName || 'Not Assigned'}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-700">Bus Minder</p>
+                <p className="text-sm font-medium text-slate-700">Bus Assistant</p>
                 <p className="text-base text-slate-900">{selectedBus.minderName || 'Not Assigned'}</p>
               </div>
               {selectedBus.lastMaintenance && (

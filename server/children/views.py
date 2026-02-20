@@ -1,4 +1,4 @@
-from rest_framework import generics
+from rest_framework import generics, filters
 from rest_framework.permissions import IsAuthenticated
 from .models import Child
 from .serializers import ChildSerializer, ChildCreateSerializer
@@ -10,7 +10,9 @@ class ChildListCreateView(generics.ListCreateAPIView):
     POST /api/children/ - Create new child
     """
     permission_classes = [IsAuthenticated]
-    queryset = Child.objects.select_related('parent__user', 'assigned_bus').all()
+    queryset = Child.objects.select_related('parent__user', 'assigned_bus').order_by('id')
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['first_name', 'last_name', 'parent__user__first_name', 'parent__user__last_name']
 
     def get_serializer_class(self):
         if self.request.method == 'POST':

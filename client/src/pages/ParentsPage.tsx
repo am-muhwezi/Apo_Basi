@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Plus, Search, Eye, CreditCard as Edit, Trash2, UserPlus, Users, Baby, UserCheck, Phone } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
@@ -19,40 +19,56 @@ export default function ParentsPage() {
   const [parents, setParents] = useState<Parent[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const offsetRef = useRef(0);
+  const loadingRef = useRef(false);
 
   // State for parent-specific children (loaded on-demand)
   const [parentChildren, setParentChildren] = useState<Child[]>([]);
   const [loadingChildren, setLoadingChildren] = useState(false);
 
-  // Fetch parents from backend on mount
-  React.useEffect(() => {
-    loadParents();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function loadParents(append = false) {
+  const loadParents = useCallback(async (append = false, search = '') => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
       setLoading(true);
-      const offset = append ? parents.length : 0;
-      const result = await parentService.loadParents({ limit: 20, offset });
+      const offset = append ? offsetRef.current : 0;
+      const result = await parentService.loadParents({
+        limit: 20,
+        offset,
+        search: search || undefined,
+      });
 
       if (result.success && result.data) {
         const newParents = result.data.parents || [];
-        setParents(append ? [...parents, ...newParents] : newParents);
-        setHasMore(result.data.hasNext || false);
+        const newOffset = offset + newParents.length;
+        setParents((prev) => (append ? [...prev, ...newParents] : newParents));
+        setTotalCount(result.data.count || 0);
+        setHasMore(newOffset < (result.data.count || 0));
+        offsetRef.current = newOffset;
       }
-    } catch (error) {
+    } catch {
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
-  }
+  }, []); // No deps — uses refs for mutable values
+
+  // Initial load + debounced search (400ms). Cleanup cancels pending timer on rapid typing.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadParents(false, searchTerm);
+    }, searchTerm ? 400 : 0);
+    return () => clearTimeout(timer);
+  }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function loadMoreParents() {
     if (!loading && hasMore) {
-      loadParents(true);
+      loadParents(true, searchTerm);
     }
   }
 
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedParent, setSelectedParent] = useState<Parent | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -63,13 +79,8 @@ export default function ParentsPage() {
   const [formData, setFormData] = useState<Partial<Parent>>({});
   const [childFormData, setChildFormData] = useState<Partial<Child>>({});
 
-  const filteredParents = parents.filter((parent) => {
-    const matchesSearch =
-      parent.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parent.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parent.email.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+  // Search is server-side — parents already filtered by backend
+  const filteredParents = parents;
 
   const handleCreate = () => {
     setSelectedParent(null);
@@ -124,11 +135,22 @@ export default function ParentsPage() {
   };
 
   const handleDelete = async (id: string) => {
+    const confirmed = await confirmDialog({
+      title: 'Delete Parent',
+      message: 'Are you sure you want to delete this parent?',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
+
     // First attempt - check if parent has children
     const result = await parentService.deleteParent(id);
 
     if (result.success) {
       toast.success('Parent deleted successfully');
+      offsetRef.current = 0;
       loadParents();
       return;
     }
@@ -151,6 +173,7 @@ export default function ParentsPage() {
       const message = result.data?.message || 'Parent deleted successfully';
       toast.success(message);
       setShowDeleteOptionsModal(false);
+      offsetRef.current = 0;
       loadParents();
     } else {
       toast.error(result.error?.message || 'Failed to delete parent');
@@ -212,8 +235,8 @@ export default function ParentsPage() {
     }
   };
 
-  // Calculate stats from parent data (no need to load all children)
-  const totalParents = parents.length;
+  // Calculate stats — use server count for total, loaded array for derived stats
+  const totalParents = totalCount || parents.length;
   const activeParents = parents.filter((p) => p.status === 'active').length;
   const totalChildren = parents.reduce((sum, p) => sum + (p.childrenCount || 0), 0);
   const parentsWithChildren = parents.filter((p) => p.childrenIds && p.childrenIds.length > 0).length;
@@ -311,6 +334,18 @@ export default function ParentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
+              {filteredParents.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-16 text-center">
+                    <p className="text-slate-500 font-medium">
+                      {searchTerm ? 'No parents match your search' : 'No parents yet'}
+                    </p>
+                    {!searchTerm && (
+                      <p className="text-slate-400 text-sm mt-1">Click "Add Parent" to get started</p>
+                    )}
+                  </td>
+                </tr>
+              )}
               {filteredParents.map((parent) => (
                 <tr key={parent.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -373,7 +408,7 @@ export default function ParentsPage() {
         <div className="p-4 border-t border-slate-200">
           <div className="flex flex-col items-center gap-3">
             <span className="text-sm text-slate-600">
-              Loaded {filteredParents.length} of {filteredParents.length}{hasMore ? '+' : ''} parents
+              Loaded {Math.min(parents.length, totalCount)} of {totalCount} parents
             </span>
             {hasMore && (
               <Button
@@ -391,6 +426,16 @@ export default function ParentsPage() {
 
       {/* Parents Cards - Mobile */}
       <div className="md:hidden space-y-4">
+        {filteredParents.length === 0 && !loading && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+            <p className="text-slate-500 font-medium">
+              {searchTerm ? 'No parents match your search' : 'No parents yet'}
+            </p>
+            {!searchTerm && (
+              <p className="text-slate-400 text-sm mt-1">Click "Add Parent" to get started</p>
+            )}
+          </div>
+        )}
         {filteredParents.map((parent) => (
           <div key={parent.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex items-start justify-between mb-3">
@@ -464,7 +509,7 @@ export default function ParentsPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex flex-col items-center gap-3">
               <span className="text-sm text-slate-600">
-                Loaded {filteredParents.length} of {filteredParents.length}{hasMore ? '+' : ''} parents
+                Loaded {Math.min(parents.length, totalCount)} of {totalCount} parents
               </span>
               {hasMore && (
                 <Button

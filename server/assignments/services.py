@@ -251,28 +251,28 @@ class AssignmentService:
                 'children': 'One or more children not found'
             })
 
-        # Check capacity
-        # Count unique children already assigned to this bus via Assignment records
-        # and via the legacy `Child.assigned_bus` FK so capacity checks are accurate.
-        assigned_via_assignments = list(Assignment.get_assignments_to(bus, 'child_to_bus').values_list('assignee_object_id', flat=True))
-        assigned_via_fk = list(Child.objects.filter(assigned_bus=bus).values_list('id', flat=True))
-        current_assigned_ids = set(assigned_via_assignments + assigned_via_fk)
-
-        # Determine unique children that would be assigned after this operation
-        requested_ids_set = set(children_ids)
-        final_assigned_ids = current_assigned_ids.union(requested_ids_set)
-        current_assignments = len(current_assigned_ids)
-        total_after_assignment = len(final_assigned_ids)
-
-        # Only raise if final unique assignments exceed capacity
-        if total_after_assignment > getattr(bus, 'capacity', 0):
+        # This is a REPLACE operation — validate only against the new list size
+        bus_capacity = getattr(bus, 'capacity', 0)
+        if len(children_ids) > bus_capacity:
             raise ValidationError({
-                'capacity': f'Bus capacity ({getattr(bus, "capacity", 0)}) exceeded. Current: {current_assignments}, Attempting to add: {len(requested_ids_set - current_assigned_ids)}'
+                'capacity': (
+                    f'Bus capacity ({bus_capacity}) exceeded. '
+                    f'You selected {len(children_ids)} children but the bus only fits {bus_capacity}.'
+                )
             })
 
-        # Create assignments
+        # Create assignments, cancelling all existing child_to_bus assignments
+        # for this bus first so this is a clean replace rather than an append.
         assignments = []
         with transaction.atomic():
+            # Cancel all current child assignments for this bus
+            existing = Assignment.get_assignments_to(bus, 'child_to_bus')
+            for existing_assignment in existing:
+                existing_assignment.cancel(
+                    cancelled_by=assigned_by,
+                    reason=f"Replaced by new bulk assignment to bus {bus.bus_number}"
+                )
+
             for child in children:
                 assignment = AssignmentService.create_assignment(
                     assignment_type='child_to_bus',
@@ -281,7 +281,7 @@ class AssignmentService:
                     assigned_by=assigned_by,
                     effective_date=effective_date,
                     reason=f"Bulk assignment to bus {bus.bus_number}",
-                    auto_cancel_conflicting=auto_cancel_conflicting
+                    auto_cancel_conflicting=True,
                 )
                 assignments.append(assignment)
 
