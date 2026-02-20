@@ -31,35 +31,14 @@ class ApiConfig {
   static String get mapboxAccessToken =>
       dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '';
 
-  /// Mapbox Style ID
-  /// Available styles: streets-v12, outdoors-v12, light-v11, dark-v11,
-  /// satellite-v9, satellite-streets-v12
+  /// Mapbox Style ID (e.g. 'd-ampire/cmltlzid4000o01qu8ze2hrr2')
   static String get mapboxStyleId =>
       dotenv.env['MAPBOX_STYLE_ID'] ?? 'mapbox/streets-v12';
 
-  /// Get the Mapbox tile URL template for flutter_map
-  static String getMapboxTileUrl() {
-    return 'https://api.mapbox.com/styles/v1/${mapboxStyleId}/tiles/{z}/{x}/{y}?access_token=${mapboxAccessToken}';
+  /// Get the Mapbox style URI for the native SDK
+  static String getMapboxStyleUri() {
+    return 'mapbox://styles/$mapboxStyleId';
   }
-
-  // ============================================================================
-  // Alternative Map Styles
-  // ============================================================================
-
-  /// Get Mapbox tile URL for a specific style
-  static String getMapboxTileUrlWithStyle(String styleId) {
-    return 'https://api.mapbox.com/styles/v1/$styleId/tiles/{z}/{x}/{y}?access_token=${mapboxAccessToken}';
-  }
-
-  /// Available Mapbox styles
-  static const Map<String, String> mapboxStyles = {
-    'streets': 'mapbox/streets-v12',
-    'outdoors': 'mapbox/outdoors-v12',
-    'light': 'mapbox/light-v11',
-    'dark': 'mapbox/dark-v11',
-    'satellite': 'mapbox/satellite-v9',
-    'satellite-streets': 'mapbox/satellite-streets-v12',
-  };
 
   // ============================================================================
   // API Endpoints
