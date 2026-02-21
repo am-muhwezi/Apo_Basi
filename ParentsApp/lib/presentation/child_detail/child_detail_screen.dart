@@ -231,7 +231,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         PointAnnotationOptions(
           geometry: latLngToPoint(busLatLng),
           image: _busMarkerImage,
-          iconSize: 0.4,
+          iconSize: 0.035,
           iconRotate: heading,
           iconAnchor: IconAnchor.CENTER,
         ),
