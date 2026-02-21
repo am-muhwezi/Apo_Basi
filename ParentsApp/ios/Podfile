@@ -1,5 +1,5 @@
-# Uncomment this line to define a global platform for your project
-# platform :ios, '13.0'
+# mapbox_maps_flutter requires iOS 14.0+
+platform :ios, '14.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -39,5 +39,28 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+  end
+
+  # Fix "Upload Symbols Failed" for Mapbox binary frameworks.
+  # Mapbox does not distribute dSYMs for MapboxCommon/MapboxCoreMaps.
+  # This adds a build phase that generates dSYM stubs with matching UUIDs
+  # so App Store Connect accepts the archive without warnings.
+  project = Xcodeproj::Project.open("#{installer.sandbox.root}/../Runner.xcodeproj")
+  runner_target = project.targets.find { |t| t.name == 'Runner' }
+
+  phase_name = 'Generate Mapbox dSYMs'
+  unless runner_target.shell_script_build_phases.any? { |p| p.name == phase_name }
+    phase = runner_target.new_shell_script_build_phase(phase_name)
+    phase.shell_script = <<~'SCRIPT'
+      for framework in MapboxCommon MapboxCoreMaps; do
+        FW_PATH="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/${framework}.framework/${framework}"
+        DSYM_PATH="${DWARF_DSYM_FOLDER_PATH}/${framework}.framework.dSYM"
+        if [ -f "$FW_PATH" ] && [ ! -d "$DSYM_PATH" ]; then
+          echo "Generating dSYM for ${framework}..."
+          xcrun dsymutil "$FW_PATH" -o "$DSYM_PATH" 2>/dev/null || true
+        fi
+      done
+    SCRIPT
+    project.save
   end
 end

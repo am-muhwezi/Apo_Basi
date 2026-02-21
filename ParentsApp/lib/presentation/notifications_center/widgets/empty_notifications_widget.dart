@@ -15,6 +15,9 @@ class EmptyNotificationsWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Center(
       child: Padding(
         padding: EdgeInsets.all(8.w),
@@ -25,14 +28,13 @@ class EmptyNotificationsWidget extends StatelessWidget {
               width: 30.w,
               height: 30.w,
               decoration: BoxDecoration(
-                color: AppTheme.lightTheme.colorScheme.primary
-                    .withValues(alpha: 0.1),
+                color: colorScheme.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Center(
                 child: CustomIconWidget(
                   iconName: 'notifications_none',
-                  color: AppTheme.lightTheme.colorScheme.primary,
+                  color: colorScheme.primary,
                   size: 15.w,
                 ),
               ),
@@ -40,18 +42,22 @@ class EmptyNotificationsWidget extends StatelessWidget {
             SizedBox(height: 4.h),
             Text(
               message,
-              style: AppTheme.lightTheme.textTheme.headlineSmall?.copyWith(
+              style: TextStyle(
+                fontSize: 22,
                 fontWeight: FontWeight.w600,
-                color: AppTheme.lightTheme.colorScheme.onSurface,
+                color: colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 2.h),
             if (subtitle != null || message == 'No new notifications')
               Text(
-                subtitle ?? 'You\'re all caught up! Check back later for updates on your child\'s transportation.',
-                style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                  color: AppTheme.lightTheme.colorScheme.onSurfaceVariant,
+                subtitle ??
+                    'You\'re all caught up! Check back later for updates on your child\'s transportation.',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w400,
+                  color: colorScheme.onSurfaceVariant,
                   height: 1.5,
                 ),
                 textAlign: TextAlign.center,
@@ -60,12 +66,10 @@ class EmptyNotificationsWidget extends StatelessWidget {
             Container(
               padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 3.h),
               decoration: BoxDecoration(
-                color: AppTheme.lightTheme.colorScheme.secondary
-                    .withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                color: colorScheme.secondary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: AppTheme.lightTheme.colorScheme.secondary
-                      .withValues(alpha: 0.3),
+                  color: colorScheme.secondary.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -73,15 +77,16 @@ class EmptyNotificationsWidget extends StatelessWidget {
                 children: [
                   CustomIconWidget(
                     iconName: 'check_circle',
-                    color: AppTheme.lightTheme.colorScheme.secondary,
+                    color: colorScheme.secondary,
                     size: 20,
                   ),
                   SizedBox(width: 2.w),
                   Text(
                     'Notifications are enabled',
-                    style: AppTheme.lightTheme.textTheme.labelLarge?.copyWith(
-                      color: AppTheme.lightTheme.colorScheme.secondary,
+                    style: TextStyle(
+                      fontSize: 14,
                       fontWeight: FontWeight.w500,
+                      color: colorScheme.secondary,
                     ),
                   ),
                 ],

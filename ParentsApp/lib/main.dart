@@ -4,8 +4,10 @@ import 'package:sizer/sizer.dart';
 import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import 'core/app_export.dart';
+import 'config/api_config.dart';
 import 'widgets/custom_error_widget.dart';
 import 'services/notification_service.dart';
 import 'services/bus_websocket_service.dart';
@@ -18,6 +20,9 @@ Future<void> main() async {
 
   // Load .env before starting the app
   await dotenv.load();
+
+  // Initialize Mapbox access token
+  MapboxOptions.setAccessToken(ApiConfig.mapboxAccessToken);
 
   // Initialize Supabase for magic link authentication
   await Supabase.initialize(

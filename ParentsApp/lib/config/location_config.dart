@@ -3,7 +3,6 @@
 /// Centralized configuration for location tracking, Socket.IO connections,
 /// and real-time bus monitoring features.
 
-import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 class LocationConfig {
@@ -14,10 +13,8 @@ class LocationConfig {
   /// Map bounds - limits the visible area to Limuru Road, 2 Rivers area
   /// Southwest corner: South of 2 Rivers Mall
   /// Northeast corner: North along Limuru Road
-  static final LatLngBounds mapBounds = LatLngBounds(
-    LatLng(-1.2500, 36.7500), // Southwest (South of working area)
-    LatLng(-1.1700, 36.8500), // Northeast (North of working area)
-  );
+  static const LatLng boundsSouthwest = LatLng(-1.2500, 36.7500);
+  static const LatLng boundsNortheast = LatLng(-1.1700, 36.8500);
 
   // ============================================================================
   // Socket.IO Configuration
@@ -95,7 +92,9 @@ class LocationConfig {
   static const String locationAccuracy = 'high';
 
   /// Whether to request background location permission on Android
-  static const bool requestBackgroundLocation = true;
+  /// Parents app only uses foreground location (home address detection).
+  /// Bus locations are received via Socket.IO, not device GPS.
+  static const bool requestBackgroundLocation = false;
 
   /// Whether to show rationale before requesting permissions
   static const bool showPermissionRationale = true;
