@@ -1,76 +1,77 @@
 import 'package:flutter/material.dart';
-import 'package:sizer/sizer.dart';
 
 class ChildStatusCard extends StatelessWidget {
   final Map<String, dynamic> childData;
-  final VoidCallback? onTap;
+  final VoidCallback? onTrackLive;
 
   const ChildStatusCard({
     Key? key,
     required this.childData,
-    this.onTap,
+    this.onTrackLive,
   }) : super(key: key);
-
-  String _getInitials(String name) {
-    final parts = name.trim().split(' ');
-    if (parts.isEmpty) return 'C';
-    if (parts.length == 1) return parts[0][0].toUpperCase();
-    return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
-  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     final String status = childData['status'] ?? 'No record today';
     final String name = childData['name'] ?? 'Child Name';
-    final String grade = childData['grade'] ?? 'N/A';
+    final String? busNumber = childData['busNumber'];
+    final Color statusColor = _getStatusColor(status);
+    final String statusText = _getStatusText(status);
 
-    final Color statusColor = _getStatusColor(context, status);
-    return RepaintBoundary(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: double.infinity,
-          margin: EdgeInsets.symmetric(horizontal: 5.w, vertical: 1.h),
-          padding: EdgeInsets.all(4.w),
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.shadow.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-            border: Border.all(
-              color: colorScheme.outline.withValues(alpha: 0.15),
-            ),
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: colorScheme.outline,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.12),
+            blurRadius: 2,
           ),
-          child: Row(
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.09),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Top row: avatar + name/bus
+          Row(
             children: [
-              // Avatar with initials
+              // Avatar
               Container(
-                width: 18.w,
-                height: 18.w,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceVariant,
+                  color: isDark
+                      ? colorScheme.primary.withValues(alpha: 0.15)
+                      : const Color(0xFFE9E7F9),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Text(
-                    _getInitials(name),
+                    _getInitial(name),
                     style: TextStyle(
-                      fontWeight: FontWeight.w700,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
                       color: colorScheme.primary,
-                      fontSize: 16.sp,
                     ),
                   ),
                 ),
               ),
-              SizedBox(width: 4.w),
-              // Child info
+              const SizedBox(width: 12),
+              // Name and bus
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -78,102 +79,126 @@ class ChildStatusCard extends StatelessWidget {
                     Text(
                       name,
                       style: TextStyle(
+                        fontSize: 18,
                         fontWeight: FontWeight.w600,
                         color: colorScheme.onSurface,
-                        fontSize: 16.sp,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
-                    SizedBox(height: 0.5.h),
-                    Text(
-                      grade,
-                      style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.w400,
+                    if (busNumber != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Bus: $busNumber',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                       ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Bottom row: status pill + Track Live button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Status pill
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.access_time,
+                      size: 14,
+                      color: statusColor,
                     ),
-                    SizedBox(height: 1.h),
-                    // Status chip with label inside
-                    Semantics(
-                      label: 'Status',
-                      value: _getStatusText(status),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 3.w, vertical: 0.6.h),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: statusColor.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 1.5.w,
-                              height: 1.5.w,
-                              decoration: BoxDecoration(
-                                color: statusColor,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            SizedBox(width: 1.5.w),
-                            Text(
-                              'Status: ${_getStatusText(status)}',
-                              style: TextStyle(
-                                color: colorScheme.onSurface,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 10.sp,
-                              ),
-                            ),
-                          ],
-                        ),
+                    const SizedBox(width: 6),
+                    Text(
+                      statusText,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: statusColor,
                       ),
                     ),
                   ],
                 ),
               ),
-              // Arrow icon
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 5.w,
-                color: colorScheme.onSurfaceVariant,
+              // Track Live button
+              SizedBox(
+                width: 101,
+                height: 40,
+                child: ElevatedButton(
+                  onPressed: onTrackLive,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    padding: EdgeInsets.zero,
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Track Live',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Color _getStatusColor(BuildContext context, String? status) {
+  String _getInitial(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return 'C';
+    return trimmed[0].toUpperCase();
+  }
+
+  Color _getStatusColor(String? status) {
     if (status == null || status.trim().isEmpty) {
-      return const Color(0xFF34C759); // Green for 'At home'
+      return const Color(0xFF22CCB2);
     }
 
     switch (status.toLowerCase()) {
       case 'on_bus':
       case 'on-bus':
-        return const Color(0xFFFF9500); // Orange - child is traveling
+        return const Color(0xFFFF9500);
       case 'at_school':
       case 'at-school':
-        return const Color(0xFF007AFF); // Blue - child at school
+        return const Color(0xFF007AFF);
       case 'at_home':
       case 'at-home':
       case 'home':
-        return const Color(0xFF34C759); // Green - child at home
+        return const Color(0xFF22CCB2);
       case 'picked-up':
       case 'picked_up':
-        return const Color(0xFF5856D6); // Purple - child picked up
+        return const Color(0xFF5856D6);
       case 'dropped-off':
       case 'dropped_off':
-        return const Color(0xFF34C759); // Green - same as home
+        return const Color(0xFF22CCB2);
       case 'waiting':
-        return const Color(0xFFFF3B30); // Red - waiting/alert
+        return const Color(0xFFFF3B30);
       default:
-        return const Color(0xFF34C759); // Default to green for 'At home'
+        return const Color(0xFF22CCB2);
     }
   }
 
@@ -204,7 +229,7 @@ class ChildStatusCard extends StatelessWidget {
       case 'no record today':
         return 'No record today';
       default:
-        return 'At home'; // Default to 'At home' instead of 'Unknown'
+        return 'At home';
     }
   }
 }

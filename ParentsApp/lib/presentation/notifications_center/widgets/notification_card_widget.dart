@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
 
@@ -38,35 +37,36 @@ class NotificationCardWidget extends StatelessWidget {
         fullMessage.trim().isNotEmpty &&
         fullMessage.trim() != message.trim();
 
-    // Cache theme to avoid repeated lookups
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final textTheme = theme.textTheme;
 
     // Get unique styling for this notification type
     final notificationStyle = _getNotificationStyle(type, context);
+    final Color typeColor = notificationStyle['color'];
 
     return RepaintBoundary(
       child: Container(
-        margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 0.6.h),
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
         decoration: BoxDecoration(
           color: isCritical
               ? colorScheme.error.withValues(alpha: 0.05)
-              : colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
+              : theme.cardColor,
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isRead
-                ? Colors.transparent
-                : notificationStyle['color'].withValues(alpha: 0.2),
-            width: isRead ? 0 : 1.5,
+                ? colorScheme.outline
+                : typeColor.withValues(alpha: 0.3),
+            width: isRead ? 1 : 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: notificationStyle['color']
-                  .withValues(alpha: isRead ? 0.02 : 0.06),
-              blurRadius: isRead ? 3 : 8,
-              offset: Offset(0, isRead ? 1 : 2),
-              spreadRadius: 0,
+              color: colorScheme.shadow.withValues(alpha: 0.12),
+              blurRadius: 2,
+            ),
+            BoxShadow(
+              color: colorScheme.shadow.withValues(alpha: 0.09),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -74,9 +74,9 @@ class NotificationCardWidget extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.8.h),
+              padding: const EdgeInsets.all(14),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,41 +84,39 @@ class NotificationCardWidget extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Type icon
                       Container(
-                        padding: EdgeInsets.all(1.8.w),
+                        width: 40,
+                        height: 40,
                         decoration: BoxDecoration(
-                          color: notificationStyle['color']
-                              .withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: notificationStyle['color']
-                                .withValues(alpha: 0.25),
-                            width: 1,
+                          color: typeColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Center(
+                          child: CustomIconWidget(
+                            iconName: notificationStyle['icon'],
+                            color: typeColor,
+                            size: 20,
                           ),
                         ),
-                        child: CustomIconWidget(
-                          iconName: notificationStyle['icon'],
-                          color: notificationStyle['color'],
-                          size: 18,
-                        ),
                       ),
-                      SizedBox(width: 2.5.w),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Title + timestamp row
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Expanded(
                                   child: Text(
                                     notification['title'] ?? '',
-                                    style: textTheme.titleSmall?.copyWith(
+                                    style: TextStyle(
+                                      fontSize: 16,
                                       fontWeight: isRead
-                                          ? FontWeight.w600
-                                          : FontWeight.w700,
-                                      fontSize: 13.5.sp,
-                                      letterSpacing: -0.2,
+                                          ? FontWeight.w500
+                                          : FontWeight.w600,
                                       color: isCritical
                                           ? colorScheme.error
                                           : colorScheme.onSurface,
@@ -127,74 +125,65 @@ class NotificationCardWidget extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                                const SizedBox(width: 8),
                                 Text(
                                   _formatTimestamp(notification['timestamp']),
-                                  style: textTheme.bodySmall?.copyWith(
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w400,
                                     color: colorScheme.onSurfaceVariant,
-                                    fontSize: 9.5.sp,
-                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ],
                             ),
-                            SizedBox(height: 0.8.h),
+                            const SizedBox(height: 4),
+                            // Message body
                             Text(
                               message,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurface
-                                    .withValues(alpha: 0.7),
-                                fontSize: 12.sp,
-                                height: 1.3,
-                                letterSpacing: 0,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w400,
+                                color: colorScheme.onSurfaceVariant,
+                                height: 1.4,
                               ),
                               maxLines:
-                                  notification['expanded'] == true ? 10 : 1,
+                                  notification['expanded'] == true ? 10 : 2,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            // Expanded details
                             if (notification['expanded'] == true) ...[
                               if (hasExtraDetails) ...[
-                                SizedBox(height: 2.h),
+                                const SizedBox(height: 10),
                                 Text(
                                   fullMessage!,
-                                  style: textTheme.bodyMedium?.copyWith(
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
                                     color: colorScheme.onSurface,
                                   ),
                                 ),
-                                SizedBox(height: 2.h),
                               ],
+                              const SizedBox(height: 10),
+                              // Action buttons
                               Row(
                                 children: [
                                   if (type == 'bus_approaching' ||
                                       type == 'pickup_confirmed') ...[
-                                    TextButton.icon(
-                                      onPressed: onViewOnMap,
-                                      icon: CustomIconWidget(
-                                        iconName: 'map',
-                                        color: colorScheme.primary,
-                                        size: 16,
-                                      ),
-                                      label: Text(
-                                        'View on Map',
-                                        style: textTheme.labelMedium?.copyWith(
-                                          color: colorScheme.primary,
-                                        ),
-                                      ),
+                                    _buildActionButton(
+                                      context,
+                                      icon: 'map',
+                                      label: 'View on Map',
+                                      color: colorScheme.primary,
+                                      onTap: onViewOnMap,
                                     ),
-                                    SizedBox(width: 2.w),
+                                    const SizedBox(width: 8),
                                   ],
-                                  TextButton.icon(
-                                    onPressed: onContactSchool,
-                                    icon: CustomIconWidget(
-                                      iconName: 'phone',
-                                      color: colorScheme.secondary,
-                                      size: 16,
-                                    ),
-                                    label: Text(
-                                      'Call Driver',
-                                      style: textTheme.labelMedium?.copyWith(
-                                        color: colorScheme.secondary,
-                                      ),
-                                    ),
+                                  _buildActionButton(
+                                    context,
+                                    icon: 'phone',
+                                    label: 'Call Driver',
+                                    color: colorScheme.secondary,
+                                    onTap: onContactSchool,
                                   ),
                                 ],
                               ),
@@ -204,34 +193,34 @@ class NotificationCardWidget extends StatelessWidget {
                       ),
                     ],
                   ),
+                  // Unread badge
                   if (!isRead) ...[
-                    SizedBox(height: 0.8.h),
+                    const SizedBox(height: 8),
                     Container(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 1.5.w, vertical: 0.3.h),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color:
-                            notificationStyle['color'].withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
+                        color: typeColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(100),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            width: 1.2.w,
-                            height: 1.2.w,
+                            width: 6,
+                            height: 6,
                             decoration: BoxDecoration(
-                              color: notificationStyle['color'],
+                              color: typeColor,
                               shape: BoxShape.circle,
                             ),
                           ),
-                          SizedBox(width: 1.w),
+                          const SizedBox(width: 4),
                           Text(
                             'New',
-                            style: textTheme.labelSmall?.copyWith(
-                              color: notificationStyle['color'],
+                            style: TextStyle(
+                              fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              fontSize: 9.sp,
+                              color: typeColor,
                             ),
                           ),
                         ],
@@ -247,69 +236,95 @@ class NotificationCardWidget extends StatelessWidget {
     );
   }
 
+  Widget _buildActionButton(
+    BuildContext context, {
+    required String icon,
+    required String label,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CustomIconWidget(
+              iconName: icon,
+              color: color,
+              size: 16,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // Get unique styling for each notification type
   Map<String, dynamic> _getNotificationStyle(
       String type, BuildContext context) {
     switch (type) {
       case 'bus_approaching':
         return {
-          'color': const Color(0xFF2B5CE6), // Blue
+          'color': const Color(0xFF2B5CE6),
           'icon': 'directions_bus',
-          'gradient': [const Color(0xFF2B5CE6), const Color(0xFF1E3A8A)],
         };
       case 'pickup_confirmed':
         return {
-          'color': const Color(0xFF34C759), // Green
+          'color': const Color(0xFF34C759),
           'icon': 'check_circle',
-          'gradient': [const Color(0xFF34C759), const Color(0xFF10B981)],
         };
       case 'dropoff_complete':
         return {
-          'color': const Color(0xFF22C55E), // Lighter green
+          'color': const Color(0xFF22C55E),
           'icon': 'verified',
-          'gradient': [const Color(0xFF22C55E), const Color(0xFF16A34A)],
         };
       case 'route_change':
         return {
-          'color': const Color(0xFFFF9500), // Orange
+          'color': const Color(0xFFFF9500),
           'icon': 'alt_route',
-          'gradient': [const Color(0xFFFF9500), const Color(0xFFF97316)],
         };
       case 'emergency':
         return {
-          'color': const Color(0xFFFF3B30), // Red
+          'color': const Color(0xFFFF3B30),
           'icon': 'warning',
-          'gradient': [const Color(0xFFFF3B30), const Color(0xFFDC2626)],
         };
       case 'major_delay':
         return {
-          'color': const Color(0xFFEF4444), // Red
+          'color': const Color(0xFFEF4444),
           'icon': 'schedule',
-          'gradient': [const Color(0xFFEF4444), const Color(0xFFDC2626)],
         };
       case 'trip_started':
         return {
-          'color': const Color(0xFF2B5CE6), // Blue (matching bus_approaching)
+          'color': const Color(0xFF2B5CE6),
           'icon': 'directions_bus',
-          'gradient': [const Color(0xFF2B5CE6), const Color(0xFF1E3A8A)],
         };
       case 'trip_ended':
       case 'trip_completed':
       case 'student_reached_safely':
       case 'reached_safely':
         return {
-          'color': const Color(0xFF34C759), // Green (matching pickup_confirmed)
+          'color': const Color(0xFF34C759),
           'icon': 'check_circle',
-          'gradient': [const Color(0xFF34C759), const Color(0xFF10B981)],
         };
       default:
         return {
           'color': Theme.of(context).colorScheme.onSurfaceVariant,
           'icon': 'notifications',
-          'gradient': [
-            Theme.of(context).colorScheme.onSurfaceVariant,
-            Theme.of(context).colorScheme.onSurfaceVariant
-          ],
         };
     }
   }
