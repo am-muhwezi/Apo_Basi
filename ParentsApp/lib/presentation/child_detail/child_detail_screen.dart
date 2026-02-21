@@ -467,6 +467,204 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     }
   }
 
+  bool _isChildEnRoute() {
+    final status = (_childData?['status'] ?? '').toString().toLowerCase();
+    return status == 'on_bus' ||
+        status == 'on-bus' ||
+        status == 'picked_up' ||
+        status == 'picked-up';
+  }
+
+  String _getDriverInitial() {
+    final driverName = _childData?['driverName']?.toString() ?? '';
+    if (driverName.isNotEmpty) return driverName[0].toUpperCase();
+    return 'D';
+  }
+
+  /// En route layout: driver avatar (with bus badge) + call icon + plate/route
+  Widget _buildEnRouteInfo(ColorScheme colorScheme, bool isDark) {
+    final String? busNumber = _childData?['busNumber'];
+    final String routeName = _getRouteDisplay();
+
+    return Row(
+      children: [
+        // Driver avatar with bus badge
+        SizedBox(
+          width: 64,
+          height: 64,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Driver circle
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? colorScheme.primary.withValues(alpha: 0.15)
+                      : const Color(0xFFE9E7F9),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    _getDriverInitial(),
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
+              // Bus badge
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isDark ? colorScheme.surface : Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: colorScheme.outline.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.directions_bus,
+                    size: 16,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        // Call icon
+        GestureDetector(
+          onTap: () => _makePhoneCall('+254718073907'),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? colorScheme.onSurface.withValues(alpha: 0.08)
+                  : const Color(0xFFF0F0F5),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.phone,
+              size: 22,
+              color: colorScheme.onSurface,
+            ),
+          ),
+        ),
+        const Spacer(),
+        // Plate number + route (right-aligned)
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (busNumber != null && busNumber != 'N/A')
+              Text(
+                busNumber,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            const SizedBox(height: 2),
+            Text(
+              routeName,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// At rest layout (home, school, etc.): status icon + message + call school
+  Widget _buildAtRestInfo(ColorScheme colorScheme, bool isDark) {
+    final status = (_childData?['status'] ?? '').toString().toLowerCase();
+    final childName = _childData?['name'] ?? 'Child';
+    final firstName = childName.toString().split(' ').first;
+
+    final bool isAtSchool = status == 'at_school' || status == 'at-school';
+    final IconData icon = isAtSchool ? Icons.school : Icons.home;
+    final Color accentColor =
+        isAtSchool ? const Color(0xFF007AFF) : const Color(0xFF22CCB2);
+    final String message = isAtSchool
+        ? '$firstName is safely at school'
+        : '$firstName is safely at home';
+
+    return Row(
+      children: [
+        // Status icon
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: accentColor.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 28, color: accentColor),
+        ),
+        const SizedBox(width: 14),
+        // Status message
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                message,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _getRouteDisplay(),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Call school
+        GestureDetector(
+          onTap: () => _makePhoneCall('+254718073907'),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? colorScheme.onSurface.withValues(alpha: 0.08)
+                  : const Color(0xFFF0F0F5),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.phone,
+              size: 22,
+              color: colorScheme.onSurface,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -585,232 +783,98 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
             ),
           ),
 
-          // Modern DraggableScrollableSheet
+          // Bottom detail sheet
           DraggableScrollableSheet(
-            initialChildSize: 0.20,
+            initialChildSize: 0.22,
             minChildSize: 0.18,
-            maxChildSize: 0.50,
+            maxChildSize: 0.45,
             builder: (context, scrollController) {
+              final isDark = theme.brightness == Brightness.dark;
+              final bool isEnRoute = _isChildEnRoute();
+
               return Container(
                 decoration: BoxDecoration(
-                  color: colorScheme.surface,
+                  color: theme.cardColor,
                   borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    topRight: Radius.circular(24),
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      blurRadius: 20,
-                      offset: const Offset(0, -5),
+                      color: colorScheme.shadow.withValues(alpha: 0.12),
+                      blurRadius: 16,
+                      offset: const Offset(0, -4),
                     ),
                   ],
                 ),
                 child: ListView(
                   controller: scrollController,
-                  padding: EdgeInsets.fromLTRB(5.w, 1.5.h, 5.w, 2.h),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                   children: [
                     // Drag handle
                     Center(
                       child: Container(
-                        width: 40,
+                        width: 36,
                         height: 4,
-                        margin: EdgeInsets.only(bottom: 1.5.h),
+                        margin: const EdgeInsets.only(bottom: 14),
                         decoration: BoxDecoration(
-                          color: colorScheme.onSurface.withValues(alpha: 0.2),
+                          color: colorScheme.onSurface.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     ),
 
-                    // Trip Status Header with ETA Badge
+                    // Status row + ETA pill
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          _getTripStatus(),
-                          style: textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                        Expanded(
+                          child: Text(
+                            _getTripStatus(),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
                         ),
-                        if (_etaMinutes != null)
+                        if (isEnRoute && _etaMinutes != null)
                           Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 3.w,
-                              vertical: 0.5.h,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color:
-                                  colorScheme.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.schedule,
-                                    size: 16, color: colorScheme.primary),
-                                SizedBox(width: 1.w),
-                                Text(
-                                  '$_etaMinutes min',
-                                  style: textTheme.labelMedium?.copyWith(
-                                    color: colorScheme.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-
-                    SizedBox(height: 1.5.h),
-
-                    // Driver Photo Circle
-                    Row(
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: [
-                                colorScheme.primary.withValues(alpha: 0.15),
-                                colorScheme.primary.withValues(alpha: 0.05),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            border: Border.all(
                               color: colorScheme.primary,
-                              width: 2.5,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '$_etaMinutes mins',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                          child: Icon(Icons.person,
-                              size: 32, color: colorScheme.primary),
-                        ),
-                        SizedBox(width: 3.w),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _childData?['busId'] == null
-                                    ? 'Not yet assigned to a bus'
-                                    : (_childData?['driverName'] ?? 'Driver'),
-                                style: textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 15.sp,
-                                  color: _childData?['busId'] == null
-                                      ? colorScheme.onSurface
-                                          .withValues(alpha: 0.6)
-                                      : colorScheme.onSurface,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              if (_childData?['busId'] != null) ...[
-                                SizedBox(height: 0.5.h),
-                                if (_childData?['busNumber'] != null &&
-                                    _childData!['busNumber'] != 'N/A')
-                                  Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 2.5.w,
-                                      vertical: 0.4.h,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: theme.brightness == Brightness.dark
-                                          ? colorScheme.primary
-                                              .withValues(alpha: 0.2)
-                                          : colorScheme.primary
-                                              .withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: colorScheme.primary
-                                            .withValues(alpha: 0.4),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.directions_bus,
-                                            size: 14,
-                                            color: colorScheme.primary),
-                                        SizedBox(width: 1.w),
-                                        Text(
-                                          _childData!['busNumber'],
-                                          style:
-                                              textTheme.labelMedium?.copyWith(
-                                            color: colorScheme.primary,
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 11.sp,
-                                            letterSpacing: 0.8,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                SizedBox(height: 0.5.h),
-                                Row(
-                                  children: [
-                                    Icon(Icons.route,
-                                        size: 16,
-                                        color: colorScheme.onSurface
-                                            .withValues(alpha: 0.6)),
-                                    SizedBox(width: 1.5.w),
-                                    Expanded(
-                                      child: Text(
-                                        _getRouteDisplay(),
-                                        style: textTheme.bodySmall?.copyWith(
-                                          color: colorScheme.onSurface
-                                              .withValues(alpha: 0.6),
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 11.sp,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
                       ],
                     ),
 
-                    SizedBox(height: 1.5.h),
-
-                    Divider(
-                      color: colorScheme.onSurface.withValues(alpha: 0.1),
-                      thickness: 1,
-                    ),
-
-                    SizedBox(height: 1.5.h),
-
-                    Text(
-                      'Contact School',
-                      style: textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-
-                    SizedBox(height: 1.5.h),
-
-                    ElevatedButton.icon(
-                      onPressed: () => _makePhoneCall('+254718073907'),
-                      icon: const Icon(Icons.phone, size: 20),
-                      label: const Text(
-                        'Call School',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 1.4.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                    // Divider
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: colorScheme.outline.withValues(alpha: 0.5),
                       ),
                     ),
+
+                    // Dynamic content based on status
+                    if (isEnRoute)
+                      _buildEnRouteInfo(colorScheme, isDark)
+                    else
+                      _buildAtRestInfo(colorScheme, isDark),
                   ],
                 ),
               );
