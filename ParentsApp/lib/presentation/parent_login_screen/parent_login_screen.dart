@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
 import '../../services/auth_service.dart';
@@ -192,30 +191,30 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
               const RepaintBoundary(child: WelcomeHeaderWidget()),
 
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 2.h),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SizedBox(height: 1.h),
+                    const SizedBox(height: 8),
 
                     if (_magicLinkSent)
                       _buildMagicLinkSentCard(isDark)
                     else
                       _buildForm(isDark),
 
-                    SizedBox(height: 3.h),
+                    const SizedBox(height: 24),
 
                     Center(
                       child: Text(
                         '© 2026 ApoBasi - Powered by SoG',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                          fontSize: 10.sp,
+                          fontSize: 12,
                         ),
                         textAlign: TextAlign.center,
                       ),
                     ),
-                    SizedBox(height: 2.h),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -237,16 +236,16 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
             color: isDark ? Colors.white : Colors.grey.shade700,
           ),
         ),
-        SizedBox(height: 1.h),
+        const SizedBox(height: 8),
         _buildEmailInput(isDark),
 
         if (_emailError != null) ...[
-          SizedBox(height: 1.h),
+          const SizedBox(height: 8),
           _buildErrorRow(_emailError!, isDark),
         ],
 
         if (_isReviewerAccount) ...[
-          SizedBox(height: 2.h),
+          const SizedBox(height: 16),
           Text(
             'Password',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -254,22 +253,22 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
               color: isDark ? Colors.white : Colors.grey.shade700,
             ),
           ),
-          SizedBox(height: 1.h),
+          const SizedBox(height: 8),
           _buildPasswordInput(isDark),
           if (_passwordError != null) ...[
-            SizedBox(height: 1.h),
+            const SizedBox(height: 8),
             Text(
               _passwordError!,
               style: TextStyle(
                 color: Colors.red.shade700,
-                fontSize: 12.sp,
+                fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
             ),
           ],
         ],
 
-        SizedBox(height: 2.5.h),
+        const SizedBox(height: 20),
 
         // ValueListenableBuilder: only the button area rebuilds when password
         // text changes, not the entire screen
@@ -288,7 +287,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
     return Column(
       children: [
         Container(
-          padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.5.h),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           decoration: BoxDecoration(
             color: isDark
                 ? Colors.green.shade900.withValues(alpha: 0.15)
@@ -301,31 +300,31 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
           child: Column(
             children: [
               Icon(Icons.mark_email_read_rounded, size: 36, color: Colors.green.shade600),
-              SizedBox(height: 1.5.h),
+              const SizedBox(height: 12),
               Text(
                 'Check your email',
                 style: TextStyle(
-                  fontSize: 16.sp,
+                  fontSize: 18,
                   fontWeight: FontWeight.w700,
                   color: isDark ? Colors.white : Colors.green.shade900,
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 0.5.h),
+              const SizedBox(height: 4),
               Text(
                 _emailController.text.trim(),
                 style: TextStyle(
-                  fontSize: 12.sp,
+                  fontSize: 14,
                   color: isDark ? Colors.green.shade300 : Colors.green.shade700,
                   fontWeight: FontWeight.w600,
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 1.h),
+              const SizedBox(height: 8),
               Text(
                 'Click the link in your email to sign in.\nThe link expires in 1 hour.',
                 style: TextStyle(
-                  fontSize: 10.sp,
+                  fontSize: 12,
                   color: isDark ? Colors.grey.shade400 : Colors.green.shade600,
                   height: 1.4,
                 ),
@@ -334,14 +333,14 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
             ],
           ),
         ),
-        SizedBox(height: 1.5.h),
+        const SizedBox(height: 12),
         TextButton.icon(
           onPressed: () => setState(() => _magicLinkSent = false),
           icon: const Icon(Icons.edit, size: 16),
-          label: Text('Use a different email', style: TextStyle(fontSize: 12.sp)),
+          label: const Text('Use a different email', style: TextStyle(fontSize: 14)),
           style: TextButton.styleFrom(
             foregroundColor: AppTheme.primaryLight,
-            padding: EdgeInsets.symmetric(vertical: 1.h),
+            padding: const EdgeInsets.symmetric(vertical: 8),
           ),
         ),
       ],
@@ -359,7 +358,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: borderColor, width: (_emailError != null || _isEmailValid) ? 2 : 1.5),
         color: isDark ? Colors.grey.shade900 : Colors.white,
       ),
@@ -368,11 +367,11 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
         focusNode: _emailFocusNode,
         keyboardType: TextInputType.emailAddress,
         autofillHints: const [AutofillHints.email],
-        style: TextStyle(fontSize: 13.sp, color: isDark ? Colors.white : Colors.black87),
+        style: TextStyle(fontSize: 14, color: isDark ? Colors.white : Colors.black87),
         decoration: InputDecoration(
           hintText: 'your.email@example.com',
-          hintStyle: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade400, fontSize: 13.sp),
-          contentPadding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.8.h),
+          hintStyle: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade400, fontSize: 14),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           border: InputBorder.none,
           suffixIcon: _isEmailValid ? const Icon(Icons.check_circle, color: Colors.green, size: 20) : null,
         ),
@@ -383,7 +382,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
   Widget _buildPasswordInput(bool isDark) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: _passwordError != null ? Colors.red.shade700 : isDark ? Colors.grey.shade700 : Colors.grey.shade300,
           width: _passwordError != null ? 2 : 1.5,
@@ -393,11 +392,11 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
       child: TextField(
         controller: _passwordController,
         obscureText: _obscurePassword,
-        style: TextStyle(fontSize: 13.sp, color: isDark ? Colors.white : Colors.black87),
+        style: TextStyle(fontSize: 14, color: isDark ? Colors.white : Colors.black87),
         decoration: InputDecoration(
           hintText: 'Password',
-          hintStyle: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade400, fontSize: 13.sp),
-          contentPadding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.8.h),
+          hintStyle: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade400, fontSize: 14),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           border: InputBorder.none,
           suffixIcon: IconButton(
             icon: Icon(
@@ -414,7 +413,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
 
   Widget _buildErrorRow(String message, bool isDark) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: isDark ? Colors.red.shade900.withValues(alpha: 0.2) : Colors.red.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
@@ -423,13 +422,13 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
       child: Row(
         children: [
           Icon(Icons.error_outline, color: Colors.red.shade700, size: 18),
-          SizedBox(width: 2.w),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
               style: TextStyle(
                 color: isDark ? Colors.red.shade200 : Colors.red.shade900,
-                fontSize: 12.sp,
+                fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -456,13 +455,13 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
         _isLoading
             ? (isSignIn ? 'Signing in...' : 'Sending...')
             : (isSignIn ? 'Sign In' : 'Send Login Link'),
-        style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.3),
       ),
       style: ElevatedButton.styleFrom(
         backgroundColor: bgColor,
         foregroundColor: fgColor,
-        padding: EdgeInsets.symmetric(vertical: 1.8.h),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         elevation: enabled ? 2 : 0,
       ),
     );
