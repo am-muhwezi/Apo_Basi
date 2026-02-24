@@ -43,6 +43,8 @@
 		<true/>
 		<key>NSCameraUsageDescription</key>
 		<string>ApoBasi may need camera access for profile photos.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>ApoBasi needs your location to set your home address for accurate bus tracking.</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>ApoBasi needs your location to set your home address for accurate bus tracking.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
