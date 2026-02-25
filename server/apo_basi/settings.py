@@ -238,6 +238,11 @@ CHANNEL_LAYERS = {
 }
 
 
+# School location — served to the Flutter app via GET /api/school/info/
+# Set these in .env for each school deployment.
+SCHOOL_LATITUDE = config("SCHOOL_LATITUDE", default=None, cast=lambda v: float(v) if v else None)
+SCHOOL_LONGITUDE = config("SCHOOL_LONGITUDE", default=None, cast=lambda v: float(v) if v else None)
+
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", cast=bool, default=False)
 

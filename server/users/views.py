@@ -192,3 +192,23 @@ def health_check(request):
     Simple health check endpoint
     """
     return Response({'status': 'ok', 'message': 'Server is running'}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def school_info(request):
+    """
+    GET /api/school/info/
+    Returns school configuration for this deployment.
+    Unauthenticated so the Flutter app can call it before login if needed.
+    """
+    from django.conf import settings as django_settings
+
+    lat = getattr(django_settings, 'SCHOOL_LATITUDE', None)
+    lng = getattr(django_settings, 'SCHOOL_LONGITUDE', None)
+
+    return Response({
+        'schoolLatitude': lat,
+        'schoolLongitude': lng,
+        'configured': lat is not None and lng is not None,
+    }, status=status.HTTP_200_OK)
