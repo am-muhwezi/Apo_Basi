@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Position;
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:sizer/sizer.dart';
@@ -13,6 +16,7 @@ import '../../config/location_config.dart';
 import '../../config/mapbox_helpers.dart';
 import '../../models/bus_location_model.dart';
 import '../../services/bus_websocket_service.dart';
+import '../../services/mapbox_optimization_service.dart';
 import '../../services/mapbox_route_service.dart';
 import '../../services/home_location_service.dart';
 
@@ -57,13 +61,19 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   String? _distance;
   bool _isCalculatingETA = false;
 
+  // Multi-stop route optimization
+  OptimizedRoute? _optimizedRoute;
+  int _thisChildStopIndex = -1; // index in _optimizedRoute.orderedStops
+  String _tripType = 'dropoff'; // 'pickup' or 'dropoff'
+
   @override
   void initState() {
     super.initState();
     _loadMarkerImages();
-    // Defer WebSocket connection to after first frame
+    // Defer WebSocket connection and route optimization to after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeSocketConnection();
+      _initializeRouteOptimization();
     });
   }
 
@@ -82,6 +92,12 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   void dispose() {
     _locationSubscription?.cancel();
     _connectionSubscription?.cancel();
+    // Invalidate the cached optimized route for this bus
+    final busValue = _childData?['busId'];
+    if (busValue != null) {
+      final busId = busValue is int ? busValue : int.tryParse(busValue.toString());
+      if (busId != null) MapboxOptimizationService.invalidate(busId);
+    }
     super.dispose();
   }
 
@@ -348,7 +364,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     _webSocketService.subscribeToBus(busId);
   }
 
-  /// Update bus location with road snapping and ETA calculation
+  /// Update bus location with road snapping and multi-stop ETA calculation.
+  ///
+  /// Uses the optimized stop order when available; falls back to the direct
+  /// 2-point route so the screen always shows something meaningful.
   Future<void> _updateBusLocationWithSnapping(BusLocation location) async {
     if (_homeLocation == null) return;
 
@@ -358,24 +377,69 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
     try {
       final busCoord = ll.LatLng(location.latitude, location.longitude);
-      final homeCoord =
-          ll.LatLng(_homeLocation!.latitude, _homeLocation!.longitude);
 
       final snappedCoord = await MapboxRouteService.snapSinglePointToRoad(
         coordinate: busCoord,
         radius: 25,
       );
+      final effectiveBus = snappedCoord ?? busCoord;
 
-      final tripInfo = await MapboxRouteService.getTripInformation(
-        busLocation: snappedCoord ?? busCoord,
-        homeLocation: homeCoord,
+      Map<String, dynamic>? tripInfo;
+
+      // --- Multi-stop path ---------------------------------------------------
+      if (_optimizedRoute != null && _thisChildStopIndex >= 0) {
+        final stops = _optimizedRoute!.orderedStops;
+
+        // Find the next stop: the one with the smallest haversine distance
+        // to the current bus position.
+        int nextStopIndex = 0;
+        double minDist = double.infinity;
+        for (int i = 0; i < stops.length; i++) {
+          final d = _haversineKm(effectiveBus, stops[i].homeLatLng);
+          if (d < minDist) {
+            minDist = d;
+            nextStopIndex = i;
+          }
+        }
+
+        // If this child's stop was already passed, ETA = 0 (arrived)
+        if (_thisChildStopIndex < nextStopIndex) {
+          if (mounted) {
+            setState(() {
+              _snappedBusLocation = snappedCoord;
+              _etaMinutes = 0;
+              _isCalculatingETA = false;
+            });
+            _updateBusAnnotation();
+          }
+          return;
+        }
+
+        // Build waypoints: bus → next stop → ... → this child's stop
+        final waypoints = <ll.LatLng>[effectiveBus];
+        for (int i = nextStopIndex; i <= _thisChildStopIndex; i++) {
+          waypoints.add(stops[i].homeLatLng);
+        }
+
+        if (waypoints.length > 1) {
+          tripInfo = await MapboxRouteService.getMultiWaypointTripInformation(
+            waypoints: waypoints,
+            profile: 'driving-traffic',
+          );
+        }
+      }
+
+      // --- Direct-route fallback -------------------------------------------
+      tripInfo ??= await MapboxRouteService.getTripInformation(
+        busLocation: effectiveBus,
+        homeLocation: _homeLocation!,
         profile: 'driving-traffic',
       );
 
       if (mounted && tripInfo != null) {
         setState(() {
           _snappedBusLocation = snappedCoord;
-          _etaMinutes = tripInfo['eta'];
+          _etaMinutes = tripInfo!['eta'];
           _distance = tripInfo['distance'];
           _routePoints = tripInfo['route'];
           _isCalculatingETA = false;
@@ -387,10 +451,141 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           _isCalculatingETA = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       setState(() {
         _isCalculatingETA = false;
       });
+    }
+  }
+
+  /// Haversine distance in km (used to find nearest stop to bus position).
+  double _haversineKm(ll.LatLng a, ll.LatLng b) {
+    const r = 6371.0;
+    final dLat = _deg2rad(b.latitude - a.latitude);
+    final dLon = _deg2rad(b.longitude - a.longitude);
+    final sinDLat = sin(dLat / 2);
+    final sinDLon = sin(dLon / 2);
+    final h = sinDLat * sinDLat +
+        cos(_deg2rad(a.latitude)) * cos(_deg2rad(b.latitude)) * sinDLon * sinDLon;
+    return 2 * r * asin(sqrt(h));
+  }
+
+  double _deg2rad(double deg) => deg * pi / 180.0;
+
+  /// Fetch the active trip type and all sibling stops, then run optimization.
+  /// Called once on screen load; result cached by [MapboxOptimizationService].
+  Future<void> _initializeRouteOptimization() async {
+    if (_childData == null) return;
+
+    final busValue = _childData!['busId'];
+    if (busValue == null) return;
+    final busId = busValue is int ? busValue : int.tryParse(busValue.toString());
+    if (busId == null) return;
+
+    try {
+      // 1. Determine trip type from active trip, fall back to time-of-day
+      _tripType = await _getActiveTripType(busId);
+
+      // 2. Fetch all children on this bus to get their home coordinates
+      final busStops = await _fetchBusStops(busId);
+      if (busStops.isEmpty) return;
+
+      // 3. Run optimization — requires school coords from .env
+      final schoolLat = ApiConfig.schoolLatitude;
+      final schoolLng = ApiConfig.schoolLongitude;
+      if (schoolLat == null || schoolLng == null) return;
+      final school = ll.LatLng(schoolLat, schoolLng);
+      final optimized = await MapboxOptimizationService.optimizeRoute(
+        busId: busId,
+        schoolLocation: school,
+        busStops: busStops,
+        tripType: _tripType,
+      );
+      if (optimized == null || !mounted) return;
+
+      // 4. Find this child's stop index in the optimized order
+      final thisChildId = _childData!['id'] is int
+          ? _childData!['id'] as int
+          : int.tryParse(_childData!['id'].toString()) ?? -1;
+
+      final stopIdx = optimized.orderedStops
+          .indexWhere((s) => s.childId == thisChildId);
+
+      if (mounted) {
+        setState(() {
+          _optimizedRoute = optimized;
+          _thisChildStopIndex = stopIdx;
+        });
+      }
+    } catch (_) {
+      // Optimization failed — direct-route ETA fallback stays in place
+    }
+  }
+
+  /// GET /api/trips/?bus_id=X&status=in-progress — returns 'pickup' or 'dropoff'.
+  Future<String> _getActiveTripType(int busId) async {
+    try {
+      final uri = Uri.parse(
+        '${ApiConfig.apiBaseUrl}/api/trips/?bus_id=$busId&status=in-progress',
+      );
+      final token = await _getAuthToken();
+      final response = await http.get(
+        uri,
+        headers: token != null ? {'Authorization': 'Bearer $token'} : {},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final results = data['results'] as List? ?? data as List? ?? [];
+        if (results.isNotEmpty) {
+          final tripType = results[0]['type']?.toString() ?? '';
+          if (tripType == 'pickup' || tripType == 'dropoff') return tripType;
+        }
+      }
+    } catch (_) {}
+
+    // Time-of-day heuristic: before noon → pickup, after noon → dropoff
+    return DateTime.now().hour < 12 ? 'pickup' : 'dropoff';
+  }
+
+  /// GET /api/buses/{busId}/children/ and build the list of [BusStop]s.
+  Future<List<BusStop>> _fetchBusStops(int busId) async {
+    try {
+      final uri = Uri.parse(
+        '${ApiConfig.apiBaseUrl}${ApiConfig.busChildrenEndpoint(busId)}',
+      );
+      final token = await _getAuthToken();
+      final response = await http.get(
+        uri,
+        headers: token != null ? {'Authorization': 'Bearer $token'} : {},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final children = data['children'] as List? ?? [];
+
+        final stops = <BusStop>[];
+        for (final child in children) {
+          final lat = (child['homeLatitude'] as num?)?.toDouble();
+          final lng = (child['homeLongitude'] as num?)?.toDouble();
+          final id = child['id'] as int?;
+          if (lat != null && lng != null && id != null) {
+            stops.add(BusStop(childId: id, homeLatLng: ll.LatLng(lat, lng)));
+          }
+        }
+        return stops;
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// Read the JWT access token from SharedPreferences.
+  Future<String?> _getAuthToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('access_token');
+    } catch (_) {
+      return null;
     }
   }
 
