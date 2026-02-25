@@ -28,7 +28,8 @@ from .views import (
     CheckEmailView,
     SupabaseMagicLinkAuthView,
     DemoLoginView,
-    ChildAttendanceHistoryView
+    ChildAttendanceHistoryView,
+    UpdateHomeLocationView,
 )
 
 # Create a router and register the ParentViewSet
@@ -42,6 +43,7 @@ urlpatterns = [
     path('auth/magic-link/', SupabaseMagicLinkAuthView.as_view(), name='supabase-magic-link-auth'),
     path('auth/demo-login/', DemoLoginView.as_view(), name='demo-login'),
     path('children/<int:child_id>/attendance/', ChildAttendanceHistoryView.as_view(), name='child-attendance-history'),
+    path('home-location/', UpdateHomeLocationView.as_view(), name='parent-home-location'),
 
     # Include router URLs
     path('', include(router.urls)),

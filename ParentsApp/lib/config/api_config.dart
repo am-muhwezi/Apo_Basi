@@ -35,6 +35,13 @@ class ApiConfig {
   static String get mapboxStyleId =>
       dotenv.env['MAPBOX_STYLE_ID'] ?? 'mapbox/streets-v12';
 
+  /// School GPS coordinates (used for route optimization).
+  /// Must be set in .env — returns null if not configured.
+  static double? get schoolLatitude =>
+      double.tryParse(dotenv.env['SCHOOL_LATITUDE'] ?? '');
+  static double? get schoolLongitude =>
+      double.tryParse(dotenv.env['SCHOOL_LONGITUDE'] ?? '');
+
   /// Get the Mapbox style URI for the native SDK
   static String getMapboxStyleUri() {
     return 'mapbox://styles/$mapboxStyleId';
@@ -52,6 +59,10 @@ class ApiConfig {
   static const String parentsEndpoint = '/api/parents/';
   static String parentDetailEndpoint(int id) => '/api/parents/$id/';
   static String parentChildrenEndpoint(int id) => '/api/parents/$id/children/';
+  static const String parentHomeLocationEndpoint = '/api/parents/home-location/';
+
+  /// Buses endpoints
+  static String busChildrenEndpoint(int busId) => '/api/buses/$busId/children/';
 
   /// Children endpoints
   static const String childrenEndpoint = '/api/children/';
