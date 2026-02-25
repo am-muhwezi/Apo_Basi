@@ -96,43 +96,65 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       // Bus image not found, will skip bus marker
     }
 
-    // Create home marker image programmatically (blue circle with home icon)
-    _homeMarkerImage = await _createHomeMarkerImage();
+    // Render home pin using a standard Material icon
+    _homeMarkerImage = await _renderPinIcon(icon: Icons.home_rounded);
   }
 
-  /// Create a home marker icon image programmatically
-  Future<Uint8List> _createHomeMarkerImage() async {
-    const double size = 96; // 48 logical * 2 for retina
+  /// Renders a Material [icon] onto a standard teardrop map-pin and returns
+  /// PNG bytes suitable for [PointAnnotationOptions.image].
+  ///
+  /// Uses Flutter's built-in Material Icons font via [TextPainter] — no custom
+  /// path drawing required. Swap the icon for any [Icons.xxx] constant.
+  ///
+  /// Canvas: 96 × 124 px (2× retina → 48 × 62 logical pts).
+  /// Use [iconAnchor: IconAnchor.BOTTOM] so the pin tip sits on the coordinate.
+  Future<Uint8List> _renderPinIcon({
+    required IconData icon,
+    Color pinColor = const Color(0xFF2B5CE6),
+    Color iconColor = Colors.white,
+  }) async {
+    const double w = 96.0;
+    const double h = 124.0;
+    const double r = 40.0;
+    const double cx = w / 2;
+    const double cy = r + 6;
+
     final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, size, size));
+    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, w, h));
 
-    // Draw blue circle
-    final paint = Paint()..color = const Color(0xFF2B5CE6);
-    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2.5, paint);
+    // White outline ring — ensures visibility against any map tile colour
+    canvas.drawCircle(Offset(cx, cy), r + 3, Paint()..color = Colors.white);
 
-    // Draw white inner circle
-    final innerPaint = Paint()..color = Colors.white;
-    canvas.drawCircle(const Offset(size / 2, size / 2), size / 3.5, innerPaint);
+    // Pin head
+    canvas.drawCircle(Offset(cx, cy), r, Paint()..color = pinColor);
 
-    // Draw house icon (simple)
-    final iconPaint = Paint()
-      ..color = const Color(0xFF2B5CE6)
-      ..style = PaintingStyle.fill;
-    final path = Path();
-    // Roof
-    path.moveTo(size / 2, size * 0.3);
-    path.lineTo(size * 0.35, size * 0.48);
-    path.lineTo(size * 0.65, size * 0.48);
-    path.close();
-    canvas.drawPath(path, iconPaint);
-    // Body
-    canvas.drawRect(
-      Rect.fromLTWH(size * 0.38, size * 0.48, size * 0.24, size * 0.2),
-      iconPaint,
+    // Tapered pin tip (quadratic bezier curves)
+    canvas.drawPath(
+      Path()
+        ..moveTo(cx - r * 0.44, cy + r * 0.62)
+        ..quadraticBezierTo(cx - 5, h - 22, cx, h - 3)
+        ..quadraticBezierTo(cx + 5, h - 22, cx + r * 0.44, cy + r * 0.62)
+        ..close(),
+      Paint()..color = pinColor,
     );
 
+    // Icon glyph — paint the Material icon font character onto the pin head
+    final tp = TextPainter(textDirection: TextDirection.ltr)
+      ..text = TextSpan(
+        text: String.fromCharCode(icon.codePoint),
+        style: TextStyle(
+          fontSize: r * 1.15,
+          fontFamily: icon.fontFamily,
+          package: icon.fontPackage,
+          color: iconColor,
+          height: 1.0,
+        ),
+      )
+      ..layout();
+    tp.paint(canvas, Offset(cx - tp.width / 2, cy - tp.height / 2 - 2));
+
     final picture = recorder.endRecording();
-    final img = await picture.toImage(size.toInt(), size.toInt());
+    final img = await picture.toImage(w.toInt(), h.toInt());
     final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
     return byteData!.buffer.asUint8List();
   }
