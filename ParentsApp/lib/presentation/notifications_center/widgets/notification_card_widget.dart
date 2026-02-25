@@ -113,7 +113,7 @@ class NotificationCardWidget extends StatelessWidget {
                                   child: Text(
                                     notification['title'] ?? '',
                                     style: TextStyle(
-                                      fontSize: 16,
+                                      fontSize: 14,
                                       fontWeight: isRead
                                           ? FontWeight.w500
                                           : FontWeight.w600,

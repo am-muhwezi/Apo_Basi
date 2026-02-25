@@ -79,7 +79,7 @@ class ChildStatusCard extends StatelessWidget {
                     Text(
                       name,
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: colorScheme.onSurface,
                       ),

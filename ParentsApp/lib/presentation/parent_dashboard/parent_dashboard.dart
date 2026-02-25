@@ -293,7 +293,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                             child: Text(
                               "Children's Bus Status",
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w700,
                                 color: theme.colorScheme.onSurface,
                               ),
@@ -338,7 +338,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
           Text(
             'Welcome, $_parentName',
             style: TextStyle(
-              fontSize: 22,
+              fontSize: 20,
               fontWeight: FontWeight.w700,
               color: colorScheme.onSurface,
             ),
