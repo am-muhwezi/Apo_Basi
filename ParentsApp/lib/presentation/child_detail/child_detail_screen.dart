@@ -490,11 +490,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       final busStops = await _fetchBusStops(busId);
       if (busStops.isEmpty) return;
 
-      // 3. Run optimization — requires school coords from .env
-      final schoolLat = ApiConfig.schoolLatitude;
-      final schoolLng = ApiConfig.schoolLongitude;
-      if (schoolLat == null || schoolLng == null) return;
-      final school = ll.LatLng(schoolLat, schoolLng);
+      // 3. Fetch school coordinates from server (multi-tenant source of truth)
+      final schoolCoords = await _fetchSchoolCoordinates();
+      if (schoolCoords == null) return;
+      final school = schoolCoords;
       final optimized = await MapboxOptimizationService.optimizeRoute(
         busId: busId,
         schoolLocation: school,
@@ -520,6 +519,24 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     } catch (_) {
       // Optimization failed — direct-route ETA fallback stays in place
     }
+  }
+
+  /// Fetch school GPS coordinates from the server.
+  /// Returns null if the server hasn't configured them.
+  Future<ll.LatLng?> _fetchSchoolCoordinates() async {
+    try {
+      final uri = Uri.parse(
+        '${ApiConfig.apiBaseUrl}${ApiConfig.schoolInfoEndpoint}',
+      );
+      final response = await http.get(uri);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final lat = (data['schoolLatitude'] as num?)?.toDouble();
+        final lng = (data['schoolLongitude'] as num?)?.toDouble();
+        if (lat != null && lng != null) return ll.LatLng(lat, lng);
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// GET /api/trips/?bus_id=X&status=in-progress — returns 'pickup' or 'dropoff'.
