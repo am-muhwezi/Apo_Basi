@@ -16,7 +16,7 @@ class BusRouteAdmin(admin.ModelAdmin):
             'fields': ('default_bus', 'default_driver', 'default_minder')
         }),
         ('Route Details', {
-            'fields': ('schedule', 'estimated_duration', 'total_distance')
+            'fields': ('schedule',)
         }),
         ('Metadata', {
             'fields': ('created_at', 'updated_at'),

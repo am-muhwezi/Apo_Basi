@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:sizer/sizer.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../theme/app_theme.dart';
@@ -81,7 +80,7 @@ class _SplashScreenState extends State<SplashScreen>
       backgroundColor: AppTheme.apobasiDark,
       body: SafeArea(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 6.w),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             children: [
               // Spacer to push content to center-ish
@@ -98,20 +97,20 @@ class _SplashScreenState extends State<SplashScreen>
                       // Logo Image
                       SvgPicture.asset(
                         'assets/images/apobasi_logo.svg',
-                        width: 55.w,
+                        width: MediaQuery.of(context).size.width * 0.55,
                         fit: BoxFit.contain,
                       ),
 
-                      SizedBox(height: 4.h),
+                      const SizedBox(height: 32),
 
                       // Tagline
                       Text(
                         'Safe Journeys, Happy Parents',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.inter(
-                          fontSize: 16.sp,
+                          fontSize: 16,
                           fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -129,7 +128,7 @@ class _SplashScreenState extends State<SplashScreen>
                 child: _buildGetStartedButton(),
               ),
 
-              SizedBox(height: 4.h),
+              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -158,15 +157,15 @@ class _SplashScreenState extends State<SplashScreen>
             Text(
               'Get Started',
               style: GoogleFonts.inter(
-                fontSize: 16.sp,
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.2,
               ),
             ),
-            SizedBox(width: 2.w),
-            Icon(
+            const SizedBox(width: 8),
+            const Icon(
               Icons.arrow_forward,
-              size: 20.sp,
+              size: 20,
             ),
           ],
         ),

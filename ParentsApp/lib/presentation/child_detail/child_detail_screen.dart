@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Position;
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:sizer/sizer.dart';
@@ -12,6 +16,7 @@ import '../../config/location_config.dart';
 import '../../config/mapbox_helpers.dart';
 import '../../models/bus_location_model.dart';
 import '../../services/bus_websocket_service.dart';
+import '../../services/mapbox_optimization_service.dart';
 import '../../services/mapbox_route_service.dart';
 import '../../services/home_location_service.dart';
 
@@ -30,7 +35,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   // Mapbox Maps SDK
   MapboxMap? _mapboxMap;
-  PointAnnotationManager? _pointAnnotationManager;
+  PointAnnotationManager? _homeAnnotationManager;
+  PointAnnotationManager? _busAnnotationManager;
   PolylineAnnotationManager? _polylineAnnotationManager;
   PointAnnotation? _homeAnnotation;
   PointAnnotation? _busAnnotation;
@@ -55,13 +61,19 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   String? _distance;
   bool _isCalculatingETA = false;
 
+  // Multi-stop route optimization
+  OptimizedRoute? _optimizedRoute;
+  int _thisChildStopIndex = -1; // index in _optimizedRoute.orderedStops
+  String _tripType = 'dropoff'; // 'pickup' or 'dropoff'
+
   @override
   void initState() {
     super.initState();
     _loadMarkerImages();
-    // Defer WebSocket connection to after first frame
+    // Defer WebSocket connection and route optimization to after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeSocketConnection();
+      _initializeRouteOptimization();
     });
   }
 
@@ -80,6 +92,12 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   void dispose() {
     _locationSubscription?.cancel();
     _connectionSubscription?.cancel();
+    // Invalidate the cached optimized route for this bus
+    final busValue = _childData?['busId'];
+    if (busValue != null) {
+      final busId = busValue is int ? busValue : int.tryParse(busValue.toString());
+      if (busId != null) MapboxOptimizationService.invalidate(busId);
+    }
     super.dispose();
   }
 
@@ -94,43 +112,65 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       // Bus image not found, will skip bus marker
     }
 
-    // Create home marker image programmatically (blue circle with home icon)
-    _homeMarkerImage = await _createHomeMarkerImage();
+    // Render home pin using a standard Material icon
+    _homeMarkerImage = await _renderPinIcon(icon: Icons.home_rounded);
   }
 
-  /// Create a home marker icon image programmatically
-  Future<Uint8List> _createHomeMarkerImage() async {
-    const double size = 96; // 48 logical * 2 for retina
+  /// Renders a Material [icon] onto a standard teardrop map-pin and returns
+  /// PNG bytes suitable for [PointAnnotationOptions.image].
+  ///
+  /// Uses Flutter's built-in Material Icons font via [TextPainter] — no custom
+  /// path drawing required. Swap the icon for any [Icons.xxx] constant.
+  ///
+  /// Canvas: 96 × 124 px (2× retina → 48 × 62 logical pts).
+  /// Use [iconAnchor: IconAnchor.BOTTOM] so the pin tip sits on the coordinate.
+  Future<Uint8List> _renderPinIcon({
+    required IconData icon,
+    Color pinColor = const Color(0xFF2B5CE6),
+    Color iconColor = Colors.white,
+  }) async {
+    const double w = 96.0;
+    const double h = 124.0;
+    const double r = 40.0;
+    const double cx = w / 2;
+    const double cy = r + 6;
+
     final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, size, size));
+    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, w, h));
 
-    // Draw blue circle
-    final paint = Paint()..color = const Color(0xFF2B5CE6);
-    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2.5, paint);
+    // White outline ring — ensures visibility against any map tile colour
+    canvas.drawCircle(Offset(cx, cy), r + 3, Paint()..color = Colors.white);
 
-    // Draw white inner circle
-    final innerPaint = Paint()..color = Colors.white;
-    canvas.drawCircle(const Offset(size / 2, size / 2), size / 3.5, innerPaint);
+    // Pin head
+    canvas.drawCircle(Offset(cx, cy), r, Paint()..color = pinColor);
 
-    // Draw house icon (simple)
-    final iconPaint = Paint()
-      ..color = const Color(0xFF2B5CE6)
-      ..style = PaintingStyle.fill;
-    final path = Path();
-    // Roof
-    path.moveTo(size / 2, size * 0.3);
-    path.lineTo(size * 0.35, size * 0.48);
-    path.lineTo(size * 0.65, size * 0.48);
-    path.close();
-    canvas.drawPath(path, iconPaint);
-    // Body
-    canvas.drawRect(
-      Rect.fromLTWH(size * 0.38, size * 0.48, size * 0.24, size * 0.2),
-      iconPaint,
+    // Tapered pin tip (quadratic bezier curves)
+    canvas.drawPath(
+      Path()
+        ..moveTo(cx - r * 0.44, cy + r * 0.62)
+        ..quadraticBezierTo(cx - 5, h - 22, cx, h - 3)
+        ..quadraticBezierTo(cx + 5, h - 22, cx + r * 0.44, cy + r * 0.62)
+        ..close(),
+      Paint()..color = pinColor,
     );
 
+    // Icon glyph — paint the Material icon font character onto the pin head
+    final tp = TextPainter(textDirection: TextDirection.ltr)
+      ..text = TextSpan(
+        text: String.fromCharCode(icon.codePoint),
+        style: TextStyle(
+          fontSize: r * 1.15,
+          fontFamily: icon.fontFamily,
+          package: icon.fontPackage,
+          color: iconColor,
+          height: 1.0,
+        ),
+      )
+      ..layout();
+    tp.paint(canvas, Offset(cx - tp.width / 2, cy - tp.height / 2 - 2));
+
     final picture = recorder.endRecording();
-    final img = await picture.toImage(size.toInt(), size.toInt());
+    final img = await picture.toImage(w.toInt(), h.toInt());
     final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
     return byteData!.buffer.asUint8List();
   }
@@ -139,11 +179,20 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   void _onMapCreated(MapboxMap mapboxMap) async {
     _mapboxMap = mapboxMap;
 
-    // Create annotation managers
-    _pointAnnotationManager =
+    // Separate managers so home and bus can have independent sizing
+    _homeAnnotationManager =
+        await mapboxMap.annotations.createPointAnnotationManager();
+    _busAnnotationManager =
         await mapboxMap.annotations.createPointAnnotationManager();
     _polylineAnnotationManager =
         await mapboxMap.annotations.createPolylineAnnotationManager();
+
+    // Make bus icon scale with zoom: small when zoomed out, full-size when close
+    await _mapboxMap!.style.setStyleLayerProperty(
+      _busAnnotationManager!.id,
+      'icon-size',
+      jsonDecode('["interpolate",["linear"],["zoom"],10,0.015,14,0.04,17,0.10]'),
+    );
 
     // Place initial markers
     _updateHomeAnnotation();
@@ -182,22 +231,22 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   /// Update the home marker annotation
   Future<void> _updateHomeAnnotation() async {
-    if (_pointAnnotationManager == null ||
+    if (_homeAnnotationManager == null ||
         _homeLocation == null ||
         _homeMarkerImage == null) return;
 
     // Delete existing
     if (_homeAnnotation != null) {
-      await _pointAnnotationManager!.delete(_homeAnnotation!);
+      await _homeAnnotationManager!.delete(_homeAnnotation!);
       _homeAnnotation = null;
     }
 
-    // Create new
-    _homeAnnotation = await _pointAnnotationManager!.create(
+    // Create new — larger than regular POIs so it's always easy to find
+    _homeAnnotation = await _homeAnnotationManager!.create(
       PointAnnotationOptions(
         geometry: latLngToPoint(_homeLocation!),
         image: _homeMarkerImage,
-        iconSize: 0.5,
+        iconSize: 1.2,
         iconAnchor: IconAnchor.BOTTOM,
       ),
     );
@@ -205,12 +254,12 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   /// Update the bus marker annotation
   Future<void> _updateBusAnnotation() async {
-    if (_pointAnnotationManager == null || _busMarkerImage == null) return;
+    if (_busAnnotationManager == null || _busMarkerImage == null) return;
 
     if (_busLocation == null) {
       // Remove bus marker if no location
       if (_busAnnotation != null) {
-        await _pointAnnotationManager!.delete(_busAnnotation!);
+        await _busAnnotationManager!.delete(_busAnnotation!);
         _busAnnotation = null;
       }
       return;
@@ -224,14 +273,13 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       // Update existing annotation
       _busAnnotation!.geometry = latLngToPoint(busLatLng);
       _busAnnotation!.iconRotate = heading;
-      await _pointAnnotationManager!.update(_busAnnotation!);
+      await _busAnnotationManager!.update(_busAnnotation!);
     } else {
-      // Create new
-      _busAnnotation = await _pointAnnotationManager!.create(
+      // Create new — iconSize is intentionally omitted so the zoom expression controls it
+      _busAnnotation = await _busAnnotationManager!.create(
         PointAnnotationOptions(
           geometry: latLngToPoint(busLatLng),
           image: _busMarkerImage,
-          iconSize: 0.4,
           iconRotate: heading,
           iconAnchor: IconAnchor.CENTER,
         ),
@@ -316,7 +364,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     _webSocketService.subscribeToBus(busId);
   }
 
-  /// Update bus location with road snapping and ETA calculation
+  /// Update bus location with road snapping and multi-stop ETA calculation.
+  ///
+  /// Uses the optimized stop order when available; falls back to the direct
+  /// 2-point route so the screen always shows something meaningful.
   Future<void> _updateBusLocationWithSnapping(BusLocation location) async {
     if (_homeLocation == null) return;
 
@@ -326,24 +377,69 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
     try {
       final busCoord = ll.LatLng(location.latitude, location.longitude);
-      final homeCoord =
-          ll.LatLng(_homeLocation!.latitude, _homeLocation!.longitude);
 
       final snappedCoord = await MapboxRouteService.snapSinglePointToRoad(
         coordinate: busCoord,
         radius: 25,
       );
+      final effectiveBus = snappedCoord ?? busCoord;
 
-      final tripInfo = await MapboxRouteService.getTripInformation(
-        busLocation: snappedCoord ?? busCoord,
-        homeLocation: homeCoord,
+      Map<String, dynamic>? tripInfo;
+
+      // --- Multi-stop path ---------------------------------------------------
+      if (_optimizedRoute != null && _thisChildStopIndex >= 0) {
+        final stops = _optimizedRoute!.orderedStops;
+
+        // Find the next stop: the one with the smallest haversine distance
+        // to the current bus position.
+        int nextStopIndex = 0;
+        double minDist = double.infinity;
+        for (int i = 0; i < stops.length; i++) {
+          final d = _haversineKm(effectiveBus, stops[i].homeLatLng);
+          if (d < minDist) {
+            minDist = d;
+            nextStopIndex = i;
+          }
+        }
+
+        // If this child's stop was already passed, ETA = 0 (arrived)
+        if (_thisChildStopIndex < nextStopIndex) {
+          if (mounted) {
+            setState(() {
+              _snappedBusLocation = snappedCoord;
+              _etaMinutes = 0;
+              _isCalculatingETA = false;
+            });
+            _updateBusAnnotation();
+          }
+          return;
+        }
+
+        // Build waypoints: bus → next stop → ... → this child's stop
+        final waypoints = <ll.LatLng>[effectiveBus];
+        for (int i = nextStopIndex; i <= _thisChildStopIndex; i++) {
+          waypoints.add(stops[i].homeLatLng);
+        }
+
+        if (waypoints.length > 1) {
+          tripInfo = await MapboxRouteService.getMultiWaypointTripInformation(
+            waypoints: waypoints,
+            profile: 'driving-traffic',
+          );
+        }
+      }
+
+      // --- Direct-route fallback -------------------------------------------
+      tripInfo ??= await MapboxRouteService.getTripInformation(
+        busLocation: effectiveBus,
+        homeLocation: _homeLocation!,
         profile: 'driving-traffic',
       );
 
       if (mounted && tripInfo != null) {
         setState(() {
           _snappedBusLocation = snappedCoord;
-          _etaMinutes = tripInfo['eta'];
+          _etaMinutes = tripInfo!['eta'];
           _distance = tripInfo['distance'];
           _routePoints = tripInfo['route'];
           _isCalculatingETA = false;
@@ -355,10 +451,141 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           _isCalculatingETA = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       setState(() {
         _isCalculatingETA = false;
       });
+    }
+  }
+
+  /// Haversine distance in km (used to find nearest stop to bus position).
+  double _haversineKm(ll.LatLng a, ll.LatLng b) {
+    const r = 6371.0;
+    final dLat = _deg2rad(b.latitude - a.latitude);
+    final dLon = _deg2rad(b.longitude - a.longitude);
+    final sinDLat = sin(dLat / 2);
+    final sinDLon = sin(dLon / 2);
+    final h = sinDLat * sinDLat +
+        cos(_deg2rad(a.latitude)) * cos(_deg2rad(b.latitude)) * sinDLon * sinDLon;
+    return 2 * r * asin(sqrt(h));
+  }
+
+  double _deg2rad(double deg) => deg * pi / 180.0;
+
+  /// Fetch the active trip type and all sibling stops, then run optimization.
+  /// Called once on screen load; result cached by [MapboxOptimizationService].
+  Future<void> _initializeRouteOptimization() async {
+    if (_childData == null) return;
+
+    final busValue = _childData!['busId'];
+    if (busValue == null) return;
+    final busId = busValue is int ? busValue : int.tryParse(busValue.toString());
+    if (busId == null) return;
+
+    try {
+      // 1. Determine trip type from active trip, fall back to time-of-day
+      _tripType = await _getActiveTripType(busId);
+
+      // 2. Fetch all children on this bus to get their home coordinates
+      final busStops = await _fetchBusStops(busId);
+      if (busStops.isEmpty) return;
+
+      // 3. Run optimization — requires school coords from .env
+      final schoolLat = ApiConfig.schoolLatitude;
+      final schoolLng = ApiConfig.schoolLongitude;
+      if (schoolLat == null || schoolLng == null) return;
+      final school = ll.LatLng(schoolLat, schoolLng);
+      final optimized = await MapboxOptimizationService.optimizeRoute(
+        busId: busId,
+        schoolLocation: school,
+        busStops: busStops,
+        tripType: _tripType,
+      );
+      if (optimized == null || !mounted) return;
+
+      // 4. Find this child's stop index in the optimized order
+      final thisChildId = _childData!['id'] is int
+          ? _childData!['id'] as int
+          : int.tryParse(_childData!['id'].toString()) ?? -1;
+
+      final stopIdx = optimized.orderedStops
+          .indexWhere((s) => s.childId == thisChildId);
+
+      if (mounted) {
+        setState(() {
+          _optimizedRoute = optimized;
+          _thisChildStopIndex = stopIdx;
+        });
+      }
+    } catch (_) {
+      // Optimization failed — direct-route ETA fallback stays in place
+    }
+  }
+
+  /// GET /api/trips/?bus_id=X&status=in-progress — returns 'pickup' or 'dropoff'.
+  Future<String> _getActiveTripType(int busId) async {
+    try {
+      final uri = Uri.parse(
+        '${ApiConfig.apiBaseUrl}/api/trips/?bus_id=$busId&status=in-progress',
+      );
+      final token = await _getAuthToken();
+      final response = await http.get(
+        uri,
+        headers: token != null ? {'Authorization': 'Bearer $token'} : {},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final results = data['results'] as List? ?? data as List? ?? [];
+        if (results.isNotEmpty) {
+          final tripType = results[0]['type']?.toString() ?? '';
+          if (tripType == 'pickup' || tripType == 'dropoff') return tripType;
+        }
+      }
+    } catch (_) {}
+
+    // Time-of-day heuristic: before noon → pickup, after noon → dropoff
+    return DateTime.now().hour < 12 ? 'pickup' : 'dropoff';
+  }
+
+  /// GET /api/buses/{busId}/children/ and build the list of [BusStop]s.
+  Future<List<BusStop>> _fetchBusStops(int busId) async {
+    try {
+      final uri = Uri.parse(
+        '${ApiConfig.apiBaseUrl}${ApiConfig.busChildrenEndpoint(busId)}',
+      );
+      final token = await _getAuthToken();
+      final response = await http.get(
+        uri,
+        headers: token != null ? {'Authorization': 'Bearer $token'} : {},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final children = data['children'] as List? ?? [];
+
+        final stops = <BusStop>[];
+        for (final child in children) {
+          final lat = (child['homeLatitude'] as num?)?.toDouble();
+          final lng = (child['homeLongitude'] as num?)?.toDouble();
+          final id = child['id'] as int?;
+          if (lat != null && lng != null && id != null) {
+            stops.add(BusStop(childId: id, homeLatLng: ll.LatLng(lat, lng)));
+          }
+        }
+        return stops;
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// Read the JWT access token from SharedPreferences.
+  Future<String?> _getAuthToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('access_token');
+    } catch (_) {
+      return null;
     }
   }
 
@@ -465,6 +692,204 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     if (await canLaunchUrl(launchUri)) {
       await launchUrl(launchUri);
     }
+  }
+
+  bool _isChildEnRoute() {
+    final status = (_childData?['status'] ?? '').toString().toLowerCase();
+    return status == 'on_bus' ||
+        status == 'on-bus' ||
+        status == 'picked_up' ||
+        status == 'picked-up';
+  }
+
+  String _getDriverInitial() {
+    final driverName = _childData?['driverName']?.toString() ?? '';
+    if (driverName.isNotEmpty) return driverName[0].toUpperCase();
+    return 'D';
+  }
+
+  /// En route layout: driver avatar (with bus badge) + call icon + plate/route
+  Widget _buildEnRouteInfo(ColorScheme colorScheme, bool isDark) {
+    final String? busNumber = _childData?['busNumber'];
+    final String routeName = _getRouteDisplay();
+
+    return Row(
+      children: [
+        // Driver avatar with bus badge
+        SizedBox(
+          width: 64,
+          height: 64,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Driver circle
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? colorScheme.primary.withValues(alpha: 0.15)
+                      : const Color(0xFFE9E7F9),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    _getDriverInitial(),
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
+              // Bus badge
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isDark ? colorScheme.surface : Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: colorScheme.outline.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.directions_bus,
+                    size: 16,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        // Call icon
+        GestureDetector(
+          onTap: () => _makePhoneCall('+254718073907'),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? colorScheme.onSurface.withValues(alpha: 0.08)
+                  : const Color(0xFFF0F0F5),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.phone,
+              size: 22,
+              color: colorScheme.onSurface,
+            ),
+          ),
+        ),
+        const Spacer(),
+        // Plate number + route (right-aligned)
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (busNumber != null && busNumber != 'N/A')
+              Text(
+                busNumber,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            const SizedBox(height: 2),
+            Text(
+              routeName,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// At rest layout (home, school, etc.): status icon + message + call school
+  Widget _buildAtRestInfo(ColorScheme colorScheme, bool isDark) {
+    final status = (_childData?['status'] ?? '').toString().toLowerCase();
+    final childName = _childData?['name'] ?? 'Child';
+    final firstName = childName.toString().split(' ').first;
+
+    final bool isAtSchool = status == 'at_school' || status == 'at-school';
+    final IconData icon = isAtSchool ? Icons.school : Icons.home;
+    final Color accentColor =
+        isAtSchool ? const Color(0xFF007AFF) : const Color(0xFF22CCB2);
+    final String message = isAtSchool
+        ? '$firstName is safely at school'
+        : '$firstName is safely at home';
+
+    return Row(
+      children: [
+        // Status icon
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: accentColor.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 28, color: accentColor),
+        ),
+        const SizedBox(width: 14),
+        // Status message
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                message,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _getRouteDisplay(),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Call school
+        GestureDetector(
+          onTap: () => _makePhoneCall('+254718073907'),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? colorScheme.onSurface.withValues(alpha: 0.08)
+                  : const Color(0xFFF0F0F5),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.phone,
+              size: 22,
+              color: colorScheme.onSurface,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -585,232 +1010,98 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
             ),
           ),
 
-          // Modern DraggableScrollableSheet
+          // Bottom detail sheet
           DraggableScrollableSheet(
-            initialChildSize: 0.20,
+            initialChildSize: 0.22,
             minChildSize: 0.18,
-            maxChildSize: 0.50,
+            maxChildSize: 0.45,
             builder: (context, scrollController) {
+              final isDark = theme.brightness == Brightness.dark;
+              final bool isEnRoute = _isChildEnRoute();
+
               return Container(
                 decoration: BoxDecoration(
-                  color: colorScheme.surface,
+                  color: theme.cardColor,
                   borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    topRight: Radius.circular(24),
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      blurRadius: 20,
-                      offset: const Offset(0, -5),
+                      color: colorScheme.shadow.withValues(alpha: 0.12),
+                      blurRadius: 16,
+                      offset: const Offset(0, -4),
                     ),
                   ],
                 ),
                 child: ListView(
                   controller: scrollController,
-                  padding: EdgeInsets.fromLTRB(5.w, 1.5.h, 5.w, 2.h),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                   children: [
                     // Drag handle
                     Center(
                       child: Container(
-                        width: 40,
+                        width: 36,
                         height: 4,
-                        margin: EdgeInsets.only(bottom: 1.5.h),
+                        margin: const EdgeInsets.only(bottom: 14),
                         decoration: BoxDecoration(
-                          color: colorScheme.onSurface.withValues(alpha: 0.2),
+                          color: colorScheme.onSurface.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     ),
 
-                    // Trip Status Header with ETA Badge
+                    // Status row + ETA pill
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          _getTripStatus(),
-                          style: textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                        Expanded(
+                          child: Text(
+                            _getTripStatus(),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
                         ),
-                        if (_etaMinutes != null)
+                        if (isEnRoute && _etaMinutes != null)
                           Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 3.w,
-                              vertical: 0.5.h,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color:
-                                  colorScheme.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.schedule,
-                                    size: 16, color: colorScheme.primary),
-                                SizedBox(width: 1.w),
-                                Text(
-                                  '$_etaMinutes min',
-                                  style: textTheme.labelMedium?.copyWith(
-                                    color: colorScheme.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-
-                    SizedBox(height: 1.5.h),
-
-                    // Driver Photo Circle
-                    Row(
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: [
-                                colorScheme.primary.withValues(alpha: 0.15),
-                                colorScheme.primary.withValues(alpha: 0.05),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            border: Border.all(
                               color: colorScheme.primary,
-                              width: 2.5,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '$_etaMinutes mins',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                          child: Icon(Icons.person,
-                              size: 32, color: colorScheme.primary),
-                        ),
-                        SizedBox(width: 3.w),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _childData?['busId'] == null
-                                    ? 'Not yet assigned to a bus'
-                                    : (_childData?['driverName'] ?? 'Driver'),
-                                style: textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 15.sp,
-                                  color: _childData?['busId'] == null
-                                      ? colorScheme.onSurface
-                                          .withValues(alpha: 0.6)
-                                      : colorScheme.onSurface,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              if (_childData?['busId'] != null) ...[
-                                SizedBox(height: 0.5.h),
-                                if (_childData?['busNumber'] != null &&
-                                    _childData!['busNumber'] != 'N/A')
-                                  Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 2.5.w,
-                                      vertical: 0.4.h,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: theme.brightness == Brightness.dark
-                                          ? colorScheme.primary
-                                              .withValues(alpha: 0.2)
-                                          : colorScheme.primary
-                                              .withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: colorScheme.primary
-                                            .withValues(alpha: 0.4),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.directions_bus,
-                                            size: 14,
-                                            color: colorScheme.primary),
-                                        SizedBox(width: 1.w),
-                                        Text(
-                                          _childData!['busNumber'],
-                                          style:
-                                              textTheme.labelMedium?.copyWith(
-                                            color: colorScheme.primary,
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 11.sp,
-                                            letterSpacing: 0.8,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                SizedBox(height: 0.5.h),
-                                Row(
-                                  children: [
-                                    Icon(Icons.route,
-                                        size: 16,
-                                        color: colorScheme.onSurface
-                                            .withValues(alpha: 0.6)),
-                                    SizedBox(width: 1.5.w),
-                                    Expanded(
-                                      child: Text(
-                                        _getRouteDisplay(),
-                                        style: textTheme.bodySmall?.copyWith(
-                                          color: colorScheme.onSurface
-                                              .withValues(alpha: 0.6),
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 11.sp,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
                       ],
                     ),
 
-                    SizedBox(height: 1.5.h),
-
-                    Divider(
-                      color: colorScheme.onSurface.withValues(alpha: 0.1),
-                      thickness: 1,
-                    ),
-
-                    SizedBox(height: 1.5.h),
-
-                    Text(
-                      'Contact School',
-                      style: textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-
-                    SizedBox(height: 1.5.h),
-
-                    ElevatedButton.icon(
-                      onPressed: () => _makePhoneCall('+254718073907'),
-                      icon: const Icon(Icons.phone, size: 20),
-                      label: const Text(
-                        'Call School',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 1.4.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                    // Divider
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: colorScheme.outline.withValues(alpha: 0.5),
                       ),
                     ),
+
+                    // Dynamic content based on status
+                    if (isEnRoute)
+                      _buildEnRouteInfo(colorScheme, isDark)
+                    else
+                      _buildAtRestInfo(colorScheme, isDark),
                   ],
                 ),
               );
