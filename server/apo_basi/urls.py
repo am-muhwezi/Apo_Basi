@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path
 from django.urls import include
-from users.views import health_check
+from users.views import health_check, school_info
 from users.views_auth import unified_phone_login
 from rest_framework_simplejwt.views import TokenRefreshView
 from trips.views import StopDetailView, StopCompleteView, StopSkipView
@@ -29,5 +29,6 @@ urlpatterns = [
     path("api/attendance/", include("attendance.urls")),
     path("api/analytics/", include("analytics.urls")),
     path("api/notifications/", include("notifications.urls")),
-    path("api/health/", health_check, name="health_check"),  # Health check endpoint
+    path("api/health/", health_check, name="health_check"),
+    path("api/school/info/", school_info, name="school_info"),
 ]
