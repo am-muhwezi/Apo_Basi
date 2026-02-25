@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,7 +31,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   // Mapbox Maps SDK
   MapboxMap? _mapboxMap;
-  PointAnnotationManager? _pointAnnotationManager;
+  PointAnnotationManager? _homeAnnotationManager;
+  PointAnnotationManager? _busAnnotationManager;
   PolylineAnnotationManager? _polylineAnnotationManager;
   PointAnnotation? _homeAnnotation;
   PointAnnotation? _busAnnotation;
@@ -139,11 +141,20 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   void _onMapCreated(MapboxMap mapboxMap) async {
     _mapboxMap = mapboxMap;
 
-    // Create annotation managers
-    _pointAnnotationManager =
+    // Separate managers so home and bus can have independent sizing
+    _homeAnnotationManager =
+        await mapboxMap.annotations.createPointAnnotationManager();
+    _busAnnotationManager =
         await mapboxMap.annotations.createPointAnnotationManager();
     _polylineAnnotationManager =
         await mapboxMap.annotations.createPolylineAnnotationManager();
+
+    // Make bus icon scale with zoom: small when zoomed out, full-size when close
+    await _mapboxMap!.style.setStyleLayerProperty(
+      _busAnnotationManager!.id,
+      'icon-size',
+      jsonDecode('["interpolate",["linear"],["zoom"],10,0.015,14,0.04,17,0.10]'),
+    );
 
     // Place initial markers
     _updateHomeAnnotation();
@@ -182,22 +193,22 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   /// Update the home marker annotation
   Future<void> _updateHomeAnnotation() async {
-    if (_pointAnnotationManager == null ||
+    if (_homeAnnotationManager == null ||
         _homeLocation == null ||
         _homeMarkerImage == null) return;
 
     // Delete existing
     if (_homeAnnotation != null) {
-      await _pointAnnotationManager!.delete(_homeAnnotation!);
+      await _homeAnnotationManager!.delete(_homeAnnotation!);
       _homeAnnotation = null;
     }
 
-    // Create new
-    _homeAnnotation = await _pointAnnotationManager!.create(
+    // Create new — larger than regular POIs so it's always easy to find
+    _homeAnnotation = await _homeAnnotationManager!.create(
       PointAnnotationOptions(
         geometry: latLngToPoint(_homeLocation!),
         image: _homeMarkerImage,
-        iconSize: 0.5,
+        iconSize: 1.2,
         iconAnchor: IconAnchor.BOTTOM,
       ),
     );
@@ -205,12 +216,12 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   /// Update the bus marker annotation
   Future<void> _updateBusAnnotation() async {
-    if (_pointAnnotationManager == null || _busMarkerImage == null) return;
+    if (_busAnnotationManager == null || _busMarkerImage == null) return;
 
     if (_busLocation == null) {
       // Remove bus marker if no location
       if (_busAnnotation != null) {
-        await _pointAnnotationManager!.delete(_busAnnotation!);
+        await _busAnnotationManager!.delete(_busAnnotation!);
         _busAnnotation = null;
       }
       return;
@@ -224,14 +235,13 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       // Update existing annotation
       _busAnnotation!.geometry = latLngToPoint(busLatLng);
       _busAnnotation!.iconRotate = heading;
-      await _pointAnnotationManager!.update(_busAnnotation!);
+      await _busAnnotationManager!.update(_busAnnotation!);
     } else {
-      // Create new
-      _busAnnotation = await _pointAnnotationManager!.create(
+      // Create new — iconSize is intentionally omitted so the zoom expression controls it
+      _busAnnotation = await _busAnnotationManager!.create(
         PointAnnotationOptions(
           geometry: latLngToPoint(busLatLng),
           image: _busMarkerImage,
-          iconSize: 0.035,
           iconRotate: heading,
           iconAnchor: IconAnchor.CENTER,
         ),
