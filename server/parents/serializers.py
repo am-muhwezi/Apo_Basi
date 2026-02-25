@@ -31,6 +31,8 @@ class ParentSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email', read_only=True)
     phone = serializers.CharField(source='contact_number', read_only=True)
     emergencyContact = serializers.CharField(source='emergency_contact', read_only=True)
+    homeLatitude = serializers.FloatField(source='home_latitude', read_only=True, allow_null=True)
+    homeLongitude = serializers.FloatField(source='home_longitude', read_only=True, allow_null=True)
     childrenCount = serializers.SerializerMethodField()
     childrenIds = serializers.SerializerMethodField()
 
@@ -38,7 +40,9 @@ class ParentSerializer(serializers.ModelSerializer):
         model = Parent
         fields = [
             'id', 'firstName', 'lastName', 'email', 'phone',
-            'address', 'emergencyContact', 'status', 'childrenCount', 'childrenIds'
+            'address', 'emergencyContact', 'status',
+            'homeLatitude', 'homeLongitude',
+            'childrenCount', 'childrenIds'
         ]
 
     def get_childrenCount(self, obj):

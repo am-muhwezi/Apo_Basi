@@ -847,6 +847,52 @@ class DemoLoginView(APIView):
             )
 
 
+class UpdateHomeLocationView(APIView):
+    """
+    PATCH /api/parents/home-location/
+    Save the authenticated parent's home GPS coordinates.
+    Coordinates are pre-geocoded by the Flutter app — no geocoding on backend.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        try:
+            parent = Parent.objects.get(user=request.user)
+        except Parent.DoesNotExist:
+            return Response(
+                {"error": "Parent profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        home_lat = request.data.get('homeLatitude')
+        home_lng = request.data.get('homeLongitude')
+
+        if home_lat is None or home_lng is None:
+            return Response(
+                {"error": "homeLatitude and homeLongitude are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            parent.home_latitude = float(home_lat)
+            parent.home_longitude = float(home_lng)
+            parent.save(update_fields=['home_latitude', 'home_longitude'])
+        except (ValueError, TypeError):
+            return Response(
+                {"error": "homeLatitude and homeLongitude must be valid numbers"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response(
+            {
+                "success": True,
+                "homeLatitude": parent.home_latitude,
+                "homeLongitude": parent.home_longitude,
+            },
+            status=status.HTTP_200_OK
+        )
+
+
 class ChildAttendanceHistoryView(APIView):
     """
     GET /api/parents/children/<child_id>/attendance/

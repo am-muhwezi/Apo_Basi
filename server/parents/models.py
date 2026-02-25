@@ -15,6 +15,8 @@ class Parent(models.Model):
     address = models.TextField(blank=True)
     emergency_contact = models.CharField(max_length=15, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    home_latitude = models.FloatField(null=True, blank=True)
+    home_longitude = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return f"Parent: {self.user.get_full_name() or self.user.username}"
