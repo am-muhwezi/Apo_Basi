@@ -65,6 +65,9 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   OptimizedRoute? _optimizedRoute;
   int _thisChildStopIndex = -1; // index in _optimizedRoute.orderedStops
   String _tripType = 'dropoff'; // 'pickup' or 'dropoff'
+  // Monotonically-advancing pointer: the first stop the bus has NOT yet visited.
+  // Only ever moves forward, never back, so past stops are never re-included.
+  int _nextStopIndex = 0;
 
   @override
   void initState() {
@@ -390,20 +393,21 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       if (_optimizedRoute != null && _thisChildStopIndex >= 0) {
         final stops = _optimizedRoute!.orderedStops;
 
-        // Find the next stop: the one with the smallest haversine distance
-        // to the current bus position.
-        int nextStopIndex = 0;
-        double minDist = double.infinity;
-        for (int i = 0; i < stops.length; i++) {
-          final d = _haversineKm(effectiveBus, stops[i].homeLatLng);
-          if (d < minDist) {
-            minDist = d;
-            nextStopIndex = i;
+        // Advance _nextStopIndex forward whenever the bus is within 200 m of
+        // the current next stop — this is monotonic (never goes backward) so
+        // a stop is never re-added to the waypoint list after it's been visited.
+        while (_nextStopIndex < stops.length) {
+          final distToNext = _haversineKm(effectiveBus, stops[_nextStopIndex].homeLatLng);
+          if (distToNext < 0.2) {
+            // Bus is within 200 m — consider this stop reached, advance pointer
+            setState(() => _nextStopIndex++);
+          } else {
+            break;
           }
         }
 
-        // If this child's stop was already passed, ETA = 0 (arrived)
-        if (_thisChildStopIndex < nextStopIndex) {
+        // If this child's stop has already been passed, show arrived
+        if (_thisChildStopIndex < _nextStopIndex) {
           if (mounted) {
             setState(() {
               _snappedBusLocation = snappedCoord;
@@ -415,11 +419,13 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           return;
         }
 
-        // Build waypoints: bus → next stop → ... → this child's stop
+        // Build waypoints: bus → _nextStopIndex → ... → _thisChildStopIndex
         final waypoints = <ll.LatLng>[effectiveBus];
-        for (int i = nextStopIndex; i <= _thisChildStopIndex; i++) {
+        for (int i = _nextStopIndex; i <= _thisChildStopIndex; i++) {
           waypoints.add(stops[i].homeLatLng);
         }
+
+        debugPrint('[ETA] multi-stop: ${waypoints.length} waypoints, nextStop=$_nextStopIndex, thisChild=$_thisChildStopIndex');
 
         if (waypoints.length > 1) {
           tripInfo = await MapboxRouteService.getMultiWaypointTripInformation(
@@ -485,19 +491,27 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     try {
       // 1. Determine trip type from active trip, fall back to time-of-day
       _tripType = await _getActiveTripType(busId);
+      debugPrint('[Optimization] tripType=$_tripType for busId=$busId');
 
-      // 2. Fetch all children on this bus to get their home coordinates
+      // 2. Fetch all children on this bus that have home coordinates set
       final busStops = await _fetchBusStops(busId);
-      if (busStops.isEmpty) return;
+      debugPrint('[Optimization] busStops with coords: ${busStops.length}');
+      // Need at least 2 stops for multi-stop routing to be meaningful
+      if (busStops.length < 2) {
+        debugPrint('[Optimization] Not enough stops with home coords — using direct route');
+        return;
+      }
 
-      // 3. Run optimization — requires school coords from .env
-      final schoolLat = ApiConfig.schoolLatitude;
-      final schoolLng = ApiConfig.schoolLongitude;
-      if (schoolLat == null || schoolLng == null) return;
-      final school = ll.LatLng(schoolLat, schoolLng);
+      // 3. Fetch school coordinates from server (multi-tenant source of truth)
+      final schoolCoords = await _fetchSchoolCoordinates();
+      if (schoolCoords == null) {
+        debugPrint('[Optimization] School coords not configured on server — using direct route');
+        return;
+      }
+
       final optimized = await MapboxOptimizationService.optimizeRoute(
         busId: busId,
-        schoolLocation: school,
+        schoolLocation: schoolCoords,
         busStops: busStops,
         tripType: _tripType,
       );
@@ -511,15 +525,45 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       final stopIdx = optimized.orderedStops
           .indexWhere((s) => s.childId == thisChildId);
 
-      if (mounted) {
-        setState(() {
-          _optimizedRoute = optimized;
-          _thisChildStopIndex = stopIdx;
-        });
+      debugPrint('[Optimization] orderedStops=${optimized.orderedStops.map((s) => s.childId).toList()}, thisChildId=$thisChildId at index=$stopIdx');
+
+      if (!mounted) return;
+      setState(() {
+        _optimizedRoute = optimized;
+        _thisChildStopIndex = stopIdx;
+        _nextStopIndex = 0; // reset pointer for this fresh route
+      });
+
+      // CRITICAL: Re-trigger ETA now that we have the optimized route.
+      // The WebSocket may have already fired before optimization completed,
+      // so the first ETA was calculated using the direct-route fallback.
+      // Recalculate immediately with the correct multi-stop waypoints.
+      if (_busLocation != null) {
+        debugPrint('[Optimization] Route ready — recalculating ETA with optimized stops');
+        _updateBusLocationWithSnapping(_busLocation!);
       }
-    } catch (_) {
-      // Optimization failed — direct-route ETA fallback stays in place
+    } catch (e, st) {
+      debugPrint('[Optimization] Failed: $e\n$st');
+      // Direct-route ETA fallback remains in place
     }
+  }
+
+  /// Fetch school GPS coordinates from the server.
+  /// Returns null if the server hasn't configured them.
+  Future<ll.LatLng?> _fetchSchoolCoordinates() async {
+    try {
+      final uri = Uri.parse(
+        '${ApiConfig.apiBaseUrl}${ApiConfig.schoolInfoEndpoint}',
+      );
+      final response = await http.get(uri);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final lat = (data['schoolLatitude'] as num?)?.toDouble();
+        final lng = (data['schoolLongitude'] as num?)?.toDouble();
+        if (lat != null && lng != null) return ll.LatLng(lat, lng);
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// GET /api/trips/?bus_id=X&status=in-progress — returns 'pickup' or 'dropoff'.
