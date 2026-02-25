@@ -92,7 +92,9 @@ class LocationConfig {
   static const String locationAccuracy = 'high';
 
   /// Whether to request background location permission on Android
-  static const bool requestBackgroundLocation = true;
+  /// Parents app only uses foreground location (home address detection).
+  /// Bus locations are received via Socket.IO, not device GPS.
+  static const bool requestBackgroundLocation = false;
 
   /// Whether to show rationale before requesting permissions
   static const bool showPermissionRationale = true;

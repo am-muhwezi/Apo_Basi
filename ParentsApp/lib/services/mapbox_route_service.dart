@@ -235,6 +235,55 @@ class MapboxRouteService {
     }
   }
 
+  /// Get trip information for a multi-waypoint route.
+  ///
+  /// [waypoints] must have at least 2 entries: `[bus, stop1, ..., destination]`.
+  /// Returns the same map shape as [getTripInformation] (route, eta, distance).
+  static Future<Map<String, dynamic>?> getMultiWaypointTripInformation({
+    required List<LatLng> waypoints,
+    String profile = 'driving-traffic',
+  }) async {
+    if (waypoints.length < 2) return null;
+    try {
+      final coordsString = waypoints
+          .map((c) => '${c.longitude},${c.latitude}')
+          .join(';');
+      final url = Uri.parse(
+        '$_baseUrl/$profile/$coordsString?geometries=geojson&overview=full&steps=true&access_token=${ApiConfig.mapboxAccessToken}',
+      );
+
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['routes'] != null && (data['routes'] as List).isNotEmpty) {
+          final route = data['routes'][0];
+          final geometry = route['geometry'];
+          final coordinates = geometry['coordinates'] as List;
+
+          final routePoints = coordinates.map((coord) {
+            return LatLng(coord[1].toDouble(), coord[0].toDouble());
+          }).toList();
+
+          final durationSeconds = route['duration'] as num;
+          final distanceMeters = route['distance'] as num;
+
+          return {
+            'route': routePoints,
+            'eta': (durationSeconds / 60).ceil(),
+            'duration': durationSeconds.toInt(),
+            'distance': (distanceMeters / 1000).toStringAsFixed(2),
+            'distanceMeters': distanceMeters.toInt(),
+          };
+        }
+      }
+
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   /// Get comprehensive trip information including ETA, distance, and route
   static Future<Map<String, dynamic>?> getTripInformation({
     required LatLng busLocation,

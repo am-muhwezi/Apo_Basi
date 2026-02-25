@@ -39,17 +39,59 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+
+    # Enforce iOS 14.0 minimum across all pods to match our platform requirement.
+    # Fixes deployment target warnings from: flutter_local_notifications (11.0),
+    # flutter_native_splash (9.0), fluttertoast (9.0), geolocator_apple (11.0),
+    # Turf (11.0), geocoding_ios (9.0).
+    target.build_configurations.each do |config|
+      current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f
+      if current < 14.0
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+      end
+    end
+  end
+
+  # Suppress deprecation/compiler warnings in third-party pods whose source we
+  # cannot modify. These are upstream issues tracked by each package maintainer.
+  pods_to_silence = %w[
+    camera_avfoundation
+    flutter_local_notifications
+    fluttertoast
+    geocoding_ios
+    geolocator_apple
+    MapboxMaps
+    mapbox_maps_flutter
+    permission_handler_apple
+  ]
+  installer.pods_project.targets.each do |target|
+    next unless pods_to_silence.include?(target.name)
+    target.build_configurations.each do |config|
+      config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+      config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
+    end
+  end
+
+  # Fix geocoding_ios PrivacyInfo.xcprivacy being misidentified as text.xml.
+  # Xcode cannot process it under that type, so we correct the file type.
+  installer.pods_project.files.each do |file|
+    if file.path =~ /PrivacyInfo\.xcprivacy$/
+      file.last_known_file_type = 'text.xcprivacy'
+    end
   end
 
   # Fix "Upload Symbols Failed" for Mapbox binary frameworks.
   # Mapbox does not distribute dSYMs for MapboxCommon/MapboxCoreMaps.
   # This adds a build phase that generates dSYM stubs with matching UUIDs
   # so App Store Connect accepts the archive without warnings.
+  # 'always_out_of_date = 1' marks it as intentionally always-run, which
+  # suppresses the "no outputs specified" Xcode warning.
   project = Xcodeproj::Project.open("#{installer.sandbox.root}/../Runner.xcodeproj")
   runner_target = project.targets.find { |t| t.name == 'Runner' }
 
   phase_name = 'Generate Mapbox dSYMs'
-  unless runner_target.shell_script_build_phases.any? { |p| p.name == phase_name }
+  phase = runner_target.shell_script_build_phases.find { |p| p.name == phase_name }
+  unless phase
     phase = runner_target.new_shell_script_build_phase(phase_name)
     phase.shell_script = <<~'SCRIPT'
       for framework in MapboxCommon MapboxCoreMaps; do
@@ -61,6 +103,8 @@ post_install do |installer|
         fi
       done
     SCRIPT
-    project.save
   end
+  # Declare as intentionally always-run (suppresses "no outputs" warning)
+  phase.always_out_of_date = '1'
+  project.save
 end

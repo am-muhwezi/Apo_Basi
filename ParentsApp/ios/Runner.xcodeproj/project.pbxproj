@@ -290,6 +290,7 @@
 		};
 		31DAD7C1B21605323E643CD9 /* Generate Mapbox dSYMs */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);

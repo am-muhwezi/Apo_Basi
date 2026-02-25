@@ -179,24 +179,18 @@ class MyRouteView(APIView):
 
         # Resolve the driver's active route for this bus using BusRoute
         route_name = None
-        estimated_duration = None
 
         # Prefer explicit bus_to_route assignments
         route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
         if route_assignment:
             route_obj = route_assignment.assigned_to
             route_name = getattr(route_obj, 'name', None)
-            duration_minutes = getattr(route_obj, 'estimated_duration', None)
-            if duration_minutes is not None:
-                estimated_duration = f"{duration_minutes} min"
 
         # Fallback to BusRoute.default_bus in case explicit assignment is missing
         if not route_name:
             fallback_route = BusRoute.objects.filter(default_bus=bus, is_active=True).first()
             if fallback_route:
                 route_name = fallback_route.name
-                if fallback_route.estimated_duration is not None:
-                    estimated_duration = f"{fallback_route.estimated_duration} min"
 
         # Get all children assigned to this bus using Assignment API
         child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
@@ -227,6 +221,8 @@ class MyRouteView(APIView):
                 "grade": child.class_grade,
                 "class_grade": child.class_grade,
                 "address": home_address,
+                "home_latitude": child.parent.home_latitude if child.parent else None,
+                "home_longitude": child.parent.home_longitude if child.parent else None,
                 "parent_name": child.parent.user.get_full_name() if child.parent else "N/A",
                 "pickup_status": pickup_attendance.status if pickup_attendance else None,
                 "pickup_status_display": pickup_attendance.get_status_display() if pickup_attendance else "Not marked",
@@ -241,29 +237,23 @@ class MyRouteView(APIView):
         # Look up actual route name: try bus_to_route Assignment first, then BusRoute.default_bus FK
         route_name = f"Bus {bus.bus_number} Route"  # fallback
         route_id = None
-        estimated_duration = "45 minutes"
 
         route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
         if route_assignment:
             route_obj = route_assignment.assigned_to
             if hasattr(route_obj, 'name') and route_obj.name:
                 route_name = route_obj.name
-            if hasattr(route_obj, 'estimated_duration') and route_obj.estimated_duration:
-                estimated_duration = f"{route_obj.estimated_duration} minutes"
             route_id = route_obj.id
         else:
             route_obj = BusRoute.objects.filter(default_bus=bus, is_active=True).first()
             if route_obj:
                 route_name = route_obj.name
-                if route_obj.estimated_duration:
-                    estimated_duration = f"{route_obj.estimated_duration} minutes"
                 route_id = route_obj.id
 
         return Response({
             "bus_number": bus.bus_number,
             "route_name": route_name,
             "route_id": route_id,
-            "estimated_duration": estimated_duration,
             "bus": {
                 "id": bus.id,
                 "bus_number": bus.bus_number,
@@ -321,23 +311,17 @@ def driver_phone_login(request):
 
             # Resolve the driver's active route for this bus using BusRoute
             route_name = None
-            estimated_duration = None
 
             route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
             if route_assignment:
                 route_obj = route_assignment.assigned_to
                 route_name = getattr(route_obj, 'name', None)
-                duration_minutes = getattr(route_obj, 'estimated_duration', None)
-                if duration_minutes is not None:
-                    estimated_duration = f"{duration_minutes} min"
 
             # Fallback to BusRoute.default_bus mapping if explicit assignment missing
             if not route_name:
                 fallback_route = BusRoute.objects.filter(default_bus=bus, is_active=True).first()
                 if fallback_route:
                     route_name = fallback_route.name
-                    if fallback_route.estimated_duration is not None:
-                        estimated_duration = f"{fallback_route.estimated_duration} min"
 
             # Get children assigned to this bus
             child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
@@ -361,7 +345,9 @@ def driver_phone_login(request):
                     "name": f"{child.first_name} {child.last_name}",
                     "grade": child.class_grade,
                     "class_grade": child.class_grade,
-                    "address": child.address if hasattr(child, 'address') else "N/A",
+                    "address": child.parent.address if child.parent and child.parent.address else (child.address if hasattr(child, 'address') else "N/A"),
+                    "home_latitude": child.parent.home_latitude if child.parent else None,
+                    "home_longitude": child.parent.home_longitude if child.parent else None,
                     "parent_name": child.parent.user.get_full_name() if child.parent else "N/A",
                     "parent_contact": child.parent.contact_number if child.parent else "N/A",
                     "emergency_contact": child.parent.emergency_contact if child.parent else "N/A",
@@ -392,7 +378,6 @@ def driver_phone_login(request):
             route_data = {
                 "bus_number": bus.bus_number,
                 "route_name": route_name,
-                "estimated_duration": estimated_duration,
                 "bus": {
                     "id": bus.id,
                     "bus_number": bus.bus_number,
@@ -570,7 +555,9 @@ def driver_magic_link_auth(request):
                     "name": f"{child.first_name} {child.last_name}",
                     "grade": child.class_grade,
                     "class_grade": child.class_grade,
-                    "address": child.address if hasattr(child, 'address') else "N/A",
+                    "address": child.parent.address if child.parent and child.parent.address else (child.address if hasattr(child, 'address') else "N/A"),
+                    "home_latitude": child.parent.home_latitude if child.parent else None,
+                    "home_longitude": child.parent.home_longitude if child.parent else None,
                     "parent_name": child.parent.user.get_full_name() if child.parent else "N/A",
                     "parent_contact": child.parent.contact_number if child.parent else "N/A",
                     "emergency_contact": child.parent.emergency_contact if child.parent else "N/A",
@@ -601,7 +588,6 @@ def driver_magic_link_auth(request):
             route_data = {
                 "bus_number": bus.bus_number,
                 "route_name": f"Bus {bus.bus_number} Route",
-                "estimated_duration": "45 minutes",
                 "bus": {
                     "id": bus.id,
                     "bus_number": bus.bus_number,
