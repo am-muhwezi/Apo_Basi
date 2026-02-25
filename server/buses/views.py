@@ -419,6 +419,8 @@ class BusViewSet(viewsets.ModelViewSet):
                 "grade": ca.assignee.class_grade,
                 "parentName": ca.assignee.parent.user.get_full_name() if ca.assignee.parent else None,
                 "address": getattr(ca.assignee, 'address', None),
+                "homeLatitude": ca.assignee.parent.home_latitude if ca.assignee.parent else None,
+                "homeLongitude": ca.assignee.parent.home_longitude if ca.assignee.parent else None,
             }
             for ca in child_assignments
         ]
