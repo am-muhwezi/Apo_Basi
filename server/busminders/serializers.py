@@ -1,7 +1,36 @@
+import re
+
 from rest_framework import serializers
 from .models import BusMinder
 from users.models import User
 from assignments.models import Assignment
+
+
+def _validate_phone_format(value):
+    """
+    Validate phone number format.
+    Accepted formats:
+      - Local (no country code): at least 10 digits
+      - International with +: '+' followed by country code and number, 10–15 digits total
+      - International without +: at least 10 digits, up to 15
+    Rejects anything shorter than 10 digits or longer than 15.
+    """
+    phone = re.sub(r'[\s\-\(\)]', '', value.strip())
+    if phone.startswith('+'):
+        # International format: + then 10–14 digits (ITU-T E.164: max 15 digits total)
+        if not re.match(r'^\+\d{10,14}$', phone):
+            raise serializers.ValidationError(
+                "Enter a valid international phone number starting with + "
+                "(e.g., +254712345678). Must be 10–14 digits after the + sign."
+            )
+    else:
+        # Local or international without +: 10–15 digits
+        if not re.match(r'^\d{10,15}$', phone):
+            raise serializers.ValidationError(
+                "Enter a valid phone number with at least 10 digits "
+                "(e.g., 0712345678 or 254712345678)."
+            )
+    return phone
 
 
 class BusMinderSerializer(serializers.ModelSerializer):
@@ -50,7 +79,9 @@ class BusMinderCreateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=['active', 'inactive'], default='active', write_only=True)
 
     def validate_phone(self, value):
-        """Check that phone number is unique across all roles"""
+        """Check that phone number has valid format and is unique across all roles"""
+        value = _validate_phone_format(value)
+
         from parents.models import Parent
         from drivers.models import Driver
 
