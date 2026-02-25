@@ -62,18 +62,6 @@ class BusRoute(models.Model):
         help_text="Route schedule with pickup/dropoff times in JSON format"
     )
 
-    # Route details
-    estimated_duration = models.IntegerField(
-        null=True,
-        blank=True,
-        help_text="Estimated route duration in minutes"
-    )
-    total_distance = models.FloatField(
-        null=True,
-        blank=True,
-        help_text="Total route distance in kilometers"
-    )
-
     # Status
     is_active = models.BooleanField(
         default=True,

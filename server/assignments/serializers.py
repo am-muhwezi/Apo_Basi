@@ -17,8 +17,6 @@ class BusRouteSerializer(serializers.ModelSerializer):
     defaultDriverName = serializers.SerializerMethodField()
     defaultMinderId = serializers.IntegerField(source='default_minder.id', read_only=True, allow_null=True)
     defaultMinderName = serializers.SerializerMethodField()
-    estimatedDuration = serializers.IntegerField(source='estimated_duration', allow_null=True)
-    totalDistance = serializers.FloatField(source='total_distance', allow_null=True)
     isActive = serializers.BooleanField(source='is_active')
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
@@ -34,7 +32,7 @@ class BusRouteSerializer(serializers.ModelSerializer):
             'defaultBusId', 'defaultBusNumber',
             'defaultDriverId', 'defaultDriverName',
             'defaultMinderId', 'defaultMinderName',
-            'schedule', 'estimatedDuration', 'totalDistance',
+            'schedule',
             'isActive', 'createdAt', 'updatedAt',
             'activeAssignmentsCount', 'assignedChildrenCount'
         ]
@@ -97,8 +95,6 @@ class BusRouteCreateSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
-    estimatedDuration = serializers.IntegerField(source='estimated_duration', required=False, allow_null=True)
-    totalDistance = serializers.FloatField(source='total_distance', required=False, allow_null=True)
     isActive = serializers.BooleanField(source='is_active', required=False, default=True)
 
     class Meta:
@@ -106,7 +102,7 @@ class BusRouteCreateSerializer(serializers.ModelSerializer):
         fields = [
             'name', 'routeCode', 'description',
             'defaultBusId', 'defaultDriverId', 'defaultMinderId',
-            'schedule', 'estimatedDuration', 'totalDistance', 'isActive'
+            'schedule', 'isActive'
         ]
 
 
