@@ -69,7 +69,10 @@ function queryPlaceName(
     ],
   ];
 
-  const features = map.queryRenderedFeatures(bbox, { layers: labelLayers });
+  const existingLayerIds = new Set(map.getStyle()?.layers?.map((l) => l.id) ?? []);
+  const validLayers = labelLayers.filter((id) => existingLayerIds.has(id));
+  if (!validLayers.length) return null;
+  const features = map.queryRenderedFeatures(bbox, { layers: validLayers });
 
   if (!features.length) return null;
 
