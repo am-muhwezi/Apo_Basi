@@ -430,7 +430,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           waypoints.add(stops[i].homeLatLng);
         }
 
-        debugPrint('[ETA] multi-stop: ${waypoints.length} waypoints, nextStop=$_nextStopIndex, thisChild=$_thisChildStopIndex');
 
         if (waypoints.length > 1) {
           tripInfo = await MapboxRouteService.getMultiWaypointTripInformation(
@@ -444,7 +443,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       if (tripInfo == null && _busStops.length >= 2) {
         final waypoints = _buildFallbackWaypoints(effectiveBus);
         if (waypoints != null && waypoints.length >= 2) {
-          debugPrint('[ETA] fallback multi-stop: ${waypoints.length} waypoints');
           tripInfo = await MapboxRouteService.getMultiWaypointTripInformation(
             waypoints: waypoints,
             profile: 'driving-traffic',
@@ -508,11 +506,9 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     try {
       // 1. Determine trip type from active trip, fall back to time-of-day
       _tripType = await _getActiveTripType(busId);
-      debugPrint('[Optimization] tripType=$_tripType for busId=$busId');
 
       // 2. Fetch all children on this bus that have home coordinates set
       final busStops = await _fetchBusStops(busId);
-      debugPrint('[Optimization] busStops with coords: ${busStops.length}');
 
       // Store stops so the fallback multi-stop router can use them
       if (mounted) {
@@ -524,14 +520,12 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
       // Need at least 2 stops for multi-stop routing to be meaningful
       if (busStops.length < 2) {
-        debugPrint('[Optimization] Not enough stops with home coords — using direct route');
         return;
       }
 
       // 3. Read school coordinates from .env (always present)
       final schoolCoords = _getSchoolCoordinates();
       if (schoolCoords == null) {
-        debugPrint('[Optimization] School coords missing from .env — check SCHOOL_LATITUDE/SCHOOL_LONGITUDE');
         return;
       }
 
@@ -551,13 +545,11 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       int stopIdx = optimized.orderedStops
           .indexWhere((s) => s.childId == thisChildId);
 
-      debugPrint('[Optimization] orderedStops=${optimized.orderedStops.map((s) => s.childId).toList()}, thisChildId=$thisChildId at index=$stopIdx');
 
       // If this child has no home coords in the DB (not in orderedStops),
       // treat all optimized stops as intermediate waypoints and append
       // _homeLocation as the final destination.
       if (stopIdx == -1 && _homeLocation != null) {
-        debugPrint('[Optimization] thisChild not in stops — appending homeLocation as final waypoint');
         final extendedStops = [
           ...optimized.orderedStops,
           BusStop(childId: thisChildId, homeLatLng: _homeLocation!),
@@ -576,7 +568,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           _stopsBeforeChild = stopIdx; // all other stops come first
         });
         if (_busLocation != null) {
-          debugPrint('[Optimization] Route extended — recalculating ETA');
           _updateBusLocationWithSnapping(_busLocation!);
         }
         return;
@@ -595,11 +586,9 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       // so the first ETA was calculated using the direct-route fallback.
       // Recalculate immediately with the correct multi-stop waypoints.
       if (_busLocation != null) {
-        debugPrint('[Optimization] Route ready — recalculating ETA with optimized stops');
         _updateBusLocationWithSnapping(_busLocation!);
       }
-    } catch (e, st) {
-      debugPrint('[Optimization] Failed: $e\n$st');
+    } catch (_) {
       // Direct-route ETA fallback remains in place
     }
   }
