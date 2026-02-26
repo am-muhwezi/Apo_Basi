@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../presentation/children_map_screen/children_map_screen.dart';
 import '../presentation/driver_start_shift_screen/driver_start_shift_screen.dart';
 import '../presentation/shared_login_screen/shared_login_screen.dart';
 import '../presentation/driver_active_trip_screen/driver_active_trip_screen.dart';
@@ -21,6 +22,7 @@ class AppRoutes {
   static const String sharedLogin = '/shared-login-screen';
 
   // Driver routes
+  static const String childrenMap = '/children-map-screen';
   static const String driverStartShift = '/driver-start-shift-screen';
   static const String driverActiveTrip = '/driver-active-trip-screen';
   static const String driverTripHistory = '/driver-trip-history-screen';
@@ -41,6 +43,13 @@ class AppRoutes {
   static Map<String, WidgetBuilder> routes = {
     initial: (context) => const SharedLoginScreen(),
     sharedLogin: (context) => const SharedLoginScreen(),
+    childrenMap: (context) {
+      final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+      return ChildrenMapScreen(
+        students: List<Map<String, dynamic>>.from(args['students'] as List),
+        tripData: Map<String, dynamic>.from(args['tripData'] as Map),
+      );
+    },
     driverStartShift: (context) => const DriverStartShiftScreen(),
     driverActiveTrip: (context) => const DriverActiveTripScreen(),
     driverTripHistory: (context) => const DriverTripHistoryScreen(),

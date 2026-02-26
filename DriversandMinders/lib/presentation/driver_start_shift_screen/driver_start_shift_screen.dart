@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:dio/dio.dart';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
@@ -280,7 +281,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                 _routeDetails?['name'] ??
                 'No Route',
             "routeAssignment": _busData?['bus_number'] ?? 'No Bus',
-            "estimatedDuration": _routeDetails?['estimated_duration'] ?? "N/A",
+            "estimatedDuration": "Calculating...",
             "studentCount":
                 _routeDetails?['total_children'] ?? _assignedChildren.length,
           };
@@ -325,6 +326,8 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
               'grade': child['grade']?.toString() ??
                   child['class_grade']?.toString() ??
                   'N/A',
+              'lat': double.tryParse(child['home_latitude']?.toString() ?? ''),
+              'lng': double.tryParse(child['home_longitude']?.toString() ?? ''),
             };
           }
           _assignedChildren = byId.values.toList();
@@ -337,9 +340,10 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
           "busPlate": _busData?['number_plate'] ?? 'N/A',
           "routeName": routeResponse['route_name'] ?? 'No Route',
           "routeAssignment": _busData?['bus_number'] ?? 'No Bus',
-          "estimatedDuration": routeResponse['estimated_duration'] ?? "N/A",
+          "estimatedDuration": "Calculating...",
           "studentCount": _assignedChildren.length,
         };
+        _computeMapboxETA();
         // API succeeded — cancel any pending retry and mark server reachable
         _retryTimer?.cancel();
         _retryTimer = null;
@@ -389,7 +393,70 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   }
 
   Future<void> _refreshDriverData() async {
-    return _loadDriverData(forceRemote: true);
+    return _loadDriverData();
+  }
+
+  /// Calls the Mapbox Directions API (driving-traffic) to compute the total
+  /// trip duration from the driver's current location through all children's
+  /// home stops, then updates the estimatedDuration chip.
+  Future<void> _computeMapboxETA() async {
+    try {
+      // Only proceed if we have children with coordinates
+      final stops = _assignedChildren
+          .where((c) => c['lat'] != null && c['lng'] != null)
+          .toList();
+      if (stops.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _driverData?['estimatedDuration'] = 'N/A';
+          });
+        }
+        return;
+      }
+
+      // Get current driver location
+      Position position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 8),
+          ),
+        );
+      } catch (_) {
+        // Location unavailable — still compute using just the stops in order
+        if (mounted) setState(() => _driverData?['estimatedDuration'] = 'N/A');
+        return;
+      }
+
+      // Build coordinate string: driver → stop1 → stop2 → ...
+      final coordParts = <String>[
+        '${position.longitude},${position.latitude}',
+        ...stops.map((s) => '${s['lng']},${s['lat']}'),
+      ];
+      final coords = coordParts.join(';');
+
+      final token = ApiConfig.mapboxAccessToken;
+      final url =
+          'https://api.mapbox.com/directions/v5/mapbox/driving-traffic/$coords'
+          '?access_token=$token';
+
+      final response = await Dio().get(url);
+      if (response.statusCode == 200) {
+        final routes = response.data['routes'] as List?;
+        if (routes != null && routes.isNotEmpty) {
+          final durationSec = (routes[0]['duration'] as num).toDouble();
+          final minutes = (durationSec / 60).ceil();
+          if (mounted) {
+            setState(() {
+              _driverData?['estimatedDuration'] = '$minutes min';
+            });
+          }
+          return;
+        }
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _driverData?['estimatedDuration'] = 'N/A');
   }
 
   @override

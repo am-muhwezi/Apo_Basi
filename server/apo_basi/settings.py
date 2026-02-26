@@ -243,6 +243,8 @@ CHANNEL_LAYERS = {
 SCHOOL_LATITUDE = config("SCHOOL_LATITUDE", default=None, cast=lambda v: float(v) if v else None)
 SCHOOL_LONGITUDE = config("SCHOOL_LONGITUDE", default=None, cast=lambda v: float(v) if v else None)
 
+MAPBOX_ACCESS_TOKEN = config("MAPBOX_ACCESS_TOKEN", default="")
+
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", cast=bool, default=False)
 
