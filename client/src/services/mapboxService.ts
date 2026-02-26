@@ -7,8 +7,7 @@
  * - ETA calculations
  */
 
-// Get Mapbox token from environment or use a placeholder
-const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || 'YOUR_MAPBOX_TOKEN';
+const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string;
 
 export interface LatLng {
   latitude: number;
@@ -151,5 +150,5 @@ export function formatDistance(meters: number): string {
  * Check if Mapbox is configured
  */
 export function isMapboxConfigured(): boolean {
-  return MAPBOX_ACCESS_TOKEN !== 'YOUR_MAPBOX_TOKEN' && MAPBOX_ACCESS_TOKEN.length > 0;
+  return typeof MAPBOX_ACCESS_TOKEN === 'string' && MAPBOX_ACCESS_TOKEN.length > 10;
 }

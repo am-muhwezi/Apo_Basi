@@ -100,6 +100,13 @@ export interface Trip {
   currentLocation?: Location;
   stops: Stop[];
   childrenIds: string[];
+  children?: Array<{
+    id: string;
+    name: string;
+    address: string;
+    latitude: number | null;
+    longitude: number | null;
+  }>;
   totalStudents?: number;
   studentsCompleted?: number;
   studentsAbsent?: number;
@@ -158,8 +165,6 @@ export interface BusRoute {
   defaultMinderId?: string;
   defaultMinderName?: string;
   schedule?: Record<string, any>;
-  estimatedDuration?: number;
-  totalDistance?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -232,7 +237,5 @@ export interface RouteFormData {
   defaultDriverId?: string;
   defaultMinderId?: string;
   schedule?: Record<string, any>;
-  estimatedDuration?: number;
-  totalDistance?: number;
   isActive: boolean;
 }

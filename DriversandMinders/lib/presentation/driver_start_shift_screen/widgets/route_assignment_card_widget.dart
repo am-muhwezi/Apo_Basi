@@ -5,7 +5,6 @@ import '../../../core/app_export.dart';
 
 class RouteAssignmentCardWidget extends StatelessWidget {
   final String routeName;
-  final String estimatedDuration;
   final int studentCount;
   final List<Map<String, dynamic>> assignedChildren;
   final VoidCallback? onTap;
@@ -15,7 +14,6 @@ class RouteAssignmentCardWidget extends StatelessWidget {
   const RouteAssignmentCardWidget({
     super.key,
     required this.routeName,
-    required this.estimatedDuration,
     required this.studentCount,
     this.assignedChildren = const [],
     this.onTap,
