@@ -35,6 +35,12 @@ class ApiConfig {
   static String get mapboxStyleId =>
       dotenv.env['MAPBOX_STYLE_ID'] ?? 'mapbox/streets-v12';
 
+  // School location — used for route optimization when the API is unavailable
+  static double? get schoolLatitude =>
+      double.tryParse(dotenv.env['SCHOOL_LATITUDE'] ?? '');
+  static double? get schoolLongitude =>
+      double.tryParse(dotenv.env['SCHOOL_LONGITUDE'] ?? '');
+
 
   /// Get the Mapbox style URI for the native SDK
   static String getMapboxStyleUri() {
