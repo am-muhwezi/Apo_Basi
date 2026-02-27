@@ -153,6 +153,19 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
                 "message": str(e)
             }))
 
+    async def bus_trip_event(self, event):
+        """
+        Handle trip lifecycle events broadcast to the bus group.
+        Forwards trip_started / trip_ended to all connected clients so the
+        parent app can react immediately without polling.
+        """
+        await self.send(text_data=json.dumps({
+            "type": event["event_type"],       # "trip_started" or "trip_ended"
+            "trip_id": event.get("trip_id"),
+            "trip_type": event.get("trip_type"),
+            "scheduled_time": event.get("scheduled_time"),
+        }))
+
     async def bus_location(self, event):
         """
         Handle location broadcast messages from the group.

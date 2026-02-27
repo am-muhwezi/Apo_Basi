@@ -36,6 +36,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   String _accuracyText = 'Searching...';
   Timer? _timeTimer;
   StreamSubscription<Position>? _positionStream;
+  Position? _currentPosition;
   final ApiService _apiService = ApiService();
   final TripStateService _tripStateService = TripStateService();
   final NativeLocationService _nativeLocationService = NativeLocationService();
@@ -215,6 +216,10 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   }
 
   Future<void> _continueTrip() async {
+    // Cancel GPS stream before navigating to ensure clean handoff
+    await _positionStream?.cancel();
+    _positionStream = null;
+    
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => const DriverActiveTripScreen()),
@@ -389,7 +394,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   }
 
   Future<void> _refreshDriverData() async {
-    return _loadDriverData(forceRemote: true);
+    return _loadDriverData();
   }
 
   @override
@@ -434,31 +439,14 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   Future<void> _enableLocationServices() async {
     try {
       final permission = await Permission.location.request();
-
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-
       setState(() {
         _isLocationEnabled = true;
-        _accuracyText = 'Acquiring...';
+        _accuracyText = 'Enabled';
       });
-
-      _positionStream = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high, distanceFilter: 10),
-      ).listen(
-        (Position position) {
-          setState(() {
-            _isGpsConnected = true;
-            _accuracyText = '±${position.accuracy.toInt()}m';
-          });
-        },
-        onError: (_) {
-          setState(() {
-            _isGpsConnected = false;
-            _accuracyText = 'Error';
-          });
-        },
-      );
+      // For the start shift screen we just reflect whether location is
+      // logically enabled; continuous tracking is handled by the native
+      // foreground service once a trip actually starts.
+      _isGpsConnected = true;
     } catch (_) {
       setState(() {
         _isLocationEnabled = false;
@@ -470,6 +458,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   Future<void> _disableLocationServices() async {
     _positionStream?.cancel();
     setState(() {
+      _currentPosition = null;
       _isLocationEnabled = false;
       _isGpsConnected = false;
       _accuracyText = 'Disabled';
@@ -572,6 +561,11 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
         setState(() => _isLoading = false);
         HapticFeedback.heavyImpact();
+        
+        // Cancel GPS stream before navigating to ensure clean handoff
+        await _positionStream?.cancel();
+        _positionStream = null;
+        
         if (mounted) {
           Navigator.pushReplacement(
             context,

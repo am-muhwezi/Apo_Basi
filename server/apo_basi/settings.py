@@ -238,6 +238,17 @@ CHANNEL_LAYERS = {
 }
 
 
+# -----------------------------------------------------------------------
+# School & Mapbox (route optimisation)
+# -----------------------------------------------------------------------
+# KICC, Nairobi defaults — override via env in production
+SCHOOL_LATITUDE  = config("SCHOOL_LATITUDE",  default=-1.2864, cast=float)
+SCHOOL_LONGITUDE = config("SCHOOL_LONGITUDE", default=36.8172, cast=float)
+SCHOOL_NAME      = config("SCHOOL_NAME",      default="KICC, Nairobi")
+
+# Mapbox token used server-side for stop-order optimisation on trip start
+MAPBOX_ACCESS_TOKEN = config("MAPBOX_ACCESS_TOKEN", default="")
+
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", cast=bool, default=False)
 

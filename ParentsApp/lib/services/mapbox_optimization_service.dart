@@ -35,13 +35,24 @@ class OptimizedRoute {
 /// coordinates total), a nearest-neighbour greedy sort is used instead.
 class MapboxOptimizationService {
   static const String _optimizationBaseUrl =
-      'https://api.mapbox.com/optimized-trips/v1/mapbox/driving';
+      'https://api.mapbox.com/optimized-trips/v1/mapbox/driving-traffic';
 
-  // Cache keyed by busId — cleared when the screen disposes.
-  static final Map<int, OptimizedRoute> _cache = {};
+  // Cache keyed by "busId|tripType" — so pickup and dropoff trips do not
+  // share the same optimisation result.
+  static final Map<String, OptimizedRoute> _cache = {};
+
+  static String _cacheKey(int busId, String tripType) => '$busId|$tripType';
 
   /// Remove the cached route for [busId] (call from screen dispose).
-  static void invalidate(int busId) => _cache.remove(busId);
+  static void invalidate(int busId) {
+    final prefix = '$busId|';
+    final keysToRemove = _cache.keys
+        .where((key) => key.startsWith(prefix))
+        .toList(growable: false);
+    for (final key in keysToRemove) {
+      _cache.remove(key);
+    }
+  }
 
   /// Clear all cached routes.
   static void clearAll() => _cache.clear();
@@ -51,6 +62,9 @@ class MapboxOptimizationService {
   /// [schoolLocation] is the school coordinate.
   /// [busStops]       is the list of children's home stops.
   /// [tripType]       is `'pickup'` (homes→school) or `'dropoff'` (school→homes).
+  /// [busLocation]    optional current bus position; used as the pickup start
+  ///                  coordinate so Mapbox routes outward from the bus and
+  ///                  comes back toward school (furthest-first).
   ///
   /// Returns `null` only when [busStops] is empty.
   static Future<OptimizedRoute?> optimizeRoute({
@@ -58,11 +72,14 @@ class MapboxOptimizationService {
     required LatLng schoolLocation,
     required List<BusStop> busStops,
     required String tripType,
+    LatLng? busLocation,
   }) async {
     if (busStops.isEmpty) return null;
 
+    final cacheKey = _cacheKey(busId, tripType);
+
     // Return cached result if available
-    if (_cache.containsKey(busId)) return _cache[busId];
+    if (_cache.containsKey(cacheKey)) return _cache[cacheKey];
 
     // Single stop — no optimisation needed
     if (busStops.length == 1) {
@@ -70,19 +87,21 @@ class MapboxOptimizationService {
         orderedStops: busStops,
         legDurations: const [0.0],
       );
-      _cache[busId] = result;
+      _cache[cacheKey] = result;
       return result;
     }
 
     // Mapbox Optimization API supports at most 12 coordinates total.
-    // school + homes must be ≤ 12, i.e. homes ≤ 11.
-    if (busStops.length > 11) {
+    // For pickup: start + homes + school = busStops.length + 2 ≤ 12 → homes ≤ 10.
+    // For dropoff: school + homes = busStops.length + 1 ≤ 12 → homes ≤ 11.
+    final maxStops = tripType == 'pickup' ? 10 : 11;
+    if (busStops.length > maxStops) {
       final result = _nearestNeighbourSort(
         schoolLocation: schoolLocation,
         busStops: busStops,
         tripType: tripType,
       );
-      _cache[busId] = result;
+      _cache[cacheKey] = result;
       return result;
     }
 
@@ -91,9 +110,10 @@ class MapboxOptimizationService {
         schoolLocation: schoolLocation,
         busStops: busStops,
         tripType: tripType,
+        busLocation: busLocation,
       );
       if (result != null) {
-        _cache[busId] = result;
+        _cache[cacheKey] = result;
         return result;
       }
     } catch (_) {
@@ -106,7 +126,7 @@ class MapboxOptimizationService {
       busStops: busStops,
       tripType: tripType,
     );
-    _cache[busId] = fallback;
+    _cache[cacheKey] = fallback;
     return fallback;
   }
 
@@ -118,36 +138,47 @@ class MapboxOptimizationService {
     required LatLng schoolLocation,
     required List<BusStop> busStops,
     required String tripType,
+    LatLng? busLocation,
   }) async {
     // Build coordinate string and determine source/destination pins.
     //
-    // dropoff (school → homes): school is fixed first, destination is any home
+    // dropoff (school → homes):
     //   coords: [school, home_1, ..., home_N]
-    //   source=first, destination=any
+    //   source=first (school), destination=any
     //
-    // pickup (homes → school): school is fixed last, source is any home
-    //   coords: [home_1, ..., home_N, school]
-    //   source=any, destination=last
+    // pickup (homes → school):
+    //   coords: [start, home_1, ..., home_N, school]
+    //   source=first (bus/school start), destination=last (school)
+    //   Routes outward from start → furthest homes first → back to school.
 
     late final String coordsString;
     late final String source;
     late final String destination;
     late final List<BusStop> inputOrder; // order of home stops in coord list
+    // Number of extra leading coords before the first home stop (affects index offsets)
+    late final int homeIndexOffset;
 
     if (tripType == 'dropoff') {
       inputOrder = busStops;
+      homeIndexOffset = 1; // school at index 0
       final allCoords = [schoolLocation, ...busStops.map((s) => s.homeLatLng)];
       coordsString =
           allCoords.map((c) => '${c.longitude},${c.latitude}').join(';');
       source = 'first';
       destination = 'any';
     } else {
-      // pickup
+      // pickup — start from bus position (fallback: school acts as depot proxy)
       inputOrder = busStops;
-      final allCoords = [...busStops.map((s) => s.homeLatLng), schoolLocation];
+      homeIndexOffset = 1; // start coord at index 0
+      final startCoord = busLocation ?? schoolLocation;
+      final allCoords = [
+        startCoord,
+        ...busStops.map((s) => s.homeLatLng),
+        schoolLocation,
+      ];
       coordsString =
           allCoords.map((c) => '${c.longitude},${c.latitude}').join(';');
-      source = 'any';
+      source = 'first';
       destination = 'last';
     }
 
@@ -173,24 +204,35 @@ class MapboxOptimizationService {
     waypoints.sort((a, b) =>
         (a['waypoint_index'] as int).compareTo(b['waypoint_index'] as int));
 
-    // Extract only the home-stop waypoints (skip school coordinate).
+    // Extract only the home-stop waypoints (skip start/school coordinates).
+    //
+    // dropoff: origIdx 0 = school (skip); 1..N = homes → inputOrder[origIdx-1]
+    // pickup:  origIdx 0 = start (skip); 1..N = homes → inputOrder[origIdx-1];
+    //          origIdx N+1 = school (skip)
     final orderedStops = <BusStop>[];
     for (final wp in waypoints) {
       final origIdx = wp['original_index'] as int;
       if (tripType == 'dropoff') {
-        // original_index 0 is school; 1..N are homes
-        if (origIdx == 0) continue;
-        orderedStops.add(inputOrder[origIdx - 1]);
+        if (origIdx == 0) continue; // school start
+        orderedStops.add(inputOrder[origIdx - homeIndexOffset]);
       } else {
-        // pickup: original_index 0..N-1 are homes; N is school
-        if (origIdx == busStops.length) continue;
-        orderedStops.add(inputOrder[origIdx]);
+        // pickup
+        if (origIdx == 0) continue; // bus/school start
+        if (origIdx == busStops.length + 1) continue; // school end
+        orderedStops.add(inputOrder[origIdx - homeIndexOffset]);
       }
     }
 
-    // Extract per-leg durations from the trip legs
-    final legs = (trips[0]['legs'] as List?) ?? [];
-    final legDurations = legs
+    // Extract per-leg durations from the trip legs.
+    //
+    // For pickup we prepend a "start→first_home" leg that has no business
+    // meaning (the driver is already heading out), so we skip it.
+    // legDurations[i] = travel time from orderedStops[i] to orderedStops[i+1]
+    //                   (last entry = travel from last home to school).
+    final allLegs = (trips[0]['legs'] as List?) ?? [];
+    final legSkip = (tripType == 'pickup') ? 1 : 0; // skip start→first_home leg
+    final legDurations = allLegs
+        .skip(legSkip)
         .map<double>((leg) => ((leg['duration'] as num?)?.toDouble()) ?? 0.0)
         .toList();
 
@@ -262,15 +304,32 @@ class MapboxOptimizationService {
       }
     }
 
-    // Estimate leg durations: assume 30 km/h average in city traffic
+    // Estimate leg durations at 30 km/h average (city traffic).
+    //
+    // legDurations[i] = time from ordered[i] to ordered[i+1].
+    // Last entry = time from ordered[N-1] to school (same convention as API).
     final legDurations = <double>[];
-    LatLng prev = tripType == 'dropoff' ? schoolLocation : ordered.first.homeLatLng;
-    final startIdx = tripType == 'dropoff' ? 0 : 1;
-    for (int i = startIdx; i < ordered.length; i++) {
-      final dist = _haversineKm(prev, ordered[i].homeLatLng);
-      legDurations.add(dist / 30.0 * 3600); // seconds at 30 km/h
-      prev = ordered[i].homeLatLng;
+
+    if (tripType == 'dropoff') {
+      // First leg: school → ordered[0]
+      LatLng prev = schoolLocation;
+      for (final stop in ordered) {
+        legDurations.add(_haversineKm(prev, stop.homeLatLng) / 30.0 * 3600);
+        prev = stop.homeLatLng;
+      }
+    } else {
+      // Legs between homes: ordered[i] → ordered[i+1]
+      for (int i = 0; i < ordered.length - 1; i++) {
+        legDurations.add(
+            _haversineKm(ordered[i].homeLatLng, ordered[i + 1].homeLatLng) /
+                30.0 *
+                3600);
+      }
+      // Final leg: last home → school
+      legDurations.add(
+          _haversineKm(ordered.last.homeLatLng, schoolLocation) / 30.0 * 3600);
     }
+
     while (legDurations.length < ordered.length) {
       legDurations.add(0.0);
     }
@@ -290,7 +349,10 @@ class MapboxOptimizationService {
     final sinDLat = sin(dLat / 2);
     final sinDLon = sin(dLon / 2);
     final h = sinDLat * sinDLat +
-        cos(_deg2rad(a.latitude)) * cos(_deg2rad(b.latitude)) * sinDLon * sinDLon;
+        cos(_deg2rad(a.latitude)) *
+            cos(_deg2rad(b.latitude)) *
+            sinDLon *
+            sinDLon;
     return 2 * r * asin(sqrt(h));
   }
 
