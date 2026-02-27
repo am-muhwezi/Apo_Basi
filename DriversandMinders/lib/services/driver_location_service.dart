@@ -14,8 +14,8 @@ import '../config/location_config.dart';
 /// 1. Driver enables location sharing
 /// 2. Service tracks location every 3-5 seconds
 /// 3. HTTP POST to Django /api/buses/push-location/
-/// 4. Django publishes to Redis pub/sub
-/// 5. Node.js Socket.IO service relays to subscribed parents
+/// 4. Django stores latest location in Redis + PostgreSQL
+/// 5. Django Channels (ASGI) broadcasts updates to subscribed clients
 ///
 /// Features:
 /// - Background location tracking

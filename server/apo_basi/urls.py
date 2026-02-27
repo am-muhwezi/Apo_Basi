@@ -4,7 +4,7 @@ from django.urls import include
 from users.views import health_check
 from users.views_auth import unified_phone_login
 from rest_framework_simplejwt.views import TokenRefreshView
-from trips.views import StopDetailView, StopCompleteView, StopSkipView
+from trips.views import StopDetailView, StopCompleteView, StopSkipView, SchoolInfoView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -29,5 +29,7 @@ urlpatterns = [
     path("api/attendance/", include("attendance.urls")),
     path("api/analytics/", include("analytics.urls")),
     path("api/notifications/", include("notifications.urls")),
-    path("api/health/", health_check, name="health_check"),  # Health check endpoint
+    path("api/health/", health_check, name="health_check"),
+    # School GPS coordinates — used by Flutter clients for Mapbox optimisation
+    path("api/school/info/", SchoolInfoView.as_view(), name="school-info"),
 ]

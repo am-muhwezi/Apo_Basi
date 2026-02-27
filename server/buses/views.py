@@ -31,7 +31,6 @@ from django.core.cache import cache
 from django.utils import timezone
 import json
 import time
-import redis
 
 from .models import Bus, BusLocationHistory
 from .serializers import (
@@ -725,20 +724,6 @@ class BusViewSet(viewsets.ModelViewSet):
 # Real-time Location Tracking Endpoints
 # ============================================
 
-def get_redis_client():
-    """
-    Get a Redis client for pub/sub operations.
-
-    Returns a direct Redis client (not Django cache) for pub/sub functionality.
-    """
-    return redis.Redis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        db=settings.REDIS_DB,
-        password=settings.REDIS_PASSWORD,
-        decode_responses=True
-    )
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsDriver])
@@ -761,13 +746,13 @@ def push_location(request):
     2. Validates driver is assigned to a bus
     3. Stores location in Redis (fast, 60s TTL)
     4. Stores in PostgreSQL for trip history
-    5. Publishes to Redis pub/sub for Socket.IO relay
+    5. Broadcasts to Django Channels WebSocket consumers
 
     Architecture:
     - HTTP POST: Works with mobile background services
     - Redis cache: Fast retrieval for current location
-    - Redis pub/sub: Bridge to Socket.IO server
     - PostgreSQL: Persistent history for analytics
+    - Django Channels: Real-time streaming to admin/parent clients
 
     Response:
     {
@@ -874,17 +859,11 @@ def push_location(request):
             timestamp=timestamp
         )
 
-        # 3. Publish to Redis pub/sub for Socket.IO relay
-        redis_client = get_redis_client()
-        redis_client.publish(
-            settings.REDIS_LOCATION_UPDATES_CHANNEL,
-            json.dumps(location_data)
-        )
-
-        # 4. Broadcast via Django Channels WebSocket (replaces Socket.IO)
-        # Socket.IO notification removed - now using Django Channels
-        # Location updates are automatically sent to connected WebSocket clients
-        # via the BusLocationConsumer in buses/consumers.py
+        # 3. Broadcast via Django Channels WebSocket (no Node/Socket.IO)
+        #
+        # Location updates are automatically sent to connected WebSocket
+        # clients via the BusLocationConsumer in buses/consumers.py, which
+        # reads from Redis or the latest database state.
 
         return Response(
             {

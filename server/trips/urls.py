@@ -6,6 +6,7 @@ from .views import (
     TripCompleteView,
     TripCancelView,
     TripUpdateLocationView,
+    TripReorderStopsView,
     StopListCreateView,
     StopDetailView,
     StopCompleteView,
@@ -22,6 +23,8 @@ urlpatterns = [
     path("<int:pk>/complete/", TripCompleteView.as_view(), name="trip-complete"),
     path("<int:pk>/cancel/", TripCancelView.as_view(), name="trip-cancel"),
     path("<int:pk>/update-location/", TripUpdateLocationView.as_view(), name="trip-update-location"),
+    # Persist client-computed optimised stop order to DB
+    path("<int:pk>/reorder-stops/", TripReorderStopsView.as_view(), name="trip-reorder-stops"),
 
     # Stop endpoints for a specific trip
     path("<int:trip_id>/stops/", StopListCreateView.as_view(), name="trip-stops"),

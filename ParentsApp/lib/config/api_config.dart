@@ -17,8 +17,10 @@ class ApiConfig {
   /// Production: 'https://yourdomain.com' or 'http://YOUR_VPS_IP'
   static String get apiBaseUrl => dotenv.env['API_BASE_URL'] ?? '';
 
-  /// Socket.IO Server URL for real-time updates
-  /// Must be accessible from mobile devices (not localhost!)
+  /// Deprecated: historical Socket.IO server URL for real-time updates.
+  ///
+  /// Real-time bus tracking now uses Django Channels WebSockets derived from
+  /// [apiBaseUrl], so this value is no longer required.
   static String get socketServerUrl => dotenv.env['SOCKET_SERVER_URL'] ?? '';
   // ============================================================================
   // Mapbox Configuration
@@ -96,9 +98,6 @@ class ApiConfig {
       return false;
     }
     if (apiBaseUrl.isEmpty) {
-      return false;
-    }
-    if (socketServerUrl.isEmpty) {
       return false;
     }
     return true;
