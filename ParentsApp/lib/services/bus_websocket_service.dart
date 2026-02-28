@@ -33,6 +33,9 @@ class BusWebSocketService {
   final _connectionStateController =
       StreamController<LocationConnectionState>.broadcast();
   final _errorController = StreamController<String>.broadcast();
+  // Trip lifecycle events: trip_started / trip_ended
+  final _tripEventController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   // Public streams
   Stream<BusLocation> get locationUpdateStream =>
@@ -40,6 +43,8 @@ class BusWebSocketService {
   Stream<LocationConnectionState> get connectionStateStream =>
       _connectionStateController.stream;
   Stream<String> get errorStream => _errorController.stream;
+  Stream<Map<String, dynamic>> get tripEventStream =>
+      _tripEventController.stream;
 
   bool get isConnected => _isConnected;
   int? get subscribedBusId => _subscribedBusId;
@@ -141,6 +146,7 @@ class BusWebSocketService {
 
       if (messageType == 'connected') {
         if (LocationConfig.enableSocketLogging) {}
+        _reconnectionAttempts = 0; // Reset on successful connection
         _connectionStateController.add(LocationConnectionState.connected);
 
         // Request current location
@@ -161,6 +167,8 @@ class BusWebSocketService {
         if (LocationConfig.enableSocketLogging) {}
 
         _locationUpdateController.add(location);
+      } else if (messageType == 'trip_started' || messageType == 'trip_ended') {
+        _tripEventController.add(Map<String, dynamic>.from(data));
       } else if (messageType == 'error') {
         _errorController.add(data['message']);
       }
@@ -186,20 +194,22 @@ class BusWebSocketService {
     _scheduleReconnect();
   }
 
-  /// Schedule automatic reconnection
+  /// Schedule automatic reconnection.
+  ///
+  /// Uses quick retries (2 s) for the first [maxReconnectionAttempts] attempts,
+  /// then switches to a slow 30-second retry loop so the client never
+  /// permanently gives up waiting for the driver to start a trip.
   void _scheduleReconnect() {
-    if (_reconnectionAttempts >= LocationConfig.maxReconnectionAttempts) {
-      _connectionStateController.add(LocationConnectionState.error);
-      _errorController.add('Failed to reconnect after maximum attempts');
-      return;
-    }
-
     if (_reconnectTimer != null && _reconnectTimer!.isActive) {
       return; // Already scheduled
     }
 
     _reconnectionAttempts++;
-    final delay = LocationConfig.socketReconnectionDelay;
+
+    // After exhausting quick retries, keep trying every 30 s indefinitely.
+    final delay = _reconnectionAttempts > LocationConfig.maxReconnectionAttempts
+        ? const Duration(seconds: 30)
+        : LocationConfig.socketReconnectionDelay;
 
     if (LocationConfig.enableSocketLogging) {}
 
@@ -246,6 +256,7 @@ class BusWebSocketService {
     _locationUpdateController.close();
     _connectionStateController.close();
     _errorController.close();
+    _tripEventController.close();
   }
 
   /// Get WebSocket base URL from API config

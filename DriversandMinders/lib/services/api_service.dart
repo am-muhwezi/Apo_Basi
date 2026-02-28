@@ -258,6 +258,24 @@ class ApiService {
     }
   }
 
+  // Get current location for a specific bus
+  // Backend endpoint: GET /api/buses/{bus_id}/current-location/
+  Future<Map<String, dynamic>> getBusCurrentLocation(int busId) async {
+    try {
+      final response = await _dio.get('/api/buses/$busId/current-location/');
+
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>;
+      } else {
+        throw Exception('Failed to load current bus location');
+      }
+    } on DioException catch (e) {
+      throw Exception(
+        _extractErrorMessage(e, 'Failed to load current bus location'),
+      );
+    }
+  }
+
   // Get children for a specific bus (for bus minders)
   // Backend endpoint: GET /api/busminders/buses/{bus_id}/children/?trip_type=pickup|dropoff
   Future<List<dynamic>> getBusChildren(int busId, {String? tripType}) async {

@@ -76,7 +76,7 @@ class TripSerializer(serializers.ModelSerializer):
     startTime = serializers.DateTimeField(source='start_time', allow_null=True, required=False)
     endTime = serializers.DateTimeField(source='end_time', allow_null=True, required=False)
     currentLocation = serializers.SerializerMethodField()
-    stops = StopSerializer(many=True, read_only=True)
+    stops = serializers.SerializerMethodField()
     # expose children IDs as list of PKs; use `.all` to get a QuerySet
     childrenIds = serializers.PrimaryKeyRelatedField(
         source='children.all',
@@ -88,6 +88,7 @@ class TripSerializer(serializers.ModelSerializer):
     studentsAbsent = serializers.IntegerField(source='students_absent', allow_null=True, required=False)
     studentsPending = serializers.IntegerField(source='students_pending', allow_null=True, required=False)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    children = serializers.SerializerMethodField()
 
     class Meta:
         model = Trip
@@ -95,9 +96,29 @@ class TripSerializer(serializers.ModelSerializer):
             'id', 'busId', 'busNumber', 'driverId', 'driverName', 'minderId', 'minderName',
             'route', 'type', 'status',
             'scheduledTime', 'startTime', 'endTime', 'currentLocation',
-            'stops', 'childrenIds', 'totalStudents', 'studentsCompleted',
+            'stops', 'childrenIds', 'children', 'totalStudents', 'studentsCompleted',
             'studentsAbsent', 'studentsPending', 'createdAt'
         ]
+
+    def get_stops(self, obj):
+        """Return stops ordered by the `order` field so clients always get them in sequence."""
+        ordered = obj.stops.order_by('order')
+        return StopSerializer(ordered, many=True).data
+
+    def get_children(self, obj):
+        result = []
+        for child in obj.children.select_related('parent').all():
+            parent = getattr(child, 'parent', None)
+            lat = float(parent.home_latitude) if parent and parent.home_latitude else None
+            lng = float(parent.home_longitude) if parent and parent.home_longitude else None
+            result.append({
+                'id': str(child.id),
+                'name': f"{child.first_name} {child.last_name}",
+                'address': child.address or (parent.address if parent else '') or '',
+                'latitude': lat,
+                'longitude': lng,
+            })
+        return result
 
     def get_minderName(self, obj):
         if obj.bus_minder:

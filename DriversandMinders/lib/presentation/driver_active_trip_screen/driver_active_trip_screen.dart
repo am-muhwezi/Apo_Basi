@@ -14,7 +14,6 @@ import 'package:sizer/sizer.dart';
 import '../../core/app_export.dart';
 import '../../config/api_config.dart';
 import '../../services/api_service.dart';
-import '../../services/driver_location_service.dart';
 import '../../services/native_location_service.dart';
 import '../../services/trip_state_service.dart';
 import '../../widgets/driver_drawer_widget.dart';
@@ -30,7 +29,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     implements OnPointAnnotationClickListener {
   // ── Services ────────────────────────────────────────────────────────────────
   final ApiService _apiService = ApiService();
-  final DriverLocationService _locationService = DriverLocationService();
   final NativeLocationService _nativeLocationService = NativeLocationService();
   final TripStateService _tripStateService = TripStateService();
 
@@ -68,6 +66,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
   // Camera follow mode — stops when user pans, resumes on recenter tap
   bool _followDriver = true;
+  // Guard: true while WE are moving the camera programmatically so the
+  // onScrollListener does not mistake our own camera moves as a user pan.
+  bool _isProgrammaticMove = false;
 
   // Tap → student lookup
   final Map<String, Map<String, dynamic>> _annotationToStudent = {};
@@ -78,7 +79,14 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
   // ── Computed helpers ────────────────────────────────────────────────────────
   List<Map<String, dynamic>> get _mappableStudents =>
-      _students.where((s) => s['lat'] != null && s['lng'] != null).toList();
+      _students.where((s) {
+        final lat = s['lat'] as double?;
+        final lng = s['lng'] as double?;
+        // Exclude null and (0,0) — the latter is a DB default that was never
+        // set. Including (0,0) creates a ~4,500 km detour to the Gulf of Guinea
+        // which exceeds the Mapbox Directions distance limit.
+        return lat != null && lng != null && (lat != 0.0 || lng != 0.0);
+      }).toList();
 
   int get _studentsPickedUp =>
       _students.where((s) => s["isPickedUp"] as bool? ?? false).length;
@@ -226,37 +234,75 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
   Future<void> _initDriverLocation() async {
     try {
-      final permission = await geo.Geolocator.checkPermission();
-      if (permission == geo.LocationPermission.always ||
-          permission == geo.LocationPermission.whileInUse) {
-        try {
-          final pos = await geo.Geolocator.getCurrentPosition(
-            locationSettings: const geo.LocationSettings(
-              accuracy: geo.LocationAccuracy.high,
-              timeLimit: Duration(seconds: 5),
-            ),
-          );
-          if (mounted) setState(() => _driverPosition = pos);
-          await _updateNavAnnotation();
-        } catch (_) {}
+      // Use backend as the single source of truth for driver/bus position.
+      // NativeLocationService pushes updates to Django; this screen polls the
+      // /api/buses/{bus_id}/current-location/ endpoint to drive the map.
 
-        _positionStream = geo.Geolocator.getPositionStream(
-          locationSettings: const geo.LocationSettings(
-            accuracy: geo.LocationAccuracy.high,
-            distanceFilter: 5,
-          ),
-        ).listen((pos) {
-          if (mounted) setState(() => _driverPosition = pos);
-          _updateNavAnnotation();
-          _updateRoute(); // throttled internally
-          // Auto-pan camera to follow driver unless user has panned away
-          if (_followDriver && _mapboxMap != null) {
-            _mapboxMap!.setCamera(CameraOptions(
-              center: _latlng(pos.latitude, pos.longitude),
-            ));
+      // Cancel any existing polling timer
+      _locationUpdateTimer?.cancel();
+
+      final prefs = await SharedPreferences.getInstance();
+      final prefBusId = prefs.getInt('current_bus_id');
+      final busId = (_busData != null ? _busData!['id'] as int? : null) ?? prefBusId;
+      if (busId == null) return;
+
+      // Helper to fetch and apply latest position
+      Future<void> fetchOnce() async {
+        try {
+          final response = await _apiService.getBusCurrentLocation(busId);
+          if (response['success'] == true && response['data'] != null) {
+            final data = response['data'] as Map<String, dynamic>;
+
+            final lat = (data['lat'] as num?)?.toDouble();
+            final lng = (data['lng'] as num?)?.toDouble();
+            if (lat == null || lng == null) return;
+
+            final speed = (data['speed'] as num?)?.toDouble() ?? 0.0;
+            final heading = (data['heading'] as num?)?.toDouble() ?? 0.0;
+            final timestampStr = data['timestamp'] as String?;
+            final timestamp = timestampStr != null
+                ? DateTime.tryParse(timestampStr) ?? DateTime.now()
+                : DateTime.now();
+
+            final pos = geo.Position(
+              latitude: lat,
+              longitude: lng,
+              accuracy: 0.0,
+              altitude: 0.0,
+              altitudeAccuracy: 0.0,
+              heading: heading,
+              headingAccuracy: 0.0,
+              speed: speed,
+              speedAccuracy: 0.0,
+              timestamp: timestamp,
+            );
+
+            if (mounted) {
+              setState(() => _driverPosition = pos);
+              await _updateNavAnnotation();
+              _updateRoute(); // throttled internally
+
+              // Auto-pan camera to follow driver unless user has panned away
+              if (_followDriver && _mapboxMap != null) {
+                _isProgrammaticMove = true;
+                _mapboxMap!.setCamera(CameraOptions(
+                  center: _latlng(pos.latitude, pos.longitude),
+                  bearing: pos.heading,
+                ));
+                Future.delayed(const Duration(milliseconds: 150),
+                    () => _isProgrammaticMove = false);
+              }
+            }
           }
-        });
+        } catch (_) {}
       }
+
+      // Initial fetch
+      await fetchOnce();
+
+      // Poll every 5 seconds for updated bus position
+      _locationUpdateTimer =
+          Timer.periodic(const Duration(seconds: 5), (_) => fetchOnce());
     } catch (_) {}
   }
 
@@ -296,10 +342,13 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       );
     }
     if (center != null) {
+      _isProgrammaticMove = true;
       _mapboxMap!.flyTo(
         CameraOptions(center: center, zoom: 14.5),
         MapAnimationOptions(duration: 800),
       );
+      Future.delayed(const Duration(milliseconds: 900),
+          () => _isProgrammaticMove = false);
     }
   }
 
@@ -405,15 +454,19 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
   void _recenterOnDriver() {
     if (_driverPosition == null || _mapboxMap == null) return;
+    _isProgrammaticMove = true;
     setState(() => _followDriver = true);
     _mapboxMap!.flyTo(
       CameraOptions(
         center:
             _latlng(_driverPosition!.latitude, _driverPosition!.longitude),
         zoom: 15.0,
+        bearing: _driverPosition!.heading,
       ),
       MapAnimationOptions(duration: 500),
     );
+    Future.delayed(const Duration(milliseconds: 600),
+        () => _isProgrammaticMove = false);
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
@@ -470,7 +523,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
           }
           return;
         }
-        await _loadTripData();
+        await _loadTripData(activeTrip: backendTrip);
         await _initializeLocationTracking();
       } catch (e) {
         if (mounted) {
@@ -529,19 +582,12 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
         busId: busId,
         apiUrl: apiUrl,
       );
-
-      await _locationService.initialize();
-      await _locationService.setBusId(busId);
-      if (_currentTripId != null) {
-        await _locationService.setTripId(_currentTripId);
-      }
-      await _locationService.startTracking();
     } catch (e) {
       // Silently handle
     }
   }
 
-  Future<void> _loadTripData() async {
+  Future<void> _loadTripData({Map<String, dynamic>? activeTrip}) async {
     setState(() {
       _isLoadingData = true;
       _errorMessage = null;
@@ -612,9 +658,60 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
         _students = byId.values.toList();
       }
 
+      // -----------------------------------------------------------------------
+      // Populate route stops from the active trip (ordered by `order` field).
+      // This drives the map polyline and ensures students appear in pickup order.
+      // -----------------------------------------------------------------------
+      final tripData = activeTrip ?? await _apiService.getActiveTrip();
+      if (tripData != null) {
+        if (tripData['id'] != null) {
+          _currentTripId ??= tripData['id'] as int?;
+        }
+
+        final rawStops = (tripData['stops'] as List? ?? [])
+            .cast<Map<String, dynamic>>();
+
+        // Stops arrive pre-sorted from the server but we sort again as a safety net.
+        rawStops.sort((a, b) =>
+            (a['order'] as int? ?? 0).compareTo(b['order'] as int? ?? 0));
+
+        // Convert TripSerializer stop format → map annotation format
+        _tripData["stops"] = rawStops.map((stop) {
+          final loc = stop['location'] as Map<String, dynamic>?;
+          return {
+            "latitude": (loc?['latitude'] as num?)?.toDouble() ?? 0.0,
+            "longitude": (loc?['longitude'] as num?)?.toDouble() ?? 0.0,
+            "name": stop['address'] ?? 'Stop',
+            "order": stop['order'] ?? 0,
+            "isCompleted": stop['status'] == 'completed',
+          };
+        }).toList();
+
+        // Build child_id → stop order map so the student list matches pickup sequence
+        final Map<int, int> childStopOrder = {};
+        for (final stop in rawStops) {
+          final stopOrder = stop['order'] as int? ?? 999;
+          for (final childId
+              in (stop['childrenIds'] as List? ?? []).cast<int>()) {
+            childStopOrder[childId] = stopOrder;
+          }
+        }
+
+        if (childStopOrder.isNotEmpty) {
+          _students.sort((a, b) {
+            final aId = int.tryParse(a['id'].toString()) ?? 0;
+            final bId = int.tryParse(b['id'].toString()) ?? 0;
+            return (childStopOrder[aId] ?? 999)
+                .compareTo(childStopOrder[bId] ?? 999);
+          });
+        }
+      }
+
       setState(() => _isLoadingData = false);
 
-      // Refresh map markers and route after data load
+      // Refresh map markers and route after data load.
+      // Reset throttle so the route is fetched immediately with real student data.
+      _lastRouteRefresh = null;
       await _placeHomeMarkers();
       _updateRoute();
     } catch (e) {
@@ -846,9 +943,6 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     try {
       await _nativeLocationService.stopLocationTracking();
     } catch (_) {}
-    try {
-      await _locationService.stopTracking();
-    } catch (_) {}
     _locationUpdateTimer?.cancel();
     try {
       await _tripStateService.clearTripState();
@@ -877,12 +971,14 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   Future<void> _updateRoute() async {
     if (_driverPosition == null || _polylineAnnotationManager == null) return;
 
-    // Throttle: at most once every 45 seconds (bypass when forced by _lastRouteRefresh = null)
+    // Throttle: at most once every 45 seconds.
+    // Only stamp _lastRouteRefresh when we actually hit the Directions API so
+    // early returns (no GPS, no manager, or empty student list) do NOT eat up
+    // the 45-second window.
     final now = DateTime.now();
     if (_lastRouteRefresh != null &&
         now.difference(_lastRouteRefresh!) <
             const Duration(seconds: 45)) return;
-    _lastRouteRefresh = now;
 
     final pending = _mappableStudents
         .where((s) => !(s['isPickedUp'] as bool? ?? false))
@@ -899,10 +995,18 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       return;
     }
 
+    // Stamp throttle only now — we are about to call the Directions API.
+    _lastRouteRefresh = now;
+
+    // Mapbox Directions v5 allows max 25 waypoints (driver + 24 stops).
+    final capped = pending.length > 24 ? pending.sublist(0, 24) : pending;
+
     final waypoints = [
       '${_driverPosition!.longitude},${_driverPosition!.latitude}',
-      ...pending.map((s) => '${s['lng']},${s['lat']}'),
+      ...capped.map((s) => '${s['lng']},${s['lat']}'),
     ].join(';');
+
+    print('🗺️ _updateRoute: fetching route for ${capped.length} stops');
 
     try {
       final dio = Dio();
@@ -916,8 +1020,13 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
         },
       ).timeout(const Duration(seconds: 10));
 
+      print('🗺️ _updateRoute: HTTP ${response.statusCode}');
+
       final routes = response.data['routes'] as List?;
-      if (routes == null || routes.isEmpty) return;
+      if (routes == null || routes.isEmpty) {
+        print('🗺️ _updateRoute: no routes returned');
+        return;
+      }
 
       final route = routes[0] as Map<String, dynamic>;
       final geometry = route['geometry'] as Map<String, dynamic>;
@@ -948,9 +1057,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       final legs = route['legs'] as List;
       double cumSecs = 0;
       final newEtas = <String, Duration?>{};
-      for (int i = 0; i < pending.length && i < legs.length; i++) {
+      for (int i = 0; i < capped.length && i < legs.length; i++) {
         cumSecs += (legs[i]['duration'] as num).toDouble();
-        newEtas[pending[i]['id'] as String] =
+        newEtas[capped[i]['id'] as String] =
             Duration(seconds: cumSecs.round());
       }
 
@@ -961,9 +1070,15 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
             ..addAll(newEtas);
         });
       }
-    } on DioException catch (_) {
+      print('✅ _updateRoute: polyline drawn, ${newEtas.length} ETAs set');
+    } on DioException catch (e) {
+      print('❌ _updateRoute DioException: ${e.message} | ${e.response?.statusCode} | ${e.response?.data}');
       // Network unavailable — keep existing route/ETAs
-    } catch (_) {}
+      _lastRouteRefresh = null; // allow retry next call
+    } catch (e) {
+      print('❌ _updateRoute error: $e');
+      _lastRouteRefresh = null; // allow retry next call
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
@@ -1019,8 +1134,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
               ),
               onMapCreated: _onMapCreated,
               onScrollListener: (_) {
-                // User panned — disengage auto-follow
-                if (_followDriver && mounted) {
+                // Only disengage follow when the user actually pans,
+                // not when we move the camera programmatically.
+                if (_followDriver && !_isProgrammaticMove && mounted) {
                   setState(() => _followDriver = false);
                 }
               },

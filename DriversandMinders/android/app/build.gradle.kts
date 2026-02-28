@@ -70,4 +70,10 @@ dependencies {
     // Kotlin Coroutines for async operations
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+
+    // OkHttp for WebSocket connection to backend (driver location streaming)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // AppCompat required by Mapbox SDK widgets (compass, logo, attribution views)
+    implementation("androidx.appcompat:appcompat:1.6.1")
 }

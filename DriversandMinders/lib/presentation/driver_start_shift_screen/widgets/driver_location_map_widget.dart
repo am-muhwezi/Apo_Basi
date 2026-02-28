@@ -15,10 +15,12 @@ import '../../../config/api_config.dart';
 /// Displayed on the Driver Start Shift screen
 class DriverLocationMapWidget extends StatefulWidget {
   final String busNumber;
+  final Position? currentPosition;
 
   const DriverLocationMapWidget({
     super.key,
     required this.busNumber,
+    this.currentPosition,
   });
 
   @override
@@ -27,10 +29,8 @@ class DriverLocationMapWidget extends StatefulWidget {
 
 class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
   MapController? _mapController;
-  Position? _currentPosition;
   bool _isLoading = true;
   bool _hasLocationPermission = false;
-  StreamSubscription<Position>? _positionStream;
 
   @override
   void initState() {
@@ -41,9 +41,18 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
 
   @override
   void dispose() {
-    _positionStream?.cancel();
     _mapController?.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(DriverLocationMapWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update camera when position changes from parent
+    if (widget.currentPosition != null && 
+        widget.currentPosition != oldWidget.currentPosition) {
+      _updateCamera(widget.currentPosition!);
+    }
   }
 
   Future<void> _initializeMap() async {
@@ -51,10 +60,11 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
       // Request location permission
       await _requestLocationPermission();
 
-      // Get current location
-      if (_hasLocationPermission) {
+      // Get initial location if provided
+      if (widget.currentPosition != null) {
+        _updateCamera(widget.currentPosition!);
+      } else if (_hasLocationPermission) {
         await _getCurrentLocation();
-        _startLocationUpdates();
       }
 
       setState(() {
@@ -85,10 +95,6 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      setState(() {
-        _currentPosition = position;
-      });
-
       // Move map to current location
       _mapController?.move(
         LatLng(position.latitude, position.longitude),
@@ -96,21 +102,6 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
       );
     } catch (e) {
     }
-  }
-
-  /// Start real-time location updates
-  void _startLocationUpdates() {
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10, // Update every 10 meters
-      ),
-    ).listen((Position position) {
-      setState(() {
-        _currentPosition = position;
-      });
-      _updateCamera(position);
-    });
   }
 
   /// Update camera to follow bus
@@ -158,7 +149,7 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 2.w, vertical: 1.h),
                 decoration: BoxDecoration(
-                  color: _hasLocationPermission && _currentPosition != null
+                  color: _hasLocationPermission && widget.currentPosition != null
                       ? AppTheme.successAction.withValues(alpha: 0.9)
                       : AppTheme.warningState.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(8),
@@ -168,7 +159,7 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
                   children: [
                     CustomIconWidget(
                       iconName:
-                          _hasLocationPermission && _currentPosition != null
+                          _hasLocationPermission && widget.currentPosition != null
                               ? 'gps_fixed'
                               : 'gps_off',
                       color: AppTheme.textOnPrimary,
@@ -176,7 +167,7 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
                     ),
                     SizedBox(width: 1.w),
                     Text(
-                      _hasLocationPermission && _currentPosition != null
+                      _hasLocationPermission && widget.currentPosition != null
                           ? 'GPS Active'
                           : 'GPS Off',
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -190,7 +181,7 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
             ),
 
             // Bus info overlay
-            if (_currentPosition != null)
+            if (widget.currentPosition != null)
               Positioned(
                 bottom: 2.h,
                 left: 3.w,
@@ -218,12 +209,12 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
                       _buildInfoItem(
                         icon: 'speed',
                         label: 'Speed',
-                        value: '${_currentPosition!.speed.toStringAsFixed(1)} m/s',
+                        value: '${widget.currentPosition!.speed.toStringAsFixed(1)} m/s',
                       ),
                       _buildInfoItem(
                         icon: 'my_location',
                         label: 'Accuracy',
-                        value: '±${_currentPosition!.accuracy.toInt()}m',
+                        value: '±${widget.currentPosition!.accuracy.toInt()}m',
                       ),
                     ],
                   ),
@@ -333,8 +324,8 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
-        initialCenter: _currentPosition != null
-            ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
+        initialCenter: widget.currentPosition != null
+            ? LatLng(widget.currentPosition!.latitude, widget.currentPosition!.longitude)
             : LatLng(0.3476, 32.5825), // Default: Kampala, Uganda
         initialZoom: 16.0,
         minZoom: 5.0,
@@ -346,13 +337,13 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
           userAgentPackageName: 'com.apobasi.driversandminders',
           maxZoom: 19,
         ),
-        if (_currentPosition != null)
+        if (widget.currentPosition != null)
           MarkerLayer(
             markers: [
               Marker(
                 point: LatLng(
-                  _currentPosition!.latitude,
-                  _currentPosition!.longitude,
+                  widget.currentPosition!.latitude,
+                  widget.currentPosition!.longitude,
                 ),
                 width: 80,
                 height: 80,
