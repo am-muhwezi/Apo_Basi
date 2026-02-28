@@ -54,9 +54,11 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       LocationConnectionState.disconnected;
   StreamSubscription? _locationSubscription;
   StreamSubscription? _connectionSubscription;
+  StreamSubscription? _tripEventSubscription;
 
   // ETA and Route Information
   int? _etaMinutes;
+  int? _scheduledEtaMinutes; // Pre-trip scheduled ETA (before bus goes live)
   List<ll.LatLng>? _routePoints;
   String? _distance;
   bool _isCalculatingETA = false;
@@ -65,9 +67,29 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   OptimizedRoute? _optimizedRoute;
   int _thisChildStopIndex = -1; // index in _optimizedRoute.orderedStops
   String _tripType = 'dropoff'; // 'pickup' or 'dropoff'
+  DateTime?
+      _tripScheduledTime; // school arrival (pickup) or departure (dropoff)
   // Monotonically-advancing pointer: the first stop the bus has NOT yet visited.
   // Only ever moves forward, never back, so past stops are never re-included.
   int _nextStopIndex = 0;
+
+  // ETA/route throttle — only re-fetch Directions API every 30 s or 75 m
+  DateTime? _lastEtaRefresh;
+  ll.LatLng? _lastEtaPosition;
+
+  // Guard: once a trip_ended event is received, ignore any further
+  // location_update messages until the next trip_started.
+  bool _tripHasEnded = false;
+
+  // Trip-watcher: polls while no bus is broadcasting to detect trip start
+  Timer? _tripWatchTimer;
+
+  // Smooth bus position animation (Mapbox Maps SDK annotation interpolation)
+  Timer? _busAnimTimer;
+  ll.LatLng? _busAnimFrom;
+  ll.LatLng? _busAnimTo;
+  double _busAnimFromHeading = 0;
+  double _busAnimToHeading = 0;
 
   // Fallback multi-stop routing (used when optimization service fails)
   bool _hasActiveTrip = false;
@@ -82,6 +104,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeSocketConnection();
       _initializeRouteOptimization();
+      _startTripWatcher();
     });
   }
 
@@ -98,12 +121,16 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   @override
   void dispose() {
+    _tripWatchTimer?.cancel();
+    _busAnimTimer?.cancel();
     _locationSubscription?.cancel();
     _connectionSubscription?.cancel();
+    _tripEventSubscription?.cancel();
     // Invalidate the cached optimized route for this bus
     final busValue = _childData?['busId'];
     if (busValue != null) {
-      final busId = busValue is int ? busValue : int.tryParse(busValue.toString());
+      final busId =
+          busValue is int ? busValue : int.tryParse(busValue.toString());
       if (busId != null) MapboxOptimizationService.invalidate(busId);
     }
     super.dispose();
@@ -199,7 +226,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     await _mapboxMap!.style.setStyleLayerProperty(
       _busAnnotationManager!.id,
       'icon-size',
-      jsonDecode('["interpolate",["linear"],["zoom"],10,0.015,14,0.04,17,0.10]'),
+      jsonDecode(
+          '["interpolate",["linear"],["zoom"],10,0.015,14,0.04,17,0.10]'),
     );
 
     // Place initial markers
@@ -260,12 +288,13 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     );
   }
 
-  /// Update the bus marker annotation
+  /// Update the bus marker annotation, animating smoothly from the previous
+  /// position to the new one (1 second, ease-in-out, ~30 fps).
   Future<void> _updateBusAnnotation() async {
     if (_busAnnotationManager == null || _busMarkerImage == null) return;
 
     if (_busLocation == null) {
-      // Remove bus marker if no location
+      _busAnimTimer?.cancel();
       if (_busAnnotation != null) {
         await _busAnnotationManager!.delete(_busAnnotation!);
         _busAnnotation = null;
@@ -273,27 +302,65 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       return;
     }
 
-    final busLatLng = _snappedBusLocation ??
+    final targetLatLng = _snappedBusLocation ??
         ll.LatLng(_busLocation!.latitude, _busLocation!.longitude);
-    final heading = _busLocation!.heading ?? 0;
+    final targetHeading = (_busLocation!.heading ?? 0).toDouble();
 
-    if (_busAnnotation != null) {
-      // Update existing annotation
-      _busAnnotation!.geometry = latLngToPoint(busLatLng);
-      _busAnnotation!.iconRotate = heading;
-      await _busAnnotationManager!.update(_busAnnotation!);
-    } else {
-      // Create new — iconSize is intentionally omitted so the zoom expression controls it
+    if (_busAnnotation == null) {
+      // First time — create annotation at target immediately (no animation)
       _busAnnotation = await _busAnnotationManager!.create(
         PointAnnotationOptions(
-          geometry: latLngToPoint(busLatLng),
+          geometry: latLngToPoint(targetLatLng),
           image: _busMarkerImage,
-          iconRotate: heading,
+          iconRotate: targetHeading,
           iconAnchor: IconAnchor.CENTER,
         ),
       );
+      _busAnimFrom = targetLatLng;
+      _busAnimFromHeading = targetHeading;
+      return;
     }
+
+    // Animate from previous position to new position
+    _busAnimTimer?.cancel();
+    final fromLatLng = _busAnimFrom ?? targetLatLng;
+    final fromHeading = _busAnimFromHeading;
+
+    // Shortest-path heading delta (handles 0↔360 wraparound)
+    double headingDiff = targetHeading - fromHeading;
+    if (headingDiff > 180) headingDiff -= 360;
+    if (headingDiff < -180) headingDiff += 360;
+
+    const totalFrames = 30;
+    int frame = 0;
+    _busAnimTimer = Timer.periodic(const Duration(milliseconds: 33), (t) async {
+      frame++;
+      final rawT = frame / totalFrames;
+      if (rawT >= 1.0) {
+        t.cancel();
+      }
+      final easedT = _easeInOut(rawT.clamp(0.0, 1.0));
+
+      final lat = fromLatLng.latitude +
+          (targetLatLng.latitude - fromLatLng.latitude) * easedT;
+      final lng = fromLatLng.longitude +
+          (targetLatLng.longitude - fromLatLng.longitude) * easedT;
+      final heading = fromHeading + headingDiff * easedT;
+
+      if (_busAnnotation != null && _busAnnotationManager != null && mounted) {
+        _busAnnotation!.geometry = latLngToPoint(ll.LatLng(lat, lng));
+        _busAnnotation!.iconRotate = heading;
+        // Fire-and-forget: don't await to avoid blocking the timer
+        _busAnnotationManager!.update(_busAnnotation!);
+      }
+    });
+
+    _busAnimFrom = targetLatLng;
+    _busAnimFromHeading = targetHeading;
   }
+
+  /// Ease-in-out curve: smooth acceleration and deceleration.
+  double _easeInOut(double t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
   /// Update the route polyline annotation on the map
   Future<void> _updateRouteAnnotation() async {
@@ -338,14 +405,58 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
       _locationSubscription =
           _webSocketService.locationUpdateStream.listen((location) {
-        if (mounted) {
-          setState(() {
-            _busLocation = location;
-          });
-          _updateBusLocationWithSnapping(location);
+        if (!mounted) return;
+        if (_tripHasEnded) {
+          // Ignore stale location updates after trip end until a
+          // fresh trip_started event arrives.
+          return;
         }
+
+        final isFirstLocation = _busLocation == null;
+        setState(() {
+          _busLocation = location;
+        });
+        _updateBusLocationWithSnapping(location);
+        // Trip just started while screen was already open — refresh
+        // optimization so ETAs use the correct live trip type.
+        if (isFirstLocation) _onFirstBusLocation();
       }, onError: (error) {
         if (LocationConfig.enableSocketLogging) {}
+      });
+
+      // Server pushes trip_started / trip_ended events over the same channel.
+      // This is the primary mechanism — no polling needed.
+      _tripEventSubscription =
+          _webSocketService.tripEventStream.listen((event) {
+        if (!mounted) return;
+        final eventType = event['type'] as String?;
+        if (eventType == 'trip_started') {
+          debugPrint(
+              '[TripEvent] trip_started received via WebSocket — refreshing optimization');
+          setState(() {
+            _tripHasEnded = false;
+          });
+          final busValue = _childData?['busId'];
+          if (busValue != null) {
+            final busId =
+                busValue is int ? busValue : int.tryParse(busValue.toString());
+            if (busId != null) MapboxOptimizationService.invalidate(busId);
+          }
+          _initializeRouteOptimization();
+        } else if (eventType == 'trip_ended') {
+          debugPrint('[TripEvent] trip_ended received via WebSocket');
+          if (mounted) {
+            setState(() {
+              _tripHasEnded = true;
+              _busLocation = null;
+              _etaMinutes = null;
+              _routePoints = null;
+              _optimizedRoute = null;
+            });
+            _updateBusAnnotation();
+            _updateRouteAnnotation();
+          }
+        }
       });
 
       if (_webSocketService.isConnected) {
@@ -378,11 +489,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   /// 2-point route so the screen always shows something meaningful.
   Future<void> _updateBusLocationWithSnapping(BusLocation location) async {
     if (_homeLocation == null) return;
-
-    setState(() {
-      _isCalculatingETA = true;
-    });
-
     try {
       final busCoord = ll.LatLng(location.latitude, location.longitude);
 
@@ -391,6 +497,39 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         radius: 25,
       );
       final effectiveBus = snappedCoord ?? busCoord;
+
+      // Throttle expensive ETA/route recomputation: only hit the Directions
+      // API when either at least 30 seconds have elapsed since the last
+      // refresh or the bus has moved more than 75 m.
+      final now = DateTime.now();
+      bool shouldRefreshEta = false;
+
+      if (_lastEtaRefresh == null || _lastEtaPosition == null) {
+        shouldRefreshEta = true;
+      } else {
+        final elapsed = now.difference(_lastEtaRefresh!).inSeconds;
+        final movedKm = _haversineKm(effectiveBus, _lastEtaPosition!);
+        if (elapsed >= 30 || movedKm >= 0.075) {
+          shouldRefreshEta = true;
+        }
+      }
+
+      if (!shouldRefreshEta) {
+        if (!mounted) return;
+        setState(() {
+          _snappedBusLocation = snappedCoord;
+          _isCalculatingETA = false;
+        });
+        _updateBusAnnotation();
+        // Keep existing ETA/route until the next refresh window.
+        return;
+      }
+
+      if (mounted) {
+        setState(() {
+          _isCalculatingETA = true;
+        });
+      }
 
       Map<String, dynamic>? tripInfo;
 
@@ -402,7 +541,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         // the current next stop — this is monotonic (never goes backward) so
         // a stop is never re-added to the waypoint list after it's been visited.
         while (_nextStopIndex < stops.length) {
-          final distToNext = _haversineKm(effectiveBus, stops[_nextStopIndex].homeLatLng);
+          final distToNext =
+              _haversineKm(effectiveBus, stops[_nextStopIndex].homeLatLng);
           if (distToNext < 0.2) {
             // Bus is within 200 m — consider this stop reached, advance pointer
             setState(() => _nextStopIndex++);
@@ -464,12 +604,16 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           _distance = tripInfo['distance'];
           _routePoints = tripInfo['route'];
           _isCalculatingETA = false;
+          _lastEtaRefresh = now;
+          _lastEtaPosition = effectiveBus;
         });
         _updateBusAnnotation();
         _updateRouteAnnotation();
       } else {
         setState(() {
           _isCalculatingETA = false;
+          _lastEtaRefresh = now;
+          _lastEtaPosition = effectiveBus;
         });
       }
     } catch (_) {
@@ -487,11 +631,69 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     final sinDLat = sin(dLat / 2);
     final sinDLon = sin(dLon / 2);
     final h = sinDLat * sinDLat +
-        cos(_deg2rad(a.latitude)) * cos(_deg2rad(b.latitude)) * sinDLon * sinDLon;
+        cos(_deg2rad(a.latitude)) *
+            cos(_deg2rad(b.latitude)) *
+            sinDLon *
+            sinDLon;
     return 2 * r * asin(sqrt(h));
   }
 
   double _deg2rad(double deg) => deg * pi / 180.0;
+
+  /// Fallback poll — fires every 60 s while no bus is broadcasting.
+  ///
+  /// The primary trip-detection mechanism is the WebSocket push event
+  /// (trip_started).  This timer is a safety net for the rare case where the
+  /// WebSocket is offline when the driver starts a trip.
+  void _startTripWatcher() {
+    _tripWatchTimer?.cancel();
+    _tripWatchTimer = Timer.periodic(const Duration(seconds: 60), (_) async {
+      if (!mounted || _busLocation != null) return;
+
+      if (_childData == null) return;
+      final busValue = _childData!['busId'];
+      if (busValue == null) return;
+      final busId =
+          busValue is int ? busValue : int.tryParse(busValue.toString());
+      if (busId == null) return;
+
+      // Ensure WebSocket is alive — re-subscribe if it dropped
+      if (!_webSocketService.isConnected) {
+        debugPrint(
+            '[TripWatcher] WebSocket offline — re-subscribing bus $busId');
+        _webSocketService.subscribeToBus(busId);
+      }
+
+      // Re-check the server for an active trip
+      final newTripType = await _getActiveTripType(busId);
+      if (!mounted) return;
+      if (newTripType != _tripType) {
+        debugPrint(
+            '[TripWatcher] Trip started ($newTripType) — re-running optimization');
+        setState(() => _tripType = newTripType);
+        MapboxOptimizationService.invalidate(busId);
+        _initializeRouteOptimization();
+      }
+    });
+  }
+
+  /// Called once when the very first bus-location update arrives after the
+  /// screen was opened with no active trip.  Re-runs route optimisation so
+  /// ETAs use the correct (now live) trip type instead of the time-of-day
+  /// heuristic that was used at screen-open time.
+  Future<void> _onFirstBusLocation() async {
+    if (_childData == null) return;
+    final busValue = _childData!['busId'];
+    if (busValue == null) return;
+    final busId =
+        busValue is int ? busValue : int.tryParse(busValue.toString());
+    if (busId == null) return;
+
+    debugPrint(
+        '[TripWatcher] First bus location received — refreshing optimization');
+    MapboxOptimizationService.invalidate(busId);
+    await _initializeRouteOptimization();
+  }
 
   /// Fetch the active trip type and all sibling stops, then run optimization.
   /// Called once on screen load; result cached by [MapboxOptimizationService].
@@ -500,7 +702,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
     final busValue = _childData!['busId'];
     if (busValue == null) return;
-    final busId = busValue is int ? busValue : int.tryParse(busValue.toString());
+    final busId =
+        busValue is int ? busValue : int.tryParse(busValue.toString());
     if (busId == null) return;
 
     try {
@@ -529,11 +732,17 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         return;
       }
 
+      // Pass live bus location as pickup start so Mapbox routes furthest-first
+      final busLatLng = _busLocation != null
+          ? ll.LatLng(_busLocation!.latitude, _busLocation!.longitude)
+          : null;
+
       final optimized = await MapboxOptimizationService.optimizeRoute(
         busId: busId,
         schoolLocation: schoolCoords,
         busStops: busStops,
         tripType: _tripType,
+        busLocation: busLatLng,
       );
       if (optimized == null || !mounted) return;
 
@@ -544,7 +753,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
       int stopIdx = optimized.orderedStops
           .indexWhere((s) => s.childId == thisChildId);
-
 
       // If this child has no home coords in the DB (not in orderedStops),
       // treat all optimized stops as intermediate waypoints and append
@@ -580,6 +788,9 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         _nextStopIndex = 0; // reset pointer for this fresh route
         _stopsBeforeChild = stopIdx > 0 ? stopIdx : 0;
       });
+
+      // Calculate pre-trip scheduled ETA from leg durations + trip scheduled time
+      _calculateScheduledEta();
 
       // CRITICAL: Re-trigger ETA now that we have the optimized route.
       // The WebSocket may have already fired before optimization completed,
@@ -653,6 +864,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   }
 
   /// GET /api/trips/?bus_id=X&status=in-progress — returns 'pickup' or 'dropoff'.
+  /// Also captures [_tripScheduledTime] for scheduled ETA calculation.
   Future<String> _getActiveTripType(int busId) async {
     try {
       final uri = Uri.parse(
@@ -669,6 +881,11 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         final results = data['results'] as List? ?? data as List? ?? [];
         if (results.isNotEmpty) {
           final tripType = results[0]['type']?.toString() ?? '';
+          // Capture scheduled time for pre-trip ETA calculation
+          final scheduledStr = results[0]['scheduledTime']?.toString();
+          if (scheduledStr != null) {
+            _tripScheduledTime = DateTime.tryParse(scheduledStr);
+          }
           if (tripType == 'pickup' || tripType == 'dropoff') return tripType;
         }
       }
@@ -676,6 +893,59 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
     // Time-of-day heuristic: before noon → pickup, after noon → dropoff
     return DateTime.now().hour < 12 ? 'pickup' : 'dropoff';
+  }
+
+  /// Calculate a scheduled ETA for this child based on the optimized leg
+  /// durations and the trip's scheduled time.
+  ///
+  /// Morning (pickup):
+  ///   school_arrival − Σ legs[j..N-1] − (N-1-j) × stopBuffer
+  ///
+  /// Afternoon (dropoff):
+  ///   school_departure + Σ legs[0..j] + j × stopBuffer
+  void _calculateScheduledEta() {
+    if (_optimizedRoute == null ||
+        _thisChildStopIndex < 0 ||
+        _tripScheduledTime == null) return;
+
+    const stopBufferSeconds = 120.0; // 2 min stop buffer per child
+    final legs = _optimizedRoute!.legDurations;
+    final j = _thisChildStopIndex;
+    final n = legs.length; // legs.length == orderedStops.length
+
+    double etaSeconds;
+
+    if (_tripType == 'pickup') {
+      // Work BACKWARD from school arrival.
+      // Remaining time after picking up child at stop j:
+      //   Σ legs[j..n-1]  +  (n-1-j) × stopBuffer  (stops visited after j)
+      double remaining = 0;
+      for (int i = j; i < n; i++) {
+        remaining += legs[i];
+      }
+      remaining += (n - 1 - j) * stopBufferSeconds;
+      final childPickupTime =
+          _tripScheduledTime!.subtract(Duration(seconds: remaining.toInt()));
+      final diff = childPickupTime.difference(DateTime.now()).inMinutes;
+      if (diff >= 0) {
+        setState(() => _scheduledEtaMinutes = diff);
+      }
+    } else {
+      // Dropoff — accumulate FORWARD from school departure.
+      // Time from school to stop j:
+      //   Σ legs[0..j]  +  j × stopBuffer
+      double forward = 0;
+      for (int i = 0; i <= j && i < n; i++) {
+        forward += legs[i];
+        if (i < j) forward += stopBufferSeconds;
+      }
+      final childDropTime =
+          _tripScheduledTime!.add(Duration(seconds: forward.toInt()));
+      final diff = childDropTime.difference(DateTime.now()).inMinutes;
+      if (diff >= 0) {
+        setState(() => _scheduledEtaMinutes = diff);
+      }
+    }
   }
 
   /// GET /api/buses/{busId}/children/ and build the list of [BusStop]s.
@@ -1055,8 +1325,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
               ? const Center(child: CircularProgressIndicator())
               : _homeLocation != null
                   ? MapWidget(
-                      styleUri:
-                          'mapbox://styles/${ApiConfig.mapboxStyleId}',
+                      styleUri: 'mapbox://styles/${ApiConfig.mapboxStyleId}',
                       cameraOptions: CameraOptions(
                         center: latLngToPoint(_homeLocation!),
                         zoom: 16.0,
@@ -1098,8 +1367,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                       ],
                     ),
                     child: IconButton(
-                      icon: Icon(Icons.arrow_back,
-                          color: colorScheme.onSurface),
+                      icon:
+                          Icon(Icons.arrow_back, color: colorScheme.onSurface),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
@@ -1117,8 +1386,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                       ],
                     ),
                     child: IconButton(
-                      icon: Icon(Icons.my_location,
-                          color: colorScheme.primary),
+                      icon: Icon(Icons.my_location, color: colorScheme.primary),
                       onPressed: () {
                         if (_busLocation != null) {
                           _mapboxMap?.flyTo(
@@ -1204,26 +1472,34 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                             ),
                           ),
                         ),
-                        // Show ETA whenever bus is active and we have an estimate
-                        if (_busLocation != null && _etaMinutes != null && _etaMinutes! > 0)
-                          Container(
+                        // Show live ETA when bus is tracked, else fall back
+                        // to scheduled ETA (works before bus goes live too)
+                        Builder(builder: (_) {
+                          final eta = _etaMinutes ?? _scheduledEtaMinutes;
+                          final isScheduled = _etaMinutes == null &&
+                              _scheduledEtaMinutes != null;
+                          if (eta == null) return const SizedBox.shrink();
+                          return Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: colorScheme.primary,
+                              color: isScheduled
+                                  ? colorScheme.secondary
+                                  : colorScheme.primary,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              '$_etaMinutes min${_etaMinutes! == 1 ? '' : 's'}',
+                              '$eta mins${isScheduled ? ' (sched.)' : ''}',
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
                               ),
                             ),
-                          ),
+                          );
+                        }),
                       ],
                     ),
 
