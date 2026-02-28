@@ -394,8 +394,6 @@ export default function AssignmentsPage() {
       defaultBusId: route.defaultBusId,
       defaultDriverId: route.defaultDriverId,
       defaultMinderId: route.defaultMinderId,
-      estimatedDuration: route.estimatedDuration,
-      totalDistance: route.totalDistance,
       isActive: route.isActive,
     });
     setShowRouteModal(true);
@@ -1051,12 +1049,6 @@ export default function AssignmentsPage() {
                         <div className="flex items-center gap-2 text-sm">
                           <UserCheck size={16} className="text-slate-400" />
                           <span className="text-slate-600">Driver: {route.defaultDriverName}</span>
-                        </div>
-                      )}
-                      {route.estimatedDuration && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Calendar size={16} className="text-slate-400" />
-                          <span className="text-slate-600">{route.estimatedDuration} min</span>
                         </div>
                       )}
                     </div>

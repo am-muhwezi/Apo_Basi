@@ -1,3 +1,5 @@
+from datetime import date
+
 from rest_framework import serializers
 from .models import Bus, BusLocationHistory
 from django.contrib.auth import get_user_model
@@ -119,6 +121,14 @@ class BusCreateSerializer(serializers.ModelSerializer):
             qs = qs.exclude(pk=instance.pk)
         if qs.exists():
             raise serializers.ValidationError(f"A bus with number '{value}' already exists.")
+        return value
+
+    def validate_lastMaintenance(self, value):
+        """Last maintenance date must not be in the future"""
+        if value and value > date.today():
+            raise serializers.ValidationError(
+                "Last maintenance date cannot be in the future."
+            )
         return value
 
     def create(self, validated_data):

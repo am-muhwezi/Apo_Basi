@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Search, Eye, MapPin, Navigation, Users, Clock, TrendingUp, AlertCircle, RefreshCw, StopCircle } from 'lucide-react';
 import Button from '../components/common/Button';
 import Select from '../components/common/Select';
 import Modal from '../components/common/Modal';
 import BusMap from '../components/BusMap';
-import { getTrips, cancelTrip } from '../services/tripsApi';
+import { getTrips, getTrip, cancelTrip } from '../services/tripsApi';
 import { busWebSocketService, LocationUpdate } from '../services/busWebSocketService';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import type { Trip } from '../types';
+
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string;
 
 export default function TripsPage() {
   const toast = useToast();
@@ -23,6 +25,15 @@ export default function TripsPage() {
   const [hasMore, setHasMore] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
   const [recenterTrigger, setRecenterTrigger] = useState(0);
+  const [busPlaceName, setBusPlaceName] = useState<string | null>(null);
+  const [detailPlaceName, setDetailPlaceName] = useState<string | null>(null);
+  const [sortedChildrenLocations, setSortedChildrenLocations] = useState<
+    Array<{ name: string; address: string; latitude: number; longitude: number; duration?: number }>
+  >([]);
+
+  // Ref so WebSocket callbacks always read the latest selectedTrip (avoids stale closure)
+  const selectedTripRef = useRef<Trip | null>(null);
+  useEffect(() => { selectedTripRef.current = selectedTrip; }, [selectedTrip]);
 
   // Real-time location tracking
   const [busLocations, setBusLocations] = useState<Map<string, { latitude: number; longitude: number; timestamp: string }>>(new Map());
@@ -84,6 +95,111 @@ export default function TripsPage() {
     }
   }
 
+  /**
+   * Sorts children by actual road duration from the bus using the Mapbox Matrix API.
+   * Pickup  → furthest (longest duration) first.
+   * Dropoff → nearest (shortest duration) first.
+   * Falls back to unsorted on error.
+   */
+  const fetchSortedChildren = useCallback(async (trip: Trip) => {
+    const validChildren = (trip.children ?? []).filter(
+      (c) => c.latitude != null && c.longitude != null,
+    );
+
+    if (validChildren.length === 0) {
+      setSortedChildrenLocations([]);
+      return;
+    }
+
+    if (!trip.currentLocation) {
+      // No bus position yet — show pins unsorted, no ETA
+      setSortedChildrenLocations(
+        validChildren.map((c) => ({
+          name: c.name,
+          address: c.address,
+          latitude: c.latitude!,
+          longitude: c.longitude!,
+        })),
+      );
+      return;
+    }
+
+    const busLat = trip.currentLocation.latitude;
+    const busLng = trip.currentLocation.longitude;
+    const coords = [
+      `${busLng},${busLat}`,
+      ...validChildren.map((c) => `${c.longitude},${c.latitude}`),
+    ].join(';');
+
+    try {
+      const res = await fetch(
+        `https://api.mapbox.com/directions-matrix/v1/mapbox/driving/${coords}` +
+          `?sources=0&annotations=duration&access_token=${MAPBOX_TOKEN}`,
+      );
+      if (!res.ok) throw new Error('matrix failed');
+      const data = await res.json();
+      // durations[0][i] = road duration (seconds) from bus to child i-1
+      const durations: number[] = (data.durations[0] as number[]).slice(1);
+
+      const withDuration = validChildren.map((c, i) => ({
+        ...c,
+        duration: durations[i] ?? 0,
+      }));
+
+      withDuration.sort((a, b) =>
+        trip.type === 'pickup'
+          ? b.duration - a.duration   // furthest first for pickup
+          : a.duration - b.duration,  // nearest first for dropoff
+      );
+
+      setSortedChildrenLocations(
+        withDuration.map((c) => ({
+          name: c.name,
+          address: c.address,
+          latitude: c.latitude!,
+          longitude: c.longitude!,
+          duration: c.duration,
+        })),
+      );
+    } catch {
+      // Fallback: pass unsorted without durations
+      setSortedChildrenLocations(
+        validChildren.map((c) => ({
+          name: c.name,
+          address: c.address,
+          latitude: c.latitude!,
+          longitude: c.longitude!,
+        })),
+      );
+    }
+  }, []);
+
+  /** Reverse-geocode coordinates to a human-readable place name */
+  const geocodePlaceName = useCallback(async (lat: number, lng: number): Promise<string | null> => {
+    try {
+      const res = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json` +
+          `?types=neighborhood,locality,place,address&limit=1&access_token=${MAPBOX_TOKEN}`,
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      return (data.features?.[0]?.text as string) ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Geocode current location when Trip Details modal opens
+  useEffect(() => {
+    if (showDetailModal && selectedTrip?.currentLocation) {
+      const { latitude, longitude } = selectedTrip.currentLocation;
+      setDetailPlaceName(null);
+      geocodePlaceName(latitude, longitude).then((name) => {
+        if (name) setDetailPlaceName(name);
+      });
+    }
+  }, [showDetailModal, selectedTrip?.currentLocation?.latitude, selectedTrip?.currentLocation?.longitude]);
+
   function initializeWebSocket() {
     const token = localStorage.getItem('adminToken');
     if (!token) {
@@ -121,8 +237,8 @@ export default function TripsPage() {
             return updated;
           });
 
-          // Update trip if it's currently being viewed
-          if (selectedTrip && selectedTrip.busId === data.bus_id) {
+          // Update trip if it's currently being viewed (use ref to avoid stale closure)
+          if (selectedTripRef.current && selectedTripRef.current.busId === data.bus_id) {
             setSelectedTrip(prev => prev ? {
               ...prev,
               currentLocation: {
@@ -174,9 +290,23 @@ export default function TripsPage() {
     setShowDetailModal(true);
   };
 
-  const handleTrackOnMap = (trip: Trip) => {
+  const handleTrackOnMap = async (trip: Trip) => {
+    // Open modal immediately with cached data so the map renders right away
     setSelectedTrip(trip);
+    setBusPlaceName(null);
+    setSortedChildrenLocations([]);
     setShowMapModal(true);
+
+    // Fetch a fresh copy so we always have the 'children' array with home coordinates
+    try {
+      const res = await getTrip(trip.id);
+      const fresh: Trip = res.data;
+      setSelectedTrip(fresh);
+      fetchSortedChildren(fresh);
+    } catch {
+      // Fallback: try with whatever is already in the list (may lack children coords)
+      fetchSortedChildren(trip);
+    }
   };
 
   const handleRecenterMap = () => {
@@ -653,19 +783,50 @@ export default function TripsPage() {
             {selectedTrip.currentLocation && (
               <div className="bg-blue-50 rounded-lg p-4">
                 <h4 className="font-medium text-slate-900 mb-2">Current Location</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-slate-600">Latitude:</span>{' '}
-                    <span className="font-medium">{selectedTrip.currentLocation.latitude.toFixed(6)}</span>
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mt-0.5">
+                    <MapPin className="w-4 h-4 text-blue-600" />
                   </div>
-                  <div>
-                    <span className="text-slate-600">Longitude:</span>{' '}
-                    <span className="font-medium">{selectedTrip.currentLocation.longitude.toFixed(6)}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {detailPlaceName ?? `${selectedTrip.currentLocation.latitude.toFixed(5)}, ${selectedTrip.currentLocation.longitude.toFixed(5)}`}
+                    </p>
+                    {detailPlaceName && (
+                      <p className="text-xs text-slate-400 font-mono mt-0.5">
+                        {selectedTrip.currentLocation.latitude.toFixed(5)}, {selectedTrip.currentLocation.longitude.toFixed(5)}
+                      </p>
+                    )}
+                    <p className="text-xs text-slate-500 mt-1">
+                      Updated {formatTime(selectedTrip.currentLocation.timestamp)}
+                    </p>
                   </div>
-                  <div className="col-span-2">
-                    <span className="text-slate-600">Last Update:</span>{' '}
-                    <span className="font-medium">{formatTime(selectedTrip.currentLocation.timestamp)}</span>
-                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedTrip.children && selectedTrip.children.length > 0 && (
+              <div>
+                <h4 className="font-medium text-slate-900 mb-3">
+                  Students ({selectedTrip.children.length})
+                  <span className="ml-2 text-xs font-normal text-slate-500">
+                    {selectedTrip.type === 'pickup' ? 'Furthest picked up first' : 'Nearest dropped off first'}
+                  </span>
+                </h4>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {selectedTrip.children.map((child, index) => (
+                    <div key={child.id} className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-lg">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-600 text-white text-xs flex items-center justify-center">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900">{child.name}</p>
+                        {child.address && <p className="text-xs text-slate-500 truncate">{child.address}</p>}
+                      </div>
+                      {child.latitude == null && (
+                        <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">No GPS</span>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -748,22 +909,24 @@ export default function TripsPage() {
 
             {selectedTrip.currentLocation ? (
               <div className="space-y-4">
-                {/* Location Stats */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-white border border-slate-200 rounded-lg p-3">
-                    <div className="text-xs text-slate-500 mb-1">Latitude</div>
-                    <div className="text-sm font-mono font-semibold text-slate-900">
-                      {selectedTrip.currentLocation.latitude.toFixed(6)}
-                    </div>
+                {/* Location — place name when available, GPS coords as fallback */}
+                <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-lg p-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                    <MapPin className="w-4 h-4 text-blue-600" />
                   </div>
-                  <div className="bg-white border border-slate-200 rounded-lg p-3">
-                    <div className="text-xs text-slate-500 mb-1">Longitude</div>
-                    <div className="text-sm font-mono font-semibold text-slate-900">
-                      {selectedTrip.currentLocation.longitude.toFixed(6)}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-slate-500 mb-0.5">Current Location</div>
+                    <div className="text-sm font-semibold text-slate-900 truncate">
+                      {busPlaceName ?? `${selectedTrip.currentLocation.latitude.toFixed(5)}, ${selectedTrip.currentLocation.longitude.toFixed(5)}`}
                     </div>
+                    {busPlaceName && (
+                      <div className="text-xs text-slate-400 font-mono">
+                        {selectedTrip.currentLocation.latitude.toFixed(5)}, {selectedTrip.currentLocation.longitude.toFixed(5)}
+                      </div>
+                    )}
                   </div>
-                  <div className="bg-white border border-slate-200 rounded-lg p-3">
-                    <div className="text-xs text-slate-500 mb-1">Last Update</div>
+                  <div className="flex-shrink-0 text-right">
+                    <div className="text-xs text-slate-500">Updated</div>
                     <div className="text-sm font-semibold text-slate-900">
                       {formatTime(selectedTrip.currentLocation.timestamp)}
                     </div>
@@ -810,6 +973,8 @@ export default function TripsPage() {
                   route={selectedTrip.route}
                   lastUpdate={selectedTrip.currentLocation.timestamp}
                   recenterTrigger={recenterTrigger}
+                  onPlaceName={setBusPlaceName}
+                  childrenLocations={sortedChildrenLocations}
                 />
               </div>
             ) : (

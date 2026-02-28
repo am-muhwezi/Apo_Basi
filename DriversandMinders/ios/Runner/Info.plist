@@ -67,6 +67,20 @@
 		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
+	<!-- Supabase magic link deep link callback -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>apobasi-drivers</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>apobasi-drivers</string>
+			</array>
+		</dict>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

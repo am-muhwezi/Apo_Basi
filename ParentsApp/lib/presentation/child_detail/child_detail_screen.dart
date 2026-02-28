@@ -91,6 +91,11 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   double _busAnimFromHeading = 0;
   double _busAnimToHeading = 0;
 
+  // Fallback multi-stop routing (used when optimization service fails)
+  bool _hasActiveTrip = false;
+  List<BusStop> _busStops = [];
+  int _stopsBeforeChild = 0;
+
   @override
   void initState() {
     super.initState();
@@ -565,10 +570,19 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           waypoints.add(stops[i].homeLatLng);
         }
 
-        debugPrint(
-            '[ETA] multi-stop: ${waypoints.length} waypoints, nextStop=$_nextStopIndex, thisChild=$_thisChildStopIndex');
 
         if (waypoints.length > 1) {
+          tripInfo = await MapboxRouteService.getMultiWaypointTripInformation(
+            waypoints: waypoints,
+            profile: 'driving-traffic',
+          );
+        }
+      }
+
+      // --- Fallback: use stored bus stops when optimization is unavailable ---
+      if (tripInfo == null && _busStops.length >= 2) {
+        final waypoints = _buildFallbackWaypoints(effectiveBus);
+        if (waypoints != null && waypoints.length >= 2) {
           tripInfo = await MapboxRouteService.getMultiWaypointTripInformation(
             waypoints: waypoints,
             profile: 'driving-traffic',
@@ -695,23 +709,26 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     try {
       // 1. Determine trip type from active trip, fall back to time-of-day
       _tripType = await _getActiveTripType(busId);
-      debugPrint('[Optimization] tripType=$_tripType for busId=$busId');
 
       // 2. Fetch all children on this bus that have home coordinates set
       final busStops = await _fetchBusStops(busId);
-      debugPrint('[Optimization] busStops with coords: ${busStops.length}');
+
+      // Store stops so the fallback multi-stop router can use them
+      if (mounted) {
+        setState(() {
+          _busStops = busStops;
+          _hasActiveTrip = true;
+        });
+      }
+
       // Need at least 2 stops for multi-stop routing to be meaningful
       if (busStops.length < 2) {
-        debugPrint(
-            '[Optimization] Not enough stops with home coords — using direct route');
         return;
       }
 
-      // 3. Fetch school coordinates from server (multi-tenant source of truth)
-      final schoolCoords = await _fetchSchoolCoordinates();
+      // 3. Read school coordinates from .env (always present)
+      final schoolCoords = _getSchoolCoordinates();
       if (schoolCoords == null) {
-        debugPrint(
-            '[Optimization] School coords not configured on server — using direct route');
         return;
       }
 
@@ -734,17 +751,42 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           ? _childData!['id'] as int
           : int.tryParse(_childData!['id'].toString()) ?? -1;
 
-      final stopIdx =
-          optimized.orderedStops.indexWhere((s) => s.childId == thisChildId);
+      int stopIdx = optimized.orderedStops
+          .indexWhere((s) => s.childId == thisChildId);
 
-      debugPrint(
-          '[Optimization] orderedStops=${optimized.orderedStops.map((s) => s.childId).toList()}, thisChildId=$thisChildId at index=$stopIdx');
+      // If this child has no home coords in the DB (not in orderedStops),
+      // treat all optimized stops as intermediate waypoints and append
+      // _homeLocation as the final destination.
+      if (stopIdx == -1 && _homeLocation != null) {
+        final extendedStops = [
+          ...optimized.orderedStops,
+          BusStop(childId: thisChildId, homeLatLng: _homeLocation!),
+        ];
+        final extendedDurations = [...optimized.legDurations, 0.0];
+        final extended = OptimizedRoute(
+          orderedStops: extendedStops,
+          legDurations: extendedDurations,
+        );
+        stopIdx = extendedStops.length - 1;
+        if (!mounted) return;
+        setState(() {
+          _optimizedRoute = extended;
+          _thisChildStopIndex = stopIdx;
+          _nextStopIndex = 0;
+          _stopsBeforeChild = stopIdx; // all other stops come first
+        });
+        if (_busLocation != null) {
+          _updateBusLocationWithSnapping(_busLocation!);
+        }
+        return;
+      }
 
       if (!mounted) return;
       setState(() {
         _optimizedRoute = optimized;
         _thisChildStopIndex = stopIdx;
         _nextStopIndex = 0; // reset pointer for this fresh route
+        _stopsBeforeChild = stopIdx > 0 ? stopIdx : 0;
       });
 
       // Calculate pre-trip scheduled ETA from leg durations + trip scheduled time
@@ -755,31 +797,69 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       // so the first ETA was calculated using the direct-route fallback.
       // Recalculate immediately with the correct multi-stop waypoints.
       if (_busLocation != null) {
-        debugPrint(
-            '[Optimization] Route ready — recalculating ETA with optimized stops');
         _updateBusLocationWithSnapping(_busLocation!);
       }
-    } catch (e, st) {
-      debugPrint('[Optimization] Failed: $e\n$st');
+    } catch (_) {
       // Direct-route ETA fallback remains in place
     }
   }
 
-  /// Fetch school GPS coordinates from the server.
-  /// Returns null if the server hasn't configured them.
-  Future<ll.LatLng?> _fetchSchoolCoordinates() async {
-    try {
-      final uri = Uri.parse(
-        '${ApiConfig.apiBaseUrl}${ApiConfig.schoolInfoEndpoint}',
-      );
-      final response = await http.get(uri);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final lat = (data['schoolLatitude'] as num?)?.toDouble();
-        final lng = (data['schoolLongitude'] as num?)?.toDouble();
-        if (lat != null && lng != null) return ll.LatLng(lat, lng);
-      }
-    } catch (_) {}
+  /// Build ordered waypoints [bus, stop1, ..., thisChildHome] using stored
+  /// [_busStops] when [_optimizedRoute] is unavailable or the Directions API
+  /// transiently failed.
+  ///
+  /// Ordering rules (mirrors Mapbox Optimization logic):
+  ///   pickup  → farthest from school first (bus heads outward, comes back)
+  ///   dropoff → nearest to school first (bus delivers closest kids first)
+  ///
+  /// Skips stops the bus has already passed (within 200 m).
+  /// Does NOT update [_stopsBeforeChild] — that value is owned by
+  /// [_initializeRouteOptimization] so we never overwrite the correct count.
+  List<ll.LatLng>? _buildFallbackWaypoints(ll.LatLng busLocation) {
+    if (_busStops.isEmpty) return null;
+
+    final thisChildId = _childData?['id'] is int
+        ? _childData!['id'] as int
+        : int.tryParse(_childData?['id']?.toString() ?? '') ?? -1;
+    if (thisChildId == -1) return null;
+
+    // Filter out stops already passed by the bus (within 200 m)
+    final remaining = _busStops
+        .where((s) => _haversineKm(busLocation, s.homeLatLng) > 0.2)
+        .toList();
+    if (remaining.isEmpty) return null;
+
+    // Sort by school distance: school coords are always available from .env
+    final school = _getSchoolCoordinates();
+    if (school != null) {
+      remaining.sort((a, b) {
+        final dA = _haversineKm(school, a.homeLatLng);
+        final dB = _haversineKm(school, b.homeLatLng);
+        // pickup → farthest first (descending); dropoff → nearest first (ascending)
+        return _tripType == 'pickup'
+            ? dB.compareTo(dA)
+            : dA.compareTo(dB);
+      });
+    }
+
+    // Find this child's position in the sorted list
+    final thisChildIdx = remaining.indexWhere((s) => s.childId == thisChildId);
+    if (thisChildIdx == -1) return null;
+
+    // Waypoints: bus → stops[0..thisChildIdx] inclusive
+    final waypoints = <ll.LatLng>[busLocation];
+    for (int i = 0; i <= thisChildIdx; i++) {
+      waypoints.add(remaining[i].homeLatLng);
+    }
+    return waypoints;
+  }
+
+  /// Return school GPS coordinates from the .env file.
+  /// SCHOOL_LATITUDE and SCHOOL_LONGITUDE are always present in .env.
+  ll.LatLng? _getSchoolCoordinates() {
+    final lat = ApiConfig.schoolLatitude;
+    final lng = ApiConfig.schoolLongitude;
+    if (lat != null && lng != null) return ll.LatLng(lat, lng);
     return null;
   }
 
@@ -966,6 +1046,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   String _getTripStatus() {
     final String childName = _childData?['name'] ?? 'Child';
+    final String firstName = childName.split(' ').first;
     final String? status = _childData?['status']?.toString().toLowerCase();
 
     if (status == 'on-bus' ||
@@ -976,20 +1057,28 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         final isMoving = (_busLocation!.speed ?? 0) > 0.5;
         if (!isMoving) return 'Bus Stopped';
         if (_etaMinutes != null) {
-          if (_etaMinutes! <= 5) return 'Driver arrives soon';
+          if (_etaMinutes! <= 3) return 'Bus arrives soon';
           if (_etaMinutes! <= 15) return 'Driver on the way';
         }
         return 'Driver on the way';
       }
-      return '$childName is on the bus';
+      return '$firstName is on the bus';
     } else if (status == 'at-school' || status == 'at_school') {
-      return '$childName is at school';
+      return '$firstName is at school';
     } else if (status == 'dropped-off' ||
         status == 'dropped_off' ||
         status == 'home') {
-      return '$childName is Home';
+      return '$firstName is Home';
     } else {
-      return '$childName is Home';
+      // No terminal status — show trip-in-progress message if bus is active
+      if (_hasActiveTrip && _busLocation != null) {
+        if (_etaMinutes != null) {
+          if (_etaMinutes! <= 3) return 'Bus arrives soon';
+          return 'Bus is on its way';
+        }
+        return 'Bus is on its way';
+      }
+      return '$firstName is Home';
     }
   }
 
@@ -1413,6 +1502,29 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                         }),
                       ],
                     ),
+
+                    // Stops-before-this-child indicator
+                    if (_busLocation != null && _stopsBeforeChild > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.pin_drop_outlined,
+                              size: 14,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$_stopsBeforeChild stop${_stopsBeforeChild > 1 ? 's' : ''} before yours',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
 
                     // Divider
                     Padding(
