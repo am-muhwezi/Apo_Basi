@@ -83,7 +83,10 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun checkLocationPermission(): Boolean {
-        return this.hasAllLocationPermissions()
+        // Foreground location is sufficient for a foreground service with
+        // foregroundServiceType="location". ACCESS_BACKGROUND_LOCATION is only
+        // needed for background (non-visible) location access — not required here.
+        return this.hasLocationPermission()
     }
 
     private fun checkAndRequestPermissions(): Boolean {

@@ -226,8 +226,20 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
 
         # Drivers can access their assigned buses
         if user.user_type == "driver":
+            # Check 1: direct Bus.driver FK (may be set alongside the assignment)
             if bus.driver_id == user.id:
                 return True
+            # Check 2: Assignment model — Driver.pk == user.id (primary_key=True on user FK)
+            from drivers.models import Driver
+            driver_ct = ContentType.objects.get_for_model(Driver)
+            bus_ct = ContentType.objects.get_for_model(Bus)
+            return Assignment.objects.filter(
+                assignee_content_type=driver_ct,
+                assignee_object_id=user.id,
+                assigned_to_content_type=bus_ct,
+                assigned_to_object_id=bus_id,
+                status='active'
+            ).exists()
 
         # Bus minders can access their assigned buses
         if user.user_type == "busminder":
