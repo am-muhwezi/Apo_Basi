@@ -1,10 +1,10 @@
 from django.contrib import admin
 from django.urls import path
 from django.urls import include
-from users.views import health_check
+from users.views import health_check, school_info
 from users.views_auth import unified_phone_login
 from rest_framework_simplejwt.views import TokenRefreshView
-from trips.views import StopDetailView, StopCompleteView, StopSkipView, SchoolInfoView
+from trips.views import StopDetailView, StopCompleteView, StopSkipView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -30,6 +30,5 @@ urlpatterns = [
     path("api/analytics/", include("analytics.urls")),
     path("api/notifications/", include("notifications.urls")),
     path("api/health/", health_check, name="health_check"),
-    # School GPS coordinates — used by Flutter clients for Mapbox optimisation
-    path("api/school/info/", SchoolInfoView.as_view(), name="school-info"),
+    path("api/school/info/", school_info, name="school_info"),
 ]

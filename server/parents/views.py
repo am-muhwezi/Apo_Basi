@@ -224,10 +224,10 @@ class ParentViewSet(viewsets.ModelViewSet):
                 )
 
             if action == 'delete_children':
-                # Delete children first, then parent
+                # Delete children first, then user (cascades to parent)
                 with transaction.atomic():
                     children.delete()
-                    parent.delete()
+                    parent.user.delete()
                 return Response(
                     {
                         "message": f"Parent and {children_count} child(ren) deleted successfully"
@@ -236,8 +236,8 @@ class ParentViewSet(viewsets.ModelViewSet):
                 )
 
             if action == 'keep_children':
-                # Delete parent only, children will have parent set to NULL
-                parent.delete()
+                # Delete user (cascades to parent); children will have parent set to NULL
+                parent.user.delete()
                 return Response(
                     {
                         "message": f"Parent deleted. {children_count} child(ren) now have no parent assigned."
@@ -245,8 +245,8 @@ class ParentViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_200_OK
                 )
 
-        # No children, delete normally
-        parent.delete()
+        # No children, delete user (cascades to parent)
+        parent.user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
