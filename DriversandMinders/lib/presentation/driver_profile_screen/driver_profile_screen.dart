@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/theme_service.dart';
 import '../../widgets/custom_bottom_bar.dart';
@@ -161,30 +162,101 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
 
   void _showLogoutDialog() {
     final cs = Theme.of(context).colorScheme;
-    showDialog(
+    final tt = Theme.of(context).textTheme;
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.clear();
-              if (mounted) {
-                Navigator.pushNamedAndRemoveUntil(
-                    context, '/shared-login-screen', (_) => false);
-              }
-            },
-            style: TextButton.styleFrom(foregroundColor: cs.error),
-            child: const Text('Sign Out'),
-          ),
-        ],
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(6.w, 2.h, 6.w, 4.h),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              width: 10.w,
+              height: 4,
+              decoration: BoxDecoration(
+                color: cs.outline.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            SizedBox(height: 3.h),
+            // Icon
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: cs.error.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.logout_rounded, color: cs.error, size: 32),
+            ),
+            SizedBox(height: 2.h),
+            // Title
+            Text(
+              'Logout?',
+              style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            SizedBox(height: 1.h),
+            // Subtitle
+            Text(
+              'You will need to login again to access your account',
+              textAlign: TextAlign.center,
+              style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            SizedBox(height: 3.h),
+            // Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      side: BorderSide(
+                          color: cs.outline.withValues(alpha: 0.4)),
+                    ),
+                    child: Text('Cancel',
+                        style: tt.bodyLarge
+                            ?.copyWith(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                SizedBox(width: 4.w),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.of(ctx).pop();
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.clear();
+                      if (mounted) {
+                        Navigator.pushNamedAndRemoveUntil(
+                            context, '/shared-login-screen', (_) => false);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: cs.error,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: Text('Logout',
+                        style: tt.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -523,6 +595,42 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                   Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
                   SizedBox(height: 2.5.h),
 
+                  // ── About ──────────────────────────────────────────────
+                  _sectionHeader('About'),
+                  SizedBox(height: 1.5.h),
+                  _SettingsCard(
+                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                    children: [
+                      _InfoRow(label: 'Version', value: '1.0.0'),
+                      Divider(
+                          height: 1,
+                          color: cs.outline.withValues(alpha: 0.4)),
+                      _NavRow(
+                        label: 'Terms of Service',
+                        trailing: '',
+                        onTap: () => launchUrl(
+                          Uri.parse('https://www.apobasi.com/terms'),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                      ),
+                      Divider(
+                          height: 1,
+                          color: cs.outline.withValues(alpha: 0.4)),
+                      _NavRow(
+                        label: 'Privacy Policy',
+                        trailing: '',
+                        onTap: () => launchUrl(
+                          Uri.parse('https://www.apobasi.com/privacy'),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: 2.5.h),
+                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                  SizedBox(height: 2.5.h),
+
                   // ── Account ────────────────────────────────────────────
                   _sectionHeader('Account'),
                   SizedBox(height: 1.5.h),
@@ -538,8 +646,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                           color: cs.outline.withValues(alpha: 0.4)),
                       _InfoRow(
                         label: 'License',
-                        value: _driverInfo['licenseNumber'] as String? ??
-                            'N/A',
+                        value: _driverInfo['licenseNumber'] as String? ?? 'N/A',
                       ),
                       Divider(
                           height: 1,
@@ -548,61 +655,24 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                         label: 'Join Date',
                         value: _driverInfo['joinDate'] as String? ?? 'N/A',
                       ),
-                      Divider(
-                          height: 1,
-                          color: cs.outline.withValues(alpha: 0.4)),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(Icons.logout, color: cs.error, size: 22),
-                        title: Text('Sign Out',
-                            style:
-                                tt.bodyLarge?.copyWith(color: cs.error)),
-                        onTap: _showLogoutDialog,
-                      ),
                     ],
                   ),
 
-                  SizedBox(height: 2.5.h),
-                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
-                  SizedBox(height: 2.5.h),
+                  SizedBox(height: 3.h),
 
-                  // ── About ──────────────────────────────────────────────
-                  _sectionHeader('About'),
-                  SizedBox(height: 1.5.h),
-                  _SettingsCard(
-                    padding: EdgeInsets.symmetric(horizontal: 4.w),
-                    children: [
-                      _InfoRow(label: 'Version', value: '1.0.0'),
-                      Divider(
-                          height: 1,
-                          color: cs.outline.withValues(alpha: 0.4)),
-                      _InfoRow(label: 'Build', value: '100'),
-                      Divider(
-                          height: 1,
-                          color: cs.outline.withValues(alpha: 0.4)),
-                      _NavRow(
-                        label: 'Terms of Service',
-                        trailing: '',
-                        onTap: () =>
-                            ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content:
-                                  Text('Terms of Service coming soon')),
+                  // ── Logout ─────────────────────────────────────────────
+                  Center(
+                    child: GestureDetector(
+                      onTap: _showLogoutDialog,
+                      child: Text(
+                        'Logout',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: cs.error,
                         ),
                       ),
-                      Divider(
-                          height: 1,
-                          color: cs.outline.withValues(alpha: 0.4)),
-                      _NavRow(
-                        label: 'Privacy Policy',
-                        trailing: '',
-                        onTap: () =>
-                            ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Privacy Policy coming soon')),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
 
                   SizedBox(height: 4.h),
