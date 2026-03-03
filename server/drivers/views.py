@@ -790,6 +790,23 @@ def end_trip(request, trip_id):
 
     trip.save()
 
+    # Broadcast trip_ended to all parents connected to this bus so the
+    # ParentsApp updates immediately without waiting for the 60-second poll.
+    if trip.bus_id:
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"bus_{trip.bus_id}",
+            {
+                "type": "bus.trip_event",
+                "event_type": "trip_ended",
+                "trip_id": trip.id,
+                "trip_type": trip.trip_type,
+                "scheduled_time": None,
+            }
+        )
+
     # Update children's location_status for PICKUP trips only
     # Pickup trip ended → children have arrived at school
     # Dropoff status is already handled by bus assistant marking attendance
