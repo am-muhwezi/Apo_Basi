@@ -19,19 +19,39 @@ class LocationApp : Application() {
 
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Create notification channel for location tracking
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            // High-importance channel used when a trip is actively in progress.
+            // IMPORTANCE_HIGH causes a heads-up notification to appear so the
+            // driver cannot miss it, and the OS will not silently suppress it.
+            val tripChannel = NotificationChannel(
+                LocationTrackingService.TRIP_CHANNEL_ID,
+                "Active School Trip",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Critical alert shown while children are being transported — cannot be dismissed"
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                setShowBadge(true)
+                // Vibrate once on first appearance, not on every update
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 250)
+                enableLights(true)
+                lightColor = android.graphics.Color.BLUE
+            }
+
+            // Low-importance background channel kept for general location sharing
+            // outside of active child-transport trips.
             val locationChannel = NotificationChannel(
                 LocationTrackingService.CHANNEL_ID,
                 "Location Tracking",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Persistent notification shown while tracking driver location"
+                description = "Background location tracking channel"
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
                 setShowBadge(false)
             }
 
-            // Register the channel with the system
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(tripChannel)
             notificationManager.createNotificationChannel(locationChannel)
         }
     }

@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/app_export.dart';
 import '../widgets/custom_error_widget.dart';
+import '../config/api_config.dart';
 import '../config/supabase_config.dart';
 import 'config/api_config.dart';
 

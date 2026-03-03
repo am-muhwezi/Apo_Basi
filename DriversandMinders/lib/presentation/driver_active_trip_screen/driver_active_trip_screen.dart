@@ -64,11 +64,11 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   final Map<String, Duration?> _studentEtas = {};
   DateTime? _lastRouteRefresh;
 
-  // Camera follow mode — stops when user pans, resumes on recenter tap
-  bool _followDriver = true;
-  // Guard: true while WE are moving the camera programmatically so the
-  // onScrollListener does not mistake our own camera moves as a user pan.
-  bool _isProgrammaticMove = false;
+  // Next-turn navigation instruction (from Mapbox Directions steps)
+  String? _nextTurnInstruction;
+  String? _nextTurnModifier; // 'left', 'right', 'straight', 'slight left', etc.
+  String? _nextTurnType;     // 'turn', 'arrive', 'continue', 'roundabout', etc.
+  double _nextTurnDistanceM = 0;
 
   // Tap → student lookup
   final Map<String, Map<String, dynamic>> _annotationToStudent = {};
@@ -233,76 +233,64 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   // ══════════════════════════════════════════════════════════════════════════════
 
   Future<void> _initDriverLocation() async {
+    // Use the device GPS directly — works offline and gives immediate updates.
+    // The NativeLocationService continues to push positions to the backend in
+    // parallel so parent apps stay up to date.
     try {
-      // Use backend as the single source of truth for driver/bus position.
-      // NativeLocationService pushes updates to Django; this screen polls the
-      // /api/buses/{bus_id}/current-location/ endpoint to drive the map.
-
-      // Cancel any existing polling timer
+      _positionStream?.cancel();
       _locationUpdateTimer?.cancel();
 
-      final prefs = await SharedPreferences.getInstance();
-      final prefBusId = prefs.getInt('current_bus_id');
-      final busId = (_busData != null ? _busData!['id'] as int? : null) ?? prefBusId;
-      if (busId == null) return;
-
-      // Helper to fetch and apply latest position
-      Future<void> fetchOnce() async {
-        try {
-          final response = await _apiService.getBusCurrentLocation(busId);
-          if (response['success'] == true && response['data'] != null) {
-            final data = response['data'] as Map<String, dynamic>;
-
-            final lat = (data['lat'] as num?)?.toDouble();
-            final lng = (data['lng'] as num?)?.toDouble();
-            if (lat == null || lng == null) return;
-
-            final speed = (data['speed'] as num?)?.toDouble() ?? 0.0;
-            final heading = (data['heading'] as num?)?.toDouble() ?? 0.0;
-            final timestampStr = data['timestamp'] as String?;
-            final timestamp = timestampStr != null
-                ? DateTime.tryParse(timestampStr) ?? DateTime.now()
-                : DateTime.now();
-
-            final pos = geo.Position(
-              latitude: lat,
-              longitude: lng,
-              accuracy: 0.0,
-              altitude: 0.0,
-              altitudeAccuracy: 0.0,
-              heading: heading,
-              headingAccuracy: 0.0,
-              speed: speed,
-              speedAccuracy: 0.0,
-              timestamp: timestamp,
-            );
-
-            if (mounted) {
-              setState(() => _driverPosition = pos);
-              await _updateNavAnnotation();
-              _updateRoute(); // throttled internally
-
-              // Auto-pan camera to follow driver unless user has panned away
-              if (_followDriver && _mapboxMap != null) {
-                _isProgrammaticMove = true;
-                _mapboxMap!.setCamera(CameraOptions(
-                  center: _latlng(pos.latitude, pos.longitude),
-                  bearing: pos.heading,
-                ));
-                Future.delayed(const Duration(milliseconds: 150),
-                    () => _isProgrammaticMove = false);
-              }
-            }
-          }
-        } catch (_) {}
+      // Check permission
+      var permission = await geo.Geolocator.checkPermission();
+      if (permission == geo.LocationPermission.denied) {
+        permission = await geo.Geolocator.requestPermission();
       }
+      if (permission == geo.LocationPermission.denied ||
+          permission == geo.LocationPermission.deniedForever) return;
 
-      // Initial fetch
-      await fetchOnce();
+      // Snap to current position immediately so the arrow shows right away
+      try {
+        final pos = await geo.Geolocator.getCurrentPosition(
+          locationSettings: const geo.LocationSettings(
+            accuracy: geo.LocationAccuracy.high,
+          ),
+        );
+        if (mounted) {
+          setState(() => _driverPosition = pos);
+          await _updateNavAnnotation();
+          _updateRoute();
+          if (_mapboxMap != null) {
+            _mapboxMap!.setCamera(CameraOptions(
+              center: _latlng(pos.latitude, pos.longitude),
+              bearing: pos.heading,
+              pitch: 50.0,
+              zoom: 16.5,
+            ));
+          }
+        }
+      } catch (_) {}
 
-      // Poll every 5 seconds for updated bus position
-      _locationUpdateTimer =
-          Timer.periodic(const Duration(seconds: 5), (_) => fetchOnce());
+      // Continuous stream for live navigation updates
+      _positionStream = geo.Geolocator.getPositionStream(
+        locationSettings: const geo.LocationSettings(
+          accuracy: geo.LocationAccuracy.high,
+          distanceFilter: 5, // update every 5 metres of movement
+        ),
+      ).listen((pos) {
+        if (!mounted) return;
+        setState(() => _driverPosition = pos);
+        _updateNavAnnotation();
+        _updateRoute(); // throttled internally to once per 45 s
+
+        if (_mapboxMap != null) {
+          _mapboxMap!.setCamera(CameraOptions(
+            center: _latlng(pos.latitude, pos.longitude),
+            bearing: pos.heading,
+            pitch: 50.0,
+            zoom: 16.5,
+          ));
+        }
+      });
     } catch (_) {}
   }
 
@@ -312,6 +300,10 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
   void _onMapCreated(MapboxMap mapboxMap) async {
     _mapboxMap = mapboxMap;
+
+    // Apply navigation-style tilt immediately so the map is never flat,
+    // even before the first GPS position arrives.
+    await mapboxMap.setCamera(CameraOptions(pitch: 50.0, zoom: 16.0));
 
     // Polyline layer first so it renders below the point markers
     _polylineAnnotationManager =
@@ -342,13 +334,10 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       );
     }
     if (center != null) {
-      _isProgrammaticMove = true;
       _mapboxMap!.flyTo(
-        CameraOptions(center: center, zoom: 14.5),
+        CameraOptions(center: center, zoom: 16.0, pitch: 50.0),
         MapAnimationOptions(duration: 800),
       );
-      Future.delayed(const Duration(milliseconds: 900),
-          () => _isProgrammaticMove = false);
     }
   }
 
@@ -436,14 +425,11 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   }
 
   void _onStudentSelected(Map<String, dynamic> student) {
-    setState(() => _selectedStudent = student);
-    _mapboxMap?.flyTo(
-      CameraOptions(
-        center: _latlng(student['lat'] as double, student['lng'] as double),
-        zoom: 15.0,
-      ),
-      MapAnimationOptions(duration: 400),
-    );
+    // Highlight the student in the sheet without moving the camera away from
+    // the driver — the map always stays centred on the driver.
+    setState(() {
+      _selectedStudent = student;
+    });
     _placeHomeMarkers();
     _sheetController.animateTo(
       0.38,
@@ -454,19 +440,17 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
   void _recenterOnDriver() {
     if (_driverPosition == null || _mapboxMap == null) return;
-    _isProgrammaticMove = true;
-    setState(() => _followDriver = true);
+    setState(() => _selectedStudent = null);
     _mapboxMap!.flyTo(
       CameraOptions(
         center:
             _latlng(_driverPosition!.latitude, _driverPosition!.longitude),
-        zoom: 15.0,
+        zoom: 16.5,
         bearing: _driverPosition!.heading,
+        pitch: 50.0,
       ),
       MapAnimationOptions(duration: 500),
     );
-    Future.delayed(const Duration(milliseconds: 600),
-        () => _isProgrammaticMove = false);
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
@@ -687,23 +671,66 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
           };
         }).toList();
 
-        // Build child_id → stop order map so the student list matches pickup sequence
+        // Build child_id → stop order map so the student list matches pickup sequence.
+        // Django REST Framework serializes field names as snake_case, so try both
+        // children_ids (snake) and childrenIds (camel) for compatibility.
         final Map<int, int> childStopOrder = {};
         for (final stop in rawStops) {
           final stopOrder = stop['order'] as int? ?? 999;
-          for (final childId
-              in (stop['childrenIds'] as List? ?? []).cast<int>()) {
+          final ids = (stop['children_ids'] as List? ??
+                  stop['childrenIds'] as List? ??
+                  [])
+              .cast<int>();
+          for (final childId in ids) {
             childStopOrder[childId] = stopOrder;
           }
         }
 
         if (childStopOrder.isNotEmpty) {
+          // Sort by backend stop order — this is the authoritative pickup sequence.
           _students.sort((a, b) {
             final aId = int.tryParse(a['id'].toString()) ?? 0;
             final bId = int.tryParse(b['id'].toString()) ?? 0;
             return (childStopOrder[aId] ?? 999)
                 .compareTo(childStopOrder[bId] ?? 999);
           });
+        } else {
+          // Fallback: sort by distance from the school, which is represented by
+          // the last stop in the route (highest order value on a pickup trip).
+          // Pickup = farthest from school first; Dropoff = nearest first.
+          final tripType = _tripData['trip_type'] as String? ?? 'pickup';
+          final stops = _tripData['stops'] as List?;
+          if (stops != null && stops.isNotEmpty) {
+            final sortedStops = List<Map<String, dynamic>>.from(
+                stops.cast<Map<String, dynamic>>())
+              ..sort((a, b) =>
+                  (a['order'] as int? ?? 0).compareTo(b['order'] as int? ?? 0));
+            final schoolStop = sortedStops.last;
+            final schoolLat = schoolStop['latitude'] as double?;
+            final schoolLng = schoolStop['longitude'] as double?;
+
+            if (schoolLat != null &&
+                schoolLng != null &&
+                schoolLat != 0.0 &&
+                schoolLng != 0.0) {
+              _students.sort((a, b) {
+                final aLat = a['lat'] as double?;
+                final aLng = a['lng'] as double?;
+                final bLat = b['lat'] as double?;
+                final bLng = b['lng'] as double?;
+                if (aLat == null || aLng == null) return 1;
+                if (bLat == null || bLng == null) return -1;
+                final aDist = geo.Geolocator.distanceBetween(
+                    aLat, aLng, schoolLat, schoolLng);
+                final bDist = geo.Geolocator.distanceBetween(
+                    bLat, bLng, schoolLat, schoolLng);
+                // Pickup: farthest first (desc). Dropoff: nearest first (asc).
+                return tripType == 'dropoff'
+                    ? aDist.compareTo(bDist)
+                    : bDist.compareTo(aDist);
+              });
+            }
+          }
         }
       }
 
@@ -998,8 +1025,10 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     // Stamp throttle only now — we are about to call the Directions API.
     _lastRouteRefresh = now;
 
-    // Mapbox Directions v5 allows max 25 waypoints (driver + 24 stops).
-    final capped = pending.length > 24 ? pending.sublist(0, 24) : pending;
+    // Cap at next 8 stops — fewer waypoints = faster API response and avoids
+    // mobile-network timeouts on long routes. The driver only needs to see the
+    // immediate route ahead, not all remaining students at once.
+    final capped = pending.length > 8 ? pending.sublist(0, 8) : pending;
 
     final waypoints = [
       '${_driverPosition!.longitude},${_driverPosition!.latitude}',
@@ -1015,10 +1044,10 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
         queryParameters: {
           'geometries': 'geojson',
           'overview': 'full',
-          'steps': 'false',
+          'steps': 'true',
           'access_token': ApiConfig.mapboxAccessToken,
         },
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 25));
 
       print('🗺️ _updateRoute: HTTP ${response.statusCode}');
 
@@ -1063,11 +1092,37 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
             Duration(seconds: cumSecs.round());
       }
 
+      // Parse the next turn instruction from the first step of the first leg.
+      // The first step is the driver's immediate next maneuver.
+      String? nextInstruction;
+      String? nextModifier;
+      String? nextType;
+      double nextDistM = 0;
+      if (legs.isNotEmpty) {
+        final firstLeg = legs[0] as Map<String, dynamic>;
+        final steps = firstLeg['steps'] as List?;
+        if (steps != null && steps.isNotEmpty) {
+          // Step 0 is always a departure maneuver ("Head north…"). If a real
+          // turn exists as step 1, prefer it; otherwise fall back to step 0.
+          final stepIdx = steps.length > 1 ? 1 : 0;
+          final step = steps[stepIdx] as Map<String, dynamic>;
+          final maneuver = step['maneuver'] as Map<String, dynamic>?;
+          nextInstruction = maneuver?['instruction'] as String?;
+          nextType = maneuver?['type'] as String?;
+          nextModifier = maneuver?['modifier'] as String?;
+          nextDistM = (step['distance'] as num?)?.toDouble() ?? 0.0;
+        }
+      }
+
       if (mounted) {
         setState(() {
           _studentEtas
             ..clear()
             ..addAll(newEtas);
+          _nextTurnInstruction = nextInstruction;
+          _nextTurnType = nextType;
+          _nextTurnModifier = nextModifier;
+          _nextTurnDistanceM = nextDistM;
         });
       }
       print('✅ _updateRoute: polyline drawn, ${newEtas.length} ETAs set');
@@ -1079,6 +1134,40 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       print('❌ _updateRoute error: $e');
       _lastRouteRefresh = null; // allow retry next call
     }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Navigation turn helpers
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  /// Returns an icon appropriate for the Mapbox maneuver type + modifier.
+  IconData _turnIcon(String? type, String? modifier) {
+    final mod = modifier?.toLowerCase() ?? '';
+    final tp = type?.toLowerCase() ?? '';
+
+    if (tp == 'arrive') return Icons.location_on;
+    if (tp == 'roundabout' || tp == 'rotary') return Icons.roundabout_left;
+    if (tp == 'fork') {
+      if (mod.contains('right')) return Icons.fork_right;
+      return Icons.fork_left;
+    }
+    if (tp == 'merge') return Icons.merge;
+    if (mod.contains('uturn')) return Icons.u_turn_left;
+
+    if (mod.contains('sharp right')) return Icons.turn_sharp_right;
+    if (mod.contains('sharp left')) return Icons.turn_sharp_left;
+    if (mod.contains('slight right')) return Icons.turn_slight_right;
+    if (mod.contains('slight left')) return Icons.turn_slight_left;
+    if (mod.contains('right')) return Icons.turn_right;
+    if (mod.contains('left')) return Icons.turn_left;
+    return Icons.straight;
+  }
+
+  String _formatTurnDistance(double meters) {
+    if (meters >= 1000) {
+      return '${(meters / 1000).toStringAsFixed(1)} km';
+    }
+    return '${meters.round()} m';
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
@@ -1130,16 +1219,12 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
                     ? _latlng(
                         _driverPosition!.latitude, _driverPosition!.longitude)
                     : _latlng(0.3476, 32.5825),
-                zoom: 14.5,
+                zoom: 16.0,
+                pitch: 50.0,
               ),
               onMapCreated: _onMapCreated,
-              onScrollListener: (_) {
-                // Only disengage follow when the user actually pans,
-                // not when we move the camera programmatically.
-                if (_followDriver && !_isProgrammaticMove && mounted) {
-                  setState(() => _followDriver = false);
-                }
-              },
+              // No scroll listener: the map always follows the driver.
+              // Camera is updated on every location poll in fetchOnce().
             ),
 
             // ── Trip timer badge (top-center) ──────────────────────────────────
@@ -1221,6 +1306,74 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
                     Text('Offline mode',
                         style: TextStyle(color: Colors.white, fontSize: 12)),
                   ]),
+                ),
+              ),
+
+            // ── Next-turn instruction banner ───────────────────────────────────
+            if (_nextTurnInstruction != null)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 68,
+                left: 16,
+                right: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E3A5F).withValues(alpha: 0.97),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4285F4),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          _turnIcon(_nextTurnType, _nextTurnModifier),
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _formatTurnDistance(_nextTurnDistanceM),
+                              style: TextStyle(
+                                color: const Color(0xFF93C5FD),
+                                fontSize: 9.5.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _nextTurnInstruction!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
 

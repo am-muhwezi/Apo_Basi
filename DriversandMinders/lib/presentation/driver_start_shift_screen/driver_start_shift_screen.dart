@@ -169,6 +169,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         try {
           final backendTrip = await _apiService.getActiveTrip();
           if (backendTrip != null && backendTrip['status'] == 'in-progress') {
+            if (!mounted) return;
             setState(() {
               _hasActiveTrip = true;
               _activeTripInfo = localTripInfo;
@@ -177,24 +178,28 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
             await prefs.setInt('current_trip_id', backendTrip['id']);
           } else {
             await _clearStaleLocalTripState();
+            if (!mounted) return;
             setState(() {
               _hasActiveTrip = false;
               _activeTripInfo = null;
             });
           }
         } catch (e) {
+          if (!mounted) return;
           setState(() {
             _hasActiveTrip = true;
             _activeTripInfo = localTripInfo;
           });
         }
       } else {
+        if (!mounted) return;
         setState(() {
           _hasActiveTrip = false;
           _activeTripInfo = null;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _hasActiveTrip = false;
         _activeTripInfo = null;
@@ -358,8 +363,10 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         }
       }
 
+      if (!mounted) return;
       setState(() => _isLoadingData = false);
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Failed to load data';
         _isLoadingData = false;
@@ -377,6 +384,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         (prefs.getInt('driver_id') ?? prefs.getInt('user_id'))?.toString() ??
             'N/A';
 
+    if (!mounted) return;
     setState(() {
       _driverData = {
         "driverId": userId,
