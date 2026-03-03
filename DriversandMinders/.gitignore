@@ -35,6 +35,16 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+# Flutter generated files and plugin symlinks
+android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+ios/Runner/GeneratedPluginRegistrant.m
+macos/Flutter/GeneratedPluginRegistrant.swift
+linux/flutter/generated_plugin_registrant.cc
+linux/flutter/generated_plugins.cmake
+windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugins.cmake
+android/app/src/main/kotlin/com/apobasi/driver/GpsStatusBroadcaster.kt
+linux/flutter/ephemeral/.plugin_symlinks/
 
 # Symbolication related
 app.*.symbols
@@ -69,6 +79,7 @@ macos/Flutter/GeneratedPluginRegistrant.swift
 
 # Android
 android/local.properties
+android/gradle.properties
 .android/
 *.iml
 
