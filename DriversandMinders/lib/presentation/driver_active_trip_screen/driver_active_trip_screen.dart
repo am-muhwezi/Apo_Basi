@@ -44,6 +44,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   Map<String, dynamic> _tripData = {};
   List<Map<String, dynamic>> _students = [];
   Map<String, dynamic>? _busData;
+  String _driverName = '';
 
   // ── Mapbox map ───────────────────────────────────────────────────────────────
   MapboxMap? _mapboxMap;
@@ -573,7 +574,11 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
         _tripStartTime = DateTime.parse(tripStartTimeStr);
       }
 
-      final userName = prefs.getString('user_name') ?? 'Driver';
+      final userName = (prefs.getString('user_name')?.isNotEmpty == true
+              ? prefs.getString('user_name')
+              : prefs.getString('driver_name')) ??
+          '';
+      if (userName.isNotEmpty) setState(() => _driverName = userName);
       final busResponse = await _apiService.getDriverBus();
       final routeResponse = await _apiService.getDriverRoute();
 
@@ -737,7 +742,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
           "tripId": "N/A",
           "routeNumber": "N/A",
           "routeName": "No Route",
-          "driverName": "Driver",
+          "driverName": _driverName,
           "busNumber": "N/A",
           "startTime":
               "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}",
@@ -1270,7 +1275,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       drawer: DriverDrawerWidget(
         currentRoute: '/driver-active-trip-screen',
         driverData: {
-          'name': _tripData['driverName'] ?? 'Driver',
+          'name': _driverName.isNotEmpty ? _driverName : (_tripData['driverName'] ?? ''),
           'bus_number':
               _busData?['bus_number'] ?? _busData?['number_plate'] ?? 'N/A',
         },

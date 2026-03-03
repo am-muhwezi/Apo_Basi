@@ -103,7 +103,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     // Defer WebSocket connection and route optimization to after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeSocketConnection();
-      _initializeRouteOptimization();
+      // Route optimisation is triggered by the WebSocket trip_state message
+      // (sent by the server on every connect).  No HTTP poll needed here.
       _startTripWatcher();
     });
   }
@@ -116,7 +117,9 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       _childData = args;
     }
     _loadHomeLocation();
-    _subscribeToBus();
+    // Do NOT call _subscribeToBus() here — _initializeSocketConnection()
+    // handles it in the postFrameCallback and calling it here creates an
+    // orphan WebSocket connection before the stream listeners are set up.
   }
 
   @override
@@ -389,6 +392,12 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   /// Initialize WebSocket connection for real-time bus tracking
   Future<void> _initializeSocketConnection() async {
     try {
+      // Cancel any existing subscriptions before setting up new ones.
+      // Guards against duplicate listeners if this is ever called more than once.
+      _locationSubscription?.cancel();
+      _connectionSubscription?.cancel();
+      _tripEventSubscription?.cancel();
+
       await _webSocketService.connect();
 
       _connectionSubscription =
@@ -424,17 +433,89 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         if (LocationConfig.enableSocketLogging) {}
       });
 
-      // Server pushes trip_started / trip_ended events over the same channel.
-      // This is the primary mechanism — no polling needed.
+      // Server pushes trip_state (on connect), trip_started, and trip_ended
+      // over the same channel.  The UI is a pure slave to these events —
+      // no HTTP polling for trip type is ever needed.
       _tripEventSubscription =
           _webSocketService.tripEventStream.listen((event) {
         if (!mounted) return;
         final eventType = event['type'] as String?;
-        if (eventType == 'trip_started') {
-          debugPrint(
-              '[TripEvent] trip_started received via WebSocket — refreshing optimization');
+
+        if (eventType == 'trip_state') {
+          // ── Sent by the server immediately on every (re)connect ──────────
+          final hasActiveTrip = event['has_active_trip'] as bool? ?? false;
+          debugPrint('[TripEvent] trip_state: has_active_trip=$hasActiveTrip');
+
+          if (!hasActiveTrip) {
+            setState(() {
+              _hasActiveTrip = false;
+              _tripHasEnded = false;
+            });
+            return;
+          }
+
+          // Active trip confirmed — set trip type
+          final tripType = event['trip_type'] as String?;
+          if (tripType == 'pickup' || tripType == 'dropoff') {
+            _tripType = tripType!;
+          }
+
+          // Capture scheduled time if present
+          final scheduledStr = event['scheduled_time'] as String?;
+          if (scheduledStr != null) {
+            _tripScheduledTime = DateTime.tryParse(scheduledStr);
+          }
+
+          setState(() {
+            _hasActiveTrip = true;
+            _tripHasEnded = false;
+          });
+
+          // Seed the map with the last known bus position from the DB so the
+          // marker appears instantly, before the next live GPS update arrives.
+          final lat = event['bus_latitude'];
+          final lng = event['bus_longitude'];
+          if (lat != null && lng != null && _busLocation == null) {
+            final busValue = _childData?['busId'];
+            final busId = busValue is int
+                ? busValue
+                : int.tryParse(busValue?.toString() ?? '');
+            if (busId != null) {
+              final seedLocation = BusLocation(
+                busId: busId,
+                busNumber: '',
+                latitude: (lat as num).toDouble(),
+                longitude: (lng as num).toDouble(),
+                speed: (event['bus_speed'] as num?)?.toDouble() ?? 0.0,
+                heading: (event['bus_heading'] as num?)?.toDouble() ?? 0.0,
+                isActive: true,
+                timestamp: DateTime.now(),
+              );
+              setState(() => _busLocation = seedLocation);
+              _updateBusAnnotation();
+            }
+          }
+
+          // Kick off stop fetch + Mapbox optimisation now that we know the
+          // trip type — this is the only place that initialises the route.
+          final busValue = _childData?['busId'];
+          if (busValue != null) {
+            final busId = busValue is int
+                ? busValue
+                : int.tryParse(busValue.toString());
+            if (busId != null) MapboxOptimizationService.invalidate(busId);
+          }
+          _initializeRouteOptimization();
+
+        } else if (eventType == 'trip_started') {
+          debugPrint('[TripEvent] trip_started — refreshing optimisation');
+          final tripType = event['trip_type'] as String?;
+          if (tripType == 'pickup' || tripType == 'dropoff') {
+            _tripType = tripType!;
+          }
           setState(() {
             _tripHasEnded = false;
+            _hasActiveTrip = true;
           });
           final busValue = _childData?['busId'];
           if (busValue != null) {
@@ -443,15 +524,19 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
             if (busId != null) MapboxOptimizationService.invalidate(busId);
           }
           _initializeRouteOptimization();
+
         } else if (eventType == 'trip_ended') {
-          debugPrint('[TripEvent] trip_ended received via WebSocket');
+          debugPrint('[TripEvent] trip_ended — clearing trip state');
           if (mounted) {
             setState(() {
               _tripHasEnded = true;
+              _hasActiveTrip = false;
               _busLocation = null;
               _etaMinutes = null;
+              _scheduledEtaMinutes = null;
               _routePoints = null;
               _optimizedRoute = null;
+              _busStops = [];
             });
             _updateBusAnnotation();
             _updateRouteAnnotation();
@@ -459,11 +544,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         }
       });
 
-      if (_webSocketService.isConnected) {
-        _subscribeToBus();
-      } else {
-        _subscribeToBus();
-      }
+      _subscribeToBus();
     } catch (e) {
       // Failed to initialize WebSocket
     }
@@ -640,16 +721,19 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   double _deg2rad(double deg) => deg * pi / 180.0;
 
-  /// Fallback poll — fires every 60 s while no bus is broadcasting.
+  /// WebSocket health check — fires every 15 s.
   ///
-  /// The primary trip-detection mechanism is the WebSocket push event
-  /// (trip_started).  This timer is a safety net for the rare case where the
-  /// WebSocket is offline when the driver starts a trip.
+  /// Two modes:
+  ///  • No active trip:  force disconnect+reconnect every cycle so the server
+  ///    sends a fresh trip_state.  This handles zombie TCP connections (client
+  ///    thinks it's connected but the server can't reach it) and missed
+  ///    trip_started events.
+  ///  • Active trip:     only reconnect if offline — avoids interrupting the
+  ///    live GPS stream.
   void _startTripWatcher() {
     _tripWatchTimer?.cancel();
-    _tripWatchTimer = Timer.periodic(const Duration(seconds: 60), (_) async {
-      if (!mounted || _busLocation != null) return;
-
+    _tripWatchTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      if (!mounted) return;
       if (_childData == null) return;
       final busValue = _childData!['busId'];
       if (busValue == null) return;
@@ -657,22 +741,16 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           busValue is int ? busValue : int.tryParse(busValue.toString());
       if (busId == null) return;
 
-      // Ensure WebSocket is alive — re-subscribe if it dropped
       if (!_webSocketService.isConnected) {
-        debugPrint(
-            '[TripWatcher] WebSocket offline — re-subscribing bus $busId');
+        debugPrint('[TripWatcher] WebSocket offline — re-subscribing bus $busId');
         _webSocketService.subscribeToBus(busId);
-      }
-
-      // Re-check the server for an active trip
-      final newTripType = await _getActiveTripType(busId);
-      if (!mounted) return;
-      if (newTripType != _tripType) {
-        debugPrint(
-            '[TripWatcher] Trip started ($newTripType) — re-running optimization');
-        setState(() => _tripType = newTripType);
-        MapboxOptimizationService.invalidate(busId);
-        _initializeRouteOptimization();
+      } else if (!_hasActiveTrip) {
+        // No active trip: force a reconnect so the server sends a fresh
+        // trip_state.  This recovers from zombie connections and missed
+        // trip_started broadcasts.
+        debugPrint('[TripWatcher] No active trip — forcing WS refresh for bus $busId');
+        _webSocketService.disconnect();
+        _webSocketService.subscribeToBus(busId);
       }
     });
   }
@@ -707,10 +785,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     if (busId == null) return;
 
     try {
-      // 1. Determine trip type from active trip, fall back to time-of-day
-      _tripType = await _getActiveTripType(busId);
+      // _tripType is already set by the WebSocket trip_state / trip_started
+      // event before this method is called — no HTTP polling needed.
 
-      // 2. Fetch all children on this bus that have home coordinates set
+      // 1. Fetch all children on this bus that have home coordinates set
       final busStops = await _fetchBusStops(busId);
 
       // Store stops so the fallback multi-stop router can use them
@@ -1063,21 +1141,25 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         return 'Driver on the way';
       }
       return '$firstName is on the bus';
-    } else if (status == 'at-school' || status == 'at_school') {
+    }
+
+    // Active trip overrides stale static status (at-school, home, etc.).
+    // The WebSocket trip_state / trip_started events set _hasActiveTrip;
+    // don't gate on _busLocation since the GPS marker may not have arrived yet.
+    if (_hasActiveTrip) {
+      if (_busLocation != null && _etaMinutes != null && _etaMinutes! <= 3) {
+        return 'Bus arrives soon';
+      }
+      return 'Bus is on its way';
+    }
+
+    if (status == 'at-school' || status == 'at_school') {
       return '$firstName is at school';
     } else if (status == 'dropped-off' ||
         status == 'dropped_off' ||
         status == 'home') {
       return '$firstName is Home';
     } else {
-      // No terminal status — show trip-in-progress message if bus is active
-      if (_hasActiveTrip && _busLocation != null) {
-        if (_etaMinutes != null) {
-          if (_etaMinutes! <= 3) return 'Bus arrives soon';
-          return 'Bus is on its way';
-        }
-        return 'Bus is on its way';
-      }
       return '$firstName is Home';
     }
   }
@@ -1104,6 +1186,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   }
 
   bool _isChildEnRoute() {
+    // WebSocket trip state takes precedence over stale DB status
+    if (_hasActiveTrip) return true;
     final status = (_childData?['status'] ?? '').toString().toLowerCase();
     return status == 'on_bus' ||
         status == 'on-bus' ||
