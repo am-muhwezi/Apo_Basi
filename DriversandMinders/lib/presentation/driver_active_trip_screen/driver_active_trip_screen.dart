@@ -67,7 +67,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   // Next-turn navigation instruction (from Mapbox Directions steps)
   String? _nextTurnInstruction;
   String? _nextTurnModifier; // 'left', 'right', 'straight', 'slight left', etc.
-  String? _nextTurnType;     // 'turn', 'arrive', 'continue', 'roundabout', etc.
+  String? _nextTurnType; // 'turn', 'arrive', 'continue', 'roundabout', etc.
   double _nextTurnDistanceM = 0;
 
   // Tap → student lookup
@@ -78,8 +78,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       DraggableScrollableController();
 
   // ── Computed helpers ────────────────────────────────────────────────────────
-  List<Map<String, dynamic>> get _mappableStudents =>
-      _students.where((s) {
+  List<Map<String, dynamic>> get _mappableStudents => _students.where((s) {
         final lat = s['lat'] as double?;
         final lng = s['lng'] as double?;
         // Exclude null and (0,0) — the latter is a DB default that was never
@@ -325,8 +324,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     if (_mapboxMap == null) return;
     Point? center;
     if (_driverPosition != null) {
-      center =
-          _latlng(_driverPosition!.latitude, _driverPosition!.longitude);
+      center = _latlng(_driverPosition!.latitude, _driverPosition!.longitude);
     } else if (_mappableStudents.isNotEmpty) {
       center = _latlng(
         _mappableStudents.first['lat'] as double,
@@ -443,8 +441,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     setState(() => _selectedStudent = null);
     _mapboxMap!.flyTo(
       CameraOptions(
-        center:
-            _latlng(_driverPosition!.latitude, _driverPosition!.longitude),
+        center: _latlng(_driverPosition!.latitude, _driverPosition!.longitude),
         zoom: 16.5,
         bearing: _driverPosition!.heading,
         pitch: 50.0,
@@ -467,9 +464,10 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
         if (mounted) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('No active trip found. Please start a trip first.'),
-                backgroundColor: AppTheme.warningState,
+              SnackBar(
+                content:
+                    Text('No active trip found. Please start a trip first.'),
+                backgroundColor: Theme.of(context).colorScheme.tertiary,
                 behavior: SnackBarBehavior.fixed,
                 duration: Duration(seconds: 3),
               ),
@@ -491,9 +489,10 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
           if (mounted) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Trip has already ended. Returning to start shift.'),
-                  backgroundColor: AppTheme.warningState,
+                SnackBar(
+                  content:
+                      Text('Trip has already ended. Returning to start shift.'),
+                  backgroundColor: Theme.of(context).colorScheme.tertiary,
                   behavior: SnackBarBehavior.fixed,
                   duration: Duration(seconds: 3),
                 ),
@@ -512,9 +511,10 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Cannot verify trip status with server. Using local data.'),
-              backgroundColor: AppTheme.warningState,
+            SnackBar(
+              content: Text(
+                  'Cannot verify trip status with server. Using local data.'),
+              backgroundColor: Theme.of(context).colorScheme.tertiary,
               behavior: SnackBarBehavior.fixed,
               duration: Duration(seconds: 3),
             ),
@@ -527,9 +527,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text('Error loading trip. Please try again.'),
-              backgroundColor: AppTheme.criticalAlert,
+              backgroundColor: Theme.of(context).colorScheme.error,
               behavior: SnackBarBehavior.fixed,
               duration: Duration(seconds: 3),
             ),
@@ -652,8 +652,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
           _currentTripId ??= tripData['id'] as int?;
         }
 
-        final rawStops = (tripData['stops'] as List? ?? [])
-            .cast<Map<String, dynamic>>();
+        final rawStops =
+            (tripData['stops'] as List? ?? []).cast<Map<String, dynamic>>();
 
         // Stops arrive pre-sorted from the server but we sort again as a safety net.
         rawStops.sort((a, b) =>
@@ -794,7 +794,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(children: [
-              const Icon(Icons.check_circle, color: Colors.white),
+              Icon(Icons.check_circle, color: Colors.white),
               SizedBox(width: 2.w),
               Expanded(
                 child: Text(
@@ -804,8 +804,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
                 ),
               ),
             ]),
-            duration: const Duration(seconds: 2),
-            backgroundColor: AppTheme.successAction,
+            duration: Duration(seconds: 2),
+            backgroundColor: Theme.of(context).colorScheme.secondary,
             behavior: SnackBarBehavior.fixed,
           ),
         );
@@ -815,12 +815,12 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(children: [
-              const Icon(Icons.warning, color: Colors.white),
+              Icon(Icons.warning, color: Colors.white),
               SizedBox(width: 2.w),
-              const Expanded(child: Text('Saved locally. Will sync when online.')),
+              Expanded(child: Text('Saved locally. Will sync when online.')),
             ]),
-            duration: const Duration(seconds: 3),
-            backgroundColor: AppTheme.warningState,
+            duration: Duration(seconds: 3),
+            backgroundColor: Theme.of(context).colorScheme.tertiary,
             behavior: SnackBarBehavior.fixed,
           ),
         );
@@ -832,13 +832,13 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('End Trip'),
-        content: const Text(
+        title: Text('End Trip'),
+        content: Text(
             'Are you sure you want to end this trip? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
@@ -846,7 +846,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
               _endTrip();
             },
             style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.criticalAlert),
+                backgroundColor: Theme.of(context).colorScheme.error),
             child: const Text('End Trip'),
           ),
         ],
@@ -885,9 +885,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       await _clearTripStateLocally();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Trip ended successfully'),
-            backgroundColor: AppTheme.successAction,
+            backgroundColor: Theme.of(context).colorScheme.secondary,
             behavior: SnackBarBehavior.fixed,
             duration: Duration(seconds: 3),
           ),
@@ -905,24 +905,28 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
           barrierDismissible: false,
           builder: (context) => AlertDialog(
             title: Row(children: [
-              Icon(Icons.warning, color: AppTheme.criticalAlert),
+              Icon(Icons.warning, color: Theme.of(context).colorScheme.error),
               SizedBox(width: 2.w),
-              const Expanded(child: Text('Failed to End Trip')),
+              Expanded(child: Text('Failed to End Trip')),
             ]),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Could not connect to server to end trip.'),
+                Text('Could not connect to server to end trip.'),
                 SizedBox(height: 2.h),
                 Container(
                   padding: EdgeInsets.all(2.w),
                   decoration: BoxDecoration(
-                    color: AppTheme.warningState.withValues(alpha: 0.1),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .tertiary
+                        .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppTheme.warningState),
+                    border: Border.all(
+                        color: Theme.of(context).colorScheme.tertiary),
                   ),
-                  child: const Text(
+                  child: Text(
                     '• Try Again: Attempt to end trip again\n• Force End Locally: Stop timer and location tracking',
                     style: TextStyle(fontSize: 12),
                   ),
@@ -932,13 +936,13 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Try Again'),
+                child: Text('Try Again'),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.warningState),
-                child: const Text('Force End Locally'),
+                    backgroundColor: Theme.of(context).colorScheme.tertiary),
+                child: Text('Force End Locally'),
               ),
             ],
           ),
@@ -948,9 +952,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
           await _clearTripStateLocally();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
+              SnackBar(
                 content: Text('Trip ended locally. Location tracking stopped.'),
-                backgroundColor: AppTheme.warningState,
+                backgroundColor: Theme.of(context).colorScheme.tertiary,
                 behavior: SnackBarBehavior.fixed,
                 duration: Duration(seconds: 3),
               ),
@@ -1004,8 +1008,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     // the 45-second window.
     final now = DateTime.now();
     if (_lastRouteRefresh != null &&
-        now.difference(_lastRouteRefresh!) <
-            const Duration(seconds: 45)) return;
+        now.difference(_lastRouteRefresh!) < const Duration(seconds: 45))
+      return;
 
     final pending = _mappableStudents
         .where((s) => !(s['isPickedUp'] as bool? ?? false))
@@ -1088,8 +1092,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       final newEtas = <String, Duration?>{};
       for (int i = 0; i < capped.length && i < legs.length; i++) {
         cumSecs += (legs[i]['duration'] as num).toDouble();
-        newEtas[capped[i]['id'] as String] =
-            Duration(seconds: cumSecs.round());
+        newEtas[capped[i]['id'] as String] = Duration(seconds: cumSecs.round());
       }
 
       // Parse the next turn instruction from the first step of the first leg.
@@ -1127,7 +1130,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       }
       print('✅ _updateRoute: polyline drawn, ${newEtas.length} ETAs set');
     } on DioException catch (e) {
-      print('❌ _updateRoute DioException: ${e.message} | ${e.response?.statusCode} | ${e.response?.data}');
+      print(
+          '❌ _updateRoute DioException: ${e.message} | ${e.response?.statusCode} | ${e.response?.data}');
       // Network unavailable — keep existing route/ETAs
       _lastRouteRefresh = null; // allow retry next call
     } catch (e) {
@@ -1177,231 +1181,224 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   @override
   Widget build(BuildContext context) {
     if (_isLoadingData) {
-      return Theme(
-        data: AppTheme.lightDriverTheme,
-        child: const Scaffold(
-          backgroundColor: Color(0xFF0F172A),
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(color: Color(0xFF4285F4)),
-                SizedBox(height: 16),
-                Text('Loading trip…',
-                    style: TextStyle(color: Colors.white70, fontSize: 16)),
-              ],
-            ),
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F172A),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: Color(0xFF4285F4)),
+              SizedBox(height: 16),
+              Text('Loading trip…',
+                  style: TextStyle(color: Colors.white70, fontSize: 16)),
+            ],
           ),
         ),
       );
     }
 
-    return Theme(
-      data: AppTheme.lightDriverTheme,
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        drawer: DriverDrawerWidget(
-          currentRoute: '/driver-active-trip-screen',
-          driverData: {
-            'name': _tripData['driverName'] ?? 'Driver',
-            'bus_number':
-                _busData?['bus_number'] ?? _busData?['number_plate'] ?? 'N/A',
-          },
-          hasActiveTrip: true,
-        ),
-        body: Stack(
-          children: [
-            // ── Full-screen Mapbox map ─────────────────────────────────────────
-            MapWidget(
-              styleUri: 'mapbox://styles/${ApiConfig.mapboxStyleId}',
-              cameraOptions: CameraOptions(
-                center: _driverPosition != null
-                    ? _latlng(
-                        _driverPosition!.latitude, _driverPosition!.longitude)
-                    : _latlng(0.3476, 32.5825),
-                zoom: 16.0,
-                pitch: 50.0,
-              ),
-              onMapCreated: _onMapCreated,
-              // No scroll listener: the map always follows the driver.
-              // Camera is updated on every location poll in fetchOnce().
+    return Scaffold(
+      backgroundColor: Colors.black,
+      drawer: DriverDrawerWidget(
+        currentRoute: '/driver-active-trip-screen',
+        driverData: {
+          'name': _tripData['driverName'] ?? 'Driver',
+          'bus_number':
+              _busData?['bus_number'] ?? _busData?['number_plate'] ?? 'N/A',
+        },
+        hasActiveTrip: true,
+      ),
+      body: Stack(
+        children: [
+          // ── Full-screen Mapbox map ─────────────────────────────────────────
+          MapWidget(
+            styleUri: 'mapbox://styles/${ApiConfig.mapboxStyleId}',
+            cameraOptions: CameraOptions(
+              center: _driverPosition != null
+                  ? _latlng(
+                      _driverPosition!.latitude, _driverPosition!.longitude)
+                  : _latlng(0.3476, 32.5825),
+              zoom: 16.0,
+              pitch: 50.0,
             ),
+            onMapCreated: _onMapCreated,
+            // No scroll listener: the map always follows the driver.
+            // Camera is updated on every location poll in fetchOnce().
+          ),
 
-            // ── Trip timer badge (top-center) ──────────────────────────────────
+          // ── Trip timer badge (top-center) ──────────────────────────────────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 14,
+            left: 72,
+            right: 72,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A2E).withValues(alpha: 0.92),
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                '${_tripData["trip_type"] == "pickup" ? "↑ Pickup" : "↓ Drop-off"}  •  $_studentsPickedUp/${_students.length}  •  $_elapsedTime',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11.sp,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ),
+          ),
+
+          // ── Menu button (top-left) ─────────────────────────────────────────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 14,
+            left: 16,
+            child: Builder(
+              builder: (ctx) => _CircleButton(
+                onTap: () => Scaffold.of(ctx).openDrawer(),
+                child: const Icon(Icons.menu, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
+
+          // ── Recenter button (top-right) ────────────────────────────────────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 14,
+            right: 16,
+            child: _CircleButton(
+              onTap: _recenterOnDriver,
+              child: Icon(
+                Icons.my_location,
+                color: _driverPosition != null
+                    ? const Color(0xFF4285F4)
+                    : Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
+
+          // Offline warning badge
+          if (_errorMessage != null)
             Positioned(
-              top: MediaQuery.of(context).padding.top + 14,
-              left: 72,
-              right: 72,
+              top: MediaQuery.of(context).padding.top + 70,
+              left: 16,
+              right: 16,
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A2E).withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(22),
+                  color: Colors.orange.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(children: [
+                  Icon(Icons.wifi_off, color: Colors.white, size: 16),
+                  SizedBox(width: 8),
+                  Text('Offline mode',
+                      style: TextStyle(color: Colors.white, fontSize: 12)),
+                ]),
+              ),
+            ),
+
+          // ── Next-turn instruction banner ───────────────────────────────────
+          if (_nextTurnInstruction != null)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 68,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E3A5F).withValues(alpha: 0.97),
+                  borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                      color: Colors.black.withValues(alpha: 0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: Text(
-                  '${_tripData["trip_type"] == "pickup" ? "↑ Pickup" : "↓ Drop-off"}  •  $_studentsPickedUp/${_students.length}  •  $_elapsedTime',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 11.sp,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
-            ),
-
-            // ── Menu button (top-left) ─────────────────────────────────────────
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 14,
-              left: 16,
-              child: Builder(
-                builder: (ctx) => _CircleButton(
-                  onTap: () => Scaffold.of(ctx).openDrawer(),
-                  child: const Icon(Icons.menu, color: Colors.white, size: 22),
-                ),
-              ),
-            ),
-
-            // ── Recenter button (top-right) ────────────────────────────────────
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 14,
-              right: 16,
-              child: _CircleButton(
-                onTap: _recenterOnDriver,
-                child: Icon(
-                  Icons.my_location,
-                  color: _driverPosition != null
-                      ? const Color(0xFF4285F4)
-                      : Colors.white,
-                  size: 22,
-                ),
-              ),
-            ),
-
-            // Offline warning badge
-            if (_errorMessage != null)
-              Positioned(
-                top: MediaQuery.of(context).padding.top + 70,
-                left: 16,
-                right: 16,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(children: [
-                    Icon(Icons.wifi_off, color: Colors.white, size: 16),
-                    SizedBox(width: 8),
-                    Text('Offline mode',
-                        style: TextStyle(color: Colors.white, fontSize: 12)),
-                  ]),
-                ),
-              ),
-
-            // ── Next-turn instruction banner ───────────────────────────────────
-            if (_nextTurnInstruction != null)
-              Positioned(
-                top: MediaQuery.of(context).padding.top + 68,
-                left: 16,
-                right: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E3A5F).withValues(alpha: 0.97),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4285F4),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4285F4),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          _turnIcon(_nextTurnType, _nextTurnModifier),
-                          color: Colors.white,
-                          size: 28,
-                        ),
+                      child: Icon(
+                        _turnIcon(_nextTurnType, _nextTurnModifier),
+                        color: Colors.white,
+                        size: 28,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _formatTurnDistance(_nextTurnDistanceM),
-                              style: TextStyle(
-                                color: const Color(0xFF93C5FD),
-                                fontSize: 9.5.sp,
-                                fontWeight: FontWeight.w600,
-                              ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _formatTurnDistance(_nextTurnDistanceM),
+                            style: TextStyle(
+                              color: const Color(0xFF93C5FD),
+                              fontSize: 9.5.sp,
+                              fontWeight: FontWeight.w600,
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _nextTurnInstruction!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11.sp,
-                                fontWeight: FontWeight.w700,
-                              ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _nextTurnInstruction!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11.sp,
+                              fontWeight: FontWeight.w700,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-
-            // ── Draggable bottom sheet ─────────────────────────────────────────
-            DraggableScrollableSheet(
-              controller: _sheetController,
-              initialChildSize: 0.32,
-              minChildSize: 0.12,
-              maxChildSize: 0.82,
-              snap: true,
-              snapSizes: const [0.32, 0.55, 0.82],
-              builder: (context, scrollController) {
-                return _TripBottomSheet(
-                  scrollController: scrollController,
-                  students: _students,
-                  selectedStudent: _selectedStudent,
-                  tripData: _tripData,
-                  totalPickedUp: _studentsPickedUp,
-                  mappableCount: _mappableStudents.length,
-                  studentEtas: _studentEtas,
-                  onStudentTap: _onStudentSelected,
-                  onPickupToggle: _onPickupStatusChanged,
-                  onEndTrip: _onEndTripPressed,
-                );
-              },
             ),
-          ],
-        ),
+
+          // ── Draggable bottom sheet ─────────────────────────────────────────
+          DraggableScrollableSheet(
+            controller: _sheetController,
+            initialChildSize: 0.32,
+            minChildSize: 0.12,
+            maxChildSize: 0.82,
+            snap: true,
+            snapSizes: const [0.32, 0.55, 0.82],
+            builder: (context, scrollController) {
+              return _TripBottomSheet(
+                scrollController: scrollController,
+                students: _students,
+                selectedStudent: _selectedStudent,
+                tripData: _tripData,
+                totalPickedUp: _studentsPickedUp,
+                mappableCount: _mappableStudents.length,
+                studentEtas: _studentEtas,
+                onStudentTap: _onStudentSelected,
+                onPickupToggle: _onPickupStatusChanged,
+                onEndTrip: _onEndTripPressed,
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -1486,8 +1483,8 @@ class _TripBottomSheet extends StatelessWidget {
           SizedBox(height: 1.h),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 5.w),
-            child: Divider(
-                color: Colors.white.withValues(alpha: 0.12), height: 1),
+            child:
+                Divider(color: Colors.white.withValues(alpha: 0.12), height: 1),
           ),
           SizedBox(height: 1.h),
 
@@ -1536,7 +1533,8 @@ class _TripBottomSheet extends StatelessWidget {
               index: index,
               isSelected: selectedStudent?['id'] == student['id'],
               eta: eta,
-              onTap: student['lat'] != null ? () => onStudentTap(student) : null,
+              onTap:
+                  student['lat'] != null ? () => onStudentTap(student) : null,
               onToggle: (val) => onPickupToggle(index, val),
             );
           }),
@@ -1548,13 +1546,13 @@ class _TripBottomSheet extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(5.w, 0, 5.w, 3.h),
             child: ElevatedButton.icon(
               onPressed: onEndTrip,
-              icon: const Icon(Icons.stop_circle_outlined),
-              label: const Text(
+              icon: Icon(Icons.stop_circle_outlined),
+              label: Text(
                 'End Trip',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.criticalAlert,
+                backgroundColor: Theme.of(context).colorScheme.error,
                 foregroundColor: Colors.white,
                 padding:
                     const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
@@ -1635,9 +1633,8 @@ class _StudentTripTile extends StatelessWidget {
     final isPickedUp = student['isPickedUp'] as bool? ?? false;
     final hasCoordsSet = student['lat'] != null && student['lng'] != null;
 
-    final Color statusColor = isPickedUp
-        ? const Color(0xFF10B981)
-        : const Color(0xFF6B7280);
+    final Color statusColor =
+        isPickedUp ? const Color(0xFF10B981) : const Color(0xFF6B7280);
 
     return GestureDetector(
       onTap: onTap,
@@ -1696,8 +1693,7 @@ class _StudentTripTile extends StatelessWidget {
                   if (address.isNotEmpty)
                     Text(
                       'Grade $grade  •  $address',
-                      style:
-                          TextStyle(color: Colors.white54, fontSize: 9.sp),
+                      style: TextStyle(color: Colors.white54, fontSize: 9.sp),
                       overflow: TextOverflow.ellipsis,
                     ),
                 ],

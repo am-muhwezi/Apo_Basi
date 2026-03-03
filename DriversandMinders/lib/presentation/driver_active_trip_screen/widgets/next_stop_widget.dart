@@ -30,8 +30,8 @@ class NextStopWidget extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              AppTheme.successAction,
-              AppTheme.successAction.withValues(alpha: 0.8),
+              Theme.of(context).colorScheme.secondary,
+              Theme.of(context).colorScheme.secondary.withValues(alpha: 0.8),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -39,7 +39,7 @@ class NextStopWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.successAction.withValues(alpha: 0.3),
+              color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
               offset: Offset(0, 4),
               blurRadius: 12,
               spreadRadius: 0,
@@ -50,14 +50,14 @@ class NextStopWidget extends StatelessWidget {
           children: [
             CustomIconWidget(
               iconName: 'check_circle',
-              color: AppTheme.textOnPrimary,
+              color: Theme.of(context).colorScheme.onPrimary,
               size: 48,
             ),
             SizedBox(height: 2.h),
             Text(
               'All Students Picked Up!',
               style: theme.textTheme.titleLarge?.copyWith(
-                color: AppTheme.textOnPrimary,
+                color: Theme.of(context).colorScheme.onPrimary,
                 fontWeight: FontWeight.w700,
               ),
               textAlign: TextAlign.center,
@@ -66,7 +66,7 @@ class NextStopWidget extends StatelessWidget {
             Text(
               'Ready to end trip',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppTheme.textOnPrimary.withValues(alpha: 0.9),
+                color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.9),
               ),
               textAlign: TextAlign.center,
             ),
@@ -86,8 +86,8 @@ class NextStopWidget extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppTheme.primaryDriver,
-            AppTheme.primaryDriver.withValues(alpha: 0.8),
+            Theme.of(context).colorScheme.primary,
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -95,7 +95,7 @@ class NextStopWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryDriver.withValues(alpha: 0.3),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
             offset: Offset(0, 4),
             blurRadius: 12,
             spreadRadius: 0,
@@ -113,7 +113,7 @@ class NextStopWidget extends StatelessWidget {
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
                   decoration: BoxDecoration(
-                    color: AppTheme.textOnPrimary.withValues(alpha: 0.2),
+                    color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -121,14 +121,14 @@ class NextStopWidget extends StatelessWidget {
                     children: [
                       CustomIconWidget(
                         iconName: 'navigation',
-                        color: AppTheme.textOnPrimary,
+                        color: Theme.of(context).colorScheme.onPrimary,
                         size: 16,
                       ),
                       SizedBox(width: 1.w),
                       Text(
                         'NEXT STOP',
                         style: theme.textTheme.labelMedium?.copyWith(
-                          color: AppTheme.textOnPrimary,
+                          color: Theme.of(context).colorScheme.onPrimary,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1.2,
                         ),
@@ -140,13 +140,13 @@ class NextStopWidget extends StatelessWidget {
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
                   decoration: BoxDecoration(
-                    color: AppTheme.textOnPrimary.withValues(alpha: 0.2),
+                    color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     '$remainingStops Remaining',
                     style: theme.textTheme.labelMedium?.copyWith(
-                      color: AppTheme.textOnPrimary,
+                      color: Theme.of(context).colorScheme.onPrimary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -162,7 +162,7 @@ class NextStopWidget extends StatelessWidget {
               children: [
                 CustomIconWidget(
                   iconName: 'location_on',
-                  color: AppTheme.textOnPrimary,
+                  color: Theme.of(context).colorScheme.onPrimary,
                   size: 28,
                 ),
                 SizedBox(width: 3.w),
@@ -170,7 +170,7 @@ class NextStopWidget extends StatelessWidget {
                   child: Text(
                     stopName,
                     style: theme.textTheme.headlineSmall?.copyWith(
-                      color: AppTheme.textOnPrimary,
+                      color: Theme.of(context).colorScheme.onPrimary,
                       fontWeight: FontWeight.w700,
                       height: 1.2,
                     ),
@@ -194,7 +194,7 @@ class NextStopWidget extends StatelessWidget {
                   width: 15.w,
                   height: 15.w,
                   decoration: BoxDecoration(
-                    color: AppTheme.textOnPrimary,
+                    color: Theme.of(context).colorScheme.onPrimary,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
@@ -203,7 +203,7 @@ class NextStopWidget extends StatelessWidget {
                           ? studentName[0].toUpperCase()
                           : 'S',
                       style: theme.textTheme.headlineMedium?.copyWith(
-                        color: AppTheme.primaryDriver,
+                        color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -217,7 +217,7 @@ class NextStopWidget extends StatelessWidget {
                       Text(
                         studentName,
                         style: theme.textTheme.titleLarge?.copyWith(
-                          color: AppTheme.textOnPrimary,
+                          color: Theme.of(context).colorScheme.onPrimary,
                           fontWeight: FontWeight.w600,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -226,7 +226,7 @@ class NextStopWidget extends StatelessWidget {
                       Text(
                         'Grade $studentGrade',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textOnPrimary.withValues(alpha: 0.9),
+                          color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.9),
                         ),
                       ),
                     ],
@@ -243,7 +243,7 @@ class NextStopWidget extends StatelessWidget {
               margin: EdgeInsets.symmetric(horizontal: 4.w),
               padding: EdgeInsets.all(3.w),
               decoration: BoxDecoration(
-                color: AppTheme.warningState,
+                color: Theme.of(context).colorScheme.tertiary,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -276,7 +276,7 @@ class NextStopWidget extends StatelessWidget {
           Container(
             padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 3.w),
             decoration: BoxDecoration(
-              color: AppTheme.textOnPrimary.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.only(
                 bottomLeft: Radius.circular(16),
                 bottomRight: Radius.circular(16),
@@ -288,8 +288,8 @@ class NextStopWidget extends StatelessWidget {
                 onMarkPickedUp();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.successAction,
-                foregroundColor: AppTheme.textOnPrimary,
+                backgroundColor: Theme.of(context).colorScheme.secondary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 padding: EdgeInsets.symmetric(vertical: 2.h),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -301,14 +301,14 @@ class NextStopWidget extends StatelessWidget {
                 children: [
                   CustomIconWidget(
                     iconName: 'check_circle',
-                    color: AppTheme.textOnPrimary,
+                    color: Theme.of(context).colorScheme.onPrimary,
                     size: 24,
                   ),
                   SizedBox(width: 3.w),
                   Text(
                     'Student Picked Up',
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: AppTheme.textOnPrimary,
+                      color: Theme.of(context).colorScheme.onPrimary,
                       fontWeight: FontWeight.w700,
                     ),
                   ),

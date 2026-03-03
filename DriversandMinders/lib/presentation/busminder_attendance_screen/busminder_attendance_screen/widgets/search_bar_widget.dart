@@ -63,7 +63,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
           gradient: _isSearchActive
               ? LinearGradient(
                   colors: [
-                    AppTheme.primaryBusminder.withValues(alpha: 0.05),
+                    Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
                     Colors.white,
                   ],
                   begin: Alignment.topLeft,
@@ -74,15 +74,15 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
           borderRadius: BorderRadius.circular(16.0),
           border: Border.all(
             color: _isSearchActive
-                ? AppTheme.primaryBusminder.withValues(alpha: 0.3)
-                : AppTheme.borderLight.withValues(alpha: 0.3),
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
+                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
             width: _isSearchActive ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
               color: _isSearchActive
-                  ? AppTheme.primaryBusminder.withValues(alpha: 0.1)
-                  : AppTheme.shadowLight.withValues(alpha: 0.5),
+                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                  : Theme.of(context).colorScheme.shadow.withValues(alpha: 0.5),
               offset: Offset(0, _isSearchActive ? 4 : 2),
               blurRadius: _isSearchActive ? 12 : 8,
               spreadRadius: 0,
@@ -92,13 +92,13 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
         child: TextField(
           controller: _searchController,
           style: theme.textTheme.bodyMedium?.copyWith(
-            color: AppTheme.textPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.w500,
           ),
           decoration: InputDecoration(
             hintText: widget.hintText,
             hintStyle: theme.textTheme.bodyMedium?.copyWith(
-              color: AppTheme.textSecondary.withValues(alpha: 0.6),
+              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
               fontWeight: FontWeight.w400,
             ),
             prefixIcon: Padding(
@@ -110,17 +110,17 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                   gradient: _isSearchActive
                       ? LinearGradient(
                           colors: [
-                            AppTheme.primaryBusminder,
-                            AppTheme.primaryBusminderLight,
+                            Theme.of(context).colorScheme.primary,
+                            Theme.of(context).colorScheme.primaryContainer,
                           ],
                         )
                       : null,
-                  color: _isSearchActive ? null : AppTheme.backgroundSecondary.withValues(alpha: 0.5),
+                  color: _isSearchActive ? null : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: CustomIconWidget(
                   iconName: 'search',
-                  color: _isSearchActive ? Colors.white : AppTheme.textSecondary,
+                  color: _isSearchActive ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
                   size: 20,
                 ),
               ),
@@ -133,12 +133,12 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                       child: Container(
                         padding: EdgeInsets.all(1.5.w),
                         decoration: BoxDecoration(
-                          color: AppTheme.criticalAlert.withValues(alpha: 0.1),
+                          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: CustomIconWidget(
                           iconName: 'close',
-                          color: AppTheme.criticalAlert,
+                          color: Theme.of(context).colorScheme.error,
                           size: 18,
                         ),
                       ),

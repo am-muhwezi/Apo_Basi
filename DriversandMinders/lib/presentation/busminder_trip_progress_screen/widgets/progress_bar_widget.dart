@@ -50,7 +50,7 @@ class ProgressBarWidget extends StatelessWidget {
                 '${progressPercentage.toInt()}%',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.primaryBusminder,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
             ],
@@ -72,8 +72,8 @@ class ProgressBarWidget extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      AppTheme.primaryBusminder,
-                      AppTheme.primaryBusminderLight,
+                      Theme.of(context).colorScheme.primary,
+                      Theme.of(context).colorScheme.primaryContainer,
                     ],
                   ),
                   borderRadius: BorderRadius.circular(4),
@@ -107,11 +107,11 @@ class ProgressBarWidget extends StatelessWidget {
             height: 16,
             decoration: BoxDecoration(
               color: isCompleted
-                  ? AppTheme.successAction
+                  ? Theme.of(context).colorScheme.secondary
                   : theme.colorScheme.surface,
               border: Border.all(
                 color: isCompleted
-                    ? AppTheme.successAction
+                    ? Theme.of(context).colorScheme.secondary
                     : theme.colorScheme.outline,
                 width: 2,
               ),
@@ -146,12 +146,12 @@ class ProgressBarWidget extends StatelessWidget {
           padding: EdgeInsets.all(3.w),
           decoration: BoxDecoration(
             color: isCompleted
-                ? AppTheme.successAction.withValues(alpha: 0.1)
+                ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1)
                 : theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: isCompleted
-                  ? AppTheme.successAction.withValues(alpha: 0.3)
+                  ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3)
                   : theme.colorScheme.outline.withValues(alpha: 0.2),
             ),
           ),
@@ -161,7 +161,7 @@ class ProgressBarWidget extends StatelessWidget {
                 iconName:
                     isCompleted ? 'check_circle' : 'radio_button_unchecked',
                 color: isCompleted
-                    ? AppTheme.successAction
+                    ? Theme.of(context).colorScheme.secondary
                     : theme.colorScheme.outline,
                 size: 20,
               ),

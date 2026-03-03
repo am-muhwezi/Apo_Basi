@@ -85,13 +85,13 @@ class EmptyStateWidget extends StatelessWidget {
                       onPressed: onActionPressed,
                       icon: CustomIconWidget(
                         iconName: 'filter_list',
-                        color: AppTheme.primaryDriver,
+                        color: Theme.of(context).colorScheme.primary,
                         size: 20,
                       ),
                       label: Text(
                         'Adjust Filters',
                         style: theme.textTheme.titleSmall?.copyWith(
-                          color: AppTheme.primaryDriver,
+                          color: Theme.of(context).colorScheme.primary,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -100,7 +100,7 @@ class EmptyStateWidget extends StatelessWidget {
                           horizontal: 6.w,
                           vertical: 1.5.h,
                         ),
-                        side: BorderSide(color: AppTheme.primaryDriver),
+                        side: BorderSide(color: Theme.of(context).colorScheme.primary),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8.0),
                         ),
@@ -112,7 +112,7 @@ class EmptyStateWidget extends StatelessWidget {
                     ElevatedButton(
                       onPressed: onActionPressed,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryDriver,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         padding: EdgeInsets.symmetric(
                           horizontal: 6.w,
                           vertical: 1.5.h,
@@ -124,7 +124,7 @@ class EmptyStateWidget extends StatelessWidget {
                       child: Text(
                         actionText!,
                         style: theme.textTheme.titleSmall?.copyWith(
-                          color: AppTheme.textOnPrimary,
+                          color: Theme.of(context).colorScheme.onPrimary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

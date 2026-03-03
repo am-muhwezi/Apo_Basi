@@ -24,8 +24,8 @@ class DriverHeaderWidget extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppTheme.primaryDriver.withValues(alpha: 0.05),
-            AppTheme.backgroundPrimary,
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+            Theme.of(context).colorScheme.surface,
           ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
@@ -41,16 +41,16 @@ class DriverHeaderWidget extends StatelessWidget {
             child: Container(
               padding: EdgeInsets.all(2.5.w),
               decoration: BoxDecoration(
-                color: AppTheme.primaryDriver.withValues(alpha: 0.1),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppTheme.primaryDriver.withValues(alpha: 0.2),
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
                   width: 1.5,
                 ),
               ),
               child: CustomIconWidget(
                 iconName: 'menu',
-                color: AppTheme.primaryDriver,
+                color: Theme.of(context).colorScheme.primary,
                 size: 24,
               ),
             ),
@@ -65,7 +65,7 @@ class DriverHeaderWidget extends StatelessWidget {
                   style: AppTheme.lightDriverTheme.textTheme.headlineSmall
                       ?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                     letterSpacing: -0.5,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -75,7 +75,7 @@ class DriverHeaderWidget extends StatelessWidget {
                   'Driver ID: $driverId',
                   style:
                       AppTheme.lightDriverTheme.textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -90,16 +90,16 @@ class DriverHeaderWidget extends StatelessWidget {
             child: Container(
               padding: EdgeInsets.all(2.5.w),
               decoration: BoxDecoration(
-                color: AppTheme.criticalAlert.withValues(alpha: 0.1),
+                color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppTheme.criticalAlert.withValues(alpha: 0.3),
+                  color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
                   width: 1.5,
                 ),
               ),
               child: CustomIconWidget(
                 iconName: 'logout',
-                color: AppTheme.criticalAlert,
+                color: Theme.of(context).colorScheme.error,
                 size: 24,
               ),
             ),

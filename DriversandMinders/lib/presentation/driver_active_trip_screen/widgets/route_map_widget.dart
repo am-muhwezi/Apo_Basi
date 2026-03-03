@@ -88,11 +88,11 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
 
   void _setupMarkersAndRoute() {
     // Sort stops by `order` field so the polyline always follows the correct sequence
-    final stops = ((widget.tripData["stops"] as List? ?? [])
-            .cast<Map<String, dynamic>>()
-          ..sort((a, b) =>
-              (a['order'] as int? ?? 0).compareTo(b['order'] as int? ?? 0)))
-        .toList();
+    final stops =
+        ((widget.tripData["stops"] as List? ?? []).cast<Map<String, dynamic>>()
+              ..sort((a, b) =>
+                  (a['order'] as int? ?? 0).compareTo(b['order'] as int? ?? 0)))
+            .toList();
     final List<Marker> markers = [];
     final List<Polyline> polylines = [];
 
@@ -100,13 +100,15 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     if (_currentPosition != null) {
       markers.add(
         Marker(
-          point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+          point:
+              LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
           width: 60,
           height: 60,
           child: BusMarker3D(
             size: 60,
             heading: _currentPosition!.heading, // Rotate based on GPS heading
-            isMoving: _currentPosition!.speed > 0.5, // Moving if speed > 0.5 m/s (~1.8 km/h)
+            isMoving: _currentPosition!.speed >
+                0.5, // Moving if speed > 0.5 m/s (~1.8 km/h)
           ),
         ),
       );
@@ -154,7 +156,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
       polylines.add(
         Polyline(
           points: routePoints,
-          color: AppTheme.primaryDriver,
+          color: Theme.of(context).colorScheme.primary,
           strokeWidth: 4,
         ),
       );
@@ -165,7 +167,6 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
       _polylines = polylines;
     });
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -179,7 +180,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.shadowLight,
+            color: Theme.of(context).colorScheme.shadow,
             offset: Offset(0, 2),
             blurRadius: 8,
             spreadRadius: 0,
@@ -202,11 +203,14 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
                 child: Container(
                   padding: EdgeInsets.all(2.w),
                   decoration: BoxDecoration(
-                    color: AppTheme.backgroundPrimary.withValues(alpha: 0.9),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surface
+                        .withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.shadowLight,
+                        color: Theme.of(context).colorScheme.shadow,
                         offset: Offset(0, 1),
                         blurRadius: 4,
                         spreadRadius: 0,
@@ -215,7 +219,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
                   ),
                   child: CustomIconWidget(
                     iconName: 'fullscreen',
-                    color: AppTheme.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                     size: 20,
                   ),
                 ),
@@ -230,8 +234,14 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
                 padding: EdgeInsets.symmetric(horizontal: 2.w, vertical: 1.h),
                 decoration: BoxDecoration(
                   color: _hasLocationPermission && _currentPosition != null
-                      ? AppTheme.successAction.withValues(alpha: 0.9)
-                      : AppTheme.warningState.withValues(alpha: 0.9),
+                      ? Theme.of(context)
+                          .colorScheme
+                          .secondary
+                          .withValues(alpha: 0.9)
+                      : Theme.of(context)
+                          .colorScheme
+                          .tertiary
+                          .withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -242,7 +252,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
                           _hasLocationPermission && _currentPosition != null
                               ? 'gps_fixed'
                               : 'gps_off',
-                      color: AppTheme.textOnPrimary,
+                      color: Theme.of(context).colorScheme.onPrimary,
                       size: 16,
                     ),
                     SizedBox(width: 1.w),
@@ -251,7 +261,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
                           ? 'GPS Active'
                           : 'GPS Off',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textOnPrimary,
+                        color: Theme.of(context).colorScheme.onPrimary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -269,11 +279,14 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
                 child: Container(
                   padding: EdgeInsets.all(3.w),
                   decoration: BoxDecoration(
-                    color: AppTheme.backgroundPrimary.withValues(alpha: 0.95),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surface
+                        .withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.shadowLight,
+                        color: Theme.of(context).colorScheme.shadow,
                         blurRadius: 8,
                       ),
                     ],
@@ -284,12 +297,14 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
                       _buildInfoItem(
                         icon: 'directions_bus',
                         label: 'Bus',
-                        value: widget.tripData["busNumber"]?.toString() ?? 'N/A',
+                        value:
+                            widget.tripData["busNumber"]?.toString() ?? 'N/A',
                       ),
                       _buildInfoItem(
                         icon: 'speed',
                         label: 'Speed',
-                        value: '${_currentPosition!.speed.toStringAsFixed(1)} m/s',
+                        value:
+                            '${_currentPosition!.speed.toStringAsFixed(1)} m/s',
                       ),
                       _buildInfoItem(
                         icon: 'my_location',
@@ -317,21 +332,21 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
       children: [
         CustomIconWidget(
           iconName: icon,
-          color: AppTheme.primaryDriver,
+          color: Theme.of(context).colorScheme.primary,
           size: 20,
         ),
         SizedBox(height: 0.5.h),
         Text(
           label,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: AppTheme.textSecondary,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontSize: 9.sp,
           ),
         ),
         Text(
           value,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: AppTheme.textPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.w600,
             fontSize: 10.sp,
           ),
@@ -344,19 +359,19 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     final theme = Theme.of(context);
 
     return Container(
-      color: AppTheme.backgroundSecondary,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(
-              color: AppTheme.primaryDriver,
+              color: Theme.of(context).colorScheme.primary,
             ),
             SizedBox(height: 2.h),
             Text(
               'Loading Map...',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppTheme.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -390,4 +405,3 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     );
   }
 }
-

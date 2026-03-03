@@ -24,14 +24,14 @@ class RouteHeaderWidget extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppTheme.primaryBusminder,
-            AppTheme.primaryBusminderLight,
+            Theme.of(context).colorScheme.primary,
+            Theme.of(context).colorScheme.primaryContainer,
           ],
         ),
         borderRadius: BorderRadius.circular(12.0),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryBusminder.withValues(alpha: 0.15),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
             offset: const Offset(0, 2),
             blurRadius: 8,
             spreadRadius: 0,
@@ -49,7 +49,7 @@ class RouteHeaderWidget extends StatelessWidget {
                 Text(
                   routeInfo['tripType'] as String? ?? 'Trip',
                   style: TextStyle(
-                    color: AppTheme.textOnPrimary,
+                    color: Theme.of(context).colorScheme.onPrimary,
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
                     letterSpacing: -0.2,
@@ -68,14 +68,14 @@ class RouteHeaderWidget extends StatelessWidget {
               // Student count
               Icon(
                 Icons.people,
-                color: AppTheme.textOnPrimary,
+                color: Theme.of(context).colorScheme.onPrimary,
                 size: 14,
               ),
               SizedBox(width: 1.w),
               Text(
                 '$totalStudents',
                 style: TextStyle(
-                  color: AppTheme.textOnPrimary,
+                  color: Theme.of(context).colorScheme.onPrimary,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
                 ),
@@ -84,14 +84,14 @@ class RouteHeaderWidget extends StatelessWidget {
               // Time
               Icon(
                 Icons.access_time,
-                color: AppTheme.textOnPrimary,
+                color: Theme.of(context).colorScheme.onPrimary,
                 size: 14,
               ),
               SizedBox(width: 1.w),
               Text(
                 routeInfo['startTime'] as String? ?? '--:--',
                 style: TextStyle(
-                  color: AppTheme.textOnPrimary,
+                  color: Theme.of(context).colorScheme.onPrimary,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
                 ),
@@ -104,7 +104,7 @@ class RouteHeaderWidget extends StatelessWidget {
                   vertical: 0.4.h,
                 ),
                 decoration: BoxDecoration(
-                  color: AppTheme.successAction,
+                  color: Theme.of(context).colorScheme.secondary,
                   borderRadius: BorderRadius.circular(6.0),
                 ),
                 child: Row(

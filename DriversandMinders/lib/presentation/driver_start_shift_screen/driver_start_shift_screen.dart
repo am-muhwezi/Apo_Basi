@@ -248,8 +248,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
       final cachedBusData = prefs.getString('cached_bus_data');
       final cachedRouteData = prefs.getString('cached_route_data');
-      final hasCachedData =
-          cachedBusData != null && cachedRouteData != null;
+      final hasCachedData = cachedBusData != null && cachedRouteData != null;
 
       if (hasCachedData) {
         try {
@@ -667,7 +666,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(message),
-              backgroundColor: AppTheme.criticalAlert,
+              backgroundColor: Theme.of(context).colorScheme.error,
               duration: const Duration(seconds: 5)),
         );
       }
@@ -681,7 +680,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
       builder: (context) => Container(
         padding: EdgeInsets.all(6.w),
         decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -694,18 +693,19 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                     borderRadius: BorderRadius.circular(2))),
             SizedBox(height: 3.h),
             Icon(Icons.warning_amber_rounded,
-                size: 48, color: AppTheme.warningState),
+                size: 48, color: Theme.of(context).colorScheme.tertiary),
             SizedBox(height: 2.h),
             Text('Reset Trip State?',
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary)),
+                    color: Theme.of(context).colorScheme.onSurface)),
             SizedBox(height: 1.h),
             Text(
                 'This will clear local trip data. Only use if the app is stuck.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppTheme.textSecondary)),
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
             SizedBox(height: 3.h),
             Row(
               children: [
@@ -717,7 +717,9 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12))),
                         child: Text('Cancel',
-                            style: TextStyle(color: AppTheme.textPrimary)))),
+                            style: TextStyle(
+                                color:
+                                    Theme.of(context).colorScheme.onSurface)))),
                 SizedBox(width: 4.w),
                 Expanded(
                     child: ElevatedButton(
@@ -730,10 +732,11 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                     });
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content: Text('Trip state reset'),
-                        backgroundColor: AppTheme.successAction));
+                        backgroundColor:
+                            Theme.of(context).colorScheme.secondary));
                   },
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.warningState,
+                      backgroundColor: Theme.of(context).colorScheme.tertiary,
                       padding: EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
@@ -768,23 +771,21 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     return Container(
       padding: EdgeInsets.all(3),
       decoration: BoxDecoration(
-          color: Colors.grey.shade100,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14)),
       child: Row(children: [
         Expanded(
-            child: _buildTripOption(
-                'pickup', Icons.wb_sunny_outlined, 'Pickup', 'Morning',
-                AppTheme.primaryDriver)),
+            child: _buildTripOption('pickup', Icons.wb_sunny_outlined, 'Pickup',
+                'Morning', Theme.of(context).colorScheme.primary)),
         Expanded(
-            child: _buildTripOption(
-                'dropoff', Icons.nights_stay_outlined, 'Dropoff', 'Afternoon',
-                const Color(0xFF10B981))),
+            child: _buildTripOption('dropoff', Icons.nights_stay_outlined,
+                'Dropoff', 'Afternoon', const Color(0xFF10B981))),
       ]),
     );
   }
 
-  Widget _buildTripOption(String type, IconData icon, String label,
-      String sub, Color color) {
+  Widget _buildTripOption(
+      String type, IconData icon, String label, String sub, Color color) {
     final isSelected = _selectedTripType == type;
     return GestureDetector(
       onTap: () => setState(() => _selectedTripType = type),
@@ -792,35 +793,34 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         duration: const Duration(milliseconds: 150),
         padding: EdgeInsets.symmetric(vertical: 1.4.h, horizontal: 2.w),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
+          color:
+              isSelected ? color.withValues(alpha: 0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(11),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                      color: color.withOpacity(0.12),
-                      blurRadius: 8,
-                      offset: Offset(0, 2))
-                ]
-              : [],
+          border: isSelected
+              ? Border.all(color: color.withValues(alpha: 0.35), width: 1)
+              : null,
         ),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(icon,
               size: 17,
-              color: isSelected ? color : AppTheme.textSecondary),
+              color: isSelected
+                  ? color
+                  : Theme.of(context).colorScheme.onSurfaceVariant),
           SizedBox(width: 7),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label,
                 style: TextStyle(
                     fontSize: 14,
-                    fontWeight:
-                        isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? color : AppTheme.textSecondary)),
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected
+                        ? color
+                        : Theme.of(context).colorScheme.onSurfaceVariant)),
             Text(sub,
                 style: TextStyle(
                     fontSize: 11,
                     color: isSelected
                         ? color.withOpacity(0.7)
-                        : AppTheme.textSecondary)),
+                        : Theme.of(context).colorScheme.onSurfaceVariant)),
           ]),
           if (isSelected) ...[
             SizedBox(width: 5),
@@ -855,17 +855,13 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: AppTheme.lightDriverTheme,
-      child: Scaffold(
-        backgroundColor: Color(0xFFF8F9FB),
-        drawer: DriverDrawerWidget(
-            currentRoute: '/driver-start-shift-screen',
-            driverData: _driverData,
-            hasActiveTrip: _hasActiveTrip,
-            onResetTrip: _showResetTripStateDialog),
-        body: _isLoadingData ? _buildLoadingState() : _buildMainContent(),
-      ),
+    return Scaffold(
+      drawer: DriverDrawerWidget(
+          currentRoute: '/driver-start-shift-screen',
+          driverData: _driverData,
+          hasActiveTrip: _hasActiveTrip,
+          onResetTrip: _showResetTripStateDialog),
+      body: _isLoadingData ? _buildLoadingState() : _buildMainContent(),
     );
   }
 
@@ -877,9 +873,11 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           CircularProgressIndicator(
-              color: AppTheme.primaryDriver, strokeWidth: 3),
+              color: Theme.of(context).colorScheme.primary, strokeWidth: 3),
           SizedBox(height: 2.h),
-          Text('Loading...', style: TextStyle(color: AppTheme.textSecondary)),
+          Text('Loading...',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ],
       ),
     );
@@ -898,7 +896,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
           await _loadDriverData();
           await _checkForActiveTrip();
         },
-        color: AppTheme.primaryDriver,
+        color: Theme.of(context).colorScheme.primary,
         child: SingleChildScrollView(
           physics: AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.symmetric(horizontal: 4.w),
@@ -941,8 +939,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                     fontWeight: FontWeight.w500))),
         Text('Pull to refresh',
             style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 11)),
+                color: Colors.white.withValues(alpha: 0.8), fontSize: 11)),
       ]),
     );
   }
@@ -957,16 +954,20 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                   child: Container(
                     padding: EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .shadow
+                                  .withValues(alpha: 0.08),
                               blurRadius: 10,
                               offset: Offset(0, 2))
                         ]),
                     child: Icon(Icons.menu_rounded,
-                        color: AppTheme.textPrimary, size: 22),
+                        color: Theme.of(context).colorScheme.onSurface,
+                        size: 22),
                   ),
                 )),
         Spacer(),
@@ -974,16 +975,17 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
           padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
               color: _isGpsConnected
-                  ? AppTheme.successAction.withOpacity(0.1)
-                  : Colors.grey.shade100,
+                  ? Theme.of(context).colorScheme.secondary.withOpacity(0.1)
+                  : Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Container(
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                    color:
-                        _isGpsConnected ? AppTheme.successAction : Colors.grey,
+                    color: _isGpsConnected
+                        ? Theme.of(context).colorScheme.secondary
+                        : Colors.grey,
                     shape: BoxShape.circle)),
             SizedBox(width: 8),
             Text(_currentTime,
@@ -991,8 +993,8 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: _isGpsConnected
-                        ? AppTheme.successAction
-                        : AppTheme.textSecondary)),
+                        ? Theme.of(context).colorScheme.secondary
+                        : Theme.of(context).colorScheme.onSurfaceVariant)),
           ]),
         ),
         Spacer(),
@@ -1001,13 +1003,13 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
           height: 42,
           decoration: BoxDecoration(
             gradient: LinearGradient(colors: [
-              AppTheme.primaryDriver,
-              AppTheme.primaryDriver.withOpacity(0.7)
+              Theme.of(context).colorScheme.primary,
+              Theme.of(context).colorScheme.primary.withOpacity(0.7)
             ], begin: Alignment.topLeft, end: Alignment.bottomRight),
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                  color: AppTheme.primaryDriver.withOpacity(0.3),
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
                   blurRadius: 8,
                   offset: Offset(0, 3))
             ],
@@ -1024,7 +1026,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   }
 
   Widget _buildHeroCard(String name) {
-    final primary = AppTheme.primaryDriver;
+    final primary = Theme.of(context).colorScheme.primary;
     return Container(
       padding: EdgeInsets.all(4.w),
       decoration: BoxDecoration(
@@ -1073,7 +1075,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                   height: 6,
                   decoration: BoxDecoration(
                       color: _hasActiveTrip
-                          ? AppTheme.successAction
+                          ? Theme.of(context).colorScheme.secondary
                           : Colors.white,
                       shape: BoxShape.circle)),
               SizedBox(width: 5),
@@ -1094,8 +1096,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(children: [
-            Icon(Icons.directions_bus_rounded,
-                color: Colors.white, size: 17),
+            Icon(Icons.directions_bus_rounded, color: Colors.white, size: 17),
             SizedBox(width: 7),
             Text(_driverData?['busNumber'] ?? 'Bus',
                 style: TextStyle(
@@ -1120,12 +1121,11 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         SizedBox(height: 1.5.h),
         // Stats row
         Row(children: [
-          _buildHeroStat(
-              Icons.people_outline,
+          _buildHeroStat(Icons.people_outline,
               '${_driverData?['studentCount'] ?? 0} students'),
           SizedBox(width: 2.w),
-          _buildHeroStat(Icons.timer_outlined,
-              _driverData?['estimatedDuration'] ?? 'N/A'),
+          _buildHeroStat(
+              Icons.timer_outlined, _driverData?['estimatedDuration'] ?? 'N/A'),
         ]),
       ]),
     );
@@ -1152,13 +1152,14 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
   Widget _buildSectionTitle(String title, IconData icon) {
     return Row(children: [
-      Icon(icon, size: 18, color: AppTheme.textSecondary),
+      Icon(icon,
+          size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
       SizedBox(width: 8),
       Text(title,
           style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               letterSpacing: 0.5)),
     ]);
   }
@@ -1199,11 +1200,14 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.5.h),
       decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Theme.of(context)
+                    .colorScheme
+                    .shadow
+                    .withValues(alpha: 0.06),
                 blurRadius: 10,
                 offset: Offset(0, 2))
           ]),
@@ -1213,12 +1217,10 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
           Icon(
               _isGpsConnected
                   ? Icons.gps_fixed
-                  : (_isLocationEnabled
-                      ? Icons.gps_not_fixed
-                      : Icons.gps_off),
+                  : (_isLocationEnabled ? Icons.gps_not_fixed : Icons.gps_off),
               size: 18,
               color: _isGpsConnected
-                  ? AppTheme.successAction
+                  ? Theme.of(context).colorScheme.secondary
                   : (_isLocationEnabled ? Colors.orange : Colors.grey)),
           SizedBox(width: 8),
           Expanded(
@@ -1234,15 +1236,16 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary)),
+                        color: Theme.of(context).colorScheme.onSurface)),
                 Text(_accuracyText,
                     style: TextStyle(
-                        fontSize: 11, color: AppTheme.textSecondary)),
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ])),
           Switch(
               value: _isLocationEnabled,
               onChanged: (_) => _toggleLocationServices(),
-              activeThumbColor: AppTheme.successAction,
+              activeThumbColor: Theme.of(context).colorScheme.secondary,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
         ]),
       ),
@@ -1253,11 +1256,14 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     return Container(
       padding: EdgeInsets.all(4.w),
       decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Theme.of(context)
+                    .colorScheme
+                    .shadow
+                    .withValues(alpha: 0.06),
                 blurRadius: 12,
                 offset: Offset(0, 4))
           ]),
@@ -1265,7 +1271,12 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         for (int i = 0; i < _checklistItems.length; i++) ...[
           _buildChecklistItem(i),
           if (i < _checklistItems.length - 1)
-            Divider(height: 1, color: Colors.grey.shade100),
+            Divider(
+                height: 1,
+                color: Theme.of(context)
+                    .colorScheme
+                    .outline
+                    .withValues(alpha: 0.1)),
         ],
       ]),
     );
@@ -1285,11 +1296,13 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
             width: 24,
             height: 24,
             decoration: BoxDecoration(
-                color: isChecked ? AppTheme.successAction : Colors.transparent,
+                color: isChecked
+                    ? Theme.of(context).colorScheme.secondary
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
                     color: isChecked
-                        ? AppTheme.successAction
+                        ? Theme.of(context).colorScheme.secondary
                         : Colors.grey.shade300,
                     width: 2)),
             child: isChecked
@@ -1299,8 +1312,9 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
           SizedBox(width: 14),
           Icon(_getChecklistIcon(item['icon'] as String),
               size: 20,
-              color:
-                  isChecked ? AppTheme.successAction : AppTheme.textSecondary),
+              color: isChecked
+                  ? Theme.of(context).colorScheme.secondary
+                  : Theme.of(context).colorScheme.onSurfaceVariant),
           SizedBox(width: 12),
           Expanded(
               child: Text(item['title'] as String,
@@ -1308,8 +1322,8 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                       color: isChecked
-                          ? AppTheme.textSecondary
-                          : AppTheme.textPrimary,
+                          ? Theme.of(context).colorScheme.onSurfaceVariant
+                          : Theme.of(context).colorScheme.onSurface,
                       decoration:
                           isChecked ? TextDecoration.lineThrough : null))),
         ]),
@@ -1320,9 +1334,9 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   Widget _buildBottomButton() {
     return Container(
       padding: EdgeInsets.all(5.w),
-      decoration: BoxDecoration(color: Colors.white, boxShadow: [
+      decoration: BoxDecoration(color: Theme.of(context).cardColor, boxShadow: [
         BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.08),
             blurRadius: 10,
             offset: Offset(0, -5))
       ]),
@@ -1351,11 +1365,17 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                   gradient: canStart
                       ? LinearGradient(colors: [
                           _hasActiveTrip
-                              ? AppTheme.successAction
-                              : AppTheme.primaryDriver,
+                              ? Theme.of(context).colorScheme.secondary
+                              : Theme.of(context).colorScheme.primary,
                           _hasActiveTrip
-                              ? AppTheme.successAction.withOpacity(0.8)
-                              : AppTheme.primaryDriver.withOpacity(0.8)
+                              ? Theme.of(context)
+                                  .colorScheme
+                                  .secondary
+                                  .withOpacity(0.8)
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withOpacity(0.8)
                         ])
                       : null,
                   color: canStart ? null : Colors.grey.shade300,
@@ -1364,8 +1384,8 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                       ? [
                           BoxShadow(
                               color: (_hasActiveTrip
-                                      ? AppTheme.successAction
-                                      : AppTheme.primaryDriver)
+                                      ? Theme.of(context).colorScheme.secondary
+                                      : Theme.of(context).colorScheme.primary)
                                   .withOpacity(0.4),
                               blurRadius: 12,
                               offset: Offset(0, 4))
