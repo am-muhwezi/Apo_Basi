@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
@@ -27,6 +28,9 @@ class BusWebSocketService {
   int _reconnectionAttempts = 0;
   Timer? _reconnectTimer;
   String? _accessToken;
+  // Set true before calling sink.close() so _handleDisconnect knows not to
+  // schedule an automatic reconnect (the caller will reconnect manually).
+  bool _intentionalDisconnect = false;
 
   // Stream controllers for different event types
   final _locationUpdateController = StreamController<BusLocation>.broadcast();
@@ -143,6 +147,7 @@ class BusWebSocketService {
     try {
       final data = json.decode(message);
       final messageType = data['type'];
+      debugPrint('[WS] received: $messageType | ${message.toString().length > 200 ? message.toString().substring(0, 200) : message}');
 
       if (messageType == 'connected') {
         if (LocationConfig.enableSocketLogging) {}
@@ -167,7 +172,9 @@ class BusWebSocketService {
         if (LocationConfig.enableSocketLogging) {}
 
         _locationUpdateController.add(location);
-      } else if (messageType == 'trip_started' || messageType == 'trip_ended') {
+      } else if (messageType == 'trip_state' ||
+          messageType == 'trip_started' ||
+          messageType == 'trip_ended') {
         _tripEventController.add(Map<String, dynamic>.from(data));
       } else if (messageType == 'error') {
         _errorController.add(data['message']);
@@ -191,6 +198,13 @@ class BusWebSocketService {
     if (LocationConfig.enableSocketLogging) {}
     _isConnected = false;
     _connectionStateController.add(LocationConnectionState.disconnected);
+    // If disconnect() was called deliberately (e.g. TripWatcher forcing a
+    // reconnect), skip the auto-reconnect.  The caller will call
+    // subscribeToBus() immediately after.
+    if (_intentionalDisconnect) {
+      _intentionalDisconnect = false;
+      return;
+    }
     _scheduleReconnect();
   }
 
@@ -214,7 +228,10 @@ class BusWebSocketService {
     if (LocationConfig.enableSocketLogging) {}
 
     _reconnectTimer = Timer(delay, () {
-      if (_subscribedBusId != null) {
+      // Only reconnect if still disconnected — guards against the race where
+      // the TripWatcher (or the caller) already reconnected while this timer
+      // was pending.
+      if (_subscribedBusId != null && !_isConnected) {
         _connectToBusWebSocket(_subscribedBusId!);
       }
     });
@@ -231,6 +248,17 @@ class BusWebSocketService {
     }));
   }
 
+  /// Request current trip state from server (heartbeat / sync)
+  void requestTripState() {
+    if (!_isConnected || _channel == null) {
+      return;
+    }
+
+    _channel!.sink.add(json.encode({
+      'type': 'request_trip_state',
+    }));
+  }
+
   /// Disconnect from WebSocket server
   void disconnect() {
     if (_reconnectTimer != null) {
@@ -241,6 +269,7 @@ class BusWebSocketService {
     if (_channel != null) {
       if (LocationConfig.enableSocketLogging) {}
 
+      _intentionalDisconnect = true; // Suppress auto-reconnect in _handleDisconnect
       _channel!.sink.close();
       _channel = null;
       _isConnected = false;

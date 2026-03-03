@@ -77,6 +77,15 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
             "message": "Connected to bus location updates"
         }))
 
+        # Immediately push current trip state so the parent app doesn't need
+        # to poll.  The client sets _hasActiveTrip / _tripType from this and
+        # calls route optimisation — no HTTP round-trip required.
+        trip_state = await self.get_trip_state(self.bus_id)
+        await self.send(text_data=json.dumps({
+            "type": "trip_state",
+            **trip_state,
+        }))
+
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection."""
         if hasattr(self, 'group_name'):
@@ -141,6 +150,14 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
                         "type": "error",
                         "message": "No location data available"
                     }))
+
+            elif message_type == "request_trip_state":
+                # Return current trip state on demand (used as a heartbeat/sync)
+                trip_state = await self.get_trip_state(self.bus_id)
+                await self.send(text_data=json.dumps({
+                    "type": "trip_state",
+                    **trip_state,
+                }))
 
         except json.JSONDecodeError:
             await self.send(text_data=json.dumps({
@@ -324,6 +341,50 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
                 }
         except Bus.DoesNotExist:
             pass
+
+    @database_sync_to_async
+    def get_trip_state(self, bus_id):
+        """
+        Return the current trip state for this bus so the parent app can
+        restore its UI immediately on (re)connect without polling.
+        """
+        from trips.models import Trip
+        from buses.models import Bus
+
+        result = {
+            "has_active_trip": False,
+            "trip_id": None,
+            "trip_type": None,
+            "scheduled_time": None,
+            "bus_latitude": None,
+            "bus_longitude": None,
+            "bus_speed": None,
+            "bus_heading": None,
+        }
+
+        try:
+            trip = Trip.objects.filter(bus_id=bus_id, status="in-progress").first()
+            print(f"[get_trip_state] bus_id={bus_id} trip={trip} (status query: in-progress)")
+            if trip:
+                result["has_active_trip"] = True
+                result["trip_id"] = trip.id
+                result["trip_type"] = trip.trip_type
+                result["scheduled_time"] = (
+                    trip.scheduled_time.isoformat() if trip.scheduled_time else None
+                )
+
+            # Always attach last known GPS so the map marker appears instantly
+            bus = Bus.objects.get(id=bus_id)
+            if bus.latitude and bus.longitude:
+                result["bus_latitude"] = float(bus.latitude)
+                result["bus_longitude"] = float(bus.longitude)
+                result["bus_speed"] = float(bus.speed) if bus.speed else 0.0
+                result["bus_heading"] = float(bus.heading) if bus.heading else 0.0
+        except Exception as e:
+            print(f"[get_trip_state] ERROR for bus_id={bus_id}: {e}")
+
+        print(f"[get_trip_state] result={result}")
+        return result
 
     @database_sync_to_async
     def get_bus_details(self, bus_id):
