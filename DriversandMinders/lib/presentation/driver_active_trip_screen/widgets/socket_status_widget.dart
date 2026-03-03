@@ -30,11 +30,11 @@ class SocketStatusWidget extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.5.h),
         decoration: BoxDecoration(
           color: isConnected
-              ? AppTheme.successAction.withValues(alpha: 0.1)
-              : AppTheme.criticalAlert.withValues(alpha: 0.1),
+              ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1)
+              : Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isConnected ? AppTheme.successAction : AppTheme.criticalAlert,
+            color: isConnected ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.error,
             width: 1.5,
           ),
         ),
@@ -45,12 +45,12 @@ class SocketStatusWidget extends StatelessWidget {
               width: 12,
               height: 12,
               decoration: BoxDecoration(
-                color: isConnected ? AppTheme.successAction : AppTheme.criticalAlert,
+                color: isConnected ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.error,
                 shape: BoxShape.circle,
                 boxShadow: isConnected
                     ? [
                         BoxShadow(
-                          color: AppTheme.successAction.withValues(alpha: 0.5),
+                          color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5),
                           blurRadius: 8,
                           spreadRadius: 2,
                         ),
@@ -64,7 +64,7 @@ class SocketStatusWidget extends StatelessWidget {
             // Status icon
             CustomIconWidget(
               iconName: isConnected ? 'wifi' : 'wifi_off',
-              color: isConnected ? AppTheme.successAction : AppTheme.criticalAlert,
+              color: isConnected ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.error,
               size: 20,
             ),
 
@@ -78,7 +78,7 @@ class SocketStatusWidget extends StatelessWidget {
                   Text(
                     isConnected ? 'Live Tracking Active' : 'Live Tracking Offline',
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: isConnected ? AppTheme.successAction : AppTheme.criticalAlert,
+                      color: isConnected ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.error,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -88,7 +88,7 @@ class SocketStatusWidget extends StatelessWidget {
                         ? 'Real-time location sharing with parents'
                         : 'Unable to share location in real-time',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 10.sp,
                     ),
                   ),
@@ -100,7 +100,7 @@ class SocketStatusWidget extends StatelessWidget {
             if (onTap != null)
               CustomIconWidget(
                 iconName: 'info',
-                color: AppTheme.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 size: 16,
               ),
           ],

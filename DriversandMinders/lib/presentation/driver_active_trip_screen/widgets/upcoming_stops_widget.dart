@@ -32,9 +32,9 @@ class UpcomingStopsWidget extends StatelessWidget {
       margin: EdgeInsets.symmetric(horizontal: 4.w),
       padding: EdgeInsets.all(4.w),
       decoration: BoxDecoration(
-        color: AppTheme.backgroundSecondary,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.borderLight),
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -45,7 +45,7 @@ class UpcomingStopsWidget extends StatelessWidget {
               Text(
                 'Upcoming Stops',
                 style: theme.textTheme.titleSmall?.copyWith(
-                  color: AppTheme.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -60,7 +60,7 @@ class UpcomingStopsWidget extends StatelessWidget {
                   child: Text(
                     'View All (${upcomingStudents.length})',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppTheme.primaryDriver,
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -82,7 +82,7 @@ class UpcomingStopsWidget extends StatelessWidget {
               child: Text(
                 '+${upcomingStudents.length - 3} more stops',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -105,14 +105,14 @@ class UpcomingStopsWidget extends StatelessWidget {
           width: 8.w,
           height: 8.w,
           decoration: BoxDecoration(
-            color: AppTheme.primaryDriver.withValues(alpha: 0.1),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Center(
             child: Text(
               '$position',
               style: theme.textTheme.titleSmall?.copyWith(
-                color: AppTheme.primaryDriver,
+                color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -127,7 +127,7 @@ class UpcomingStopsWidget extends StatelessWidget {
               Text(
                 studentName,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -137,7 +137,7 @@ class UpcomingStopsWidget extends StatelessWidget {
                 children: [
                   CustomIconWidget(
                     iconName: 'location_on',
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     size: 12,
                   ),
                   SizedBox(width: 1.w),
@@ -145,7 +145,7 @@ class UpcomingStopsWidget extends StatelessWidget {
                     child: Text(
                       stopName,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),

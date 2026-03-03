@@ -25,8 +25,8 @@ class LocationServicesWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isLocationEnabled
-              ? AppTheme.successAction.withValues(alpha: 0.3)
-              : AppTheme.warningState.withValues(alpha: 0.3),
+              ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3)
+              : Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -45,7 +45,7 @@ class LocationServicesWidget extends StatelessWidget {
                       style: AppTheme.lightDriverTheme.textTheme.titleMedium
                           ?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     SizedBox(height: 0.5.h),
@@ -53,7 +53,7 @@ class LocationServicesWidget extends StatelessWidget {
                       'Enable GPS tracking for route monitoring',
                       style: AppTheme.lightDriverTheme.textTheme.bodySmall
                           ?.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -62,10 +62,10 @@ class LocationServicesWidget extends StatelessWidget {
               Switch(
                 value: isLocationEnabled,
                 onChanged: (_) => onToggle(),
-                activeColor: AppTheme.successAction,
-                inactiveThumbColor: AppTheme.textSecondary,
+                activeColor: Theme.of(context).colorScheme.secondary,
+                inactiveThumbColor: Theme.of(context).colorScheme.onSurfaceVariant,
                 inactiveTrackColor:
-                    AppTheme.textSecondary.withValues(alpha: 0.3),
+                    Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
               ),
             ],
           ),
@@ -74,14 +74,14 @@ class LocationServicesWidget extends StatelessWidget {
             Container(
               padding: EdgeInsets.all(2.w),
               decoration: BoxDecoration(
-                color: AppTheme.successAction.withValues(alpha: 0.1),
+                color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
                   CustomIconWidget(
                     iconName: 'gps_fixed',
-                    color: AppTheme.successAction,
+                    color: Theme.of(context).colorScheme.secondary,
                     size: 16,
                   ),
                   SizedBox(width: 2.w),
@@ -89,7 +89,7 @@ class LocationServicesWidget extends StatelessWidget {
                     'GPS Accuracy: $accuracyText',
                     style:
                         AppTheme.lightDriverTheme.textTheme.bodySmall?.copyWith(
-                      color: AppTheme.successAction,
+                      color: Theme.of(context).colorScheme.secondary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -100,7 +100,7 @@ class LocationServicesWidget extends StatelessWidget {
             Text(
               'Your location will be shared with the school administration for safety and route monitoring purposes.',
               style: AppTheme.lightDriverTheme.textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontStyle: FontStyle.italic,
               ),
             ),

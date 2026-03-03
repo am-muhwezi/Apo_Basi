@@ -60,10 +60,10 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
       padding: EdgeInsets.all(4.w),
       margin: EdgeInsets.only(bottom: 2.h),
       decoration: BoxDecoration(
-        color: AppTheme.backgroundSecondary,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppTheme.borderLight,
+          color: Theme.of(context).colorScheme.outline,
           width: 1,
         ),
       ),
@@ -72,13 +72,13 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
           Container(
             padding: EdgeInsets.all(3.w),
             decoration: BoxDecoration(
-              color: (iconColor ?? AppTheme.primaryBusminder)
+              color: (iconColor ?? Theme.of(context).colorScheme.primary)
                   .withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               icon,
-              color: iconColor ?? AppTheme.primaryBusminder,
+              color: iconColor ?? Theme.of(context).colorScheme.primary,
               size: 24,
             ),
           ),
@@ -91,7 +91,7 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
                   label,
                   style: TextStyle(
                     fontSize: 13,
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -100,7 +100,7 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
                   value,
                   style: TextStyle(
                     fontSize: 16,
-                    color: AppTheme.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -154,7 +154,7 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
-                color: AppTheme.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -167,7 +167,6 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundPrimary,
       appBar: CustomAppBar(
         title: 'My Profile',
         automaticallyImplyLeading: false,
@@ -177,7 +176,7 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        backgroundColor: AppTheme.primaryBusminder,
+        backgroundColor: Theme.of(context).colorScheme.primary,
       ),
       drawer: const BusminderDrawerWidget(currentRoute: '/busminder-profile'),
       body: _isLoading
@@ -196,8 +195,8 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              AppTheme.primaryBusminder,
-                              AppTheme.primaryBusminderLight,
+                              Theme.of(context).colorScheme.primary,
+                              Theme.of(context).colorScheme.primaryContainer,
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -205,7 +204,7 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: AppTheme.primaryBusminder
+                              color: Theme.of(context).colorScheme.primary
                                   .withValues(alpha: 0.3),
                               blurRadius: 15,
                               offset: Offset(0, 5),
@@ -220,7 +219,7 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
                               child: Icon(
                                 Icons.person,
                                 size: 50,
-                                color: AppTheme.primaryBusminder,
+                                color: Theme.of(context).colorScheme.primary,
                               ),
                             ),
                             SizedBox(height: 2.h),
@@ -266,7 +265,7 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
                             value:
                                 _profileData['trips_completed']?.toString() ??
                                     '0',
-                            color: AppTheme.successAction,
+                            color: Theme.of(context).colorScheme.secondary,
                           ),
                           SizedBox(width: 3.w),
                           _buildStatCard(
@@ -275,7 +274,7 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
                             value: _profileData['attendance_recorded']
                                     ?.toString() ??
                                 '0',
-                            color: AppTheme.warningState,
+                            color: Theme.of(context).colorScheme.tertiary,
                           ),
                         ],
                       ),
@@ -287,14 +286,14 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
                         icon: Icons.phone,
                         label: 'Phone Number',
                         value: _profileData['phone'] ?? 'N/A',
-                        iconColor: AppTheme.primaryBusminder,
+                        iconColor: Theme.of(context).colorScheme.primary,
                       ),
 
                       _buildInfoCard(
                         icon: Icons.email,
                         label: 'Email',
                         value: _profileData['email'] ?? 'N/A',
-                        iconColor: AppTheme.primaryBusminder,
+                        iconColor: Theme.of(context).colorScheme.primary,
                       ),
 
                       _buildInfoCard(
@@ -302,14 +301,14 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
                         label: 'Employee ID',
                         value:
                             'BM-${_profileData['id']?.toString().padLeft(4, '0') ?? '0000'}',
-                        iconColor: AppTheme.primaryBusminder,
+                        iconColor: Theme.of(context).colorScheme.primary,
                       ),
 
                       _buildInfoCard(
                         icon: Icons.calendar_today,
                         label: 'Joined Date',
                         value: _profileData['joined_date'] ?? 'N/A',
-                        iconColor: AppTheme.primaryBusminder,
+                        iconColor: Theme.of(context).colorScheme.primary,
                       ),
 
                       SizedBox(height: 2.h),
@@ -319,7 +318,7 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
                         '© 2026 ApoBasi - Powered by SoG',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppTheme.textSecondary,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         textAlign: TextAlign.center,
                       ),

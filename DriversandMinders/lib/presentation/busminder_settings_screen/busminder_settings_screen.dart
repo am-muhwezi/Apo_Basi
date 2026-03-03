@@ -52,10 +52,10 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
     return Container(
       margin: EdgeInsets.only(bottom: 3.h),
       decoration: BoxDecoration(
-        color: AppTheme.backgroundSecondary,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppTheme.borderLight,
+          color: Theme.of(context).colorScheme.outline,
           width: 1,
         ),
       ),
@@ -69,11 +69,11 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.primaryBusminder,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ),
-          Divider(height: 1, color: AppTheme.borderLight),
+          Divider(height: 1, color: Theme.of(context).colorScheme.outline),
           ...children,
         ],
       ),
@@ -91,30 +91,30 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
       leading: Container(
         padding: EdgeInsets.all(2.w),
         decoration: BoxDecoration(
-          color: AppTheme.primaryBusminder.withValues(alpha: 0.1),
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, color: AppTheme.primaryBusminder, size: 22),
+        child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 22),
       ),
       title: Text(
         title,
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w600,
-          color: AppTheme.textPrimary,
+          color: Theme.of(context).colorScheme.onSurface,
         ),
       ),
       subtitle: Text(
         subtitle,
         style: TextStyle(
           fontSize: 13,
-          color: AppTheme.textSecondary,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: AppTheme.primaryBusminder,
+        activeColor: Theme.of(context).colorScheme.primary,
       ),
     );
   }
@@ -131,12 +131,12 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
         padding: EdgeInsets.all(2.w),
         decoration: BoxDecoration(
           color:
-              (iconColor ?? AppTheme.primaryBusminder).withValues(alpha: 0.1),
+              (iconColor ?? Theme.of(context).colorScheme.primary).withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
           icon,
-          color: iconColor ?? AppTheme.primaryBusminder,
+          color: iconColor ?? Theme.of(context).colorScheme.primary,
           size: 22,
         ),
       ),
@@ -145,19 +145,19 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w600,
-          color: AppTheme.textPrimary,
+          color: Theme.of(context).colorScheme.onSurface,
         ),
       ),
       subtitle: Text(
         subtitle,
         style: TextStyle(
           fontSize: 13,
-          color: AppTheme.textSecondary,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
       trailing: Icon(
         Icons.chevron_right,
-        color: AppTheme.textSecondary,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
       ),
       onTap: onTap,
     );
@@ -166,7 +166,6 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundPrimary,
       appBar: CustomAppBar(
         title: 'Settings',
         automaticallyImplyLeading: false,
@@ -176,7 +175,7 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        backgroundColor: AppTheme.primaryBusminder,
+        backgroundColor: Theme.of(context).colorScheme.primary,
       ),
       drawer: const BusminderDrawerWidget(currentRoute: '/busminder-settings'),
       body: SingleChildScrollView(
@@ -197,7 +196,7 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
                     _saveSetting('notifications_enabled', value);
                   },
                 ),
-                Divider(height: 1, color: AppTheme.borderLight),
+                Divider(height: 1, color: Theme.of(context).colorScheme.outline),
                 _buildSwitchTile(
                   icon: Icons.volume_up,
                   title: 'Sound',
@@ -208,7 +207,7 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
                     _saveSetting('sound_enabled', value);
                   },
                 ),
-                Divider(height: 1, color: AppTheme.borderLight),
+                Divider(height: 1, color: Theme.of(context).colorScheme.outline),
                 _buildSwitchTile(
                   icon: Icons.vibration,
                   title: 'Vibration',
@@ -233,12 +232,12 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Language selection coming soon'),
-                        backgroundColor: AppTheme.primaryBusminder,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                       ),
                     );
                   },
                 ),
-                Divider(height: 1, color: AppTheme.borderLight),
+                Divider(height: 1, color: Theme.of(context).colorScheme.outline),
                 _buildActionTile(
                   icon: Icons.info,
                   title: 'About',
@@ -253,7 +252,7 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
                         title: Row(
                           children: [
                             Icon(Icons.bus_alert,
-                                color: AppTheme.primaryBusminder),
+                                color: Theme.of(context).colorScheme.primary),
                             SizedBox(width: 2.w),
                             Text('About ApoBasi'),
                           ],
@@ -282,7 +281,7 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
                     );
                   },
                 ),
-                Divider(height: 1, color: AppTheme.borderLight),
+                Divider(height: 1, color: Theme.of(context).colorScheme.outline),
                 _buildActionTile(
                   icon: Icons.privacy_tip,
                   title: 'Privacy Policy',
@@ -291,7 +290,7 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Privacy policy will be displayed here'),
-                        backgroundColor: AppTheme.primaryBusminder,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                       ),
                     );
                   },
@@ -306,7 +305,7 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
               '© 2026 ApoBasi - Powered by SoG',
               style: TextStyle(
                 fontSize: 12,
-                color: AppTheme.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),

@@ -55,7 +55,7 @@ class QuickActionsWidget extends StatelessWidget {
                   context,
                   'Emergency',
                   'emergency_contact',
-                  AppTheme.criticalAlert,
+                  Theme.of(context).colorScheme.error,
                   () {
                     HapticFeedback.heavyImpact();
                     _showEmergencyDialog(context);
@@ -68,7 +68,7 @@ class QuickActionsWidget extends StatelessWidget {
                   context,
                   'Call Driver',
                   'phone',
-                  AppTheme.primaryBusminder,
+                  Theme.of(context).colorScheme.primary,
                   () {
                     HapticFeedback.lightImpact();
                     onDriverCommunication();
@@ -82,7 +82,7 @@ class QuickActionsWidget extends StatelessWidget {
                   context,
                   'Notify Parents',
                   'notifications',
-                  AppTheme.warningState,
+                  Theme.of(context).colorScheme.tertiary,
                   () {
                     HapticFeedback.lightImpact();
                     onParentNotification();
@@ -158,7 +158,7 @@ class QuickActionsWidget extends StatelessWidget {
             children: [
               CustomIconWidget(
                 iconName: 'warning',
-                color: AppTheme.criticalAlert,
+                color: Theme.of(context).colorScheme.error,
                 size: 24,
               ),
               SizedBox(width: 2.w),
@@ -166,7 +166,7 @@ class QuickActionsWidget extends StatelessWidget {
                 'Emergency Contact',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: AppTheme.criticalAlert,
+                  color: Theme.of(context).colorScheme.error,
                 ),
               ),
             ],
@@ -206,9 +206,7 @@ class QuickActionsWidget extends StatelessWidget {
                 onEmergencyContact();
                 _showToast('Emergency services contacted');
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.criticalAlert,
-                foregroundColor: Colors.white,
+              style: ElevatedButton.styleFrom(                foregroundColor: Colors.white,
               ),
               child: Text(
                 'Confirm Emergency',
@@ -233,7 +231,7 @@ class QuickActionsWidget extends StatelessWidget {
         children: [
           CustomIconWidget(
             iconName: 'check_circle',
-            color: AppTheme.criticalAlert,
+            color: Theme.of(context).colorScheme.error,
             size: 16,
           ),
           SizedBox(width: 2.w),
@@ -255,9 +253,7 @@ class QuickActionsWidget extends StatelessWidget {
       Fluttertoast.showToast(
         msg: message,
         toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: AppTheme.primaryBusminder,
-        textColor: Colors.white,
+        gravity: ToastGravity.BOTTOM,        textColor: Colors.white,
         fontSize: 14.0,
       );
     } catch (e) {
