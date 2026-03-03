@@ -14,6 +14,7 @@ import 'package:sizer/sizer.dart';
 import '../../core/app_export.dart';
 import '../../config/api_config.dart';
 import '../../services/api_service.dart';
+import '../../services/gps_stream_service.dart';
 import '../../services/native_location_service.dart';
 import '../../services/trip_state_service.dart';
 import '../../widgets/driver_drawer_widget.dart';
@@ -54,9 +55,10 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   Map<String, Uint8List> _homeMarkerImages = {};
   Uint8List? _navArrowImage;
 
-  // Driver GPS
+  // Driver GPS — position comes from the shared singleton, not a new stream.
   geo.Position? _driverPosition;
-  StreamSubscription<geo.Position>? _positionStream;
+  StreamSubscription<geo.Position>? _gpsListener; // local listener only
+  final GpsStreamService _gps = GpsStreamService();
   PointAnnotation? _navAnnotation;
   PolylineAnnotation? _routePolyline;
 
@@ -102,7 +104,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
   @override
   void dispose() {
-    _positionStream?.cancel();
+    _gpsListener?.cancel(); // cancel this screen's listener only
     _sheetController.dispose();
     _locationUpdateTimer?.cancel();
     super.dispose();
@@ -232,50 +234,36 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   // ══════════════════════════════════════════════════════════════════════════════
 
   Future<void> _initDriverLocation() async {
-    // Use the device GPS directly — works offline and gives immediate updates.
-    // The NativeLocationService continues to push positions to the backend in
-    // parallel so parent apps stay up to date.
+    // Subscribe to the shared GpsStreamService instead of opening a new
+    // Geolocator stream.  The singleton is already running from the home
+    // screen, so we get a fix instantly — no "Acquiring GPS..." delay.
     try {
-      _positionStream?.cancel();
+      _gpsListener?.cancel();
       _locationUpdateTimer?.cancel();
 
-      // Check permission
-      var permission = await geo.Geolocator.checkPermission();
-      if (permission == geo.LocationPermission.denied) {
-        permission = await geo.Geolocator.requestPermission();
-      }
-      if (permission == geo.LocationPermission.denied ||
-          permission == geo.LocationPermission.deniedForever) return;
+      // Ensure the stream is running (guard for edge-case where user arrives
+      // at active trip without passing through home screen first).
+      _gps.ensureStarted();
 
-      // Snap to current position immediately so the arrow shows right away
-      try {
-        final pos = await geo.Geolocator.getCurrentPosition(
-          locationSettings: const geo.LocationSettings(
-            accuracy: geo.LocationAccuracy.high,
-          ),
-        );
-        if (mounted) {
-          setState(() => _driverPosition = pos);
-          await _updateNavAnnotation();
-          _updateRoute();
-          if (_mapboxMap != null) {
-            _mapboxMap!.setCamera(CameraOptions(
-              center: _latlng(pos.latitude, pos.longitude),
-              bearing: pos.heading,
-              pitch: 50.0,
-              zoom: 16.5,
-            ));
-          }
+      // Snap to the last known fix immediately — zero wait if home screen
+      // already acquired a position.
+      final snap = _gps.lastKnownPosition;
+      if (snap != null && mounted) {
+        setState(() => _driverPosition = snap);
+        await _updateNavAnnotation();
+        _updateRoute();
+        if (_mapboxMap != null) {
+          _mapboxMap!.setCamera(CameraOptions(
+            center: _latlng(snap.latitude, snap.longitude),
+            bearing: snap.heading,
+            pitch: 50.0,
+            zoom: 16.5,
+          ));
         }
-      } catch (_) {}
+      }
 
-      // Continuous stream for live navigation updates
-      _positionStream = geo.Geolocator.getPositionStream(
-        locationSettings: const geo.LocationSettings(
-          accuracy: geo.LocationAccuracy.high,
-          distanceFilter: 5, // update every 5 metres of movement
-        ),
-      ).listen((pos) {
+      // Subscribe to the shared broadcast for live navigation updates.
+      _gpsListener = _gps.stream.listen((geo.Position pos) {
         if (!mounted) return;
         setState(() => _driverPosition = pos);
         _updateNavAnnotation();
@@ -774,19 +762,24 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     });
   }
 
-  Future<void> _onPickupStatusChanged(int index, bool isPickedUp) async {
-    setState(() => _students[index]["isPickedUp"] = isPickedUp);
+  Future<void> _onPickupStatusChanged(String studentId, bool isPickedUp) async {
+    final student = _students.firstWhere(
+      (s) => s['id'].toString() == studentId,
+      orElse: () => {},
+    );
+    if (student.isEmpty) return;
+
+    setState(() => student["isPickedUp"] = isPickedUp);
     _placeHomeMarkers();
-    // Force a fresh route calculation excluding the now-picked-up student
+    // Force a fresh route calculation excluding the now-handled student
     _lastRouteRefresh = null;
     _updateRoute();
 
     try {
-      final studentId = _students[index]["id"];
       final prefs = await SharedPreferences.getInstance();
       final tripType = prefs.getString('current_trip_type') ?? 'pickup';
       await _apiService.markAttendance(
-        childId: studentId,
+        childId: int.parse(studentId),
         status: isPickedUp ? 'picked_up' : 'pending',
         tripType: tripType,
       );
@@ -799,8 +792,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
               Expanded(
                 child: Text(
                   isPickedUp
-                      ? '${_students[index]["name"]} marked as picked up'
-                      : '${_students[index]["name"]} marked as not picked up',
+                      ? '${student["name"]} marked as picked up'
+                      : '${student["name"]} marked as not picked up',
                 ),
               ),
             ]),
@@ -999,6 +992,74 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     return m == 0 ? '${h}h' : '${h}h ${m}m';
   }
 
+  /// Sorts [pending] in-place for the correct driving order based on trip type.
+  ///
+  ///   - Pickup:  farthest-from-school first → nearest last.
+  ///              Reference = last stop (highest order ≈ school destination).
+  ///              Sort descending by distance from reference.
+  ///   - Dropoff: nearest-to-school first   → farthest last.
+  ///              Reference = first stop (lowest order ≈ closest stop to school).
+  ///              Sort ascending by distance from reference.
+  ///
+  /// Falls back to the existing load-time sort order if no valid reference stop
+  /// can be resolved.
+  void _sortPendingForRoute(List<Map<String, dynamic>> pending) {
+    final tripType = _tripData['trip_type'] as String? ?? 'pickup';
+
+    // Resolve the geographic reference point used for distance-based ordering.
+    //
+    // Priority 1 — trip stops (most accurate, server-authoritative):
+    //   Pickup:  last stop (highest order) ≈ school destination.
+    //   Dropoff: first stop (lowest order) ≈ stop nearest the school.
+    //
+    // Priority 2 — driver's current position (fallback when stops are absent
+    //   or have unset coordinates).  Valid at trip start when driver is still
+    //   at the school/depot; good enough for the initial polyline draw.
+    double? refLat;
+    double? refLng;
+
+    final rawStops = _tripData['stops'] as List?;
+    if (rawStops != null && rawStops.isNotEmpty) {
+      final stops = rawStops.cast<Map<String, dynamic>>().toList()
+        ..sort(
+            (a, b) => (a['order'] as int? ?? 0).compareTo(b['order'] as int? ?? 0));
+      final refStop = tripType == 'dropoff' ? stops.first : stops.last;
+      final lat = refStop['latitude'] as double?;
+      final lng = refStop['longitude'] as double?;
+      if (lat != null && lng != null && !(lat == 0.0 && lng == 0.0)) {
+        refLat = lat;
+        refLng = lng;
+      }
+    }
+
+    // Fallback to driver position (school proxy at trip start).
+    if (refLat == null && _driverPosition != null) {
+      refLat = _driverPosition!.latitude;
+      refLng = _driverPosition!.longitude;
+    }
+
+    if (refLat == null || refLng == null) return;
+
+    final anchorLat = refLat;
+    final anchorLng = refLng;
+
+    pending.sort((a, b) {
+      final aLat = a['lat'] as double? ?? 0.0;
+      final aLng = a['lng'] as double? ?? 0.0;
+      final bLat = b['lat'] as double? ?? 0.0;
+      final bLng = b['lng'] as double? ?? 0.0;
+      final aDist =
+          geo.Geolocator.distanceBetween(aLat, aLng, anchorLat, anchorLng);
+      final bDist =
+          geo.Geolocator.distanceBetween(bLat, bLng, anchorLat, anchorLng);
+      // Pickup:  descending — farthest from school/anchor first.
+      // Dropoff: ascending  — nearest to school/anchor first.
+      return tripType == 'dropoff'
+          ? aDist.compareTo(bDist)
+          : bDist.compareTo(aDist);
+    });
+  }
+
   Future<void> _updateRoute() async {
     if (_driverPosition == null || _polylineAnnotationManager == null) return;
 
@@ -1029,10 +1090,17 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     // Stamp throttle only now — we are about to call the Directions API.
     _lastRouteRefresh = now;
 
-    // Cap at next 8 stops — fewer waypoints = faster API response and avoids
-    // mobile-network timeouts on long routes. The driver only needs to see the
-    // immediate route ahead, not all remaining students at once.
-    final capped = pending.length > 8 ? pending.sublist(0, 8) : pending;
+    // Sort waypoints for the correct trip-type driving order:
+    //   Pickup  → farthest-from-school first, nearest last (driver collects
+    //             far students and converges toward school).
+    //   Dropoff → nearest-to-school first, farthest last (driver drops nearby
+    //             students before heading out further).
+    _sortPendingForRoute(pending);
+
+    // Mapbox Directions API allows 25 waypoints total (driver position = 1).
+    // Cap student stops at 23 to leave one slot of headroom and keep response
+    // sizes bounded while still giving ETAs to all students on typical routes.
+    final capped = pending.length > 23 ? pending.sublist(0, 23) : pending;
 
     final waypoints = [
       '${_driverPosition!.longitude},${_driverPosition!.latitude}',
@@ -1393,7 +1461,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
                 mappableCount: _mappableStudents.length,
                 studentEtas: _studentEtas,
                 onStudentTap: _onStudentSelected,
-                onPickupToggle: _onPickupStatusChanged,
+                onPickupToggle: (id, val) => _onPickupStatusChanged(id, val),
                 onEndTrip: _onEndTripPressed,
               );
             },
@@ -1415,7 +1483,7 @@ class _TripBottomSheet extends StatelessWidget {
   final int mappableCount;
   final Map<String, Duration?> studentEtas;
   final ValueChanged<Map<String, dynamic>> onStudentTap;
-  final Function(int, bool) onPickupToggle;
+  final Function(String id, bool) onPickupToggle;
   final VoidCallback onEndTrip;
 
   const _TripBottomSheet({
@@ -1523,21 +1591,32 @@ class _TripBottomSheet extends StatelessWidget {
           ),
           SizedBox(height: 0.5.h),
 
-          // Student tiles
-          ...students.asMap().entries.map((entry) {
-            final index = entry.key;
-            final student = entry.value;
-            final eta = studentEtas[student['id'] as String?];
-            return _StudentTripTile(
-              student: student,
-              index: index,
-              isSelected: selectedStudent?['id'] == student['id'],
-              eta: eta,
-              onTap:
-                  student['lat'] != null ? () => onStudentTap(student) : null,
-              onToggle: (val) => onPickupToggle(index, val),
-            );
-          }),
+          // Student tiles — sorted by ETA ascending so the next student to
+          // visit is always at the top. Picked-up students (no ETA) sink to
+          // the bottom naturally since their ETA value is treated as ∞.
+          ...(() {
+            final sorted = students.toList()
+              ..sort((a, b) {
+                final aEta = studentEtas[a['id'] as String?]?.inSeconds ??
+                    999999;
+                final bEta = studentEtas[b['id'] as String?]?.inSeconds ??
+                    999999;
+                return aEta.compareTo(bEta);
+              });
+            return sorted.map((student) {
+              final id = student['id'] as String? ?? '';
+              final eta = studentEtas[id];
+              return _StudentTripTile(
+                student: student,
+                isSelected: selectedStudent?['id'] == student['id'],
+                eta: eta,
+                onTap: student['lat'] != null
+                    ? () => onStudentTap(student)
+                    : null,
+                onToggle: (val) => onPickupToggle(id, val),
+              );
+            });
+          })(),
 
           SizedBox(height: 2.h),
 
@@ -1610,7 +1689,6 @@ class _StatBadge extends StatelessWidget {
 
 class _StudentTripTile extends StatelessWidget {
   final Map<String, dynamic> student;
-  final int index;
   final bool isSelected;
   final Duration? eta;
   final VoidCallback? onTap;
@@ -1618,7 +1696,6 @@ class _StudentTripTile extends StatelessWidget {
 
   const _StudentTripTile({
     required this.student,
-    required this.index,
     required this.isSelected,
     required this.onToggle,
     this.eta,
