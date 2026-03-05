@@ -41,6 +41,8 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
   bool _hasActiveTrip = false;
   Map<String, dynamic>? _activeTripInfo;
 
+  bool _isStudentsExpanded = false;
+
   // Attendance-focused readiness checks
   final Map<int, bool> _readinessStates = {};
 
@@ -372,7 +374,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
       builder: (context) => Container(
         padding: EdgeInsets.all(6.w),
         decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -460,12 +462,15 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-        backgroundColor: Color(0xFFF8F9FB),
+    return Theme(
+      data: AppTheme.lightBusminderTheme,
+      child: Scaffold(
+        backgroundColor: AppTheme.lightBusminderTheme.scaffoldBackgroundColor,
         drawer: BusminderDrawerWidget(
             currentRoute: '/busminder-start-shift-screen'),
         body: _isLoadingData ? _buildLoadingState() : _buildMainContent(),
-      );
+      ),
+    );
   }
 
   Widget _buildLoadingState() {
@@ -533,13 +538,13 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).cardColor,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
+                          color: Colors.black.withValues(alpha: 0.08),
                           blurRadius: 8,
-                          offset: Offset(0, 2),
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
@@ -591,91 +596,81 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
   }
 
   Widget _buildGreetingCard(String name) {
+    final cs = Theme.of(context).colorScheme;
+    final statusColor = _hasActiveTrip ? cs.secondary : cs.primary;
+    final statusLabel = _hasActiveTrip ? 'Attendance Active' : 'Ready for Attendance';
+
     return Container(
       padding: EdgeInsets.all(5.w),
       decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 20,
-                offset: Offset(0, 4))
+                offset: const Offset(0, 4))
           ]),
       child: Row(
         children: [
           Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(_getGreeting(),
                   style: TextStyle(
                       fontSize: 14,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: cs.onSurfaceVariant,
                       fontWeight: FontWeight.w500)),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(name.split(' ').first,
                   style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.onSurface,
+                      color: cs.onSurface,
                       letterSpacing: -0.5)),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                    color: _hasActiveTrip
-                        ? Theme.of(context).colorScheme.secondary.withOpacity(0.1)
-                        : Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20)),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Container(
                       width: 6,
                       height: 6,
                       decoration: BoxDecoration(
-                          color: _hasActiveTrip
-                              ? Theme.of(context).colorScheme.secondary
-                              : Theme.of(context).colorScheme.primary,
+                          color: statusColor,
                           shape: BoxShape.circle)),
-                  SizedBox(width: 6),
-                  Text(
-                      _hasActiveTrip
-                          ? 'Attendance Active'
-                          : 'Ready for Attendance',
+                  const SizedBox(width: 6),
+                  Text(statusLabel,
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: _hasActiveTrip
-                              ? Theme.of(context).colorScheme.secondary
-                              : Theme.of(context).colorScheme.primary)),
+                          color: statusColor)),
                 ]),
               ),
             ]),
           ),
-          // Attendance clipboard icon for bus minder
           Container(
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  color: cs.primary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(16)),
-              child: Icon(Icons.assignment_outlined,
-                  size: 28, color: Theme.of(context).colorScheme.primary)),
+              child: Icon(Icons.assignment_outlined, size: 28, color: cs.primary)),
         ],
       ),
     );
   }
 
   Widget _buildSectionTitle(String title, IconData icon) {
-    return Row(children: [
-      Icon(icon, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
-      SizedBox(width: 8),
-      Text(title,
-          style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              letterSpacing: 0.5))
-    ]);
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: Theme.of(context).colorScheme.onSurface,
+      ),
+    );
   }
 
   Widget _buildNotAssignedCard() {
@@ -711,28 +706,26 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
   }
 
   Widget _buildAssignmentCard() {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: EdgeInsets.all(5.w),
       decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 20,
-                offset: Offset(0, 4))
+                offset: const Offset(0, 4))
           ]),
       child: Column(children: [
         Row(children: [
           Container(
-              padding: EdgeInsets.all(12),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [
-                    Theme.of(context).colorScheme.primary,
-                    Theme.of(context).colorScheme.primary.withOpacity(0.7)
-                  ]),
-                  borderRadius: BorderRadius.circular(12)),
-              child: Icon(Icons.directions_bus_rounded,
+                  color: cs.primary,
+                  borderRadius: BorderRadius.circular(14)),
+              child: const Icon(Icons.directions_bus_rounded,
                   size: 24, color: Colors.white)),
           SizedBox(width: 4.w),
           Expanded(
@@ -743,10 +736,9 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                     style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.onSurface)),
+                        color: cs.onSurface)),
                 Text('Assigned Bus',
-                    style:
-                        TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant)),
               ])),
         ]),
         SizedBox(height: 3.h),
@@ -762,15 +754,16 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
   }
 
   Widget _buildInfoPill(IconData icon, String value, String label) {
+    final cs = Theme.of(context).colorScheme;
     return Expanded(
       child: Container(
-        padding: EdgeInsets.all(12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
+            color: cs.primary.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(12)),
         child: Row(children: [
-          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-          SizedBox(width: 8),
+          Icon(icon, size: 20, color: cs.primary),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -780,11 +773,10 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                       style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: Theme.of(context).colorScheme.onSurface),
+                          color: cs.onSurface),
                       overflow: TextOverflow.ellipsis),
                   Text(label,
-                      style: TextStyle(
-                          fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                       overflow: TextOverflow.ellipsis),
                 ]),
           ),
@@ -794,74 +786,165 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
   }
 
   Widget _buildStudentPreviewCard() {
+    final cs = Theme.of(context).colorScheme;
     final totalStudents = _assignedChildren.length;
 
     if (totalStudents == 0) {
       return Container(
         padding: EdgeInsets.all(5.w),
         decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 12,
-                  offset: Offset(0, 4))
-            ]),
+            border: Border.all(color: cs.outline.withValues(alpha: 0.5))),
         child: Column(children: [
-          Icon(Icons.people_outline, size: 40, color: Colors.grey.shade300),
+          Icon(Icons.people_outline,
+              size: 40, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
           SizedBox(height: 1.h),
           Text('No students assigned',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              style: TextStyle(color: cs.onSurfaceVariant)),
         ]),
       );
     }
 
+    final displayChildren =
+        totalStudents > 5 ? _assignedChildren.sublist(0, 5) : _assignedChildren;
+    final remaining = totalStudents - displayChildren.length;
+
     return Container(
-      padding: EdgeInsets.all(5.w),
       decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 12,
-                offset: Offset(0, 4))
-          ]),
+          border: Border.all(color: cs.outline.withValues(alpha: 0.5))),
+      child: Column(
+        children: [
+          // Collapsible header
+          InkWell(
+            onTap: () => setState(() => _isStudentsExpanded = !_isStudentsExpanded),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
+              bottomLeft: Radius.circular(_isStudentsExpanded ? 0 : 16),
+              bottomRight: Radius.circular(_isStudentsExpanded ? 0 : 16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle),
+                    child: Icon(Icons.people_outline, size: 20, color: cs.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Assigned Students',
+                            style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurface)),
+                        Text('$totalStudents students',
+                            style: TextStyle(
+                                fontSize: 12, color: cs.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _isStudentsExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.expand_more, color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Expandable list
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Column(
+              children: [
+                Divider(height: 1, color: cs.outline.withValues(alpha: 0.4)),
+                for (int i = 0; i < displayChildren.length; i++) ...[
+                  if (i > 0)
+                    Divider(
+                        height: 1,
+                        indent: 16,
+                        endIndent: 16,
+                        color: cs.outline.withValues(alpha: 0.4)),
+                  _buildStudentRow(displayChildren[i], cs),
+                ],
+                if (remaining > 0) ...[
+                  Divider(
+                      height: 1,
+                      indent: 16,
+                      endIndent: 16,
+                      color: cs.outline.withValues(alpha: 0.4)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text('+$remaining more students',
+                        style: TextStyle(
+                            fontSize: 13, color: cs.onSurfaceVariant)),
+                  ),
+                ],
+              ],
+            ),
+            crossFadeState: _isStudentsExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 200),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStudentRow(Map<String, dynamic> student, ColorScheme cs) {
+    final name = student['name'] as String? ?? 'Student';
+    final grade = student['grade'] as String? ?? 'N/A';
+    final initials = _getInitials(name);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(3.w),
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
+                color: cs.primary.withValues(alpha: 0.12),
+                shape: BoxShape.circle),
+            child: Center(
+              child: Text(initials,
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: cs.primary)),
             ),
-            child: Icon(Icons.people_outline,
-                color: Theme.of(context).colorScheme.primary, size: 24),
           ),
-          SizedBox(width: 4.w),
+          const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Assigned Students',
-                  style: TextStyle(
-                    fontSize: 16,
+            child: Text(name,
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: cs.onSurface)),
+          ),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(20)),
+            child: Text('Gr $grade',
+                style: TextStyle(
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                SizedBox(height: 0.5.h),
-                Text(
-                  '$totalStudents students',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
+                    color: cs.primary)),
           ),
         ],
       ),
@@ -913,7 +996,9 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
         duration: const Duration(milliseconds: 200),
         padding: EdgeInsets.all(3.5.w),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : Colors.white,
+          color: isSelected
+              ? color.withValues(alpha: 0.1)
+              : Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? color : Theme.of(context).colorScheme.outline,
@@ -922,7 +1007,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: color.withOpacity(0.12),
+                    color: color.withValues(alpha: 0.12),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -934,7 +1019,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
             Container(
               padding: EdgeInsets.all(2.5.w),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
+                color: color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, size: 22, color: color),
@@ -977,12 +1062,14 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
 
     return Container(
       padding: EdgeInsets.all(5.w),
-      decoration: BoxDecoration(color: Colors.white, boxShadow: [
-        BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, -5))
-      ]),
+      decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, -5))
+          ]),
       child: SafeArea(
         top: false,
         child: AnimatedBuilder(
@@ -1008,7 +1095,10 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                               ? Theme.of(context).colorScheme.secondary
                               : Theme.of(context).colorScheme.primary,
                           _hasActiveTrip
-                              ? Theme.of(context).colorScheme.secondary.withOpacity(0.8)
+                              ? Theme.of(context)
+                                  .colorScheme
+                                  .secondary
+                                  .withValues(alpha: 0.8)
                               : Theme.of(context).colorScheme.primaryContainer,
                         ])
                       : null,
@@ -1020,9 +1110,9 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                             color: (_hasActiveTrip
                                     ? Theme.of(context).colorScheme.secondary
                                     : Theme.of(context).colorScheme.primary)
-                                .withOpacity(0.4),
+                                .withValues(alpha: 0.4),
                             blurRadius: 12,
-                            offset: Offset(0, 4),
+                            offset: const Offset(0, 4),
                           ),
                         ]
                       : null,

@@ -277,12 +277,6 @@ class BusminderDrawerWidget extends StatelessWidget {
                     title: 'Settings',
                     route: '/busminder-settings',
                   ),
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.chat_bubble_outline_rounded,
-                    title: 'Communications',
-                    route: '/busminder-communications',
-                  ),
                 ],
               ),
             ),

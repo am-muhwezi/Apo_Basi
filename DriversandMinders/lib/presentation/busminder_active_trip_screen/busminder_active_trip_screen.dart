@@ -7,6 +7,7 @@ import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/busminder_drawer_widget.dart';
 import '../busminder_trip_history_screen/busminder_trip_history_screen.dart';
@@ -73,7 +74,9 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
     }
 
     update();
-    _tripTimer = Timer.periodic(const Duration(seconds: 1), (_) => update());
+    _tripTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) update();
+    });
   }
 
   Future<void> _checkActiveTrip() async {
@@ -355,21 +358,26 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
-                SizedBox(height: 2.h),
-                Text('Loading trip data...'),
-              ],
-            ),
-          ),
-        );
+      return Theme(
+        data: AppTheme.lightBusminderTheme,
+        child: Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                      color: AppTheme.lightBusminderTheme.colorScheme.primary),
+                  SizedBox(height: 2.h),
+                  const Text('Loading trip data...'),
+                ],
+              ),
+            )),
+      );
     }
 
-    return Scaffold(
+    return Theme(
+      data: AppTheme.lightBusminderTheme,
+      child: Scaffold(
         drawer: BusminderDrawerWidget(
             currentRoute: '/busminder-active-trip-screen'),
         appBar: CustomAppBar(
@@ -460,7 +468,8 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
             ],
           ),
         ),
-      );
+      ),
+    );
   }
 
   Widget _buildTripHeader() {
