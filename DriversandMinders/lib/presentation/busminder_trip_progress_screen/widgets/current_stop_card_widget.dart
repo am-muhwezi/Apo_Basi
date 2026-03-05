@@ -35,7 +35,7 @@ class _CurrentStopCardWidgetState extends State<CurrentStopCardWidget> {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppTheme.primaryBusminder.withValues(alpha: 0.3),
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
           width: 2,
         ),
         boxShadow: [
@@ -54,7 +54,7 @@ class _CurrentStopCardWidgetState extends State<CurrentStopCardWidget> {
             width: double.infinity,
             padding: EdgeInsets.all(4.w),
             decoration: BoxDecoration(
-              color: AppTheme.primaryBusminder.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(10),
                 topRight: Radius.circular(10),
@@ -64,7 +64,7 @@ class _CurrentStopCardWidgetState extends State<CurrentStopCardWidget> {
               children: [
                 CustomIconWidget(
                   iconName: 'location_on',
-                  color: AppTheme.primaryBusminder,
+                  color: Theme.of(context).colorScheme.primary,
                   size: 24,
                 ),
                 SizedBox(width: 3.w),
@@ -75,7 +75,7 @@ class _CurrentStopCardWidgetState extends State<CurrentStopCardWidget> {
                       Text(
                         'Current Stop',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppTheme.primaryBusminder,
+                          color: Theme.of(context).colorScheme.primary,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -93,7 +93,7 @@ class _CurrentStopCardWidgetState extends State<CurrentStopCardWidget> {
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryBusminder,
+                    color: Theme.of(context).colorScheme.primary,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -111,12 +111,12 @@ class _CurrentStopCardWidgetState extends State<CurrentStopCardWidget> {
             Container(
               width: double.infinity,
               padding: EdgeInsets.all(4.w),
-              color: AppTheme.warningState.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.1),
               child: Row(
                 children: [
                   CustomIconWidget(
                     iconName: 'info',
-                    color: AppTheme.warningState,
+                    color: Theme.of(context).colorScheme.tertiary,
                     size: 18,
                   ),
                   SizedBox(width: 2.w),
@@ -124,7 +124,7 @@ class _CurrentStopCardWidgetState extends State<CurrentStopCardWidget> {
                     child: Text(
                       instructions,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppTheme.warningState,
+                        color: Theme.of(context).colorScheme.tertiary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -201,17 +201,17 @@ class _CurrentStopCardWidgetState extends State<CurrentStopCardWidget> {
 
     switch (status) {
       case 'boarded':
-        statusColor = AppTheme.successAction;
+        statusColor = Theme.of(context).colorScheme.secondary;
         statusIcon = Icons.check_circle;
         statusText = 'Boarded';
         break;
       case 'absent':
-        statusColor = AppTheme.criticalAlert;
+        statusColor = Theme.of(context).colorScheme.error;
         statusIcon = Icons.cancel;
         statusText = 'Absent';
         break;
       default:
-        statusColor = AppTheme.warningState;
+        statusColor = Theme.of(context).colorScheme.tertiary;
         statusIcon = Icons.schedule;
         statusText = 'Waiting';
     }
@@ -295,7 +295,7 @@ class _CurrentStopCardWidgetState extends State<CurrentStopCardWidget> {
                     context,
                     'Board',
                     Icons.login,
-                    AppTheme.successAction,
+                    Theme.of(context).colorScheme.secondary,
                     status != 'boarded',
                     () {
                       HapticFeedback.lightImpact();
@@ -307,7 +307,7 @@ class _CurrentStopCardWidgetState extends State<CurrentStopCardWidget> {
                     context,
                     'Absent',
                     Icons.close,
-                    AppTheme.criticalAlert,
+                    Theme.of(context).colorScheme.error,
                     status != 'absent',
                     () {
                       HapticFeedback.lightImpact();

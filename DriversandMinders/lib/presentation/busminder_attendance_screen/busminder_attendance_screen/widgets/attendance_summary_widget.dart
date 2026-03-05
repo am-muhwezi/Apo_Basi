@@ -33,17 +33,17 @@ class AttendanceSummaryWidget extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [
             Colors.white,
-            AppTheme.primaryBusminder.withValues(alpha: 0.02),
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.02),
           ],
         ),
         borderRadius: BorderRadius.circular(20.0),
         border: Border.all(
-          color: AppTheme.primaryBusminder.withValues(alpha: 0.15),
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryBusminder.withValues(alpha: 0.08),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
             offset: const Offset(0, 4),
             blurRadius: 16,
             spreadRadius: 0,
@@ -72,7 +72,7 @@ class AttendanceSummaryWidget extends StatelessWidget {
                         strokeWidth: 8,
                         backgroundColor: Colors.transparent,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          AppTheme.backgroundSecondary.withValues(alpha: 0.3),
+                          Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                         ),
                       ),
                     ),
@@ -85,7 +85,7 @@ class AttendanceSummaryWidget extends StatelessWidget {
                         strokeWidth: 8,
                         backgroundColor: Colors.transparent,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          AppTheme.successAction,
+                          Theme.of(context).colorScheme.secondary,
                         ),
                       ),
                     ),
@@ -98,7 +98,7 @@ class AttendanceSummaryWidget extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
-                            color: AppTheme.primaryBusminder,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                         Text(
@@ -106,7 +106,7 @@ class AttendanceSummaryWidget extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w500,
-                            color: AppTheme.textSecondary,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -129,7 +129,7 @@ class AttendanceSummaryWidget extends StatelessWidget {
                             context,
                             completedCount.toString(),
                             'Marked',
-                            AppTheme.successAction,
+                            Theme.of(context).colorScheme.secondary,
                             Icons.check_circle,
                           ),
                         ),
@@ -139,7 +139,7 @@ class AttendanceSummaryWidget extends StatelessWidget {
                             context,
                             pendingCount.toString(),
                             'Pending',
-                            AppTheme.warningState,
+                            Theme.of(context).colorScheme.tertiary,
                             Icons.pending,
                           ),
                         ),
@@ -204,7 +204,7 @@ class AttendanceSummaryWidget extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
       decoration: BoxDecoration(
-        color: AppTheme.primaryBusminder.withValues(alpha: 0.05),
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(10.0),
       ),
       child: Row(
@@ -212,7 +212,7 @@ class AttendanceSummaryWidget extends StatelessWidget {
         children: [
           Icon(
             Icons.people,
-            color: AppTheme.primaryBusminder,
+            color: Theme.of(context).colorScheme.primary,
             size: 16,
           ),
           SizedBox(width: 2.w),
@@ -221,13 +221,13 @@ class AttendanceSummaryWidget extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
               children: [
                 TextSpan(
                   text: '$completed',
                   style: TextStyle(
-                    color: AppTheme.successAction,
+                    color: Theme.of(context).colorScheme.secondary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -235,7 +235,7 @@ class AttendanceSummaryWidget extends StatelessWidget {
                 TextSpan(
                   text: '$total',
                   style: TextStyle(
-                    color: AppTheme.primaryBusminder,
+                    color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),

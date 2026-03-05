@@ -102,7 +102,7 @@ class _BusMinderTripHistoryScreenState
 
   Widget _buildLoadingView() {
     return Center(
-      child: CircularProgressIndicator(color: AppTheme.primaryBusminder),
+      child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
     );
   }
 
@@ -136,15 +136,15 @@ class _BusMinderTripHistoryScreenState
                       shape: BoxShape.circle,
                       gradient: LinearGradient(
                         colors: [
-                          AppTheme.successAction,
-                          AppTheme.successAction.withOpacity(0.8),
+                          Theme.of(context).colorScheme.secondary,
+                          Theme.of(context).colorScheme.secondary.withOpacity(0.8),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.successAction.withOpacity(0.3),
+                          color: Theme.of(context).colorScheme.secondary.withOpacity(0.3),
                           blurRadius: 20,
                           offset: Offset(0, 8),
                         ),
@@ -162,7 +162,7 @@ class _BusMinderTripHistoryScreenState
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
-                      color: AppTheme.textPrimary,
+                      color: Theme.of(context).colorScheme.onSurface,
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -173,7 +173,7 @@ class _BusMinderTripHistoryScreenState
                         : 'Afternoon Dropoff',
                     style: TextStyle(
                       fontSize: 15,
-                      color: AppTheme.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -212,7 +212,7 @@ class _BusMinderTripHistoryScreenState
                               style: TextStyle(
                                 fontSize: 48,
                                 fontWeight: FontWeight.w800,
-                                color: AppTheme.successAction,
+                                color: Theme.of(context).colorScheme.secondary,
                                 height: 1,
                               ),
                             ),
@@ -223,7 +223,7 @@ class _BusMinderTripHistoryScreenState
                                 style: TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.w700,
-                                  color: AppTheme.successAction,
+                                  color: Theme.of(context).colorScheme.secondary,
                                 ),
                               ),
                             ),
@@ -234,7 +234,7 @@ class _BusMinderTripHistoryScreenState
                           'Attendance Rate',
                           style: TextStyle(
                             fontSize: 14,
-                            color: AppTheme.textSecondary,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -249,18 +249,18 @@ class _BusMinderTripHistoryScreenState
                     children: [
                       Expanded(
                           child: _buildStatCard('$totalStudents', 'Total',
-                              Icons.people_outline, AppTheme.primaryBusminder)),
+                              Icons.people_outline, Theme.of(context).colorScheme.primary)),
                       SizedBox(width: 3.w),
                       Expanded(
                           child: _buildStatCard(
                               '$studentsCompleted',
                               'Done',
                               Icons.check_circle_outline,
-                              AppTheme.successAction)),
+                              Theme.of(context).colorScheme.secondary)),
                       SizedBox(width: 3.w),
                       Expanded(
                           child: _buildStatCard('$studentsAbsent', 'Absent',
-                              Icons.cancel_outlined, AppTheme.criticalAlert)),
+                              Icons.cancel_outlined, Theme.of(context).colorScheme.error)),
                     ],
                   ),
                 ],
@@ -279,7 +279,7 @@ class _BusMinderTripHistoryScreenState
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryBusminder,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Colors.white,
                   padding: EdgeInsets.symmetric(vertical: 2.h),
                   shape: RoundedRectangleBorder(
@@ -327,14 +327,14 @@ class _BusMinderTripHistoryScreenState
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
-              color: AppTheme.textPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           Text(
             label,
             style: TextStyle(
               fontSize: 12,
-              color: AppTheme.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -353,7 +353,7 @@ class _BusMinderTripHistoryScreenState
       child: Container(
         padding: EdgeInsets.symmetric(vertical: 1.5.h),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryBusminder : Colors.grey[200],
+          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey[200],
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -422,7 +422,7 @@ class _BusMinderTripHistoryScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderLight),
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -448,7 +448,7 @@ class _BusMinderTripHistoryScreenState
                     style: TextStyle(
                       fontSize: 15.sp,
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ],
@@ -481,7 +481,7 @@ class _BusMinderTripHistoryScreenState
                 'Bus $busNumber',
                 style: TextStyle(
                   fontSize: 13.sp,
-                  color: AppTheme.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -531,7 +531,7 @@ class _BusMinderTripHistoryScreenState
                     '($duration)',
                     style: TextStyle(
                       fontSize: 12.sp,
-                      color: AppTheme.primaryBusminder,
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -542,14 +542,14 @@ class _BusMinderTripHistoryScreenState
           // Summary (if trip is completed)
           if (status == 'completed' && totalStudents > 0) ...[
             SizedBox(height: 2.h),
-            Divider(color: AppTheme.borderLight),
+            Divider(color: Theme.of(context).colorScheme.outline),
             SizedBox(height: 1.h),
             Text(
               'Trip Summary',
               style: TextStyle(
                 fontSize: 12.sp,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             SizedBox(height: 1.h),
@@ -606,7 +606,7 @@ class _BusMinderTripHistoryScreenState
           style: TextStyle(
             fontSize: 14.sp,
             fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         Text(

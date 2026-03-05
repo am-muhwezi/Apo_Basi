@@ -244,6 +244,9 @@ class LocationTrackingService : Service() {
         if (!isTracking) return
         isTracking = false
 
+        // Notify Flutter that native GPS is no longer streaming
+        GpsStatusBroadcaster.sendDisconnected()
+
         disconnectWebSocket()
         fusedLocationClient.removeLocationUpdates(locationCallback)
 
@@ -261,6 +264,18 @@ class LocationTrackingService : Service() {
 
     private fun handleLocationUpdate(location: Location) {
         locationUpdateCount++
+
+        // Push position to Flutter UI immediately via EventChannel.
+        // This is the single source of truth for UI screens — they no longer
+        // need their own Geolocator stream.
+        GpsStatusBroadcaster.sendUpdate(
+            connected = true,
+            speedKmh  = location.speed * 3.6,
+            accuracy  = location.accuracy.toDouble(),
+            lat       = location.latitude,
+            lng       = location.longitude,
+        )
+
         serviceScope.launch {
             try {
                 sendLocation(location)
@@ -346,7 +361,7 @@ class LocationTrackingService : Service() {
             .setContentTitle("ApoBasi — Active School Route")
             .setContentText("$busLabel • Children on board • Location active")
             .setSubText("Tap to open the app")
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
@@ -376,11 +391,12 @@ class LocationTrackingService : Service() {
             .setContentTitle("ApoBasi — Active School Route")
             .setContentText(contentText)
             .setSubText("Children on board • End trip in-app to stop")
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setOnlyAlertOnce(true)
             .setContentIntent(openAppPendingIntent)
             .build()

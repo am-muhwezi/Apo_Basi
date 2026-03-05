@@ -29,19 +29,19 @@ class RouteAssignmentCardWidget extends StatelessWidget {
         gradient: LinearGradient(
           colors: [
             Colors.white,
-            AppTheme.primaryDriver.withValues(alpha: 0.02),
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.02),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppTheme.primaryDriver.withValues(alpha: 0.15),
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryDriver.withValues(alpha: 0.08),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
             offset: const Offset(0, 8),
             blurRadius: 24,
             spreadRadius: 0,
@@ -64,14 +64,14 @@ class RouteAssignmentCardWidget extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      AppTheme.primaryDriver,
-                      AppTheme.primaryDriver.withValues(alpha: 0.8),
+                      Theme.of(context).colorScheme.primary,
+                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: AppTheme.primaryDriver.withValues(alpha: 0.3),
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
                       offset: Offset(0, 4),
                       blurRadius: 12,
                     ),
@@ -93,7 +93,7 @@ class RouteAssignmentCardWidget extends StatelessWidget {
                       style: AppTheme.lightDriverTheme.textTheme.titleLarge
                           ?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: AppTheme.primaryDriver,
+                        color: Theme.of(context).colorScheme.primary,
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -102,7 +102,7 @@ class RouteAssignmentCardWidget extends StatelessWidget {
                       'Ready to begin your route',
                       style: AppTheme.lightDriverTheme.textTheme.bodyMedium
                           ?.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -115,10 +115,10 @@ class RouteAssignmentCardWidget extends StatelessWidget {
           Container(
             padding: EdgeInsets.all(4.w),
             decoration: BoxDecoration(
-              color: AppTheme.backgroundSecondary.withValues(alpha: 0.5),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: AppTheme.primaryDriver.withValues(alpha: 0.08),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
                 width: 1,
               ),
             ),
@@ -177,7 +177,7 @@ class RouteAssignmentCardWidget extends StatelessWidget {
       children: [
         CustomIconWidget(
           iconName: icon.toString().split('.').last,
-          color: AppTheme.textSecondary,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
           size: 20,
         ),
         SizedBox(width: 3.w),
@@ -188,14 +188,14 @@ class RouteAssignmentCardWidget extends StatelessWidget {
               Text(
                 label,
                 style: AppTheme.lightDriverTheme.textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               Text(
                 value,
                 style: AppTheme.lightDriverTheme.textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
               ),

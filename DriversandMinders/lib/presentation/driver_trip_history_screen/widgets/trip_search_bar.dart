@@ -55,7 +55,7 @@ class _TripSearchBarState extends State<TripSearchBar> {
                 borderRadius: BorderRadius.circular(8.0),
                 border: Border.all(
                   color: _isSearchActive
-                      ? AppTheme.primaryDriver
+                      ? Theme.of(context).colorScheme.primary
                       : colorScheme.outline.withValues(alpha: 0.3),
                   width: _isSearchActive ? 2.0 : 1.0,
                 ),
@@ -78,7 +78,7 @@ class _TripSearchBarState extends State<TripSearchBar> {
                     child: CustomIconWidget(
                       iconName: 'search',
                       color: _isSearchActive
-                          ? AppTheme.primaryDriver
+                          ? Theme.of(context).colorScheme.primary
                           : colorScheme.onSurface.withValues(alpha: 0.6),
                       size: 20,
                     ),
@@ -118,12 +118,12 @@ class _TripSearchBarState extends State<TripSearchBar> {
           Container(
             decoration: BoxDecoration(
               color: widget.hasActiveFilters
-                  ? AppTheme.primaryDriver
+                  ? Theme.of(context).colorScheme.primary
                   : colorScheme.surface,
               borderRadius: BorderRadius.circular(8.0),
               border: Border.all(
                 color: widget.hasActiveFilters
-                    ? AppTheme.primaryDriver
+                    ? Theme.of(context).colorScheme.primary
                     : colorScheme.outline.withValues(alpha: 0.3),
                 width: 1.0,
               ),
@@ -135,7 +135,7 @@ class _TripSearchBarState extends State<TripSearchBar> {
                   CustomIconWidget(
                     iconName: 'filter_list',
                     color: widget.hasActiveFilters
-                        ? AppTheme.textOnPrimary
+                        ? Theme.of(context).colorScheme.onPrimary
                         : colorScheme.onSurface.withValues(alpha: 0.7),
                     size: 24,
                   ),
@@ -147,7 +147,7 @@ class _TripSearchBarState extends State<TripSearchBar> {
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: AppTheme.criticalAlert,
+                          color: Theme.of(context).colorScheme.error,
                           shape: BoxShape.circle,
                         ),
                       ),

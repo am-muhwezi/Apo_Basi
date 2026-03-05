@@ -305,7 +305,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('No bus assigned. Cannot start attendance.'),
-              backgroundColor: AppTheme.criticalAlert,
+              backgroundColor: Theme.of(context).colorScheme.error,
             ),
           );
         }
@@ -346,7 +346,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text('Failed to start attendance: ${e.toString()}'),
-              backgroundColor: AppTheme.criticalAlert),
+              backgroundColor: Theme.of(context).colorScheme.error),
         );
       }
     }
@@ -372,18 +372,18 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                     borderRadius: BorderRadius.circular(2))),
             SizedBox(height: 3.h),
             Icon(Icons.warning_amber_rounded,
-                size: 48, color: AppTheme.warningState),
+                size: 48, color: Theme.of(context).colorScheme.tertiary),
             SizedBox(height: 2.h),
             Text('Reset Shift State?',
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary)),
+                    color: Theme.of(context).colorScheme.onSurface)),
             SizedBox(height: 1.h),
             Text(
                 'This will clear local attendance data. Only use if the app is stuck.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppTheme.textSecondary)),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             SizedBox(height: 3.h),
             Row(
               children: [
@@ -395,7 +395,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12))),
                         child: Text('Cancel',
-                            style: TextStyle(color: AppTheme.textPrimary)))),
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface)))),
                 SizedBox(width: 4.w),
                 Expanded(
                     child: ElevatedButton(
@@ -408,10 +408,10 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                     });
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content: Text('Shift state reset'),
-                        backgroundColor: AppTheme.successAction));
+                        backgroundColor: Theme.of(context).colorScheme.secondary));
                   },
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.warningState,
+                      backgroundColor: Theme.of(context).colorScheme.tertiary,
                       padding: EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
@@ -447,24 +447,21 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: AppTheme.lightBusminderTheme,
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: Color(0xFFF8F9FB),
         drawer: BusminderDrawerWidget(
             currentRoute: '/busminder-start-shift-screen'),
         body: _isLoadingData ? _buildLoadingState() : _buildMainContent(),
-      ),
-    );
+      );
   }
 
   Widget _buildLoadingState() {
     return Center(
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         CircularProgressIndicator(
-            color: AppTheme.primaryBusminder, strokeWidth: 3),
+            color: Theme.of(context).colorScheme.primary, strokeWidth: 3),
         SizedBox(height: 2.h),
-        Text('Loading...', style: TextStyle(color: AppTheme.textSecondary)),
+        Text('Loading...', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
       ]),
     );
   }
@@ -534,7 +531,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                       ],
                     ),
                     child: Icon(Icons.menu_rounded,
-                        color: AppTheme.textPrimary, size: 28),
+                        color: Theme.of(context).colorScheme.onSurface, size: 28),
                   ),
                 ),
               ),
@@ -553,7 +550,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
           Builder(
             builder: (context) => IconButton(
               icon: Icon(Icons.menu_rounded,
-                  color: AppTheme.textPrimary, size: 28),
+                  color: Theme.of(context).colorScheme.onSurface, size: 28),
               onPressed: () => Scaffold.of(context).openDrawer(),
               tooltip: 'Open navigation drawer',
             ),
@@ -562,17 +559,17 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
           Container(
             padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-                color: AppTheme.primaryBusminder.withOpacity(0.1),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20)),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(Icons.access_time,
-                  size: 16, color: AppTheme.primaryBusminder),
+                  size: 16, color: Theme.of(context).colorScheme.primary),
               SizedBox(width: 6),
               Text(_currentTime,
                   style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: AppTheme.primaryBusminder)),
+                      color: Theme.of(context).colorScheme.primary)),
             ]),
           ),
         ],
@@ -600,22 +597,22 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
               Text(_getGreeting(),
                   style: TextStyle(
                       fontSize: 14,
-                      color: AppTheme.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500)),
               SizedBox(height: 4),
               Text(name.split(' ').first,
                   style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
+                      color: Theme.of(context).colorScheme.onSurface,
                       letterSpacing: -0.5)),
               SizedBox(height: 8),
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                     color: _hasActiveTrip
-                        ? AppTheme.successAction.withOpacity(0.1)
-                        : AppTheme.primaryBusminder.withOpacity(0.1),
+                        ? Theme.of(context).colorScheme.secondary.withOpacity(0.1)
+                        : Theme.of(context).colorScheme.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20)),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Container(
@@ -623,8 +620,8 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                       height: 6,
                       decoration: BoxDecoration(
                           color: _hasActiveTrip
-                              ? AppTheme.successAction
-                              : AppTheme.primaryBusminder,
+                              ? Theme.of(context).colorScheme.secondary
+                              : Theme.of(context).colorScheme.primary,
                           shape: BoxShape.circle)),
                   SizedBox(width: 6),
                   Text(
@@ -635,8 +632,8 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: _hasActiveTrip
-                              ? AppTheme.successAction
-                              : AppTheme.primaryBusminder)),
+                              ? Theme.of(context).colorScheme.secondary
+                              : Theme.of(context).colorScheme.primary)),
                 ]),
               ),
             ]),
@@ -646,10 +643,10 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                  color: AppTheme.primaryBusminder.withOpacity(0.1),
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(16)),
               child: Icon(Icons.assignment_outlined,
-                  size: 28, color: AppTheme.primaryBusminder)),
+                  size: 28, color: Theme.of(context).colorScheme.primary)),
         ],
       ),
     );
@@ -657,13 +654,13 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
 
   Widget _buildSectionTitle(String title, IconData icon) {
     return Row(children: [
-      Icon(icon, size: 18, color: AppTheme.textSecondary),
+      Icon(icon, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
       SizedBox(width: 8),
       Text(title,
           style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               letterSpacing: 0.5))
     ]);
   }
@@ -718,8 +715,8 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
                   gradient: LinearGradient(colors: [
-                    AppTheme.primaryBusminder,
-                    AppTheme.primaryBusminder.withOpacity(0.7)
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.primary.withOpacity(0.7)
                   ]),
                   borderRadius: BorderRadius.circular(12)),
               child: Icon(Icons.directions_bus_rounded,
@@ -733,10 +730,10 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                     style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary)),
+                        color: Theme.of(context).colorScheme.onSurface)),
                 Text('Assigned Bus',
                     style:
-                        TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
+                        TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ])),
         ]),
         SizedBox(height: 3.h),
@@ -756,10 +753,10 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
       child: Container(
         padding: EdgeInsets.all(12),
         decoration: BoxDecoration(
-            color: AppTheme.primaryBusminder.withOpacity(0.05),
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
             borderRadius: BorderRadius.circular(12)),
         child: Row(children: [
-          Icon(icon, size: 20, color: AppTheme.primaryBusminder),
+          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
           SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -770,11 +767,11 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                       style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary),
+                          color: Theme.of(context).colorScheme.onSurface),
                       overflow: TextOverflow.ellipsis),
                   Text(label,
                       style: TextStyle(
-                          fontSize: 11, color: AppTheme.textSecondary),
+                          fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       overflow: TextOverflow.ellipsis),
                 ]),
           ),
@@ -802,7 +799,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
           Icon(Icons.people_outline, size: 40, color: Colors.grey.shade300),
           SizedBox(height: 1.h),
           Text('No students assigned',
-              style: TextStyle(color: AppTheme.textSecondary)),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ]),
       );
     }
@@ -823,11 +820,11 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
           Container(
             padding: EdgeInsets.all(3.w),
             decoration: BoxDecoration(
-              color: AppTheme.primaryBusminder.withOpacity(0.08),
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(Icons.people_outline,
-                color: AppTheme.primaryBusminder, size: 24),
+                color: Theme.of(context).colorScheme.primary, size: 24),
           ),
           SizedBox(width: 4.w),
           Expanded(
@@ -839,7 +836,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 SizedBox(height: 0.5.h),
@@ -847,7 +844,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                   '$totalStudents students',
                   style: TextStyle(
                     fontSize: 13,
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -867,7 +864,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
             label: 'Pickup',
             subtitle: 'Morning',
             icon: Icons.wb_sunny_outlined,
-            color: AppTheme.primaryBusminder,
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         SizedBox(width: 3.w),
@@ -906,7 +903,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
           color: isSelected ? color.withOpacity(0.1) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? color : AppTheme.borderLight,
+            color: isSelected ? color : Theme.of(context).colorScheme.outline,
             width: 1.5,
           ),
           boxShadow: isSelected
@@ -939,7 +936,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   SizedBox(height: 0.3.h),
@@ -947,7 +944,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                     subtitle,
                     style: TextStyle(
                       fontSize: 12,
-                      color: AppTheme.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -995,11 +992,11 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                   gradient: canStart
                       ? LinearGradient(colors: [
                           _hasActiveTrip
-                              ? AppTheme.successAction
-                              : AppTheme.primaryBusminder,
+                              ? Theme.of(context).colorScheme.secondary
+                              : Theme.of(context).colorScheme.primary,
                           _hasActiveTrip
-                              ? AppTheme.successAction.withOpacity(0.8)
-                              : AppTheme.primaryBusminderLight,
+                              ? Theme.of(context).colorScheme.secondary.withOpacity(0.8)
+                              : Theme.of(context).colorScheme.primaryContainer,
                         ])
                       : null,
                   color: canStart ? null : Colors.grey.shade300,
@@ -1008,8 +1005,8 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
                       ? [
                           BoxShadow(
                             color: (_hasActiveTrip
-                                    ? AppTheme.successAction
-                                    : AppTheme.primaryBusminder)
+                                    ? Theme.of(context).colorScheme.secondary
+                                    : Theme.of(context).colorScheme.primary)
                                 .withOpacity(0.4),
                             blurRadius: 12,
                             offset: Offset(0, 4),

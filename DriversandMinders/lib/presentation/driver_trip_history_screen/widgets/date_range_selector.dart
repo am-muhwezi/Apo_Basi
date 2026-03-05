@@ -27,7 +27,7 @@ class DateRangeSelector extends StatelessWidget {
         children: [
           CustomIconWidget(
             iconName: 'date_range',
-            color: AppTheme.primaryDriver,
+            color: Theme.of(context).colorScheme.primary,
             size: 20,
           ),
           SizedBox(width: 2.w),
@@ -112,7 +112,7 @@ class DateRangeSelector extends StatelessWidget {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: AppTheme.primaryDriver,
+                  primary: Theme.of(context).colorScheme.primary,
                 ),
           ),
           child: child!,

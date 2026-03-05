@@ -64,8 +64,8 @@ class _PreTripChecklistWidgetState extends State<PreTripChecklistWidget> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isComplete
-              ? AppTheme.successAction.withValues(alpha: 0.3)
-              : AppTheme.warningState.withValues(alpha: 0.3),
+              ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3)
+              : Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -86,15 +86,15 @@ class _PreTripChecklistWidgetState extends State<PreTripChecklistWidget> {
                     padding: EdgeInsets.all(2.w),
                     decoration: BoxDecoration(
                       color: isComplete
-                          ? AppTheme.successAction.withValues(alpha: 0.1)
-                          : AppTheme.warningState.withValues(alpha: 0.1),
+                          ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1)
+                          : Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: CustomIconWidget(
                       iconName: isComplete ? 'check_circle' : 'checklist',
                       color: isComplete
-                          ? AppTheme.successAction
-                          : AppTheme.warningState,
+                          ? Theme.of(context).colorScheme.secondary
+                          : Theme.of(context).colorScheme.tertiary,
                       size: 24,
                     ),
                   ),
@@ -108,7 +108,7 @@ class _PreTripChecklistWidgetState extends State<PreTripChecklistWidget> {
                           style: AppTheme.lightDriverTheme.textTheme.titleMedium
                               ?.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: AppTheme.textPrimary,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         SizedBox(height: 0.5.h),
@@ -117,8 +117,8 @@ class _PreTripChecklistWidgetState extends State<PreTripChecklistWidget> {
                           style: AppTheme.lightDriverTheme.textTheme.bodySmall
                               ?.copyWith(
                             color: isComplete
-                                ? AppTheme.successAction
-                                : AppTheme.textSecondary,
+                                ? Theme.of(context).colorScheme.secondary
+                                : Theme.of(context).colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -127,7 +127,7 @@ class _PreTripChecklistWidgetState extends State<PreTripChecklistWidget> {
                   ),
                   CustomIconWidget(
                     iconName: _isExpanded ? 'expand_less' : 'expand_more',
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     size: 24,
                   ),
                 ],
@@ -158,13 +158,13 @@ class _PreTripChecklistWidgetState extends State<PreTripChecklistWidget> {
                         padding: EdgeInsets.all(3.w),
                         decoration: BoxDecoration(
                           color: isChecked
-                              ? AppTheme.successAction.withValues(alpha: 0.1)
-                              : AppTheme.backgroundSecondary,
+                              ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1)
+                              : Theme.of(context).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: isChecked
-                                ? AppTheme.successAction.withValues(alpha: 0.3)
-                                : AppTheme.borderLight,
+                                ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3)
+                                : Theme.of(context).colorScheme.outline,
                             width: 1,
                           ),
                         ),
@@ -175,12 +175,12 @@ class _PreTripChecklistWidgetState extends State<PreTripChecklistWidget> {
                               height: 24,
                               decoration: BoxDecoration(
                                 color: isChecked
-                                    ? AppTheme.successAction
+                                    ? Theme.of(context).colorScheme.secondary
                                     : Colors.transparent,
                                 border: Border.all(
                                   color: isChecked
-                                      ? AppTheme.successAction
-                                      : AppTheme.textSecondary,
+                                      ? Theme.of(context).colorScheme.secondary
+                                      : Theme.of(context).colorScheme.onSurfaceVariant,
                                   width: 2,
                                 ),
                                 borderRadius: BorderRadius.circular(4),
@@ -188,7 +188,7 @@ class _PreTripChecklistWidgetState extends State<PreTripChecklistWidget> {
                               child: isChecked
                                   ? CustomIconWidget(
                                       iconName: 'check',
-                                      color: AppTheme.textOnPrimary,
+                                      color: Theme.of(context).colorScheme.onPrimary,
                                       size: 16,
                                     )
                                   : null,
@@ -204,7 +204,7 @@ class _PreTripChecklistWidgetState extends State<PreTripChecklistWidget> {
                                         .lightDriverTheme.textTheme.bodyMedium
                                         ?.copyWith(
                                       fontWeight: FontWeight.w600,
-                                      color: AppTheme.textPrimary,
+                                      color: Theme.of(context).colorScheme.onSurface,
                                     ),
                                   ),
                                   if (item['description'] != null) ...[
@@ -214,7 +214,7 @@ class _PreTripChecklistWidgetState extends State<PreTripChecklistWidget> {
                                       style: AppTheme
                                           .lightDriverTheme.textTheme.bodySmall
                                           ?.copyWith(
-                                        color: AppTheme.textSecondary,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ],

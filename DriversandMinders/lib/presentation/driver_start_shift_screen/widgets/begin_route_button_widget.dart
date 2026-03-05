@@ -33,10 +33,10 @@ class BeginRouteButtonWidget extends StatelessWidget {
               padding: EdgeInsets.all(3.w),
               margin: EdgeInsets.only(bottom: 2.h),
               decoration: BoxDecoration(
-                color: AppTheme.successAction.withValues(alpha: 0.1),
+                color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: AppTheme.successAction.withValues(alpha: 0.3),
+                  color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
                   width: 1,
                 ),
               ),
@@ -44,7 +44,7 @@ class BeginRouteButtonWidget extends StatelessWidget {
                 children: [
                   CustomIconWidget(
                     iconName: 'check_circle',
-                    color: AppTheme.successAction,
+                    color: Theme.of(context).colorScheme.secondary,
                     size: 20,
                   ),
                   SizedBox(width: 3.w),
@@ -56,7 +56,7 @@ class BeginRouteButtonWidget extends StatelessWidget {
                           'Active Trip in Progress',
                           style: AppTheme.lightDriverTheme.textTheme.bodyMedium
                               ?.copyWith(
-                            color: AppTheme.successAction,
+                            color: Theme.of(context).colorScheme.secondary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -66,7 +66,7 @@ class BeginRouteButtonWidget extends StatelessWidget {
                             'Duration: $tripDuration',
                             style: AppTheme.lightDriverTheme.textTheme.bodySmall
                                 ?.copyWith(
-                              color: AppTheme.textSecondary,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -81,10 +81,10 @@ class BeginRouteButtonWidget extends StatelessWidget {
               padding: EdgeInsets.all(3.w),
               margin: EdgeInsets.only(bottom: 2.h),
               decoration: BoxDecoration(
-                color: AppTheme.warningState.withValues(alpha: 0.1),
+                color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: AppTheme.warningState.withValues(alpha: 0.3),
+                  color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.3),
                   width: 1,
                 ),
               ),
@@ -92,7 +92,7 @@ class BeginRouteButtonWidget extends StatelessWidget {
                 children: [
                   CustomIconWidget(
                     iconName: 'info',
-                    color: AppTheme.warningState,
+                    color: Theme.of(context).colorScheme.tertiary,
                     size: 20,
                   ),
                   SizedBox(width: 3.w),
@@ -101,7 +101,7 @@ class BeginRouteButtonWidget extends StatelessWidget {
                       'Complete location setup and safety checklist to begin route',
                       style: AppTheme.lightDriverTheme.textTheme.bodySmall
                           ?.copyWith(
-                        color: AppTheme.warningState,
+                        color: Theme.of(context).colorScheme.tertiary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -129,11 +129,11 @@ class BeginRouteButtonWidget extends StatelessWidget {
                     : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isEnabled
-                      ? AppTheme.primaryDriver
-                      : AppTheme.textSecondary.withValues(alpha: 0.3),
-                  foregroundColor: AppTheme.textOnPrimary,
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
                   elevation: isEnabled ? 4 : 0,
-                  shadowColor: AppTheme.shadowLight,
+                  shadowColor: Theme.of(context).colorScheme.shadow,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -149,7 +149,7 @@ class BeginRouteButtonWidget extends StatelessWidget {
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                AppTheme.textOnPrimary,
+                                Theme.of(context).colorScheme.onPrimary,
                               ),
                             ),
                           ),
@@ -159,7 +159,7 @@ class BeginRouteButtonWidget extends StatelessWidget {
                             style: AppTheme
                                 .lightDriverTheme.textTheme.titleMedium
                                 ?.copyWith(
-                              color: AppTheme.textOnPrimary,
+                              color: Theme.of(context).colorScheme.onPrimary,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -170,7 +170,7 @@ class BeginRouteButtonWidget extends StatelessWidget {
                         children: [
                           CustomIconWidget(
                             iconName: isContinueTrip ? 'directions_bus' : 'play_arrow',
-                            color: AppTheme.textOnPrimary,
+                            color: Theme.of(context).colorScheme.onPrimary,
                             size: 28,
                           ),
                           SizedBox(width: 3.w),
@@ -179,7 +179,7 @@ class BeginRouteButtonWidget extends StatelessWidget {
                             style: AppTheme
                                 .lightDriverTheme.textTheme.titleLarge
                                 ?.copyWith(
-                              color: AppTheme.textOnPrimary,
+                              color: Theme.of(context).colorScheme.onPrimary,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -192,7 +192,7 @@ class BeginRouteButtonWidget extends StatelessWidget {
           Text(
             'Long press to view route details',
             style: AppTheme.lightDriverTheme.textTheme.bodySmall?.copyWith(
-              color: AppTheme.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontStyle: FontStyle.italic,
             ),
             textAlign: TextAlign.center,

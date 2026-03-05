@@ -186,7 +186,7 @@ class _BusminderTripProgressScreenState
             SnackBar(
               content:
                   Text('No active trip found. Please start a shift first.'),
-              backgroundColor: AppTheme.criticalAlert,
+              backgroundColor: Theme.of(context).colorScheme.error,
               duration: Duration(seconds: 3),
             ),
           );
@@ -402,7 +402,7 @@ class _BusminderTripProgressScreenState
                 onConfirm();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryBusminder,
+                backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,
               ),
               child: Text(
@@ -425,7 +425,7 @@ class _BusminderTripProgressScreenState
         msg: message,
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
-        backgroundColor: AppTheme.primaryBusminder,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         textColor: Colors.white,
         fontSize: 14.0,
       );
@@ -435,7 +435,7 @@ class _BusminderTripProgressScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
-            backgroundColor: AppTheme.primaryBusminder,
+            backgroundColor: Theme.of(context).colorScheme.primary,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -567,7 +567,7 @@ class _BusminderTripProgressScreenState
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               letterSpacing: 0.2,
             ),
           ),
@@ -584,12 +584,12 @@ class _BusminderTripProgressScreenState
           Container(
             padding: EdgeInsets.all(2.w),
             decoration: BoxDecoration(
-              color: AppTheme.primaryBusminder.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               icon,
-              color: AppTheme.primaryBusminder,
+              color: Theme.of(context).colorScheme.primary,
               size: 20,
             ),
           ),
@@ -599,7 +599,7 @@ class _BusminderTripProgressScreenState
               label,
               style:
                   AppTheme.lightBusminderTheme.textTheme.bodyMedium?.copyWith(
-                color: AppTheme.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -607,7 +607,7 @@ class _BusminderTripProgressScreenState
             value,
             style: AppTheme.lightBusminderTheme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ],
@@ -617,10 +617,7 @@ class _BusminderTripProgressScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: AppTheme.lightBusminderTheme,
-      child: Scaffold(
-        backgroundColor: AppTheme.backgroundPrimary,
+    return Scaffold(
         drawer: BusminderDrawerWidget(
           currentRoute: '/busminder-trip-progress-screen',
         ),
@@ -639,13 +636,13 @@ class _BusminderTripProgressScreenState
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          AppTheme.textOnPrimary,
+                          Theme.of(context).colorScheme.onPrimary,
                         ),
                       ),
                     )
                   : CustomIconWidget(
                       iconName: 'refresh',
-                      color: AppTheme.textOnPrimary,
+                      color: Theme.of(context).colorScheme.onPrimary,
                       size: 24,
                     ),
             ),
@@ -674,7 +671,7 @@ class _BusminderTripProgressScreenState
         ),
         body: RefreshIndicator(
           onRefresh: _handleRefresh,
-          color: AppTheme.primaryBusminder,
+          color: Theme.of(context).colorScheme.primary,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             child: Padding(
@@ -690,20 +687,20 @@ class _BusminderTripProgressScreenState
                       gradient: LinearGradient(
                         colors: [
                           Colors.white,
-                          AppTheme.backgroundSecondary.withValues(alpha: 0.3),
+                          Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: AppTheme.primaryBusminder.withValues(alpha: 0.1),
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                         width: 1.5,
                       ),
                       boxShadow: [
                         BoxShadow(
                           color:
-                              AppTheme.primaryBusminder.withValues(alpha: 0.08),
+                              Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
                           offset: const Offset(0, 4),
                           blurRadius: 12,
                           spreadRadius: 0,
@@ -719,8 +716,8 @@ class _BusminderTripProgressScreenState
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                AppTheme.primaryBusminder,
-                                AppTheme.primaryBusminder
+                                Theme.of(context).colorScheme.primary,
+                                Theme.of(context).colorScheme.primary
                                     .withValues(alpha: 0.85),
                               ],
                               begin: Alignment.topLeft,
@@ -791,7 +788,7 @@ class _BusminderTripProgressScreenState
                                   vertical: 1.2.h,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.successAction,
+                                  color: Theme.of(context).colorScheme.secondary,
                                   borderRadius: BorderRadius.circular(10),
                                   boxShadow: [
                                     BoxShadow(
@@ -837,7 +834,7 @@ class _BusminderTripProgressScreenState
                                     width: 4,
                                     height: 20,
                                     decoration: BoxDecoration(
-                                      color: AppTheme.primaryBusminder,
+                                      color: Theme.of(context).colorScheme.primary,
                                       borderRadius: BorderRadius.circular(2),
                                     ),
                                   ),
@@ -847,7 +844,7 @@ class _BusminderTripProgressScreenState
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w700,
-                                      color: AppTheme.textPrimary,
+                                      color: Theme.of(context).colorScheme.onSurface,
                                       letterSpacing: 0.2,
                                     ),
                                   ),
@@ -862,7 +859,7 @@ class _BusminderTripProgressScreenState
                                       'Total',
                                       '${_statisticsData['totalStudents']}',
                                       Icons.people,
-                                      AppTheme.primaryBusminder,
+                                      Theme.of(context).colorScheme.primary,
                                     ),
                                   ),
                                   SizedBox(width: 3.w),
@@ -871,7 +868,7 @@ class _BusminderTripProgressScreenState
                                       'Completed',
                                       '${_allStudents.where((s) => s['status'] == (_tripType == 'pickup' ? 'picked_up' : 'dropped_off')).length}',
                                       Icons.check_circle,
-                                      AppTheme.successAction,
+                                      Theme.of(context).colorScheme.secondary,
                                     ),
                                   ),
                                 ],
@@ -884,7 +881,7 @@ class _BusminderTripProgressScreenState
                                       'Absent',
                                       '${_allStudents.where((s) => s['status'] == 'absent').length}',
                                       Icons.person_off,
-                                      AppTheme.criticalAlert,
+                                      Theme.of(context).colorScheme.error,
                                     ),
                                   ),
                                   SizedBox(width: 3.w),
@@ -893,7 +890,7 @@ class _BusminderTripProgressScreenState
                                       'Pending',
                                       '${_allStudents.where((s) => s['status'] == 'pending').length}',
                                       Icons.schedule,
-                                      AppTheme.warningState,
+                                      Theme.of(context).colorScheme.tertiary,
                                     ),
                                   ),
                                 ],
@@ -914,15 +911,15 @@ class _BusminderTripProgressScreenState
                       borderRadius: BorderRadius.circular(16),
                       gradient: LinearGradient(
                         colors: [
-                          AppTheme.successAction,
-                          AppTheme.successAction.withValues(alpha: 0.85),
+                          Theme.of(context).colorScheme.secondary,
+                          Theme.of(context).colorScheme.secondary.withValues(alpha: 0.85),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.successAction.withValues(alpha: 0.3),
+                          color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
                           offset: const Offset(0, 4),
                           blurRadius: 12,
                           spreadRadius: 0,
@@ -965,7 +962,6 @@ class _BusminderTripProgressScreenState
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
