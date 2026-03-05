@@ -121,7 +121,7 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
         });
 
         try {
-          final backendTrip = await _apiService.getActiveTrip();
+          final backendTrip = await _apiService.getBusminderActiveTrip();
           final status = backendTrip?['status']?.toString().toLowerCase();
 
           if (backendTrip != null && status == 'in-progress') {
@@ -331,6 +331,18 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
         return;
       }
 
+      // POST to backend to create the trip
+      int? tripId;
+      try {
+        final tripResponse =
+            await _apiService.startBusminderTrip(tripType: tripType);
+        final tripData = tripResponse['trip'] as Map<String, dynamic>?;
+        tripId = tripData?['id'] as int?;
+      } catch (_) {
+        // Backend unreachable — proceed locally; trip_id will be missing
+        // but local attendance marking still works
+      }
+
       // Save using both key sets for compatibility
       await prefs.setInt('current_bus_id', busId);
       await prefs.setInt('bus_id', busId);
@@ -341,6 +353,10 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
       await prefs.setBool('trip_in_progress', true);
       await prefs.setBool('trip_active', true);
       await prefs.setString('bus_number', busNumber.toString());
+      if (tripId != null) {
+        await prefs.setInt('current_trip_id', tripId);
+        await prefs.setInt('trip_id', tripId);
+      }
 
       setState(() {
         _isLoading = false;

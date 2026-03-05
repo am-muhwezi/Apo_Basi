@@ -509,6 +509,34 @@ class ApiService {
     }
   }
 
+  // ==================== BusMinder Trip Management ====================
+
+  // Start a new trip as busminder
+  Future<Map<String, dynamic>> startBusminderTrip({String tripType = 'pickup'}) async {
+    try {
+      final response = await _dio.post(
+        '/api/busminders/start-trip/',
+        data: {'trip_type': tripType},
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(_extractErrorMessage(e, 'Failed to start trip'));
+    }
+  }
+
+  // Get active trip for current busminder
+  Future<Map<String, dynamic>?> getBusminderActiveTrip() async {
+    try {
+      final response = await _dio.get('/api/busminders/active-trip/');
+      if (response.data['trip'] != null) {
+        return response.data['trip'];
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   // ==================== Location Tracking ====================
 
   // Push location update for trip
