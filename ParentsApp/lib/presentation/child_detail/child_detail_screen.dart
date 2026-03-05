@@ -537,6 +537,12 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
     if (busId == null) return;
 
     _webSocketService.subscribeToBus(busId);
+
+    // Provide child name so trip event notifications say e.g. "Yahweh Alpha..."
+    final childName = _childData!['name']?.toString() ?? '';
+    if (childName.isNotEmpty) {
+      _webSocketService.setChildName(childName);
+    }
   }
 
   /// Update bus location and recompute route/ETA when needed.

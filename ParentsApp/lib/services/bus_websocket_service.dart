@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../config/location_config.dart';
 import '../models/bus_location_model.dart';
+import 'notification_service.dart';
 
 /// WebSocket Service for Real-time Bus Location Tracking
 ///
@@ -58,6 +59,17 @@ class BusWebSocketService {
   // waiting for the next WS trip_state message.
   Map<String, dynamic>? _lastTripState;
   Map<String, dynamic>? get lastTripState => _lastTripState;
+
+  // Cached names used when firing system notifications on trip events.
+  // bus_number comes from location_update messages; child name is set by caller.
+  String? _lastKnownBusNumber;
+  String? _lastKnownChildName;
+
+  /// Call this after subscribeToBus() with the child's display name so that
+  /// trip event notifications can show e.g. "Yahweh Alpha Pickup Trip Started".
+  void setChildName(String name) {
+    _lastKnownChildName = name;
+  }
 
   /// Connect to WebSocket server (initialize service)
   ///
@@ -178,6 +190,11 @@ class BusWebSocketService {
 
         if (LocationConfig.enableSocketLogging) {}
 
+        // Cache bus number so trip event notifications have something to show
+        if (location.busNumber.isNotEmpty) {
+          _lastKnownBusNumber = location.busNumber;
+        }
+
         _locationUpdateController.add(location);
       } else if (messageType == 'trip_state' ||
           messageType == 'trip_started' ||
@@ -189,6 +206,16 @@ class BusWebSocketService {
           _lastTripState = event;
         } else if (messageType == 'trip_ended') {
           _lastTripState = {'type': 'trip_state', 'has_active_trip': false};
+          // Fire system notification so parents get an alert on the phone header
+          final tripType = data['trip_type'] as String? ?? 'pickup';
+          final busNumber = _lastKnownBusNumber ?? 'your bus';
+          final childName = _lastKnownChildName ?? 'Your child';
+          NotificationService().showTripCompletedNotification(
+            childName: childName,
+            busNumber: busNumber,
+            tripType: tripType,
+            busId: _subscribedBusId ?? 0,
+          );
         } else if (messageType == 'trip_started') {
           // Merge trip_started fields into a trip_state-shaped snapshot so
           // the screen can re-apply GPS seed coordinates on re-entry.
@@ -203,6 +230,16 @@ class BusWebSocketService {
             'bus_speed': event['bus_speed'],
             'bus_heading': event['bus_heading'],
           };
+          // Fire system notification so parents get an alert on the phone header
+          final tripType = data['trip_type'] as String? ?? 'pickup';
+          final busNumber = _lastKnownBusNumber ?? 'your bus';
+          final childName = _lastKnownChildName ?? 'Your child';
+          NotificationService().showTripStartNotification(
+            childName: childName,
+            busNumber: busNumber,
+            tripType: tripType,
+            busId: _subscribedBusId ?? 0,
+          );
         }
         _tripEventController.add(event);
       } else if (messageType == 'error') {
