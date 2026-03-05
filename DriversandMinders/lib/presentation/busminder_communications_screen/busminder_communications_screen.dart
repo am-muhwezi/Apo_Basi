@@ -86,7 +86,7 @@ class _BusminderCommunicationsScreenState
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Message sent to $_selectedRecipient'),
-        backgroundColor: AppTheme.successAction,
+        backgroundColor: Theme.of(context).colorScheme.secondary,
         duration: Duration(seconds: 2),
       ),
     );
@@ -106,11 +106,11 @@ class _BusminderCommunicationsScreenState
               ? null
               : LinearGradient(
                   colors: [
-                    AppTheme.primaryBusminder,
-                    AppTheme.primaryBusminderLight,
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.primaryContainer,
                   ],
                 ),
-          color: isIncoming ? AppTheme.backgroundSecondary : null,
+          color: isIncoming ? Theme.of(context).colorScheme.surfaceContainerHighest : null,
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(16),
             topRight: Radius.circular(16),
@@ -118,13 +118,13 @@ class _BusminderCommunicationsScreenState
             bottomRight: Radius.circular(isIncoming ? 16 : 4),
           ),
           border: isIncoming
-              ? Border.all(color: AppTheme.borderLight, width: 1)
+              ? Border.all(color: Theme.of(context).colorScheme.outline, width: 1)
               : null,
           boxShadow: [
             BoxShadow(
               color: (isIncoming
-                      ? AppTheme.borderLight
-                      : AppTheme.primaryBusminder)
+                      ? Theme.of(context).colorScheme.outline
+                      : Theme.of(context).colorScheme.primary)
                   .withValues(alpha: 0.2),
               blurRadius: 8,
               offset: Offset(0, 2),
@@ -140,7 +140,7 @@ class _BusminderCommunicationsScreenState
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryBusminder,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
             if (isIncoming) SizedBox(height: 0.5.h),
@@ -148,7 +148,7 @@ class _BusminderCommunicationsScreenState
               message['message'] ?? '',
               style: TextStyle(
                 fontSize: 15,
-                color: isIncoming ? AppTheme.textPrimary : Colors.white,
+                color: isIncoming ? Theme.of(context).colorScheme.onSurface : Colors.white,
               ),
             ),
             SizedBox(height: 0.5.h),
@@ -157,7 +157,7 @@ class _BusminderCommunicationsScreenState
               style: TextStyle(
                 fontSize: 11,
                 color: isIncoming
-                    ? AppTheme.textSecondary
+                    ? Theme.of(context).colorScheme.onSurfaceVariant
                     : Colors.white.withValues(alpha: 0.8),
               ),
             ),
@@ -180,26 +180,26 @@ class _BusminderCommunicationsScreenState
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                AppTheme.primaryBusminder.withValues(alpha: 0.1),
-                AppTheme.primaryBusminderLight.withValues(alpha: 0.05),
+                Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.05),
               ],
             ),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: AppTheme.primaryBusminder.withValues(alpha: 0.2),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
               width: 1,
             ),
           ),
           child: Column(
             children: [
-              Icon(icon, color: AppTheme.primaryBusminder, size: 28),
+              Icon(icon, color: Theme.of(context).colorScheme.primary, size: 28),
               SizedBox(height: 0.5.h),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -213,7 +213,6 @@ class _BusminderCommunicationsScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundPrimary,
       appBar: CustomAppBar(
         title: 'Communications',
         automaticallyImplyLeading: false,
@@ -223,7 +222,7 @@ class _BusminderCommunicationsScreenState
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        backgroundColor: AppTheme.primaryBusminder,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         actions: [
           PopupMenuButton<String>(
             icon: Icon(Icons.person, color: Colors.white),
@@ -232,7 +231,7 @@ class _BusminderCommunicationsScreenState
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Recipient: $value'),
-                  backgroundColor: AppTheme.primaryBusminder,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
                 ),
               );
             },
@@ -252,7 +251,7 @@ class _BusminderCommunicationsScreenState
           // Quick Actions
           Container(
             padding: EdgeInsets.all(4.w),
-            color: AppTheme.backgroundSecondary,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -261,7 +260,7 @@ class _BusminderCommunicationsScreenState
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 SizedBox(height: 1.h),
@@ -280,7 +279,7 @@ class _BusminderCommunicationsScreenState
                             title: Row(
                               children: [
                                 Icon(Icons.warning,
-                                    color: AppTheme.criticalAlert),
+                                    color: Theme.of(context).colorScheme.error),
                                 SizedBox(width: 2.w),
                                 Text('Emergency Alert'),
                               ],
@@ -299,12 +298,12 @@ class _BusminderCommunicationsScreenState
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text('Emergency alert sent!'),
-                                      backgroundColor: AppTheme.criticalAlert,
+                                      backgroundColor: Theme.of(context).colorScheme.error,
                                     ),
                                   );
                                 },
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.criticalAlert,
+                                  backgroundColor: Theme.of(context).colorScheme.error,
                                 ),
                                 child: Text('Send Alert'),
                               ),
@@ -321,7 +320,7 @@ class _BusminderCommunicationsScreenState
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Calling school admin...'),
-                            backgroundColor: AppTheme.successAction,
+                            backgroundColor: Theme.of(context).colorScheme.secondary,
                           ),
                         );
                       },
@@ -334,7 +333,7 @@ class _BusminderCommunicationsScreenState
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Report issue form coming soon'),
-                            backgroundColor: AppTheme.primaryBusminder,
+                            backgroundColor: Theme.of(context).colorScheme.primary,
                           ),
                         );
                       },
@@ -345,7 +344,7 @@ class _BusminderCommunicationsScreenState
             ),
           ),
 
-          Divider(height: 1, color: AppTheme.borderLight),
+          Divider(height: 1, color: Theme.of(context).colorScheme.outline),
 
           // Messages List
           Expanded(
@@ -360,7 +359,7 @@ class _BusminderCommunicationsScreenState
                               Icons.chat_bubble_outline,
                               size: 80,
                               color:
-                                  AppTheme.textSecondary.withValues(alpha: 0.3),
+                                  Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                             ),
                             SizedBox(height: 2.h),
                             Text(
@@ -368,7 +367,7 @@ class _BusminderCommunicationsScreenState
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w600,
-                                color: AppTheme.textSecondary,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
                               ),
                             ),
                             SizedBox(height: 1.h),
@@ -376,7 +375,7 @@ class _BusminderCommunicationsScreenState
                               'Send a message to get started',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: AppTheme.textSecondary
+                                color: Theme.of(context).colorScheme.onSurfaceVariant
                                     .withValues(alpha: 0.7),
                               ),
                             ),
@@ -396,9 +395,9 @@ class _BusminderCommunicationsScreenState
           Container(
             padding: EdgeInsets.all(3.w),
             decoration: BoxDecoration(
-              color: AppTheme.backgroundSecondary,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               border: Border(
-                top: BorderSide(color: AppTheme.borderLight, width: 1),
+                top: BorderSide(color: Theme.of(context).colorScheme.outline, width: 1),
               ),
             ),
             child: Row(
@@ -408,20 +407,20 @@ class _BusminderCommunicationsScreenState
                     controller: _messageController,
                     decoration: InputDecoration(
                       hintText: 'Type a message to $_selectedRecipient...',
-                      hintStyle: TextStyle(color: AppTheme.textSecondary),
+                      hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25),
-                        borderSide: BorderSide(color: AppTheme.borderLight),
+                        borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25),
                         borderSide: BorderSide(
-                          color: AppTheme.primaryBusminder,
+                          color: Theme.of(context).colorScheme.primary,
                           width: 2,
                         ),
                       ),
                       filled: true,
-                      fillColor: AppTheme.backgroundPrimary,
+                      fillColor: Theme.of(context).colorScheme.surface,
                       contentPadding: EdgeInsets.symmetric(
                         horizontal: 5.w,
                         vertical: 1.5.h,
@@ -436,8 +435,8 @@ class _BusminderCommunicationsScreenState
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AppTheme.primaryBusminder,
-                        AppTheme.primaryBusminderLight,
+                        Theme.of(context).colorScheme.primary,
+                        Theme.of(context).colorScheme.primaryContainer,
                       ],
                     ),
                     shape: BoxShape.circle,

@@ -35,8 +35,8 @@ class GpsStatusWidget extends StatelessWidget {
               CustomIconWidget(
                 iconName: isGpsConnected ? 'gps_fixed' : 'gps_not_fixed',
                 color: isGpsConnected
-                    ? AppTheme.successAction
-                    : AppTheme.warningState,
+                    ? Theme.of(context).colorScheme.secondary
+                    : Theme.of(context).colorScheme.tertiary,
                 size: 20,
               ),
               SizedBox(width: 2.w),
@@ -44,8 +44,8 @@ class GpsStatusWidget extends StatelessWidget {
                 isGpsConnected ? 'GPS Connected' : 'GPS Searching...',
                 style: AppTheme.lightDriverTheme.textTheme.bodySmall?.copyWith(
                   color: isGpsConnected
-                      ? AppTheme.successAction
-                      : AppTheme.warningState,
+                      ? Theme.of(context).colorScheme.secondary
+                      : Theme.of(context).colorScheme.tertiary,
                   fontWeight: FontWeight.w500,
                 ),
               ),

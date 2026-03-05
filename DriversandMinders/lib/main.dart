@@ -11,6 +11,7 @@ import '../widgets/custom_error_widget.dart';
 import '../config/api_config.dart';
 import '../config/supabase_config.dart';
 import 'config/api_config.dart';
+import 'services/theme_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,6 +47,9 @@ Future<void> main() async {
     return SizedBox.shrink();
   };
 
+  // Initialize theme service so saved preference is loaded before first frame
+  await ThemeService().initialize();
+
   // 🚨 CRITICAL: Device orientation lock - DO NOT REMOVE
   Future.wait([
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp])
@@ -58,24 +62,29 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Sizer(builder: (context, orientation, screenType) {
-      return MaterialApp(
-        title: 'Basi Driver',
-        theme: AppTheme.lightDriverTheme,
-        darkTheme: AppTheme.darkDriverTheme,
-        themeMode: ThemeMode.light,
-        // 🚨 CRITICAL: NEVER REMOVE OR MODIFY
-        builder: (context, child) {
-          return MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: TextScaler.linear(1.0),
-            ),
-            child: child!,
+      return ValueListenableBuilder<ThemeMode>(
+        valueListenable: ThemeService().themeModeNotifier,
+        builder: (context, themeMode, _) {
+          return MaterialApp(
+            title: 'Basi Driver',
+            theme: AppTheme.lightDriverTheme,
+            darkTheme: AppTheme.darkDriverTheme,
+            themeMode: themeMode,
+            // 🚨 CRITICAL: NEVER REMOVE OR MODIFY
+            builder: (context, child) {
+              return MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(1.0),
+                ),
+                child: child!,
+              );
+            },
+            // 🚨 END CRITICAL SECTION
+            debugShowCheckedModeBanner: false,
+            routes: AppRoutes.routes,
+            initialRoute: AppRoutes.initial,
           );
         },
-        // 🚨 END CRITICAL SECTION
-        debugShowCheckedModeBanner: false,
-        routes: AppRoutes.routes,
-        initialRoute: AppRoutes.initial,
       );
     });
   }

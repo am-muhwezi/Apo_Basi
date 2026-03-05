@@ -12,6 +12,7 @@ import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
 import '../../services/api_service.dart';
+import '../../services/gps_stream_service.dart';
 import '../../services/native_location_service.dart';
 import '../../widgets/driver_drawer_widget.dart';
 import '../../services/trip_state_service.dart';
@@ -36,7 +37,10 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   String _currentTime = '';
   String _accuracyText = 'Searching...';
   Timer? _timeTimer;
-  StreamSubscription<Position>? _positionStream;
+  // Local listener on the shared GpsStreamService — cancel on dispose,
+  // but never stop the singleton (other screens may still be listening).
+  StreamSubscription<Position>? _gpsListener;
+  final GpsStreamService _gps = GpsStreamService();
   final ApiService _apiService = ApiService();
   final TripStateService _tripStateService = TripStateService();
   final NativeLocationService _nativeLocationService = NativeLocationService();
@@ -248,8 +252,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
       final cachedBusData = prefs.getString('cached_bus_data');
       final cachedRouteData = prefs.getString('cached_route_data');
-      final hasCachedData =
-          cachedBusData != null && cachedRouteData != null;
+      final hasCachedData = cachedBusData != null && cachedRouteData != null;
 
       if (hasCachedData) {
         try {
@@ -470,7 +473,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   @override
   void dispose() {
     _timeTimer?.cancel();
-    _positionStream?.cancel();
+    _gpsListener?.cancel(); // cancel this screen's listener only — keeps shared stream alive
     _retryTimer?.cancel();
     _connectivitySubscription?.cancel();
     _pulseController.dispose();
@@ -508,26 +511,37 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
   Future<void> _enableLocationServices() async {
     try {
-      final permission = await Permission.location.request();
+      await Permission.location.request();
 
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      // If the singleton already has a fix, show it immediately — no wait.
+      if (_gps.isConnected && _gps.lastKnownPosition != null) {
+        setState(() {
+          _isLocationEnabled = true;
+          _isGpsConnected = true;
+          _accuracyText = _gps.accuracyText;
+        });
+      } else {
+        setState(() {
+          _isLocationEnabled = true;
+          _accuracyText = 'Acquiring...';
+        });
+      }
 
-      setState(() {
-        _isLocationEnabled = true;
-        _accuracyText = 'Acquiring...';
-      });
+      // Start the shared stream (idempotent — safe if already running).
+      _gps.ensureStarted();
 
-      _positionStream = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high, distanceFilter: 10),
-      ).listen(
+      // Subscribe this screen's UI to the shared broadcast.
+      _gpsListener?.cancel();
+      _gpsListener = _gps.stream.listen(
         (Position position) {
+          if (!mounted) return;
           setState(() {
             _isGpsConnected = true;
-            _accuracyText = '±${position.accuracy.toInt()}m';
+            _accuracyText = _gps.accuracyText;
           });
         },
         onError: (_) {
+          if (!mounted) return;
           setState(() {
             _isGpsConnected = false;
             _accuracyText = 'Error';
@@ -543,7 +557,9 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   }
 
   Future<void> _disableLocationServices() async {
-    _positionStream?.cancel();
+    _gpsListener?.cancel();
+    _gpsListener = null;
+    _gps.stop(); // user explicitly disabled — stop the shared stream
     setState(() {
       _isLocationEnabled = false;
       _isGpsConnected = false;
@@ -667,7 +683,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(message),
-              backgroundColor: AppTheme.criticalAlert,
+              backgroundColor: Theme.of(context).colorScheme.error,
               duration: const Duration(seconds: 5)),
         );
       }
@@ -681,7 +697,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
       builder: (context) => Container(
         padding: EdgeInsets.all(6.w),
         decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -690,22 +706,23 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(2))),
             SizedBox(height: 3.h),
             Icon(Icons.warning_amber_rounded,
-                size: 48, color: AppTheme.warningState),
+                size: 48, color: Theme.of(context).colorScheme.tertiary),
             SizedBox(height: 2.h),
             Text('Reset Trip State?',
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary)),
+                    color: Theme.of(context).colorScheme.onSurface)),
             SizedBox(height: 1.h),
             Text(
                 'This will clear local trip data. Only use if the app is stuck.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppTheme.textSecondary)),
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
             SizedBox(height: 3.h),
             Row(
               children: [
@@ -717,7 +734,9 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12))),
                         child: Text('Cancel',
-                            style: TextStyle(color: AppTheme.textPrimary)))),
+                            style: TextStyle(
+                                color:
+                                    Theme.of(context).colorScheme.onSurface)))),
                 SizedBox(width: 4.w),
                 Expanded(
                     child: ElevatedButton(
@@ -730,10 +749,11 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                     });
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content: Text('Trip state reset'),
-                        backgroundColor: AppTheme.successAction));
+                        backgroundColor:
+                            Theme.of(context).colorScheme.secondary));
                   },
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.warningState,
+                      backgroundColor: Theme.of(context).colorScheme.tertiary,
                       padding: EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
@@ -768,23 +788,21 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     return Container(
       padding: EdgeInsets.all(3),
       decoration: BoxDecoration(
-          color: Colors.grey.shade100,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14)),
       child: Row(children: [
         Expanded(
-            child: _buildTripOption(
-                'pickup', Icons.wb_sunny_outlined, 'Pickup', 'Morning',
-                AppTheme.primaryDriver)),
+            child: _buildTripOption('pickup', Icons.wb_sunny_outlined, 'Pickup',
+                'Morning', Theme.of(context).colorScheme.primary)),
         Expanded(
-            child: _buildTripOption(
-                'dropoff', Icons.nights_stay_outlined, 'Dropoff', 'Afternoon',
-                const Color(0xFF10B981))),
+            child: _buildTripOption('dropoff', Icons.nights_stay_outlined,
+                'Dropoff', 'Afternoon', const Color(0xFF10B981))),
       ]),
     );
   }
 
-  Widget _buildTripOption(String type, IconData icon, String label,
-      String sub, Color color) {
+  Widget _buildTripOption(
+      String type, IconData icon, String label, String sub, Color color) {
     final isSelected = _selectedTripType == type;
     return GestureDetector(
       onTap: () => setState(() => _selectedTripType = type),
@@ -792,35 +810,34 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         duration: const Duration(milliseconds: 150),
         padding: EdgeInsets.symmetric(vertical: 1.4.h, horizontal: 2.w),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
+          color:
+              isSelected ? color.withValues(alpha: 0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(11),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                      color: color.withOpacity(0.12),
-                      blurRadius: 8,
-                      offset: Offset(0, 2))
-                ]
-              : [],
+          border: isSelected
+              ? Border.all(color: color.withValues(alpha: 0.35), width: 1)
+              : null,
         ),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(icon,
               size: 17,
-              color: isSelected ? color : AppTheme.textSecondary),
+              color: isSelected
+                  ? color
+                  : Theme.of(context).colorScheme.onSurfaceVariant),
           SizedBox(width: 7),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label,
                 style: TextStyle(
                     fontSize: 14,
-                    fontWeight:
-                        isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? color : AppTheme.textSecondary)),
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected
+                        ? color
+                        : Theme.of(context).colorScheme.onSurfaceVariant)),
             Text(sub,
                 style: TextStyle(
                     fontSize: 11,
                     color: isSelected
                         ? color.withOpacity(0.7)
-                        : AppTheme.textSecondary)),
+                        : Theme.of(context).colorScheme.onSurfaceVariant)),
           ]),
           if (isSelected) ...[
             SizedBox(width: 5),
@@ -855,17 +872,71 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: AppTheme.lightDriverTheme,
-      child: Scaffold(
-        backgroundColor: Color(0xFFF8F9FB),
-        drawer: DriverDrawerWidget(
-            currentRoute: '/driver-start-shift-screen',
-            driverData: _driverData,
-            hasActiveTrip: _hasActiveTrip,
-            onResetTrip: _showResetTripStateDialog),
-        body: _isLoadingData ? _buildLoadingState() : _buildMainContent(),
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final name = _driverData?['driverName'] as String? ?? 'Driver';
+    return Scaffold(
+      drawer: DriverDrawerWidget(
+          currentRoute: '/driver-start-shift-screen',
+          driverData: _driverData,
+          hasActiveTrip: _hasActiveTrip,
+          onResetTrip: _showResetTripStateDialog),
+      appBar: AppBar(
+        backgroundColor: cs.surface,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: Icon(Icons.menu_rounded, color: cs.onSurface),
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_getGreeting(),
+                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            Text(name.split(' ').first,
+                style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+          ],
+        ),
+        actions: [
+          Container(
+            margin: EdgeInsets.only(right: 4.w),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: _isGpsConnected
+                  ? cs.secondary.withValues(alpha: 0.12)
+                  : Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _isGpsConnected
+                    ? cs.secondary.withValues(alpha: 0.3)
+                    : cs.outline.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                      color: _isGpsConnected
+                          ? cs.secondary
+                          : cs.onSurfaceVariant,
+                      shape: BoxShape.circle)),
+              const SizedBox(width: 6),
+              Text(_currentTime,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: _isGpsConnected
+                          ? cs.secondary
+                          : cs.onSurfaceVariant)),
+            ]),
+          ),
+        ],
       ),
+      body: _isLoadingData ? _buildLoadingState() : _buildMainContent(),
     );
   }
 
@@ -877,52 +948,88 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           CircularProgressIndicator(
-              color: AppTheme.primaryDriver, strokeWidth: 3),
+              color: Theme.of(context).colorScheme.primary, strokeWidth: 3),
           SizedBox(height: 2.h),
-          Text('Loading...', style: TextStyle(color: AppTheme.textSecondary)),
+          Text('Loading...',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ],
       ),
     );
   }
 
   Widget _buildMainContent() {
-    final name = _driverData?['driverName'] as String? ?? 'Driver';
-
-    return SafeArea(
-        child: Column(children: [
-      _buildTopBar(name),
+    final cs = Theme.of(context).colorScheme;
+    return Column(children: [
       if (!_isOnline || !_isServerReachable) _buildOfflineBanner(),
       Expanded(
-          child: RefreshIndicator(
-        onRefresh: () async {
-          await _loadDriverData();
-          await _checkForActiveTrip();
-        },
-        color: AppTheme.primaryDriver,
-        child: SingleChildScrollView(
-          physics: AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.symmetric(horizontal: 4.w),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            SizedBox(height: 1.5.h),
-            if (_driverData?['routeAssignment'] == 'Not Assigned Yet')
-              _buildNotAssignedCard()
-            else
-              _buildHeroCard(name),
-            SizedBox(height: 1.5.h),
-            _buildCompactStatusRow(),
-            SizedBox(height: 1.5.h),
-            _buildCompactTripToggle(),
-            SizedBox(height: 2.h),
-            _buildSectionTitle('Pre-Trip Checklist', Icons.checklist_rounded),
-            SizedBox(height: 1.h),
-            _buildChecklistCard(),
-            SizedBox(height: 4.h),
-          ]),
+        child: RefreshIndicator(
+          onRefresh: () async {
+            await _loadDriverData();
+            await _checkForActiveTrip();
+          },
+          color: cs.primary,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 8),
+                Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                SizedBox(height: 2.h),
+
+                // ── Assignment ──────────────────────────────────────────
+                _sectionHeader('Assignment'),
+                SizedBox(height: 1.5.h),
+                if (_driverData?['routeAssignment'] == 'Not Assigned Yet')
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                    child: _buildNotAssignedCard(),
+                  )
+                else
+                  _buildAssignmentCard(),
+
+                SizedBox(height: 2.5.h),
+                Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                SizedBox(height: 2.5.h),
+
+                // ── Location ────────────────────────────────────────────
+                _sectionHeader('Location'),
+                SizedBox(height: 1.5.h),
+                _buildCompactStatusRow(),
+
+                SizedBox(height: 2.5.h),
+                Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                SizedBox(height: 2.5.h),
+
+                // ── Trip Type ───────────────────────────────────────────
+                _sectionHeader('Trip Type'),
+                SizedBox(height: 1.5.h),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4.w),
+                  child: _buildCompactTripToggle(),
+                ),
+
+                SizedBox(height: 2.5.h),
+                Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                SizedBox(height: 2.5.h),
+
+                // ── Pre-Trip Checklist ──────────────────────────────────
+                _sectionHeader('Pre-Trip Checklist'),
+                SizedBox(height: 1.5.h),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4.w),
+                  child: _buildChecklistCard(),
+                ),
+
+                SizedBox(height: 4.h),
+              ],
+            ),
+          ),
         ),
-      )),
+      ),
       _buildBottomButton(),
-    ]));
+    ]);
   }
 
   Widget _buildOfflineBanner() {
@@ -941,375 +1048,281 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                     fontWeight: FontWeight.w500))),
         Text('Pull to refresh',
             style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 11)),
+                color: Colors.white.withValues(alpha: 0.8), fontSize: 11)),
       ]),
     );
   }
 
-  Widget _buildTopBar(String name) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.h),
-      child: Row(children: [
-        Builder(
-            builder: (context) => GestureDetector(
-                  onTap: () => Scaffold.of(context).openDrawer(),
-                  child: Container(
-                    padding: EdgeInsets.all(10),
+  Widget _sectionHeader(String title) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 4.w),
+      child: Text(
+        title,
+        style: Theme.of(context)
+            .textTheme
+            .titleLarge
+            ?.copyWith(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  Widget _buildAssignmentCard() {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 4.w),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: cs.outline.withValues(alpha: 0.2)),
+          boxShadow: [
+            BoxShadow(
+              color: cs.shadow.withValues(alpha: 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Bus row
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 0.8.h),
+              child: Row(children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                      shape: BoxShape.circle, color: cs.primaryContainer),
+                  child: Icon(Icons.directions_bus_rounded,
+                      color: cs.primary, size: 22),
+                ),
+                SizedBox(width: 4.w),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(_driverData?['busNumber'] ?? 'Bus',
+                          style: tt.bodyLarge
+                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 2),
+                      Text(
+                          'Plate: ${_driverData?['busPlate'] ?? 'N/A'}',
+                          style: tt.bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant)),
+                    ])),
+                if (_hasActiveTrip)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: Offset(0, 2))
-                        ]),
-                    child: Icon(Icons.menu_rounded,
-                        color: AppTheme.textPrimary, size: 22),
+                      color: cs.secondary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text('Active',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: cs.secondary)),
                   ),
-                )),
-        Spacer(),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-              color: _isGpsConnected
-                  ? AppTheme.successAction.withOpacity(0.1)
-                  : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(20)),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                    color:
-                        _isGpsConnected ? AppTheme.successAction : Colors.grey,
-                    shape: BoxShape.circle)),
-            SizedBox(width: 8),
-            Text(_currentTime,
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: _isGpsConnected
-                        ? AppTheme.successAction
-                        : AppTheme.textSecondary)),
-          ]),
+              ]),
+            ),
+            Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+            // Route row
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 0.8.h),
+              child: Row(children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                      shape: BoxShape.circle, color: cs.primaryContainer),
+                  child:
+                      Icon(Icons.route_rounded, color: cs.primary, size: 22),
+                ),
+                SizedBox(width: 4.w),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(_driverData?['routeName'] ?? 'No Route',
+                          style: tt.bodyLarge
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text(
+                          '${_driverData?['studentCount'] ?? 0} students  ·  ${_driverData?['estimatedDuration'] ?? 'N/A'}',
+                          style: tt.bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant)),
+                    ])),
+              ]),
+            ),
+          ],
         ),
-        Spacer(),
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: [
-              AppTheme.primaryDriver,
-              AppTheme.primaryDriver.withOpacity(0.7)
-            ], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                  color: AppTheme.primaryDriver.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: Offset(0, 3))
-            ],
-          ),
-          child: Center(
-              child: Text(_getInitials(name),
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14))),
-        ),
-      ]),
+      ),
     );
   }
 
-  Widget _buildHeroCard(String name) {
-    final primary = AppTheme.primaryDriver;
+
+  Widget _buildNotAssignedCard() {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     return Container(
       padding: EdgeInsets.all(4.w),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [primary, primary.withOpacity(0.82)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-              color: primary.withOpacity(0.28),
-              blurRadius: 16,
-              offset: Offset(0, 6))
-        ],
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Greeting row
-        Row(children: [
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(_getGreeting(),
-                    style: TextStyle(
-                        color: Colors.white.withOpacity(0.72),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500)),
-                SizedBox(height: 2),
-                Text(name.split(' ').first,
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.3)),
-              ])),
-          // Status badge
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(20)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                      color: _hasActiveTrip
-                          ? AppTheme.successAction
-                          : Colors.white,
-                      shape: BoxShape.circle)),
-              SizedBox(width: 5),
-              Text(_hasActiveTrip ? 'Trip Active' : 'Ready',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600)),
-            ]),
-          ),
-        ]),
-        SizedBox(height: 2.h),
-        // Bus + Route chip
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.2.h),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.14),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(children: [
-            Icon(Icons.directions_bus_rounded,
-                color: Colors.white, size: 17),
-            SizedBox(width: 7),
-            Text(_driverData?['busNumber'] ?? 'Bus',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14)),
-            Container(
-                margin: EdgeInsets.symmetric(horizontal: 8),
-                width: 1,
-                height: 14,
-                color: Colors.white.withOpacity(0.35)),
-            Icon(Icons.route_rounded,
-                color: Colors.white.withOpacity(0.8), size: 15),
-            SizedBox(width: 5),
-            Expanded(
-                child: Text(_driverData?['routeName'] ?? 'No Route',
-                    style: TextStyle(
-                        color: Colors.white.withOpacity(0.9), fontSize: 13),
-                    overflow: TextOverflow.ellipsis)),
-          ]),
-        ),
-        SizedBox(height: 1.5.h),
-        // Stats row
-        Row(children: [
-          _buildHeroStat(
-              Icons.people_outline,
-              '${_driverData?['studentCount'] ?? 0} students'),
-          SizedBox(width: 2.w),
-          _buildHeroStat(Icons.timer_outlined,
-              _driverData?['estimatedDuration'] ?? 'N/A'),
-        ]),
-      ]),
-    );
-  }
-
-  Widget _buildHeroStat(IconData icon, String label) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.14),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 15, color: Colors.white.withOpacity(0.85)),
-        SizedBox(width: 5),
-        Text(label,
-            style: TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600)),
-      ]),
-    );
-  }
-
-  Widget _buildSectionTitle(String title, IconData icon) {
-    return Row(children: [
-      Icon(icon, size: 18, color: AppTheme.textSecondary),
-      SizedBox(width: 8),
-      Text(title,
-          style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondary,
-              letterSpacing: 0.5)),
-    ]);
-  }
-
-  Widget _buildNotAssignedCard() {
-    return Container(
-      padding: EdgeInsets.all(5.w),
-      decoration: BoxDecoration(
-          color: Colors.orange.shade50,
+          color: cs.tertiary.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.orange.shade200)),
+          border: Border.all(color: cs.tertiary.withValues(alpha: 0.3))),
       child: Row(children: [
         Container(
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-                color: Colors.orange.shade100,
+                color: cs.tertiary.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12)),
             child: Icon(Icons.warning_amber_rounded,
-                color: Colors.orange.shade700, size: 28)),
+                color: cs.tertiary, size: 28)),
         SizedBox(width: 4.w),
         Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Not Assigned Yet',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.orange.shade800)),
-          SizedBox(height: 4),
+              style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
           Text('Contact your administrator for a bus assignment',
-              style: TextStyle(fontSize: 13, color: Colors.orange.shade700)),
+              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         ])),
       ]),
     );
   }
 
   Widget _buildCompactStatusRow() {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.5.h),
-      decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 4.w),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: cs.outline.withValues(alpha: 0.2)),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 10,
-                offset: Offset(0, 2))
+              color: cs.shadow.withValues(alpha: 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: GestureDetector(
+          onTap: _toggleLocationServices,
+          child: Row(children: [
+            Icon(
+                _isGpsConnected
+                    ? Icons.gps_fixed
+                    : (_isLocationEnabled
+                        ? Icons.gps_not_fixed
+                        : Icons.gps_off),
+                size: 20,
+                color: _isGpsConnected
+                    ? cs.secondary
+                    : (_isLocationEnabled
+                        ? cs.tertiary
+                        : cs.onSurfaceVariant)),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(
+                      _isGpsConnected
+                          ? 'GPS Connected'
+                          : (_isLocationEnabled
+                              ? 'Acquiring GPS...'
+                              : 'Location Off'),
+                      style:
+                          tt.bodyLarge?.copyWith(fontWeight: FontWeight.w500)),
+                  Text(_accuracyText,
+                      style:
+                          tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                ])),
+            Switch(
+                value: _isLocationEnabled,
+                onChanged: (_) => _toggleLocationServices(),
+                activeThumbColor: cs.secondary,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
           ]),
-      child: GestureDetector(
-        onTap: _toggleLocationServices,
-        child: Row(children: [
-          Icon(
-              _isGpsConnected
-                  ? Icons.gps_fixed
-                  : (_isLocationEnabled
-                      ? Icons.gps_not_fixed
-                      : Icons.gps_off),
-              size: 18,
-              color: _isGpsConnected
-                  ? AppTheme.successAction
-                  : (_isLocationEnabled ? Colors.orange : Colors.grey)),
-          SizedBox(width: 8),
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(
-                    _isGpsConnected
-                        ? 'GPS Connected'
-                        : (_isLocationEnabled
-                            ? 'Acquiring GPS...'
-                            : 'Location Off'),
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary)),
-                Text(_accuracyText,
-                    style: TextStyle(
-                        fontSize: 11, color: AppTheme.textSecondary)),
-              ])),
-          Switch(
-              value: _isLocationEnabled,
-              onChanged: (_) => _toggleLocationServices(),
-              activeThumbColor: AppTheme.successAction,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
-        ]),
+        ),
       ),
     );
   }
 
   Widget _buildChecklistCard() {
+    final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: EdgeInsets.all(4.w),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 12,
-                offset: Offset(0, 4))
-          ]),
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: cs.shadow.withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(children: [
         for (int i = 0; i < _checklistItems.length; i++) ...[
           _buildChecklistItem(i),
           if (i < _checklistItems.length - 1)
-            Divider(height: 1, color: Colors.grey.shade100),
+            Divider(height: 1, color: cs.outline.withValues(alpha: 0.25)),
         ],
       ]),
     );
   }
 
   Widget _buildChecklistItem(int index) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     final item = _checklistItems[index];
     final isChecked = _checklistStates[index] ?? false;
 
     return GestureDetector(
       onTap: () => _toggleChecklistItem(index),
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(children: [
           AnimatedContainer(
-            duration: Duration(milliseconds: 200),
+            duration: const Duration(milliseconds: 200),
             width: 24,
             height: 24,
             decoration: BoxDecoration(
-                color: isChecked ? AppTheme.successAction : Colors.transparent,
+                color: isChecked ? cs.secondary : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
                     color: isChecked
-                        ? AppTheme.successAction
-                        : Colors.grey.shade300,
+                        ? cs.secondary
+                        : cs.outline.withValues(alpha: 0.6),
                     width: 2)),
             child: isChecked
-                ? Icon(Icons.check, size: 16, color: Colors.white)
+                ? const Icon(Icons.check, size: 16, color: Colors.white)
                 : null,
           ),
-          SizedBox(width: 14),
+          const SizedBox(width: 14),
           Icon(_getChecklistIcon(item['icon'] as String),
               size: 20,
-              color:
-                  isChecked ? AppTheme.successAction : AppTheme.textSecondary),
-          SizedBox(width: 12),
+              color: isChecked ? cs.secondary : cs.onSurfaceVariant),
+          const SizedBox(width: 12),
           Expanded(
               child: Text(item['title'] as String,
-                  style: TextStyle(
-                      fontSize: 15,
+                  style: tt.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w500,
-                      color: isChecked
-                          ? AppTheme.textSecondary
-                          : AppTheme.textPrimary,
+                      color:
+                          isChecked ? cs.onSurfaceVariant : cs.onSurface,
                       decoration:
                           isChecked ? TextDecoration.lineThrough : null))),
         ]),
@@ -1320,9 +1333,9 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   Widget _buildBottomButton() {
     return Container(
       padding: EdgeInsets.all(5.w),
-      decoration: BoxDecoration(color: Colors.white, boxShadow: [
+      decoration: BoxDecoration(color: Theme.of(context).cardColor, boxShadow: [
         BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.08),
             blurRadius: 10,
             offset: Offset(0, -5))
       ]),
@@ -1351,21 +1364,32 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                   gradient: canStart
                       ? LinearGradient(colors: [
                           _hasActiveTrip
-                              ? AppTheme.successAction
-                              : AppTheme.primaryDriver,
+                              ? Theme.of(context).colorScheme.secondary
+                              : Theme.of(context).colorScheme.primary,
                           _hasActiveTrip
-                              ? AppTheme.successAction.withOpacity(0.8)
-                              : AppTheme.primaryDriver.withOpacity(0.8)
+                              ? Theme.of(context)
+                                  .colorScheme
+                                  .secondary
+                                  .withOpacity(0.8)
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withOpacity(0.8)
                         ])
                       : null,
-                  color: canStart ? null : Colors.grey.shade300,
+                  color: canStart
+                      ? null
+                      : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: canStart
                       ? [
                           BoxShadow(
                               color: (_hasActiveTrip
-                                      ? AppTheme.successAction
-                                      : AppTheme.primaryDriver)
+                                      ? Theme.of(context).colorScheme.secondary
+                                      : Theme.of(context).colorScheme.primary)
                                   .withOpacity(0.4),
                               blurRadius: 12,
                               offset: Offset(0, 4))

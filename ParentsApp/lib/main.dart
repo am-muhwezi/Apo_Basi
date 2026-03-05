@@ -85,10 +85,7 @@ class _MyAppState extends State<MyApp> {
       // Delay WebSocket connection even further to improve startup
       Future.delayed(const Duration(milliseconds: 500), () {
         _webSocketService.connect();
-        // Temporarily disable parent notifications WebSocket in staging
-        // to avoid crashes when the backend WebSocket endpoint is not
-        // available. The rest of the app will continue to work normally.
-        // _notificationsService.connect();
+        _notificationsService.connect();
       });
     });
   }
