@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../theme/app_theme.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/busminder_drawer_widget.dart';
 
@@ -71,10 +72,12 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = AppTheme.lightBusminderTheme;
     final colorScheme = theme.colorScheme;
 
-    return Scaffold(
+    return Theme(
+      data: theme,
+      child: Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: CustomAppBar(
         title: 'Settings',
@@ -200,6 +203,7 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
             const SizedBox(height: 32),
           ],
         ),
+      ),
       ),
     );
   }
