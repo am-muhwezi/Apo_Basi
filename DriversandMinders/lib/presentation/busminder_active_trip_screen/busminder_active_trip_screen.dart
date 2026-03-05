@@ -7,6 +7,7 @@ import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
 import '../../services/api_service.dart';
+import '../../services/theme_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/busminder_drawer_widget.dart';
@@ -24,6 +25,9 @@ class BusminderActiveTripScreen extends StatefulWidget {
 
 class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
   final ApiService _apiService = ApiService();
+
+  // Busminder theme — set in build() so helper methods use the correct theme
+  ThemeData _busminderTheme = AppTheme.lightBusminderTheme;
 
   // Loading states
   bool _isLoading = true;
@@ -91,7 +95,7 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
             SnackBar(
               content:
                   Text('No active trip found. Please start a shift first.'),
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: _busminderTheme.colorScheme.error,
               duration: Duration(seconds: 3),
             ),
           );
@@ -269,7 +273,7 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
               _handleEndShift();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: _busminderTheme.colorScheme.error,
               foregroundColor: Colors.white,
             ),
             child: Text('End Shift'),
@@ -309,7 +313,7 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Shift ended successfully!'),
-            backgroundColor: Theme.of(context).colorScheme.secondary,
+            backgroundColor: _busminderTheme.colorScheme.secondary,
           ),
         );
 
@@ -339,7 +343,7 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error ending shift. Please try again.'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+            backgroundColor: _busminderTheme.colorScheme.error,
           ),
         );
       }
@@ -357,27 +361,35 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Theme(
-        data: AppTheme.lightBusminderTheme,
-        child: Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                      color: AppTheme.lightBusminderTheme.colorScheme.primary),
-                  SizedBox(height: 2.h),
-                  const Text('Loading trip data...'),
-                ],
-              ),
-            )),
-      );
-    }
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeService().themeModeNotifier,
+      builder: (ctx, themeMode, _) {
+        _busminderTheme = themeMode == ThemeMode.dark
+            ? AppTheme.darkBusminderTheme
+            : AppTheme.lightBusminderTheme;
+        final busTheme = _busminderTheme;
 
-    return Theme(
-      data: AppTheme.lightBusminderTheme,
-      child: Scaffold(
+        if (_isLoading) {
+          return Theme(
+            data: busTheme,
+            child: Scaffold(
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                          color: busTheme.colorScheme.primary),
+                      SizedBox(height: 2.h),
+                      const Text('Loading trip data...'),
+                    ],
+                  ),
+                )),
+          );
+        }
+
+        return Theme(
+          data: busTheme,
+          child: Scaffold(
         drawer: BusminderDrawerWidget(
             currentRoute: '/busminder-active-trip-screen'),
         appBar: CustomAppBar(
@@ -410,7 +422,7 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
         ),
         body: RefreshIndicator(
           onRefresh: _handleRefresh,
-          color: Theme.of(context).colorScheme.primary,
+          color: _busminderTheme.colorScheme.primary,
           child: Column(
             children: [
               Expanded(
@@ -435,14 +447,14 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
                             child: Column(
                               children: [
                                 Icon(Icons.people_outline,
-                                    size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                    size: 48, color: _busminderTheme.colorScheme.onSurfaceVariant),
                                 SizedBox(height: 2.h),
                                 Text(
                                   _searchQuery.isNotEmpty
                                       ? 'No students match your search'
                                       : 'No students assigned',
                                   style:
-                                      TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                      TextStyle(color: _busminderTheme.colorScheme.onSurfaceVariant),
                                 ),
                               ],
                             ),
@@ -468,7 +480,9 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
             ],
           ),
         ),
-      ),
+        ),
+      );
+      },
     );
   }
 
@@ -479,8 +493,8 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Theme.of(context).colorScheme.primary,
-            Theme.of(context).colorScheme.primary.withOpacity(0.85),
+            _busminderTheme.colorScheme.primary,
+            _busminderTheme.colorScheme.primary.withValues(alpha:0.85),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -488,7 +502,7 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+            color: _busminderTheme.colorScheme.primary.withValues(alpha:0.3),
             blurRadius: 12,
             offset: Offset(0, 4),
           ),
@@ -499,7 +513,7 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
           Container(
             padding: EdgeInsets.all(3.w),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha:0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(Icons.directions_bus, color: Colors.white, size: 28),
@@ -545,7 +559,7 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
           Container(
             padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.secondary,
+              color: _busminderTheme.colorScheme.secondary,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -575,19 +589,19 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
         children: [
           Expanded(
               child: _buildStatChip(
-                  'Total', _students.length, Theme.of(context).colorScheme.primary)),
+                  'Total', _students.length, _busminderTheme.colorScheme.primary)),
           SizedBox(width: 2.w),
           Expanded(
               child: _buildStatChip(
-                  'Done', _completedCount, Theme.of(context).colorScheme.secondary)),
+                  'Done', _completedCount, _busminderTheme.colorScheme.secondary)),
           SizedBox(width: 2.w),
           Expanded(
               child: _buildStatChip(
-                  'Absent', _absentCount, Theme.of(context).colorScheme.error)),
+                  'Absent', _absentCount, _busminderTheme.colorScheme.error)),
           SizedBox(width: 2.w),
           Expanded(
               child: _buildStatChip(
-                  'Pending', _pendingCount, Theme.of(context).colorScheme.tertiary)),
+                  'Pending', _pendingCount, _busminderTheme.colorScheme.tertiary)),
         ],
       ),
     );
@@ -597,9 +611,9 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
     return Container(
       padding: EdgeInsets.symmetric(vertical: 1.5.h, horizontal: 2.w),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: _busminderTheme.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Column(
         children: [
@@ -616,7 +630,7 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: _busminderTheme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -631,20 +645,24 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
         onChanged: (value) => setState(() => _searchQuery = value),
         decoration: InputDecoration(
           hintText: 'Search students...',
-          prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          prefixIcon: Icon(Icons.search, color: _busminderTheme.colorScheme.onSurfaceVariant),
           filled: true,
-          fillColor: Colors.white,
+          fillColor: _busminderTheme.cardColor,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade200),
+            borderSide: BorderSide(
+                color: _busminderTheme.colorScheme.outline
+                    .withValues(alpha: 0.5)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade200),
+            borderSide: BorderSide(
+                color: _busminderTheme.colorScheme.outline
+                    .withValues(alpha: 0.5)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
+            borderSide: BorderSide(color: _busminderTheme.colorScheme.primary),
           ),
           contentPadding:
               EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.5.h),
@@ -664,21 +682,21 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
       margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
       padding: EdgeInsets.all(3.w),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _busminderTheme.cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isCompleted
-              ? Theme.of(context).colorScheme.secondary.withOpacity(0.3)
+              ? _busminderTheme.colorScheme.secondary.withValues(alpha: 0.35)
               : isAbsent
-                  ? Theme.of(context).colorScheme.error.withOpacity(0.3)
-                  : Colors.grey.shade200,
+                  ? _busminderTheme.colorScheme.error.withValues(alpha: 0.35)
+                  : _busminderTheme.colorScheme.outline.withValues(alpha: 0.5),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -689,14 +707,14 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              color: _busminderTheme.colorScheme.primary.withValues(alpha:0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
               child: Text(
                 _getInitials(student['name'] as String),
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
+                  color: _busminderTheme.colorScheme.primary,
                   fontWeight: FontWeight.w700,
                   fontSize: 16,
                 ),
@@ -715,7 +733,7 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: _busminderTheme.colorScheme.onSurface,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -727,13 +745,13 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
                       _formatGrade(student['grade']),
                       style: TextStyle(
                         fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: _busminderTheme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     if (student['hasSpecialNeeds'] == true) ...[
                       SizedBox(width: 2.w),
                       Icon(Icons.medical_services,
-                          size: 14, color: Theme.of(context).colorScheme.tertiary),
+                          size: 14, color: _busminderTheme.colorScheme.tertiary),
                     ],
                   ],
                 ),
@@ -749,13 +767,13 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
                 padding:
                     EdgeInsets.symmetric(horizontal: 2.5.w, vertical: 0.8.h),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                  color: _busminderTheme.colorScheme.secondary.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
                     Icon(Icons.check_circle,
-                        size: 16, color: Theme.of(context).colorScheme.secondary),
+                        size: 16, color: _busminderTheme.colorScheme.secondary),
                     SizedBox(width: 1.w),
                     Text(
                       _tripType == 'pickup'
@@ -764,7 +782,7 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.secondary,
+                        color: _busminderTheme.colorScheme.secondary,
                       ),
                     ),
                   ],
@@ -778,19 +796,19 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
                 padding:
                     EdgeInsets.symmetric(horizontal: 2.5.w, vertical: 0.8.h),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.error.withOpacity(0.1),
+                  color: _busminderTheme.colorScheme.error.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.cancel, size: 16, color: Theme.of(context).colorScheme.error),
+                    Icon(Icons.cancel, size: 16, color: _busminderTheme.colorScheme.error),
                     SizedBox(width: 1.w),
                     Text(
                       'Absent • Tap to change',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.error,
+                        color: _busminderTheme.colorScheme.error,
                       ),
                     ),
                   ],
@@ -803,14 +821,14 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
               children: [
                 _buildActionButton(
                   icon: Icons.check,
-                  color: Theme.of(context).colorScheme.secondary,
+                  color: _busminderTheme.colorScheme.secondary,
                   onTap: () =>
                       _handleStatusChange(student['id'] as int, statusKey),
                 ),
                 SizedBox(width: 2.w),
                 _buildActionButton(
                   icon: Icons.close,
-                  color: Theme.of(context).colorScheme.error,
+                  color: _busminderTheme.colorScheme.error,
                   onTap: () =>
                       _handleStatusChange(student['id'] as int, 'absent'),
                 ),
@@ -832,9 +850,9 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: Center(
           child: Icon(icon, color: color, size: 20),
@@ -848,12 +866,12 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
       child: Container(
         padding: EdgeInsets.all(4.w),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _busminderTheme.scaffoldBackgroundColor,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 12,
-              offset: Offset(0, -4),
+              offset: const Offset(0, -4),
             ),
           ],
         ),
@@ -862,7 +880,7 @@ class _BusminderActiveTripScreenState extends State<BusminderActiveTripScreen> {
           child: ElevatedButton(
             onPressed: _isEndingShift ? null : _showEndShiftConfirmation,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: _busminderTheme.colorScheme.error,
               foregroundColor: Colors.white,
               padding: EdgeInsets.symmetric(vertical: 2.h),
               shape: RoundedRectangleBorder(

@@ -34,106 +34,118 @@ class BusminderDrawerWidget extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.all(6.w),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            SizedBox(height: 3.h),
-            Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.criticalAlert.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.logout_rounded,
-                  size: 32, color: AppTheme.criticalAlert),
-            ),
-            SizedBox(height: 2.h),
-            Text(
-              'Logout?',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            SizedBox(height: 1.h),
-            Text(
-              'You will need to login again to access your account',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-            ),
-            SizedBox(height: 3.h),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      side: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    child: Text('Cancel',
-                        style: TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.w600)),
-                  ),
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return Container(
+          padding: EdgeInsets.all(6.w),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.outline.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                SizedBox(width: 4.w),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final apiService = ApiService();
-                      await apiService.clearToken();
-                      Navigator.pop(context);
-                      Navigator.pushNamedAndRemoveUntil(
-                        context,
-                        '/shared-login-screen',
-                        (route) => false,
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.criticalAlert,
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Text('Logout',
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.w600)),
-                  ),
+              ),
+              SizedBox(height: 3.h),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cs.error.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
                 ),
-              ],
-            ),
-            SizedBox(height: 2.h),
-          ],
-        ),
-      ),
+                child:
+                    Icon(Icons.logout_rounded, size: 32, color: cs.error),
+              ),
+              SizedBox(height: 2.h),
+              Text(
+                'Logout?',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface,
+                ),
+              ),
+              SizedBox(height: 1.h),
+              Text(
+                'You will need to login again to access your account',
+                textAlign: TextAlign.center,
+                style:
+                    TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+              ),
+              SizedBox(height: 3.h),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(
+                            color: cs.outline.withValues(alpha: 0.5)),
+                      ),
+                      child: Text('Cancel',
+                          style: TextStyle(
+                              color: cs.onSurface,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  SizedBox(width: 4.w),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final apiService = ApiService();
+                        await apiService.clearToken();
+                        Navigator.pop(context);
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          '/shared-login-screen',
+                          (route) => false,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: cs.error,
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text('Logout',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 2.h),
+            ],
+          ),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // Context here is inside Theme(busminderTheme) via the Scaffold,
+    // so Theme.of(context) returns the correct busminder theme.
+    final cs = Theme.of(context).colorScheme;
     return Drawer(
-      backgroundColor: Color(0xFFFAFAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       child: SafeArea(
         child: Column(
           children: [
@@ -154,26 +166,23 @@ class BusminderDrawerWidget extends StatelessWidget {
                         height: 56,
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
-                            colors: [
-                              AppTheme.primaryBusminder,
-                              AppTheme.primaryBusminderLight
-                            ],
+                            colors: [cs.primary, cs.primaryContainer],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: AppTheme.primaryBusminder.withOpacity(0.3),
+                              color: cs.primary.withValues(alpha: 0.3),
                               blurRadius: 12,
-                              offset: Offset(0, 4),
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
                         child: Center(
                           child: Text(
                             _getInitials(name),
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
                               fontSize: 18,
@@ -191,18 +200,17 @@ class BusminderDrawerWidget extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
-                                color: AppTheme.textPrimary,
+                                color: cs.onSurface,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Container(
-                              padding: EdgeInsets.symmetric(
+                              padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color:
-                                    AppTheme.primaryBusminder.withOpacity(0.1),
+                                color: cs.primary.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -210,7 +218,7 @@ class BusminderDrawerWidget extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                  color: AppTheme.primaryBusminder,
+                                  color: cs.primary,
                                 ),
                               ),
                             ),
@@ -220,13 +228,13 @@ class BusminderDrawerWidget extends StatelessWidget {
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
                         child: Container(
-                          padding: EdgeInsets.all(8),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
+                            color: cs.onSurface.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(Icons.close,
-                              size: 20, color: AppTheme.textSecondary),
+                              size: 20, color: cs.onSurfaceVariant),
                         ),
                       ),
                     ],
@@ -238,7 +246,8 @@ class BusminderDrawerWidget extends StatelessWidget {
             // Divider
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 5.w),
-              child: Divider(height: 1, color: Colors.grey.shade200),
+              child: Divider(
+                  height: 1, color: cs.outline.withValues(alpha: 0.4)),
             ),
 
             SizedBox(height: 2.h),
@@ -291,25 +300,25 @@ class BusminderDrawerWidget extends StatelessWidget {
                   _showLogoutConfirmation(context);
                 },
                 child: Container(
-                  padding: EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
-                    color: AppTheme.criticalAlert.withOpacity(0.08),
+                    color: cs.error.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: AppTheme.criticalAlert.withOpacity(0.2)),
+                    border:
+                        Border.all(color: cs.error.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.logout_rounded,
-                          size: 20, color: AppTheme.criticalAlert),
-                      SizedBox(width: 10),
+                          size: 20, color: cs.error),
+                      const SizedBox(width: 10),
                       Text(
                         'Logout',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: AppTheme.criticalAlert,
+                          color: cs.error,
                         ),
                       ),
                     ],
@@ -324,18 +333,21 @@ class BusminderDrawerWidget extends StatelessWidget {
   }
 
   Widget _buildSectionLabel(String label) {
-    return Padding(
-      padding: EdgeInsets.only(left: 4, top: 8, bottom: 12),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: AppTheme.textSecondary.withOpacity(0.6),
-          letterSpacing: 1.2,
+    return Builder(builder: (context) {
+      final cs = Theme.of(context).colorScheme;
+      return Padding(
+        padding: const EdgeInsets.only(left: 4, top: 8, bottom: 12),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+            letterSpacing: 1.2,
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   Widget _buildMenuItem(
@@ -361,8 +373,8 @@ class BusminderDrawerWidget extends StatelessWidget {
             if (busId == null || tripType == null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Please start a shift first'),
-                  backgroundColor: AppTheme.criticalAlert,
+                  content: const Text('Please start a shift first'),
+                  backgroundColor: Theme.of(context).colorScheme.error,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                 ),
@@ -380,7 +392,9 @@ class BusminderDrawerWidget extends StatelessWidget {
         margin: EdgeInsets.only(bottom: 6),
         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: isActive ? AppTheme.primaryBusminder : Colors.transparent,
+          color: isActive
+              ? Theme.of(context).colorScheme.primary
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -388,16 +402,20 @@ class BusminderDrawerWidget extends StatelessWidget {
             Icon(
               icon,
               size: 22,
-              color: isActive ? Colors.white : AppTheme.textSecondary,
+              color: isActive
+                  ? Colors.white
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
-            SizedBox(width: 14),
+            const SizedBox(width: 14),
             Expanded(
               child: Text(
                 title,
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                  color: isActive ? Colors.white : AppTheme.textPrimary,
+                  color: isActive
+                      ? Colors.white
+                      : Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
