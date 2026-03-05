@@ -121,7 +121,9 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
           if (backendTrip != null && status == 'in-progress') {
             final prefs = await SharedPreferences.getInstance();
             await prefs.setInt('current_trip_id', backendTrip['id']);
-          } else if (backendTrip != null && status != null) {
+          } else {
+            // No active trip on backend (null response or non-in-progress status)
+            // — clear stale local state so "Continue Trip" stops showing
             await _clearStaleLocalTripState();
             if (mounted) {
               setState(() {
@@ -131,7 +133,18 @@ class _BusminderStartShiftScreenState extends State<BusminderStartShiftScreen>
             }
           }
         } catch (_) {
-          // Keep local trip state when backend check fails
+          // Backend unreachable — trust local state only if there is an actual trip ID
+          final prefs = await SharedPreferences.getInstance();
+          final hasTripId = (prefs.getInt('current_trip_id') ?? 0) > 0;
+          if (!hasTripId) {
+            await _clearStaleLocalTripState();
+            if (mounted) {
+              setState(() {
+                _hasActiveTrip = false;
+                _activeTripInfo = null;
+              });
+            }
+          }
         }
       } else {
         setState(() {
