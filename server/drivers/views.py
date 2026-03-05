@@ -752,6 +752,12 @@ def start_trip(request):
                     trip.scheduled_time.isoformat()
                     if trip.scheduled_time else None
                 ),
+                # Include last known GPS so the parent map marker appears
+                # immediately without waiting for the first live location update.
+                "bus_latitude": float(bus.latitude) if bus.latitude else None,
+                "bus_longitude": float(bus.longitude) if bus.longitude else None,
+                "bus_speed": float(bus.speed) if bus.speed else 0.0,
+                "bus_heading": float(bus.heading) if bus.heading else 0.0,
             }
         )
     except Exception:

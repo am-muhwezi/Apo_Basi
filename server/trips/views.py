@@ -222,6 +222,7 @@ class TripStartView(APIView):
         # Parents receive this on the existing bus WebSocket and immediately
         # re-initialise route optimisation — no polling required.
         if trip.bus_id:
+            bus = trip.bus
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
                 f"bus_{trip.bus_id}",
@@ -234,6 +235,11 @@ class TripStartView(APIView):
                         trip.scheduled_time.isoformat()
                         if trip.scheduled_time else None
                     ),
+                    # GPS seed so the parent map marker appears immediately.
+                    "bus_latitude": float(bus.latitude) if bus.latitude else None,
+                    "bus_longitude": float(bus.longitude) if bus.longitude else None,
+                    "bus_speed": float(bus.speed) if bus.speed else 0.0,
+                    "bus_heading": float(bus.heading) if bus.heading else 0.0,
                 }
             )
 
