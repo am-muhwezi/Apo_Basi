@@ -153,16 +153,17 @@ class BusWebSocketService {
         if (LocationConfig.enableSocketLogging) {}
         _reconnectionAttempts = 0; // Reset on successful connection
         _connectionStateController.add(LocationConnectionState.connected);
-
-        // Request current location
-        requestCurrentLocation();
+        // No need to request_current_location — the server immediately sends
+        // trip_state which includes bus_latitude/longitude as the GPS seed.
       } else if (messageType == 'location_update') {
         // Parse location update
         final location = BusLocation(
           busId: data['bus_id'] as int,
-          busNumber: data['bus_number'] ?? '', // Bus number from server
+          busNumber: data['bus_number'] ?? '',
           latitude: (data['latitude'] as num).toDouble(),
           longitude: (data['longitude'] as num).toDouble(),
+          snappedLatitude: (data['snapped_latitude'] as num?)?.toDouble(),
+          snappedLongitude: (data['snapped_longitude'] as num?)?.toDouble(),
           speed: (data['speed'] as num?)?.toDouble() ?? 0.0,
           heading: (data['heading'] as num?)?.toDouble() ?? 0.0,
           isActive: data['is_active'] ?? true,

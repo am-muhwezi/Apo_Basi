@@ -4,8 +4,6 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Position;
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:sizer/sizer.dart';
@@ -16,7 +14,6 @@ import '../../config/location_config.dart';
 import '../../config/mapbox_helpers.dart';
 import '../../models/bus_location_model.dart';
 import '../../services/bus_websocket_service.dart';
-import '../../services/mapbox_optimization_service.dart';
 import '../../services/mapbox_route_service.dart';
 import '../../services/home_location_service.dart';
 
@@ -27,7 +24,8 @@ class ChildDetailScreen extends StatefulWidget {
   State<ChildDetailScreen> createState() => _ChildDetailScreenState();
 }
 
-class _ChildDetailScreenState extends State<ChildDetailScreen> {
+class _ChildDetailScreenState extends State<ChildDetailScreen>
+    with WidgetsBindingObserver {
   Map<String, dynamic>? _childData;
   ll.LatLng? _homeLocation; // Child's home location (static, not GPS)
   bool _isLoadingLocation = true;
@@ -58,28 +56,13 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   // ETA and Route Information
   int? _etaMinutes;
-  int? _scheduledEtaMinutes; // Pre-trip scheduled ETA (before bus goes live)
   List<ll.LatLng>? _routePoints;
   String? _distance;
   bool _isCalculatingETA = false;
 
-  // Multi-stop route optimization
-  OptimizedRoute? _optimizedRoute;
-  int _thisChildStopIndex = -1; // index in _optimizedRoute.orderedStops
-  String _tripType = 'dropoff'; // 'pickup' or 'dropoff'
-  DateTime?
-      _tripScheduledTime; // school arrival (pickup) or departure (dropoff)
-  // Monotonically-advancing pointer: the first stop the bus has NOT yet visited.
-  // Only ever moves forward, never back, so past stops are never re-included.
-  int _nextStopIndex = 0;
-
   // ETA/route throttle — only re-fetch Directions API every 30 s or 75 m
   DateTime? _lastEtaRefresh;
   ll.LatLng? _lastEtaPosition;
-
-  // Guard: once a trip_ended event is received, ignore any further
-  // location_update messages until the next trip_started.
-  bool _tripHasEnded = false;
 
   // Trip-watcher: polls while no bus is broadcasting to detect trip start
   Timer? _tripWatchTimer;
@@ -91,22 +74,39 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   double _busAnimFromHeading = 0;
   double _busAnimToHeading = 0;
 
-  // Fallback multi-stop routing (used when optimization service fails)
+  // Single source of truth for trip state — set exclusively by WebSocket events
   bool _hasActiveTrip = false;
-  List<BusStop> _busStops = [];
-  int _stopsBeforeChild = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadMarkerImages();
-    // Defer WebSocket connection and route optimization to after first frame
+    // Defer WebSocket connection to after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeSocketConnection();
-      // Route optimisation is triggered by the WebSocket trip_state message
-      // (sent by the server on every connect).  No HTTP poll needed here.
       _startTripWatcher();
     });
+  }
+
+  /// Reconnect immediately when the app comes back to the foreground instead
+  /// of waiting up to 15 s for the next TripWatcher cycle.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    if (_childData == null) return;
+    final busValue = _childData!['busId'];
+    if (busValue == null) return;
+    final busId =
+        busValue is int ? busValue : int.tryParse(busValue.toString());
+    if (busId == null) return;
+
+    if (!_webSocketService.isConnected) {
+      _webSocketService.subscribeToBus(busId);
+    } else {
+      // Already connected — request a fresh trip_state snapshot.
+      _webSocketService.requestTripState();
+    }
   }
 
   @override
@@ -124,18 +124,12 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tripWatchTimer?.cancel();
     _busAnimTimer?.cancel();
     _locationSubscription?.cancel();
     _connectionSubscription?.cancel();
     _tripEventSubscription?.cancel();
-    // Invalidate the cached optimized route for this bus
-    final busValue = _childData?['busId'];
-    if (busValue != null) {
-      final busId =
-          busValue is int ? busValue : int.tryParse(busValue.toString());
-      if (busId != null) MapboxOptimizationService.invalidate(busId);
-    }
     super.dispose();
   }
 
@@ -310,7 +304,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     final targetHeading = (_busLocation!.heading ?? 0).toDouble();
 
     if (_busAnnotation == null) {
-      // First time — create annotation at target immediately (no animation)
+      // First appearance — create annotation and fly the camera to the bus
+      // so the parent sees it immediately, even if home is far away.
       _busAnnotation = await _busAnnotationManager!.create(
         PointAnnotationOptions(
           geometry: latLngToPoint(targetLatLng),
@@ -321,6 +316,13 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       );
       _busAnimFrom = targetLatLng;
       _busAnimFromHeading = targetHeading;
+      _mapboxMap?.flyTo(
+        CameraOptions(
+          center: latLngToPoint(targetLatLng),
+          zoom: 15.0,
+        ),
+        MapAnimationOptions(duration: 800),
+      );
       return;
     }
 
@@ -415,20 +417,16 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       _locationSubscription =
           _webSocketService.locationUpdateStream.listen((location) {
         if (!mounted) return;
-        if (_tripHasEnded) {
-          // Ignore stale location updates after trip end until a
-          // fresh trip_started event arrives.
+        if (!_hasActiveTrip) {
+          // No active trip — ignore all location updates (covers both the
+          // "trip just ended" case and the "no trip on screen open" case).
           return;
         }
 
-        final isFirstLocation = _busLocation == null;
         setState(() {
           _busLocation = location;
         });
         _updateBusLocationWithSnapping(location);
-        // Trip just started while screen was already open — refresh
-        // optimization so ETAs use the correct live trip type.
-        if (isFirstLocation) _onFirstBusLocation();
       }, onError: (error) {
         if (LocationConfig.enableSocketLogging) {}
       });
@@ -449,26 +447,12 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           if (!hasActiveTrip) {
             setState(() {
               _hasActiveTrip = false;
-              _tripHasEnded = false;
             });
             return;
           }
 
-          // Active trip confirmed — set trip type
-          final tripType = event['trip_type'] as String?;
-          if (tripType == 'pickup' || tripType == 'dropoff') {
-            _tripType = tripType!;
-          }
-
-          // Capture scheduled time if present
-          final scheduledStr = event['scheduled_time'] as String?;
-          if (scheduledStr != null) {
-            _tripScheduledTime = DateTime.tryParse(scheduledStr);
-          }
-
           setState(() {
             _hasActiveTrip = true;
-            _tripHasEnded = false;
           });
 
           // Seed the map with the last known bus position from the DB so the
@@ -493,50 +477,56 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
               );
               setState(() => _busLocation = seedLocation);
               _updateBusAnnotation();
+              // Kick off route/ETA immediately from seed GPS.
+              _updateBusLocationWithSnapping(seedLocation);
             }
           }
 
-          // Kick off stop fetch + Mapbox optimisation now that we know the
-          // trip type — this is the only place that initialises the route.
-          final busValue = _childData?['busId'];
-          if (busValue != null) {
-            final busId = busValue is int
-                ? busValue
-                : int.tryParse(busValue.toString());
-            if (busId != null) MapboxOptimizationService.invalidate(busId);
-          }
-          _initializeRouteOptimization();
-
         } else if (eventType == 'trip_started') {
-          debugPrint('[TripEvent] trip_started — refreshing optimisation');
-          final tripType = event['trip_type'] as String?;
-          if (tripType == 'pickup' || tripType == 'dropoff') {
-            _tripType = tripType!;
-          }
+          debugPrint('[TripEvent] trip_started');
           setState(() {
-            _tripHasEnded = false;
             _hasActiveTrip = true;
           });
-          final busValue = _childData?['busId'];
-          if (busValue != null) {
-            final busId =
-                busValue is int ? busValue : int.tryParse(busValue.toString());
-            if (busId != null) MapboxOptimizationService.invalidate(busId);
+
+          // Seed map with last known GPS so the bus marker appears immediately
+          final lat = event['bus_latitude'];
+          final lng = event['bus_longitude'];
+          if (lat != null && lng != null && _busLocation == null) {
+            final busValue = _childData?['busId'];
+            final busId = busValue is int
+                ? busValue
+                : int.tryParse(busValue?.toString() ?? '');
+            if (busId != null) {
+              final seedLocation = BusLocation(
+                busId: busId,
+                busNumber: '',
+                latitude: (lat as num).toDouble(),
+                longitude: (lng as num).toDouble(),
+                speed: (event['bus_speed'] as num?)?.toDouble() ?? 0.0,
+                heading: (event['bus_heading'] as num?)?.toDouble() ?? 0.0,
+                isActive: true,
+                timestamp: DateTime.now(),
+              );
+              setState(() => _busLocation = seedLocation);
+              _updateBusAnnotation();
+              // Kick off route/ETA immediately from seed — don't wait for
+              // the first real GPS update which may take several seconds.
+              _updateBusLocationWithSnapping(seedLocation);
+            }
           }
-          _initializeRouteOptimization();
 
         } else if (eventType == 'trip_ended') {
           debugPrint('[TripEvent] trip_ended — clearing trip state');
           if (mounted) {
             setState(() {
-              _tripHasEnded = true;
               _hasActiveTrip = false;
               _busLocation = null;
               _etaMinutes = null;
-              _scheduledEtaMinutes = null;
               _routePoints = null;
-              _optimizedRoute = null;
-              _busStops = [];
+              // Reset throttle so the next trip's first GPS update always
+              // triggers an immediate route+ETA computation.
+              _lastEtaRefresh = null;
+              _lastEtaPosition = null;
             });
             _updateBusAnnotation();
             _updateRouteAnnotation();
@@ -564,121 +554,68 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     _webSocketService.subscribeToBus(busId);
   }
 
-  /// Update bus location with road snapping and multi-stop ETA calculation.
+  /// Update bus location and recompute route/ETA when needed.
   ///
-  /// Uses the optimized stop order when available; falls back to the direct
-  /// 2-point route so the screen always shows something meaningful.
+  /// The server pre-snaps GPS to road before broadcasting, so no client-side
+  /// Map Matching call is required — only the Directions API is called here.
   Future<void> _updateBusLocationWithSnapping(BusLocation location) async {
     if (_homeLocation == null) return;
+    if (!_hasActiveTrip) return;
     try {
       final busCoord = ll.LatLng(location.latitude, location.longitude);
-
-      final snappedCoord = await MapboxRouteService.snapSinglePointToRoad(
-        coordinate: busCoord,
-        radius: 25,
-      );
-      final effectiveBus = snappedCoord ?? busCoord;
-
-      // Throttle expensive ETA/route recomputation: only hit the Directions
-      // API when either at least 30 seconds have elapsed since the last
-      // refresh or the bus has moved more than 75 m.
+      // Use server-snapped position when available; fall back to raw GPS.
+      final snappedCoord =
+          (location.snappedLatitude != null && location.snappedLongitude != null)
+              ? ll.LatLng(location.snappedLatitude!, location.snappedLongitude!)
+              : null;
+      final routeOrigin = snappedCoord ?? busCoord;
       final now = DateTime.now();
-      bool shouldRefreshEta = false;
 
+      // Throttle: only recompute route every 30 s or 75 m of movement.
+      bool shouldRefreshEta = false;
       if (_lastEtaRefresh == null || _lastEtaPosition == null) {
         shouldRefreshEta = true;
       } else {
         final elapsed = now.difference(_lastEtaRefresh!).inSeconds;
-        final movedKm = _haversineKm(effectiveBus, _lastEtaPosition!);
-        if (elapsed >= 30 || movedKm >= 0.075) {
-          shouldRefreshEta = true;
-        }
+        final movedKm = _haversineKm(busCoord, _lastEtaPosition!);
+        if (elapsed >= 30 || movedKm >= 0.075) shouldRefreshEta = true;
       }
 
       if (!shouldRefreshEta) {
-        if (!mounted) return;
-        setState(() {
-          _snappedBusLocation = snappedCoord;
-          _isCalculatingETA = false;
-        });
-        _updateBusAnnotation();
-        // Keep existing ETA/route until the next refresh window.
+        // No route recompute — just update the bus marker position.
+        if (mounted) {
+          setState(() {
+            _snappedBusLocation = snappedCoord;
+            _isCalculatingETA = false;
+          });
+          _updateBusAnnotation();
+        }
         return;
       }
 
-      if (mounted) {
-        setState(() {
-          _isCalculatingETA = true;
-        });
-      }
+      if (mounted) setState(() => _isCalculatingETA = true);
 
-      Map<String, dynamic>? tripInfo;
-
-      // --- Multi-stop path ---------------------------------------------------
-      if (_optimizedRoute != null && _thisChildStopIndex >= 0) {
-        final stops = _optimizedRoute!.orderedStops;
-
-        // Advance _nextStopIndex forward whenever the bus is within 200 m of
-        // the current next stop — this is monotonic (never goes backward) so
-        // a stop is never re-added to the waypoint list after it's been visited.
-        while (_nextStopIndex < stops.length) {
-          final distToNext =
-              _haversineKm(effectiveBus, stops[_nextStopIndex].homeLatLng);
-          if (distToNext < 0.2) {
-            // Bus is within 200 m — consider this stop reached, advance pointer
-            setState(() => _nextStopIndex++);
-          } else {
-            break;
-          }
-        }
-
-        // If this child's stop has already been passed, show arrived
-        if (_thisChildStopIndex < _nextStopIndex) {
-          if (mounted) {
-            setState(() {
-              _snappedBusLocation = snappedCoord;
-              _etaMinutes = 0;
-              _isCalculatingETA = false;
-            });
-            _updateBusAnnotation();
-          }
-          return;
-        }
-
-        // Build waypoints: bus → _nextStopIndex → ... → _thisChildStopIndex
-        final waypoints = <ll.LatLng>[effectiveBus];
-        for (int i = _nextStopIndex; i <= _thisChildStopIndex; i++) {
-          waypoints.add(stops[i].homeLatLng);
-        }
-
-
-        if (waypoints.length > 1) {
-          tripInfo = await MapboxRouteService.getMultiWaypointTripInformation(
-            waypoints: waypoints,
-            profile: 'driving-traffic',
-          );
-        }
-      }
-
-      // --- Fallback: use stored bus stops when optimization is unavailable ---
-      if (tripInfo == null && _busStops.length >= 2) {
-        final waypoints = _buildFallbackWaypoints(effectiveBus);
-        if (waypoints != null && waypoints.length >= 2) {
-          tripInfo = await MapboxRouteService.getMultiWaypointTripInformation(
-            waypoints: waypoints,
-            profile: 'driving-traffic',
-          );
-        }
-      }
-
-      // --- Direct-route fallback -------------------------------------------
-      tripInfo ??= await MapboxRouteService.getTripInformation(
-        busLocation: effectiveBus,
+      // Single Directions API call — server already handled road snapping.
+      Map<String, dynamic>? tripInfo =
+          await MapboxRouteService.getTripInformation(
+        busLocation: routeOrigin,
         homeLocation: _homeLocation!,
         profile: 'driving-traffic',
       );
+      if (!mounted || !_hasActiveTrip) return;
 
-      if (mounted && tripInfo != null) {
+      // Fallback to plain driving if traffic profile failed.
+      tripInfo ??= await MapboxRouteService.getTripInformation(
+        busLocation: routeOrigin,
+        homeLocation: _homeLocation!,
+        profile: 'driving',
+      );
+      if (!mounted || !_hasActiveTrip) return;
+
+      debugPrint(
+          '[Route] tripInfo=${tripInfo != null ? "ok eta=${tripInfo['eta']}" : "null"}');
+
+      if (tripInfo != null) {
         setState(() {
           _snappedBusLocation = snappedCoord;
           _etaMinutes = tripInfo!['eta'];
@@ -686,25 +623,21 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           _routePoints = tripInfo['route'];
           _isCalculatingETA = false;
           _lastEtaRefresh = now;
-          _lastEtaPosition = effectiveBus;
+          _lastEtaPosition = busCoord;
         });
         _updateBusAnnotation();
         _updateRouteAnnotation();
       } else {
-        setState(() {
-          _isCalculatingETA = false;
-          _lastEtaRefresh = now;
-          _lastEtaPosition = effectiveBus;
-        });
+        // Don't poison the throttle on failure — retry on next GPS update.
+        setState(() => _isCalculatingETA = false);
       }
-    } catch (_) {
-      setState(() {
-        _isCalculatingETA = false;
-      });
+    } catch (e) {
+      debugPrint('[Route] error: $e');
+      setState(() => _isCalculatingETA = false);
     }
   }
 
-  /// Haversine distance in km (used to find nearest stop to bus position).
+  /// Haversine distance in km (used to throttle ETA refresh by bus movement).
   double _haversineKm(ll.LatLng a, ll.LatLng b) {
     const r = 6371.0;
     final dLat = _deg2rad(b.latitude - a.latitude);
@@ -753,318 +686,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         _webSocketService.subscribeToBus(busId);
       }
     });
-  }
-
-  /// Called once when the very first bus-location update arrives after the
-  /// screen was opened with no active trip.  Re-runs route optimisation so
-  /// ETAs use the correct (now live) trip type instead of the time-of-day
-  /// heuristic that was used at screen-open time.
-  Future<void> _onFirstBusLocation() async {
-    if (_childData == null) return;
-    final busValue = _childData!['busId'];
-    if (busValue == null) return;
-    final busId =
-        busValue is int ? busValue : int.tryParse(busValue.toString());
-    if (busId == null) return;
-
-    debugPrint(
-        '[TripWatcher] First bus location received — refreshing optimization');
-    MapboxOptimizationService.invalidate(busId);
-    await _initializeRouteOptimization();
-  }
-
-  /// Fetch the active trip type and all sibling stops, then run optimization.
-  /// Called once on screen load; result cached by [MapboxOptimizationService].
-  Future<void> _initializeRouteOptimization() async {
-    if (_childData == null) return;
-
-    final busValue = _childData!['busId'];
-    if (busValue == null) return;
-    final busId =
-        busValue is int ? busValue : int.tryParse(busValue.toString());
-    if (busId == null) return;
-
-    try {
-      // _tripType is already set by the WebSocket trip_state / trip_started
-      // event before this method is called — no HTTP polling needed.
-
-      // 1. Fetch all children on this bus that have home coordinates set
-      final busStops = await _fetchBusStops(busId);
-
-      // Store stops so the fallback multi-stop router can use them
-      if (mounted) {
-        setState(() {
-          _busStops = busStops;
-          _hasActiveTrip = true;
-        });
-      }
-
-      // Need at least 2 stops for multi-stop routing to be meaningful
-      if (busStops.length < 2) {
-        return;
-      }
-
-      // 3. Read school coordinates from .env (always present)
-      final schoolCoords = _getSchoolCoordinates();
-      if (schoolCoords == null) {
-        return;
-      }
-
-      // Pass live bus location as pickup start so Mapbox routes furthest-first
-      final busLatLng = _busLocation != null
-          ? ll.LatLng(_busLocation!.latitude, _busLocation!.longitude)
-          : null;
-
-      final optimized = await MapboxOptimizationService.optimizeRoute(
-        busId: busId,
-        schoolLocation: schoolCoords,
-        busStops: busStops,
-        tripType: _tripType,
-        busLocation: busLatLng,
-      );
-      if (optimized == null || !mounted) return;
-
-      // 4. Find this child's stop index in the optimized order
-      final thisChildId = _childData!['id'] is int
-          ? _childData!['id'] as int
-          : int.tryParse(_childData!['id'].toString()) ?? -1;
-
-      int stopIdx = optimized.orderedStops
-          .indexWhere((s) => s.childId == thisChildId);
-
-      // If this child has no home coords in the DB (not in orderedStops),
-      // treat all optimized stops as intermediate waypoints and append
-      // _homeLocation as the final destination.
-      if (stopIdx == -1 && _homeLocation != null) {
-        final extendedStops = [
-          ...optimized.orderedStops,
-          BusStop(childId: thisChildId, homeLatLng: _homeLocation!),
-        ];
-        final extendedDurations = [...optimized.legDurations, 0.0];
-        final extended = OptimizedRoute(
-          orderedStops: extendedStops,
-          legDurations: extendedDurations,
-        );
-        stopIdx = extendedStops.length - 1;
-        if (!mounted) return;
-        setState(() {
-          _optimizedRoute = extended;
-          _thisChildStopIndex = stopIdx;
-          _nextStopIndex = 0;
-          _stopsBeforeChild = stopIdx; // all other stops come first
-        });
-        if (_busLocation != null) {
-          _updateBusLocationWithSnapping(_busLocation!);
-        }
-        return;
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _optimizedRoute = optimized;
-        _thisChildStopIndex = stopIdx;
-        _nextStopIndex = 0; // reset pointer for this fresh route
-        _stopsBeforeChild = stopIdx > 0 ? stopIdx : 0;
-      });
-
-      // Calculate pre-trip scheduled ETA from leg durations + trip scheduled time
-      _calculateScheduledEta();
-
-      // CRITICAL: Re-trigger ETA now that we have the optimized route.
-      // The WebSocket may have already fired before optimization completed,
-      // so the first ETA was calculated using the direct-route fallback.
-      // Recalculate immediately with the correct multi-stop waypoints.
-      if (_busLocation != null) {
-        _updateBusLocationWithSnapping(_busLocation!);
-      }
-    } catch (_) {
-      // Direct-route ETA fallback remains in place
-    }
-  }
-
-  /// Build ordered waypoints [bus, stop1, ..., thisChildHome] using stored
-  /// [_busStops] when [_optimizedRoute] is unavailable or the Directions API
-  /// transiently failed.
-  ///
-  /// Ordering rules (mirrors Mapbox Optimization logic):
-  ///   pickup  → farthest from school first (bus heads outward, comes back)
-  ///   dropoff → nearest to school first (bus delivers closest kids first)
-  ///
-  /// Skips stops the bus has already passed (within 200 m).
-  /// Does NOT update [_stopsBeforeChild] — that value is owned by
-  /// [_initializeRouteOptimization] so we never overwrite the correct count.
-  List<ll.LatLng>? _buildFallbackWaypoints(ll.LatLng busLocation) {
-    if (_busStops.isEmpty) return null;
-
-    final thisChildId = _childData?['id'] is int
-        ? _childData!['id'] as int
-        : int.tryParse(_childData?['id']?.toString() ?? '') ?? -1;
-    if (thisChildId == -1) return null;
-
-    // Filter out stops already passed by the bus (within 200 m)
-    final remaining = _busStops
-        .where((s) => _haversineKm(busLocation, s.homeLatLng) > 0.2)
-        .toList();
-    if (remaining.isEmpty) return null;
-
-    // Sort by school distance: school coords are always available from .env
-    final school = _getSchoolCoordinates();
-    if (school != null) {
-      remaining.sort((a, b) {
-        final dA = _haversineKm(school, a.homeLatLng);
-        final dB = _haversineKm(school, b.homeLatLng);
-        // pickup → farthest first (descending); dropoff → nearest first (ascending)
-        return _tripType == 'pickup'
-            ? dB.compareTo(dA)
-            : dA.compareTo(dB);
-      });
-    }
-
-    // Find this child's position in the sorted list
-    final thisChildIdx = remaining.indexWhere((s) => s.childId == thisChildId);
-    if (thisChildIdx == -1) return null;
-
-    // Waypoints: bus → stops[0..thisChildIdx] inclusive
-    final waypoints = <ll.LatLng>[busLocation];
-    for (int i = 0; i <= thisChildIdx; i++) {
-      waypoints.add(remaining[i].homeLatLng);
-    }
-    return waypoints;
-  }
-
-  /// Return school GPS coordinates from the .env file.
-  /// SCHOOL_LATITUDE and SCHOOL_LONGITUDE are always present in .env.
-  ll.LatLng? _getSchoolCoordinates() {
-    final lat = ApiConfig.schoolLatitude;
-    final lng = ApiConfig.schoolLongitude;
-    if (lat != null && lng != null) return ll.LatLng(lat, lng);
-    return null;
-  }
-
-  /// GET /api/trips/?bus_id=X&status=in-progress — returns 'pickup' or 'dropoff'.
-  /// Also captures [_tripScheduledTime] for scheduled ETA calculation.
-  Future<String> _getActiveTripType(int busId) async {
-    try {
-      final uri = Uri.parse(
-        '${ApiConfig.apiBaseUrl}/api/trips/?bus_id=$busId&status=in-progress',
-      );
-      final token = await _getAuthToken();
-      final response = await http.get(
-        uri,
-        headers: token != null ? {'Authorization': 'Bearer $token'} : {},
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final results = data['results'] as List? ?? data as List? ?? [];
-        if (results.isNotEmpty) {
-          final tripType = results[0]['type']?.toString() ?? '';
-          // Capture scheduled time for pre-trip ETA calculation
-          final scheduledStr = results[0]['scheduledTime']?.toString();
-          if (scheduledStr != null) {
-            _tripScheduledTime = DateTime.tryParse(scheduledStr);
-          }
-          if (tripType == 'pickup' || tripType == 'dropoff') return tripType;
-        }
-      }
-    } catch (_) {}
-
-    // Time-of-day heuristic: before noon → pickup, after noon → dropoff
-    return DateTime.now().hour < 12 ? 'pickup' : 'dropoff';
-  }
-
-  /// Calculate a scheduled ETA for this child based on the optimized leg
-  /// durations and the trip's scheduled time.
-  ///
-  /// Morning (pickup):
-  ///   school_arrival − Σ legs[j..N-1] − (N-1-j) × stopBuffer
-  ///
-  /// Afternoon (dropoff):
-  ///   school_departure + Σ legs[0..j] + j × stopBuffer
-  void _calculateScheduledEta() {
-    if (_optimizedRoute == null ||
-        _thisChildStopIndex < 0 ||
-        _tripScheduledTime == null) return;
-
-    const stopBufferSeconds = 120.0; // 2 min stop buffer per child
-    final legs = _optimizedRoute!.legDurations;
-    final j = _thisChildStopIndex;
-    final n = legs.length; // legs.length == orderedStops.length
-
-    double etaSeconds;
-
-    if (_tripType == 'pickup') {
-      // Work BACKWARD from school arrival.
-      // Remaining time after picking up child at stop j:
-      //   Σ legs[j..n-1]  +  (n-1-j) × stopBuffer  (stops visited after j)
-      double remaining = 0;
-      for (int i = j; i < n; i++) {
-        remaining += legs[i];
-      }
-      remaining += (n - 1 - j) * stopBufferSeconds;
-      final childPickupTime =
-          _tripScheduledTime!.subtract(Duration(seconds: remaining.toInt()));
-      final diff = childPickupTime.difference(DateTime.now()).inMinutes;
-      if (diff >= 0) {
-        setState(() => _scheduledEtaMinutes = diff);
-      }
-    } else {
-      // Dropoff — accumulate FORWARD from school departure.
-      // Time from school to stop j:
-      //   Σ legs[0..j]  +  j × stopBuffer
-      double forward = 0;
-      for (int i = 0; i <= j && i < n; i++) {
-        forward += legs[i];
-        if (i < j) forward += stopBufferSeconds;
-      }
-      final childDropTime =
-          _tripScheduledTime!.add(Duration(seconds: forward.toInt()));
-      final diff = childDropTime.difference(DateTime.now()).inMinutes;
-      if (diff >= 0) {
-        setState(() => _scheduledEtaMinutes = diff);
-      }
-    }
-  }
-
-  /// GET /api/buses/{busId}/children/ and build the list of [BusStop]s.
-  Future<List<BusStop>> _fetchBusStops(int busId) async {
-    try {
-      final uri = Uri.parse(
-        '${ApiConfig.apiBaseUrl}${ApiConfig.busChildrenEndpoint(busId)}',
-      );
-      final token = await _getAuthToken();
-      final response = await http.get(
-        uri,
-        headers: token != null ? {'Authorization': 'Bearer $token'} : {},
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final children = data['children'] as List? ?? [];
-
-        final stops = <BusStop>[];
-        for (final child in children) {
-          final lat = (child['homeLatitude'] as num?)?.toDouble();
-          final lng = (child['homeLongitude'] as num?)?.toDouble();
-          final id = child['id'] as int?;
-          if (lat != null && lng != null && id != null) {
-            stops.add(BusStop(childId: id, homeLatLng: ll.LatLng(lat, lng)));
-          }
-        }
-        return stops;
-      }
-    } catch (_) {}
-    return [];
-  }
-
-  /// Read the JWT access token from SharedPreferences.
-  Future<String?> _getAuthToken() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getString('access_token');
-    } catch (_) {
-      return null;
-    }
   }
 
   /// Load child's home location
@@ -1398,8 +1019,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       );
     }
 
-    final bool hasAssignedBus = _childData!['busId'] != null;
-
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Stack(
@@ -1556,59 +1175,27 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                             ),
                           ),
                         ),
-                        // Show live ETA when bus is tracked, else fall back
-                        // to scheduled ETA (works before bus goes live too)
-                        Builder(builder: (_) {
-                          final eta = _etaMinutes ?? _scheduledEtaMinutes;
-                          final isScheduled = _etaMinutes == null &&
-                              _scheduledEtaMinutes != null;
-                          if (eta == null) return const SizedBox.shrink();
-                          return Container(
+                        if (_etaMinutes != null)
+                          Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: isScheduled
-                                  ? colorScheme.secondary
-                                  : colorScheme.primary,
+                              color: colorScheme.primary,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              '$eta mins${isScheduled ? ' (sched.)' : ''}',
+                              '$_etaMinutes mins',
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
                               ),
                             ),
-                          );
-                        }),
+                          ),
                       ],
                     ),
-
-                    // Stops-before-this-child indicator
-                    if (_busLocation != null && _stopsBeforeChild > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.pin_drop_outlined,
-                              size: 14,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '$_stopsBeforeChild stop${_stopsBeforeChild > 1 ? 's' : ''} before yours',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
 
                     // Divider
                     Padding(

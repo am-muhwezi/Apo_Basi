@@ -1,4 +1,6 @@
+import asyncio
 import json
+import requests as req_lib
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from rest_framework_simplejwt.tokens import AccessToken
@@ -81,6 +83,9 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
         # to poll.  The client sets _hasActiveTrip / _tripType from this and
         # calls route optimisation — no HTTP round-trip required.
         trip_state = await self.get_trip_state(self.bus_id)
+        # Cache trip-active flag so location broadcasts are gated without an
+        # extra DB query on every GPS packet.
+        self._trip_active = trip_state.get("has_active_trip", False)
         await self.send(text_data=json.dumps({
             "type": "trip_state",
             **trip_state,
@@ -113,21 +118,7 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
                     }))
                     return
 
-                # Broadcast location update to all subscribers
-                await self.channel_layer.group_send(
-                    self.group_name,
-                    {
-                        "type": "bus.location",
-                        "bus_id": self.bus_id,
-                        "latitude": data.get("latitude"),
-                        "longitude": data.get("longitude"),
-                        "speed": data.get("speed", 0),
-                        "heading": data.get("heading", 0),
-                        "timestamp": data.get("timestamp"),
-                    }
-                )
-
-                # Save to database
+                # Always persist GPS so the next trip_started can seed the map.
                 await self.save_location_update(
                     self.bus_id,
                     data.get("latitude"),
@@ -136,19 +127,42 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
                     data.get("heading", 0)
                 )
 
+                # Only broadcast to parents while a trip is active.
+                # _trip_active is kept in sync by bus_trip_event so there is
+                # no extra DB query per GPS packet.
+                if getattr(self, "_trip_active", False):
+                    lat = data.get("latitude")
+                    lng = data.get("longitude")
+                    # Snap once on the server — all connected parents receive
+                    # the pre-snapped position so they don't each have to call
+                    # the Map Matching API individually.
+                    snapped_lat, snapped_lng = await self._snap_to_road(lat, lng)
+                    await self.channel_layer.group_send(
+                        self.group_name,
+                        {
+                            "type": "bus.location",
+                            "bus_id": self.bus_id,
+                            "latitude": lat,
+                            "longitude": lng,
+                            "snapped_latitude": snapped_lat,
+                            "snapped_longitude": snapped_lng,
+                            "speed": data.get("speed", 0),
+                            "heading": data.get("heading", 0),
+                            "timestamp": data.get("timestamp"),
+                        }
+                    )
+
             elif message_type == "request_current_location":
-                # Get current location from database and send it
+                # Only respond with a location when a trip is active — driver
+                # GPS must not be exposed to parents between trips.
+                if not getattr(self, "_trip_active", False):
+                    return
                 location = await self.get_current_location(self.bus_id)
                 if location:
                     await self.send(text_data=json.dumps({
                         "type": "location_update",
                         "bus_id": self.bus_id,
                         **location
-                    }))
-                else:
-                    await self.send(text_data=json.dumps({
-                        "type": "error",
-                        "message": "No location data available"
                     }))
 
             elif message_type == "request_trip_state":
@@ -176,11 +190,23 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
         Forwards trip_started / trip_ended to all connected clients so the
         parent app can react immediately without polling.
         """
+        event_type = event.get("event_type", "")
+        if event_type == "trip_started":
+            self._trip_active = True
+        elif event_type == "trip_ended":
+            self._trip_active = False
+
         await self.send(text_data=json.dumps({
             "type": event["event_type"],       # "trip_started" or "trip_ended"
             "trip_id": event.get("trip_id"),
             "trip_type": event.get("trip_type"),
             "scheduled_time": event.get("scheduled_time"),
+            # GPS seed — present on trip_started so the parent map marker
+            # appears immediately; absent (None) on trip_ended (bus hidden).
+            "bus_latitude": event.get("bus_latitude"),
+            "bus_longitude": event.get("bus_longitude"),
+            "bus_speed": event.get("bus_speed"),
+            "bus_heading": event.get("bus_heading"),
         }))
 
     async def bus_location(self, event):
@@ -197,11 +223,44 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
             "bus_number": bus_details.get("bus_number", ""),
             "latitude": event["latitude"],
             "longitude": event["longitude"],
+            "snapped_latitude": event.get("snapped_latitude"),
+            "snapped_longitude": event.get("snapped_longitude"),
             "speed": event.get("speed", 0),
             "heading": event.get("heading", 0),
             "is_active": True,
             "timestamp": event.get("timestamp"),
         }))
+
+    async def _snap_to_road(self, lat, lng):
+        """
+        Snap a GPS coordinate to the nearest road via Mapbox Map Matching.
+        Returns (snapped_lat, snapped_lng) or the original on failure.
+        Runs the sync HTTP call in a thread pool to avoid blocking the event loop.
+        """
+        from django.conf import settings
+        token = getattr(settings, "MAPBOX_ACCESS_TOKEN", "")
+        if not token or lat is None or lng is None:
+            return lat, lng
+
+        def _sync_snap():
+            url = (
+                f"https://api.mapbox.com/matching/v5/mapbox/driving/"
+                f"{lng},{lat}"
+                f"?geometries=geojson&radiuses=25&access_token={token}"
+            )
+            try:
+                resp = req_lib.get(url, timeout=2.0)
+                if resp.status_code == 200:
+                    matchings = resp.json().get("matchings", [])
+                    if matchings:
+                        coords = matchings[0]["geometry"]["coordinates"]
+                        if coords:
+                            return coords[0][1], coords[0][0]  # lat, lng
+            except Exception:
+                pass
+            return lat, lng
+
+        return await asyncio.to_thread(_sync_snap)
 
     @database_sync_to_async
     def authenticate_token(self, token):
@@ -373,13 +432,15 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
                     trip.scheduled_time.isoformat() if trip.scheduled_time else None
                 )
 
-            # Always attach last known GPS so the map marker appears instantly
-            bus = Bus.objects.get(id=bus_id)
-            if bus.latitude and bus.longitude:
-                result["bus_latitude"] = float(bus.latitude)
-                result["bus_longitude"] = float(bus.longitude)
-                result["bus_speed"] = float(bus.speed) if bus.speed else 0.0
-                result["bus_heading"] = float(bus.heading) if bus.heading else 0.0
+            # Only attach GPS when a trip is active — never expose driver
+            # location to parents between trips.
+            if result["has_active_trip"]:
+                bus = Bus.objects.get(id=bus_id)
+                if bus.latitude and bus.longitude:
+                    result["bus_latitude"] = float(bus.latitude)
+                    result["bus_longitude"] = float(bus.longitude)
+                    result["bus_speed"] = float(bus.speed) if bus.speed else 0.0
+                    result["bus_heading"] = float(bus.heading) if bus.heading else 0.0
         except Exception as e:
             print(f"[get_trip_state] ERROR for bus_id={bus_id}: {e}")
 
