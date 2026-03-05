@@ -53,6 +53,12 @@ class BusWebSocketService {
   bool get isConnected => _isConnected;
   int? get subscribedBusId => _subscribedBusId;
 
+  // Last trip_state received from the server. Persists in the singleton so
+  // child_detail_screen can apply it immediately on re-entry instead of
+  // waiting for the next WS trip_state message.
+  Map<String, dynamic>? _lastTripState;
+  Map<String, dynamic>? get lastTripState => _lastTripState;
+
   /// Connect to WebSocket server (initialize service)
   ///
   /// This method initializes the service and prepares for connection.
@@ -176,7 +182,29 @@ class BusWebSocketService {
       } else if (messageType == 'trip_state' ||
           messageType == 'trip_started' ||
           messageType == 'trip_ended') {
-        _tripEventController.add(Map<String, dynamic>.from(data));
+        final event = Map<String, dynamic>.from(data);
+        // Keep a snapshot of the latest trip state so screens can restore
+        // immediately on re-entry without waiting for the next WS message.
+        if (messageType == 'trip_state') {
+          _lastTripState = event;
+        } else if (messageType == 'trip_ended') {
+          _lastTripState = {'type': 'trip_state', 'has_active_trip': false};
+        } else if (messageType == 'trip_started') {
+          // Merge trip_started fields into a trip_state-shaped snapshot so
+          // the screen can re-apply GPS seed coordinates on re-entry.
+          _lastTripState = {
+            'type': 'trip_state',
+            'has_active_trip': true,
+            'trip_id': event['trip_id'],
+            'trip_type': event['trip_type'],
+            'scheduled_time': event['scheduled_time'],
+            'bus_latitude': event['bus_latitude'],
+            'bus_longitude': event['bus_longitude'],
+            'bus_speed': event['bus_speed'],
+            'bus_heading': event['bus_heading'],
+          };
+        }
+        _tripEventController.add(event);
       } else if (messageType == 'error') {
         _errorController.add(data['message']);
       }

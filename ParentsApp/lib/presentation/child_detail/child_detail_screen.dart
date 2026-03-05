@@ -441,79 +441,19 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
 
         if (eventType == 'trip_state') {
           // ── Sent by the server immediately on every (re)connect ──────────
-          final hasActiveTrip = event['has_active_trip'] as bool? ?? false;
-          debugPrint('[TripEvent] trip_state: has_active_trip=$hasActiveTrip');
-
-          if (!hasActiveTrip) {
-            setState(() {
-              _hasActiveTrip = false;
-            });
-            return;
-          }
-
-          setState(() {
-            _hasActiveTrip = true;
-          });
-
-          // Seed the map with the last known bus position from the DB so the
-          // marker appears instantly, before the next live GPS update arrives.
-          final lat = event['bus_latitude'];
-          final lng = event['bus_longitude'];
-          if (lat != null && lng != null && _busLocation == null) {
-            final busValue = _childData?['busId'];
-            final busId = busValue is int
-                ? busValue
-                : int.tryParse(busValue?.toString() ?? '');
-            if (busId != null) {
-              final seedLocation = BusLocation(
-                busId: busId,
-                busNumber: '',
-                latitude: (lat as num).toDouble(),
-                longitude: (lng as num).toDouble(),
-                speed: (event['bus_speed'] as num?)?.toDouble() ?? 0.0,
-                heading: (event['bus_heading'] as num?)?.toDouble() ?? 0.0,
-                isActive: true,
-                timestamp: DateTime.now(),
-              );
-              setState(() => _busLocation = seedLocation);
-              _updateBusAnnotation();
-              // Kick off route/ETA immediately from seed GPS.
-              _updateBusLocationWithSnapping(seedLocation);
-            }
-          }
+          debugPrint('[TripEvent] trip_state: has_active_trip=${event['has_active_trip']}');
+          _applyTripState(event);
 
         } else if (eventType == 'trip_started') {
           debugPrint('[TripEvent] trip_started');
-          setState(() {
-            _hasActiveTrip = true;
+          // Reuse the same seed+route logic as trip_state.
+          _applyTripState({
+            'has_active_trip': true,
+            'bus_latitude': event['bus_latitude'],
+            'bus_longitude': event['bus_longitude'],
+            'bus_speed': event['bus_speed'],
+            'bus_heading': event['bus_heading'],
           });
-
-          // Seed map with last known GPS so the bus marker appears immediately
-          final lat = event['bus_latitude'];
-          final lng = event['bus_longitude'];
-          if (lat != null && lng != null && _busLocation == null) {
-            final busValue = _childData?['busId'];
-            final busId = busValue is int
-                ? busValue
-                : int.tryParse(busValue?.toString() ?? '');
-            if (busId != null) {
-              final seedLocation = BusLocation(
-                busId: busId,
-                busNumber: '',
-                latitude: (lat as num).toDouble(),
-                longitude: (lng as num).toDouble(),
-                speed: (event['bus_speed'] as num?)?.toDouble() ?? 0.0,
-                heading: (event['bus_heading'] as num?)?.toDouble() ?? 0.0,
-                isActive: true,
-                timestamp: DateTime.now(),
-              );
-              setState(() => _busLocation = seedLocation);
-              _updateBusAnnotation();
-              // Kick off route/ETA immediately from seed — don't wait for
-              // the first real GPS update which may take several seconds.
-              _updateBusLocationWithSnapping(seedLocation);
-            }
-          }
 
         } else if (eventType == 'trip_ended') {
           debugPrint('[TripEvent] trip_ended — clearing trip state');
@@ -534,9 +474,54 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
         }
       });
 
+      // ── Apply cached trip state immediately ───────────────────────────────
+      // The WS service is a singleton. If the user navigated away and back,
+      // the last trip_state the server sent is still in memory. Apply it now
+      // so the screen shows the correct trip status synchronously instead of
+      // showing the blank/no-trip state until the next WS message arrives.
+      final cached = _webSocketService.lastTripState;
+      if (cached != null && mounted) {
+        _applyTripState(cached);
+      }
+
       _subscribeToBus();
     } catch (e) {
       // Failed to initialize WebSocket
+    }
+  }
+
+  /// Apply a trip_state (or trip_state-shaped) event map to local state.
+  /// Used both by the stream listener and by the cached-state restore path.
+  void _applyTripState(Map<String, dynamic> event) {
+    final hasActiveTrip = event['has_active_trip'] as bool? ?? false;
+    if (!hasActiveTrip) {
+      setState(() => _hasActiveTrip = false);
+      return;
+    }
+    setState(() => _hasActiveTrip = true);
+
+    final lat = event['bus_latitude'];
+    final lng = event['bus_longitude'];
+    if (lat != null && lng != null && _busLocation == null) {
+      final busValue = _childData?['busId'];
+      final busId = busValue is int
+          ? busValue
+          : int.tryParse(busValue?.toString() ?? '');
+      if (busId != null) {
+        final seedLocation = BusLocation(
+          busId: busId,
+          busNumber: '',
+          latitude: (lat as num).toDouble(),
+          longitude: (lng as num).toDouble(),
+          speed: (event['bus_speed'] as num?)?.toDouble() ?? 0.0,
+          heading: (event['bus_heading'] as num?)?.toDouble() ?? 0.0,
+          isActive: true,
+          timestamp: DateTime.now(),
+        );
+        setState(() => _busLocation = seedLocation);
+        _updateBusAnnotation();
+        _updateBusLocationWithSnapping(seedLocation);
+      }
     }
   }
 
