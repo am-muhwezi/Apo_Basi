@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../services/theme_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/busminder_drawer_widget.dart';
@@ -31,7 +32,8 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
       _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
       _soundEnabled = prefs.getBool('sound_enabled') ?? true;
       _vibrationEnabled = prefs.getBool('vibration_enabled') ?? true;
-      _darkMode = prefs.getBool('dark_mode') ?? false;
+      // Sync with ThemeService as source of truth
+      _darkMode = ThemeService().themeMode == ThemeMode.dark;
     });
   }
 
@@ -72,12 +74,24 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = AppTheme.lightBusminderTheme;
-    final colorScheme = theme.colorScheme;
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeService().themeModeNotifier,
+      builder: (ctx, themeMode, _) {
+        final theme = themeMode == ThemeMode.dark
+            ? AppTheme.darkBusminderTheme
+            : AppTheme.lightBusminderTheme;
+        final colorScheme = theme.colorScheme;
+        return Theme(
+          data: theme,
+          child: _buildContent(ctx, theme, colorScheme),
+        );
+      },
+    );
+  }
 
-    return Theme(
-      data: theme,
-      child: Scaffold(
+  Widget _buildContent(
+      BuildContext context, ThemeData theme, ColorScheme colorScheme) {
+    return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: CustomAppBar(
         title: 'Settings',
@@ -156,6 +170,8 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
                   onChanged: (v) {
                     setState(() => _darkMode = v);
                     _saveSetting('dark_mode', v);
+                    ThemeService().setThemeMode(
+                        v ? ThemeMode.dark : ThemeMode.light);
                   },
                   colorScheme: colorScheme,
                 ),
@@ -203,7 +219,6 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
             const SizedBox(height: 32),
           ],
         ),
-      ),
       ),
     );
   }

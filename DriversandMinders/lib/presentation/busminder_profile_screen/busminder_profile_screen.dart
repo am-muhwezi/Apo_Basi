@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../services/theme_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/busminder_drawer_widget.dart';
@@ -57,13 +58,24 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = AppTheme.lightBusminderTheme;
-    final colorScheme = theme.colorScheme;
-    final isDark = false;
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeService().themeModeNotifier,
+      builder: (ctx, themeMode, _) {
+        final theme = themeMode == ThemeMode.dark
+            ? AppTheme.darkBusminderTheme
+            : AppTheme.lightBusminderTheme;
+        final colorScheme = theme.colorScheme;
+        final isDark = themeMode == ThemeMode.dark;
+        return Theme(
+          data: theme,
+          child: _buildScaffold(colorScheme, isDark, theme),
+        );
+      },
+    );
+  }
 
-    return Theme(
-      data: theme,
-      child: Scaffold(
+  Widget _buildScaffold(ColorScheme colorScheme, bool isDark, ThemeData theme) {
+    return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: CustomAppBar(
         title: 'My Profile',
@@ -236,7 +248,6 @@ class _BusminderProfileScreenState extends State<BusminderProfileScreen> {
                 ),
               ),
             ),
-      ),
     );
   }
 
