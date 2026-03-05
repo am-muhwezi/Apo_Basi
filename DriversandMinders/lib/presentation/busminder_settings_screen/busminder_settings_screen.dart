@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sizer/sizer.dart';
 
-import '../../core/app_export.dart';
+import '../../services/theme_service.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/busminder_drawer_widget.dart';
 
@@ -18,7 +18,7 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
   bool _notificationsEnabled = true;
   bool _soundEnabled = true;
   bool _vibrationEnabled = true;
-  String _language = 'English';
+  bool _darkMode = false;
 
   @override
   void initState() {
@@ -32,284 +32,339 @@ class _BusminderSettingsScreenState extends State<BusminderSettingsScreen> {
       _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
       _soundEnabled = prefs.getBool('sound_enabled') ?? true;
       _vibrationEnabled = prefs.getBool('vibration_enabled') ?? true;
-      _language = prefs.getString('language') ?? 'English';
+      // Sync with ThemeService as source of truth
+      _darkMode = ThemeService().themeMode == ThemeMode.dark;
     });
   }
 
-  Future<void> _saveSetting(String key, dynamic value) async {
+  Future<void> _saveSetting(String key, bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    if (value is bool) {
-      await prefs.setBool(key, value);
-    } else if (value is String) {
-      await prefs.setString(key, value);
-    }
+    await prefs.setBool(key, value);
   }
 
-  Widget _buildSettingsSection({
-    required String title,
-    required List<Widget> children,
-  }) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 3.h),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline,
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.all(4.w),
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+  void _showAboutDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text('About ApoBasi'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Version: 1.0.0+3'),
+            SizedBox(height: 8),
+            Text('© 2026 ApoBasi – Powered by SoG'),
+            SizedBox(height: 8),
+            Text(
+              'School bus tracking and attendance management for African schools.',
+              style: TextStyle(fontSize: 13),
             ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
           ),
-          Divider(height: 1, color: Theme.of(context).colorScheme.outline),
-          ...children,
         ],
       ),
     );
   }
 
-  Widget _buildSwitchTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required Function(bool) onChanged,
-  }) {
-    return ListTile(
-      leading: Container(
-        padding: EdgeInsets.all(2.w),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 22),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.onSurface,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          fontSize: 13,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-      ),
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-        activeColor: Theme.of(context).colorScheme.primary,
-      ),
-    );
-  }
-
-  Widget _buildActionTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    Color? iconColor,
-  }) {
-    return ListTile(
-      leading: Container(
-        padding: EdgeInsets.all(2.w),
-        decoration: BoxDecoration(
-          color:
-              (iconColor ?? Theme.of(context).colorScheme.primary).withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(
-          icon,
-          color: iconColor ?? Theme.of(context).colorScheme.primary,
-          size: 22,
-        ),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.onSurface,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          fontSize: 13,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-      ),
-      trailing: Icon(
-        Icons.chevron_right,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-      onTap: onTap,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeService().themeModeNotifier,
+      builder: (ctx, themeMode, _) {
+        final theme = themeMode == ThemeMode.dark
+            ? AppTheme.darkBusminderTheme
+            : AppTheme.lightBusminderTheme;
+        final colorScheme = theme.colorScheme;
+        return Theme(
+          data: theme,
+          child: _buildContent(ctx, theme, colorScheme),
+        );
+      },
+    );
+  }
+
+  Widget _buildContent(
+      BuildContext context, ThemeData theme, ColorScheme colorScheme) {
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: CustomAppBar(
         title: 'Settings',
         automaticallyImplyLeading: false,
         leading: Builder(
           builder: (context) => IconButton(
-            icon: Icon(Icons.menu, color: Colors.white),
+            icon: const Icon(Icons.menu, color: Colors.white),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: colorScheme.primary,
       ),
       drawer: const BusminderDrawerWidget(currentRoute: '/busminder-settings'),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(4.w),
+        physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Notifications Section
-            _buildSettingsSection(
-              title: 'Notifications',
+            Divider(height: 1, color: colorScheme.outline.withValues(alpha: 0.3)),
+
+            // ── Notifications ─────────────────────────────────────────
+            _sectionHeader('Notifications', colorScheme),
+
+            _GroupedCard(
+              theme: theme,
+              colorScheme: colorScheme,
               children: [
-                _buildSwitchTile(
-                  icon: Icons.notifications,
-                  title: 'Push Notifications',
-                  subtitle: 'Receive alerts for trip updates',
+                _SwitchRow(
+                  icon: Icons.notifications_rounded,
+                  label: 'Push Notifications',
                   value: _notificationsEnabled,
-                  onChanged: (value) {
-                    setState(() => _notificationsEnabled = value);
-                    _saveSetting('notifications_enabled', value);
+                  onChanged: (v) {
+                    setState(() => _notificationsEnabled = v);
+                    _saveSetting('notifications_enabled', v);
                   },
+                  colorScheme: colorScheme,
                 ),
-                Divider(height: 1, color: Theme.of(context).colorScheme.outline),
-                _buildSwitchTile(
-                  icon: Icons.volume_up,
-                  title: 'Sound',
-                  subtitle: 'Play sound for notifications',
+                _divider(colorScheme),
+                _SwitchRow(
+                  icon: Icons.volume_up_rounded,
+                  label: 'Sound',
                   value: _soundEnabled,
-                  onChanged: (value) {
-                    setState(() => _soundEnabled = value);
-                    _saveSetting('sound_enabled', value);
+                  onChanged: (v) {
+                    setState(() => _soundEnabled = v);
+                    _saveSetting('sound_enabled', v);
                   },
+                  colorScheme: colorScheme,
                 ),
-                Divider(height: 1, color: Theme.of(context).colorScheme.outline),
-                _buildSwitchTile(
-                  icon: Icons.vibration,
-                  title: 'Vibration',
-                  subtitle: 'Vibrate on notifications',
+                _divider(colorScheme),
+                _SwitchRow(
+                  icon: Icons.vibration_rounded,
+                  label: 'Vibration',
                   value: _vibrationEnabled,
-                  onChanged: (value) {
-                    setState(() => _vibrationEnabled = value);
-                    _saveSetting('vibration_enabled', value);
+                  onChanged: (v) {
+                    setState(() => _vibrationEnabled = v);
+                    _saveSetting('vibration_enabled', v);
                   },
+                  colorScheme: colorScheme,
                 ),
               ],
             ),
-            // App Preferences Section
-            _buildSettingsSection(
-              title: 'App Preferences',
+
+            const SizedBox(height: 24),
+
+            // ── Appearance ────────────────────────────────────────────
+            _sectionHeader('Appearance', colorScheme),
+
+            _GroupedCard(
+              theme: theme,
+              colorScheme: colorScheme,
               children: [
-                _buildActionTile(
-                  icon: Icons.language,
-                  title: 'Language',
-                  subtitle: _language,
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Language selection coming soon'),
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                      ),
-                    );
+                _SwitchRow(
+                  icon: Icons.dark_mode_rounded,
+                  label: 'Dark Mode',
+                  value: _darkMode,
+                  onChanged: (v) {
+                    setState(() => _darkMode = v);
+                    _saveSetting('dark_mode', v);
+                    ThemeService().setThemeMode(
+                        v ? ThemeMode.dark : ThemeMode.light);
                   },
-                ),
-                Divider(height: 1, color: Theme.of(context).colorScheme.outline),
-                _buildActionTile(
-                  icon: Icons.info,
-                  title: 'About',
-                  subtitle: 'Version 1.0.0+3',
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        title: Row(
-                          children: [
-                            Icon(Icons.bus_alert,
-                                color: Theme.of(context).colorScheme.primary),
-                            SizedBox(width: 2.w),
-                            Text('About ApoBasi'),
-                          ],
-                        ),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Version: 1.0.0+3'),
-                            SizedBox(height: 1.h),
-                            Text('© 2026 ApoBasi - Powered by SoG'),
-                            SizedBox(height: 1.h),
-                            Text(
-                              'School bus tracking and attendance management for African schools.',
-                              style: TextStyle(fontSize: 13),
-                            ),
-                          ],
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: Text('Close'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-                Divider(height: 1, color: Theme.of(context).colorScheme.outline),
-                _buildActionTile(
-                  icon: Icons.privacy_tip,
-                  title: 'Privacy Policy',
-                  subtitle: 'View our privacy policy',
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Privacy policy will be displayed here'),
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                      ),
-                    );
-                  },
+                  colorScheme: colorScheme,
                 ),
               ],
             ),
 
-            SizedBox(height: 2.h),
+            const SizedBox(height: 24),
 
-            // Footer
-            Text(
-              '© 2026 ApoBasi - Powered by SoG',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
+            // ── About ─────────────────────────────────────────────────
+            _sectionHeader('About', colorScheme),
+
+            _GroupedCard(
+              theme: theme,
+              colorScheme: colorScheme,
+              children: [
+                _NavRow(
+                  icon: Icons.info_outline_rounded,
+                  label: 'About ApoBasi',
+                  subtitle: 'Version 1.0.0+3',
+                  onTap: _showAboutDialog,
+                  colorScheme: colorScheme,
+                ),
+                _divider(colorScheme),
+                _NavRow(
+                  icon: Icons.shield_outlined,
+                  label: 'Privacy Policy',
+                  onTap: () {},
+                  colorScheme: colorScheme,
+                ),
+              ],
             ),
-            SizedBox(height: 2.h),
+
+            const SizedBox(height: 40),
+
+            Center(
+              child: Text(
+                '© 2026 ApoBasi – Powered by SoG',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String title, ColorScheme colorScheme) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: colorScheme.onSurface,
+          ),
+        ),
+      );
+
+  Widget _divider(ColorScheme colorScheme) => Divider(
+        height: 1,
+        indent: 16,
+        endIndent: 16,
+        color: colorScheme.outline.withValues(alpha: 0.5),
+      );
+}
+
+// ── Sub-widgets ───────────────────────────────────────────────────────────────
+
+class _GroupedCard extends StatelessWidget {
+  final ThemeData theme;
+  final ColorScheme colorScheme;
+  final List<Widget> children;
+
+  const _GroupedCard({
+    required this.theme,
+    required this.colorScheme,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorScheme.outline),
+      ),
+      child: Column(children: children),
+    );
+  }
+}
+
+class _SwitchRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final ColorScheme colorScheme;
+
+  const _SwitchRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+                color: colorScheme.onSurface,
+              ),
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: colorScheme.primary,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final VoidCallback onTap;
+  final ColorScheme colorScheme;
+
+  const _NavRow({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.colorScheme,
+    this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right,
+                size: 20, color: colorScheme.onSurfaceVariant),
           ],
         ),
       ),
