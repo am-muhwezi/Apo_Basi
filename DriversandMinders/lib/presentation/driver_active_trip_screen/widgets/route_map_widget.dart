@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -29,12 +28,15 @@ class RouteMapWidget extends StatefulWidget {
 
 class _RouteMapWidgetState extends State<RouteMapWidget> {
   final MapController _mapController = MapController();
+  // This widget no longer owns a live GPS stream. Driver location is
+  // provided by higher-level screens via tripData or backend polling.
+  // _currentPosition is kept only for potential future use but is not
+  // updated via Geolocator here.
   Position? _currentPosition;
   List<Marker> _markers = [];
   List<Polyline> _polylines = [];
   bool _isLoading = true;
   bool _hasLocationPermission = false;
-  StreamSubscription<Position>? _positionStream;
 
   @override
   void initState() {
@@ -44,7 +46,6 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
 
   @override
   void dispose() {
-    _positionStream?.cancel();
     _mapController.dispose();
     super.dispose();
   }
@@ -54,11 +55,9 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
       // Request location permission
       await _requestLocationPermission();
 
-      // Get current location
-      if (_hasLocationPermission) {
-        await _getCurrentLocation();
-        _startLocationUpdates(); // Start real-time tracking
-      }
+      // NOTE: This widget no longer starts its own GPS tracking. The
+      // driver/bus position should be supplied from the parent via
+      // tripData or other props.
 
       // Setup markers and route
       _setupMarkersAndRoute();
@@ -83,48 +82,17 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     _hasLocationPermission = status.isGranted;
   }
 
-  Future<void> _getCurrentLocation() async {
-    try {
-      if (!_hasLocationPermission) return;
-
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      setState(() {
-        _currentPosition = position;
-      });
-    } catch (e) {
-      // Handle location error silently
-    }
-  }
-
-  /// Start real-time location updates
-  void _startLocationUpdates() {
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10, // Update every 10 meters
-      ),
-    ).listen((Position position) {
-      setState(() {
-        _currentPosition = position;
-      });
-      _setupMarkersAndRoute(); // Update markers with new position
-      _updateCamera(position);
-    });
-  }
-
-  /// Update camera to follow bus
-  void _updateCamera(Position position) {
-    _mapController.move(
-      LatLng(position.latitude, position.longitude),
-      _mapController.camera.zoom,
-    );
-  }
+  // Previously this widget owned its own Geolocator stream; that logic has
+  // been removed to avoid multiple competing GPS clients. Camera movement is
+  // now controlled by the parent screen's map.
 
   void _setupMarkersAndRoute() {
-    final stops = (widget.tripData["stops"] as List? ?? []);
+    // Sort stops by `order` field so the polyline always follows the correct sequence
+    final stops = ((widget.tripData["stops"] as List? ?? [])
+            .cast<Map<String, dynamic>>()
+          ..sort((a, b) =>
+              (a['order'] as int? ?? 0).compareTo(b['order'] as int? ?? 0)))
+        .toList();
     final List<Marker> markers = [];
     final List<Polyline> polylines = [];
 
