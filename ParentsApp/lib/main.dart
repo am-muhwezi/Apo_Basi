@@ -13,13 +13,30 @@ import 'services/notification_service.dart';
 import 'services/bus_websocket_service.dart';
 import 'services/parent_notifications_service.dart';
 import 'services/theme_service.dart';
+import 'services/home_location_service.dart';
 import 'config/supabase_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load .env before starting the app
-  await dotenv.load();
+  // Load .env before starting the app - explicitly specify the file name
+  try {
+    await dotenv.load(fileName: ".env");
+    print('✅ .env file loaded successfully');
+  } catch (e) {
+    print('❌ Failed to load .env file: $e');
+    // In release builds, continue anyway - we'll handle missing values later
+  }
+
+  // Print API configuration for debugging
+  ApiConfig.printConfigSummary();
+
+  // Validate required configuration
+  if (!ApiConfig.validateConfig()) {
+    print('⚠️ WARNING: Missing required API configuration!');
+    print('   API_BASE_URL: ${ApiConfig.apiBaseUrl.isEmpty ? "MISSING" : "OK"}');
+    print('   MAPBOX_ACCESS_TOKEN: ${ApiConfig.mapboxAccessToken.isEmpty ? "MISSING" : "OK"}');
+  }
 
   // Initialize Mapbox access token
   MapboxOptions.setAccessToken(ApiConfig.mapboxAccessToken);
@@ -85,10 +102,9 @@ class _MyAppState extends State<MyApp> {
       // Delay WebSocket connection even further to improve startup
       Future.delayed(const Duration(milliseconds: 500), () {
         _webSocketService.connect();
-        // Temporarily disable parent notifications WebSocket in staging
-        // to avoid crashes when the backend WebSocket endpoint is not
-        // available. The rest of the app will continue to work normally.
-        // _notificationsService.connect();
+        _notificationsService.connect();
+        // Migrate any existing home coords from SharedPreferences to the backend DB
+        HomeLocationService().syncOnStartup();
       });
     });
   }

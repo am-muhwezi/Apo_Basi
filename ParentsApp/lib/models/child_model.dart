@@ -8,6 +8,7 @@ class Child {
   final DateTime? lastUpdated;
   final String? routeName;  // Route name from backend
   final String? routeCode;  // Route code from backend
+  final String? driverName;  // Driver name from backend
 
   Child({
     required this.id,
@@ -19,6 +20,7 @@ class Child {
     this.lastUpdated,
     this.routeName,
     this.routeCode,
+    this.driverName,
   });
 
   String get fullName => '$firstName $lastName';
@@ -46,6 +48,8 @@ class Child {
       // Parse route information
       routeName: json['routeName'] ?? json['route_name'] ?? json['route'],
       routeCode: json['routeCode'] ?? json['route_code'],
+      // Parse driver information
+      driverName: json['driverName'] ?? json['driver_name'],
     );
   }
 
@@ -60,6 +64,7 @@ class Child {
       'last_updated': lastUpdated?.toIso8601String(),
       'route_name': routeName,
       'route_code': routeCode,
+      'driver_name': driverName,
     };
   }
 }

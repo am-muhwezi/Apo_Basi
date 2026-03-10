@@ -124,7 +124,7 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.shadowLight,
+            color: Theme.of(context).colorScheme.shadow,
             offset: Offset(0, 2),
             blurRadius: 8,
             spreadRadius: 0,
@@ -150,8 +150,8 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
                 padding: EdgeInsets.symmetric(horizontal: 2.w, vertical: 1.h),
                 decoration: BoxDecoration(
                   color: _hasLocationPermission && widget.currentPosition != null
-                      ? AppTheme.successAction.withValues(alpha: 0.9)
-                      : AppTheme.warningState.withValues(alpha: 0.9),
+                      ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.9)
+                      : Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -162,7 +162,7 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
                           _hasLocationPermission && widget.currentPosition != null
                               ? 'gps_fixed'
                               : 'gps_off',
-                      color: AppTheme.textOnPrimary,
+                      color: Theme.of(context).colorScheme.onPrimary,
                       size: 16,
                     ),
                     SizedBox(width: 1.w),
@@ -171,7 +171,7 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
                           ? 'GPS Active'
                           : 'GPS Off',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textOnPrimary,
+                        color: Theme.of(context).colorScheme.onPrimary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -189,11 +189,11 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
                 child: Container(
                   padding: EdgeInsets.all(3.w),
                   decoration: BoxDecoration(
-                    color: AppTheme.backgroundPrimary.withValues(alpha: 0.95),
+                    color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.shadowLight,
+                        color: Theme.of(context).colorScheme.shadow,
                         blurRadius: 8,
                       ),
                     ],
@@ -237,21 +237,21 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
       children: [
         CustomIconWidget(
           iconName: icon,
-          color: AppTheme.primaryDriver,
+          color: Theme.of(context).colorScheme.primary,
           size: 20,
         ),
         SizedBox(height: 0.5.h),
         Text(
           label,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: AppTheme.textSecondary,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontSize: 9.sp,
           ),
         ),
         Text(
           value,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: AppTheme.textPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.w600,
             fontSize: 10.sp,
           ),
@@ -264,19 +264,19 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
     final theme = Theme.of(context);
 
     return Container(
-      color: AppTheme.backgroundSecondary,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(
-              color: AppTheme.primaryDriver,
+              color: Theme.of(context).colorScheme.primary,
             ),
             SizedBox(height: 2.h),
             Text(
               'Loading Map...',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppTheme.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -289,21 +289,21 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
     final theme = Theme.of(context);
 
     return Container(
-      color: AppTheme.backgroundSecondary,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CustomIconWidget(
               iconName: 'location_off',
-              color: AppTheme.criticalAlert,
+              color: Theme.of(context).colorScheme.error,
               size: 48,
             ),
             SizedBox(height: 2.h),
             Text(
               'Location Permission Required',
               style: theme.textTheme.titleMedium?.copyWith(
-                color: AppTheme.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -311,7 +311,7 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
             Text(
               'Please enable location services',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -355,7 +355,7 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
                         vertical: 0.5.h,
                       ),
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryDriver,
+                        color: Theme.of(context).colorScheme.primary,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -369,7 +369,7 @@ class _DriverLocationMapWidgetState extends State<DriverLocationMapWidget> {
                     ),
                     Icon(
                       Icons.directions_bus,
-                      color: AppTheme.primaryDriver,
+                      color: Theme.of(context).colorScheme.primary,
                       size: 40,
                     ),
                   ],

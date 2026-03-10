@@ -393,6 +393,150 @@ class MarkAttendanceView(APIView):
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated, IsBusMinder])
+def start_trip_busminder(request):
+    """
+    Start a new trip initiated by a bus minder.
+
+    POST /api/busminders/start-trip/
+    Body: {"trip_type": "pickup" or "dropoff"}
+
+    Uses the driver assigned to the same bus as the busminder.
+    Returns the created Trip object.
+    """
+    from trips.models import Trip
+    from trips.serializers import TripSerializer
+    from assignments.models import Assignment, BusRoute
+    from django.utils import timezone
+
+    try:
+        busminder = BusMinder.objects.get(user=request.user)
+    except BusMinder.DoesNotExist:
+        return Response({"error": "Bus minder profile not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    # Find the bus assigned to this busminder
+    minder_assignment = Assignment.get_active_assignments_for(busminder, 'minder_to_bus').first()
+    if not minder_assignment:
+        return Response({"error": "You are not assigned to any bus"}, status=status.HTTP_400_BAD_REQUEST)
+
+    bus = minder_assignment.assigned_to
+
+    # Check for an already in-progress trip on this bus
+    existing_trip = Trip.objects.filter(
+        bus=bus,
+        bus_minder=request.user,
+        status='in-progress'
+    ).first()
+    if existing_trip:
+        return Response({
+            "message": "Trip already in progress",
+            "trip": TripSerializer(existing_trip).data
+        })
+
+    trip_type = request.data.get('trip_type', 'pickup')
+
+    # Find the driver assigned to this bus
+    driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+    if not driver_assignment:
+        return Response({
+            "error": "No driver assigned to this bus",
+            "message": "This bus has no driver assigned. Please contact the administrator."
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    driver_user = driver_assignment.assignee.user
+
+    # Find the route for this bus
+    route_assignment = Assignment.get_active_assignments_for(bus, 'bus_to_route').first()
+    route_name = None
+    if route_assignment:
+        route_obj = route_assignment.assigned_to
+        route_name = getattr(route_obj, 'name', None)
+    if not route_name:
+        route_obj = BusRoute.objects.filter(default_bus=bus, is_active=True).first()
+        if route_obj:
+            route_name = route_obj.name
+    if not route_name:
+        return Response({
+            "error": "No route assigned",
+            "message": "This bus has no route assigned. Please contact the administrator."
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate children are assigned to the bus
+    child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
+    if not child_assignments.exists():
+        return Response({
+            "error": "No children assigned",
+            "message": "This bus has no children assigned. Please contact the administrator."
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    now = timezone.now()
+    trip = Trip.objects.create(
+        bus=bus,
+        driver=driver_user,
+        bus_minder=request.user,
+        trip_type=trip_type,
+        status='in-progress',
+        scheduled_time=now,
+        start_time=now,
+        route=route_name,
+    )
+
+    for child_assignment in child_assignments:
+        trip.children.add(child_assignment.assignee)
+
+    # Notify parents via WebSocket
+    try:
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"bus_{bus.id}",
+            {
+                "type": "bus.trip_event",
+                "event_type": "trip_started",
+                "trip_id": trip.id,
+                "trip_type": trip.trip_type,
+                "scheduled_time": trip.scheduled_time.isoformat() if trip.scheduled_time else None,
+                "bus_latitude": float(bus.latitude) if bus.latitude else None,
+                "bus_longitude": float(bus.longitude) if bus.longitude else None,
+                "bus_speed": float(bus.speed) if bus.speed else 0.0,
+                "bus_heading": float(bus.heading) if bus.heading else 0.0,
+            }
+        )
+    except Exception:
+        pass
+
+    return Response({
+        "message": "Trip started successfully",
+        "trip": TripSerializer(trip).data
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsBusMinder])
+def get_active_trip_busminder(request):
+    """
+    Get the current active trip for this bus minder.
+
+    GET /api/busminders/active-trip/
+
+    Returns: Trip object or null if no active trip.
+    """
+    from trips.models import Trip
+    from trips.serializers import TripSerializer
+
+    active_trip = Trip.objects.filter(
+        bus_minder=request.user,
+        status='in-progress'
+    ).first()
+
+    if active_trip:
+        return Response({"trip": TripSerializer(active_trip).data})
+    else:
+        return Response({"trip": None, "message": "No active trip"})
+
+
+@api_view(['POST'])
 @permission_classes([AllowAny])
 def busminder_phone_login(request):
     """

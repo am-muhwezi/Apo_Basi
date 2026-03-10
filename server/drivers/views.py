@@ -776,6 +776,34 @@ def start_trip(request):
     for child_assignment in child_assignments:
         trip.children.add(child_assignment.assignee)
 
+    # Notify all parents watching this bus so their screens update immediately
+    # without waiting for the 60-second poll (mirrors end_trip broadcast).
+    try:
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"bus_{bus.id}",
+            {
+                "type": "bus.trip_event",
+                "event_type": "trip_started",
+                "trip_id": trip.id,
+                "trip_type": trip.trip_type,
+                "scheduled_time": (
+                    trip.scheduled_time.isoformat()
+                    if trip.scheduled_time else None
+                ),
+                # Include last known GPS so the parent map marker appears
+                # immediately without waiting for the first live location update.
+                "bus_latitude": float(bus.latitude) if bus.latitude else None,
+                "bus_longitude": float(bus.longitude) if bus.longitude else None,
+                "bus_speed": float(bus.speed) if bus.speed else 0.0,
+                "bus_heading": float(bus.heading) if bus.heading else 0.0,
+            }
+        )
+    except Exception:
+        pass  # Never let a broadcast failure block the HTTP response
+
     return Response({
         "message": "Trip started successfully",
         "trip": TripSerializer(trip).data
@@ -899,10 +927,10 @@ def get_active_trip(request):
 class DriverDemoLoginView(APIView):
     """
     POST /api/drivers/auth/demo-login/
-    Demo account login for Apple App Store review process (Drivers App).
+    Demo account login for Apple App Store review process.
 
-    This endpoint allows password-based authentication for a specific
-    demo driver account, bypassing the magic link flow for review purposes.
+    Allows password-based authentication for a specific demo driver account,
+    bypassing the magic link flow so Apple reviewers can access the app.
 
     Credentials are stored in environment variables:
     - REVIEWER_DRIVER_EMAIL
@@ -911,8 +939,6 @@ class DriverDemoLoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        import os
-        
         email = request.data.get('email', '').strip().lower()
         password = request.data.get('password', '')
 
@@ -939,30 +965,22 @@ class DriverDemoLoginView(APIView):
             )
             user = driver.user
 
-            # Generate Django JWT tokens
             refresh = RefreshToken.for_user(user)
 
-            # Get bus and route data (same logic as magic link auth)
+            # Get bus and route data (same as magic link auth)
             bus_data = None
             route_data = None
 
-            # Find active driver-to-bus assignment
             assignment = Assignment.get_active_assignments_for(driver, 'driver_to_bus').first()
 
             if assignment:
                 bus = assignment.assigned_to
-
-                # Get children assigned to this bus
                 child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
-
-                # Get today's date for attendance
                 today = date.today()
 
                 children_data = []
                 for child_assignment in child_assignments:
                     child = child_assignment.assignee
-
-                    # Get today's attendance for both pickup and dropoff
                     pickup_attendance = Attendance.objects.filter(child=child, date=today, trip_type='pickup').first()
                     dropoff_attendance = Attendance.objects.filter(child=child, date=today, trip_type='dropoff').first()
 
@@ -974,7 +992,7 @@ class DriverDemoLoginView(APIView):
                         "name": f"{child.first_name} {child.last_name}",
                         "grade": child.class_grade,
                         "class_grade": child.class_grade,
-                        "address": child.parent.address if child.parent and child.parent.address else (child.address if hasattr(child, 'address') else "N/A"),
+                        "address": child.parent.address if child.parent and child.parent.address else "N/A",
                         "home_latitude": child.parent.home_latitude if child.parent else None,
                         "home_longitude": child.parent.home_longitude if child.parent else None,
                         "parent_name": child.parent.user.get_full_name() if child.parent else "N/A",
@@ -1015,7 +1033,7 @@ class DriverDemoLoginView(APIView):
                     },
                     "children": children_data,
                     "route": children_data,
-                    "total_children": len(children_data)
+                    "total_children": len(children_data),
                 }
 
             logger.info(f"Driver demo login successful for: {email}")
@@ -1027,6 +1045,7 @@ class DriverDemoLoginView(APIView):
                 "phone": driver.phone_number,
                 "license_number": driver.license_number,
                 "license_expiry": driver.license_expiry.isoformat() if driver.license_expiry else None,
+                "user_type": "driver",
                 "tokens": {
                     "access": str(refresh.access_token),
                     "refresh": str(refresh),
@@ -1040,7 +1059,7 @@ class DriverDemoLoginView(APIView):
             return Response(
                 {
                     "error": "Demo account not found",
-                    "message": "The demo driver account has not been set up. Please contact support."
+                    "message": "The demo account has not been set up. Please contact support."
                 },
                 status=status.HTTP_404_NOT_FOUND
             )
