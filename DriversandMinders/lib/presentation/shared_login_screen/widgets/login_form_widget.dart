@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
+import '../../../services/auth_service.dart'; // Add this import
 import '../../../widgets/custom_icon_widget.dart';
 
 class LoginFormWidget extends StatefulWidget {
   final Function(String) onLogin;
+  final Function(String, String)?
+  onPasswordLogin; // New parameter for password login
   final bool isLoading;
   final bool magicLinkSent;
   final String? errorMessage;
@@ -13,6 +16,7 @@ class LoginFormWidget extends StatefulWidget {
   const LoginFormWidget({
     super.key,
     required this.onLogin,
+    this.onPasswordLogin,
     required this.isLoading,
     required this.magicLinkSent,
     this.errorMessage,
@@ -24,9 +28,14 @@ class LoginFormWidget extends StatefulWidget {
 
 class _LoginFormWidgetState extends State<LoginFormWidget> {
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController =
+      TextEditingController(); // Add password controller
   final FocusNode _emailFocusNode = FocusNode();
   String? _validationError;
+  String? _passwordError; // Add password error
   bool _isEmailValid = false;
+  bool _isReviewerAccount = false; // Add reviewer account detection
+  bool _obscurePassword = true; // Add password visibility toggle
 
   @override
   void initState() {
@@ -37,6 +46,7 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
   @override
   void dispose() {
     _emailController.dispose();
+    _passwordController.dispose(); // Dispose password controller
     _emailFocusNode.dispose();
     super.dispose();
   }
@@ -47,12 +57,17 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
       if (email.isEmpty) {
         _validationError = null;
         _isEmailValid = false;
+        _isReviewerAccount = false; // Reset reviewer flag
       } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
         _validationError = 'Please enter a valid email address';
         _isEmailValid = false;
+        _isReviewerAccount = false;
       } else {
         _validationError = null;
         _isEmailValid = true;
+        _isReviewerAccount = AuthService.isReviewerAccount(
+          email,
+        ); // Check if reviewer
       }
     });
   }
@@ -71,6 +86,21 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
       return;
     }
 
+    // If reviewer account, handle password login
+    if (_isReviewerAccount && widget.onPasswordLogin != null) {
+      final password = _passwordController.text;
+      if (password.isEmpty) {
+        setState(() {
+          _passwordError = 'Please enter password';
+        });
+        return;
+      }
+      FocusScope.of(context).unfocus();
+      widget.onPasswordLogin!(email, password);
+      return;
+    }
+
+    // Otherwise, send magic link
     FocusScope.of(context).unfocus();
     widget.onLogin(email);
   }
@@ -156,7 +186,9 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
             ),
             SizedBox(height: 2.h),
             TextButton(
-              onPressed: widget.isLoading ? null : () => widget.onLogin(_emailController.text.trim()),
+              onPressed: widget.isLoading
+                  ? null
+                  : () => widget.onLogin(_emailController.text.trim()),
               child: Text('Resend magic link'),
             ),
           ] else ...[
@@ -256,14 +288,112 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
                 ),
               ],
             ),
-
+            // Password field for reviewer account
+            if (_isReviewerAccount) ...[
+              SizedBox(height: 2.h),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Password',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface.withValues(alpha: 0.9),
+                      fontSize: 13.sp,
+                    ),
+                  ),
+                  SizedBox(height: 0.8.h),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    keyboardType: TextInputType.visiblePassword,
+                    textInputAction: TextInputAction.done,
+                    enabled: !widget.isLoading,
+                    onFieldSubmitted: (_) => _validateAndSubmit(),
+                    decoration: InputDecoration(
+                      hintText: 'Enter password',
+                      prefixIcon: Padding(
+                        padding: EdgeInsets.all(2.w),
+                        child: Icon(
+                          Icons.lock_outline,
+                          color: colorScheme.onSurface.withValues(alpha: 0.6),
+                          size: 20,
+                        ),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: colorScheme.onSurface.withValues(alpha: 0.6),
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                      ),
+                      errorText: _passwordError,
+                      errorMaxLines: 2,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 3.w,
+                        vertical: 0.8.h,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: colorScheme.outline,
+                          width: 1,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: colorScheme.outline.withValues(alpha: 0.5),
+                          width: 1,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: colorScheme.primary,
+                          width: 2,
+                        ),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: colorScheme.error,
+                          width: 1,
+                        ),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: colorScheme.error,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             SizedBox(height: 2.h),
 
             // Send Login Link Button
             SizedBox(
               height: 5.5.h,
               child: ElevatedButton(
-                onPressed: (widget.isLoading || !_isEmailValid) ? null : _validateAndSubmit,
+                onPressed: (widget.isLoading || !_isEmailValid)
+                    ? null
+                    : _validateAndSubmit,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colorScheme.primary,
                   foregroundColor: colorScheme.onPrimary,
@@ -286,7 +416,7 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
                         ),
                       )
                     : Text(
-                        'Send Login Link',
+                        _isReviewerAccount ? 'Sign In' : 'Send Login Link',
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: colorScheme.onPrimary,
                           fontWeight: FontWeight.w600,

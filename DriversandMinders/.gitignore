@@ -85,3 +85,8 @@ android/gradle.properties
 
 # Shorebird (if contains secrets)
 */shorebird.yaml
+
+
+# Development screenshots
+*_[0-9][0-9]_*.png
+*.png
