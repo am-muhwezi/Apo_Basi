@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../config/location_config.dart';
 import '../models/bus_location_model.dart';
+import 'notification_service.dart';
 
 /// WebSocket Service for Real-time Bus Location Tracking
 ///
@@ -27,6 +29,9 @@ class BusWebSocketService {
   int _reconnectionAttempts = 0;
   Timer? _reconnectTimer;
   String? _accessToken;
+  // Set true before calling sink.close() so _handleDisconnect knows not to
+  // schedule an automatic reconnect (the caller will reconnect manually).
+  bool _intentionalDisconnect = false;
 
   // Stream controllers for different event types
   final _locationUpdateController = StreamController<BusLocation>.broadcast();
@@ -48,6 +53,23 @@ class BusWebSocketService {
 
   bool get isConnected => _isConnected;
   int? get subscribedBusId => _subscribedBusId;
+
+  // Last trip_state received from the server. Persists in the singleton so
+  // child_detail_screen can apply it immediately on re-entry instead of
+  // waiting for the next WS trip_state message.
+  Map<String, dynamic>? _lastTripState;
+  Map<String, dynamic>? get lastTripState => _lastTripState;
+
+  // Cached names used when firing system notifications on trip events.
+  // bus_number comes from location_update messages; child name is set by caller.
+  String? _lastKnownBusNumber;
+  String? _lastKnownChildName;
+
+  /// Call this after subscribeToBus() with the child's display name so that
+  /// trip event notifications can show e.g. "Yahweh Alpha Pickup Trip Started".
+  void setChildName(String name) {
+    _lastKnownChildName = name;
+  }
 
   /// Connect to WebSocket server (initialize service)
   ///
@@ -143,21 +165,23 @@ class BusWebSocketService {
     try {
       final data = json.decode(message);
       final messageType = data['type'];
+      debugPrint('[WS] received: $messageType | ${message.toString().length > 200 ? message.toString().substring(0, 200) : message}');
 
       if (messageType == 'connected') {
         if (LocationConfig.enableSocketLogging) {}
         _reconnectionAttempts = 0; // Reset on successful connection
         _connectionStateController.add(LocationConnectionState.connected);
-
-        // Request current location
-        requestCurrentLocation();
+        // No need to request_current_location — the server immediately sends
+        // trip_state which includes bus_latitude/longitude as the GPS seed.
       } else if (messageType == 'location_update') {
         // Parse location update
         final location = BusLocation(
           busId: data['bus_id'] as int,
-          busNumber: data['bus_number'] ?? '', // Bus number from server
+          busNumber: data['bus_number'] ?? '',
           latitude: (data['latitude'] as num).toDouble(),
           longitude: (data['longitude'] as num).toDouble(),
+          snappedLatitude: (data['snapped_latitude'] as num?)?.toDouble(),
+          snappedLongitude: (data['snapped_longitude'] as num?)?.toDouble(),
           speed: (data['speed'] as num?)?.toDouble() ?? 0.0,
           heading: (data['heading'] as num?)?.toDouble() ?? 0.0,
           isActive: data['is_active'] ?? true,
@@ -166,9 +190,58 @@ class BusWebSocketService {
 
         if (LocationConfig.enableSocketLogging) {}
 
+        // Cache bus number so trip event notifications have something to show
+        if (location.busNumber.isNotEmpty) {
+          _lastKnownBusNumber = location.busNumber;
+        }
+
         _locationUpdateController.add(location);
-      } else if (messageType == 'trip_started' || messageType == 'trip_ended') {
-        _tripEventController.add(Map<String, dynamic>.from(data));
+      } else if (messageType == 'trip_state' ||
+          messageType == 'trip_started' ||
+          messageType == 'trip_ended') {
+        final event = Map<String, dynamic>.from(data);
+        // Keep a snapshot of the latest trip state so screens can restore
+        // immediately on re-entry without waiting for the next WS message.
+        if (messageType == 'trip_state') {
+          _lastTripState = event;
+        } else if (messageType == 'trip_ended') {
+          _lastTripState = {'type': 'trip_state', 'has_active_trip': false};
+          // Fire system notification so parents get an alert on the phone header
+          final tripType = data['trip_type'] as String? ?? 'pickup';
+          final busNumber = _lastKnownBusNumber ?? 'your bus';
+          final childName = _lastKnownChildName ?? 'Your child';
+          NotificationService().showTripCompletedNotification(
+            childName: childName,
+            busNumber: busNumber,
+            tripType: tripType,
+            busId: _subscribedBusId ?? 0,
+          );
+        } else if (messageType == 'trip_started') {
+          // Merge trip_started fields into a trip_state-shaped snapshot so
+          // the screen can re-apply GPS seed coordinates on re-entry.
+          _lastTripState = {
+            'type': 'trip_state',
+            'has_active_trip': true,
+            'trip_id': event['trip_id'],
+            'trip_type': event['trip_type'],
+            'scheduled_time': event['scheduled_time'],
+            'bus_latitude': event['bus_latitude'],
+            'bus_longitude': event['bus_longitude'],
+            'bus_speed': event['bus_speed'],
+            'bus_heading': event['bus_heading'],
+          };
+          // Fire system notification so parents get an alert on the phone header
+          final tripType = data['trip_type'] as String? ?? 'pickup';
+          final busNumber = _lastKnownBusNumber ?? 'your bus';
+          final childName = _lastKnownChildName ?? 'Your child';
+          NotificationService().showTripStartNotification(
+            childName: childName,
+            busNumber: busNumber,
+            tripType: tripType,
+            busId: _subscribedBusId ?? 0,
+          );
+        }
+        _tripEventController.add(event);
       } else if (messageType == 'error') {
         _errorController.add(data['message']);
       }
@@ -191,6 +264,13 @@ class BusWebSocketService {
     if (LocationConfig.enableSocketLogging) {}
     _isConnected = false;
     _connectionStateController.add(LocationConnectionState.disconnected);
+    // If disconnect() was called deliberately (e.g. TripWatcher forcing a
+    // reconnect), skip the auto-reconnect.  The caller will call
+    // subscribeToBus() immediately after.
+    if (_intentionalDisconnect) {
+      _intentionalDisconnect = false;
+      return;
+    }
     _scheduleReconnect();
   }
 
@@ -214,7 +294,10 @@ class BusWebSocketService {
     if (LocationConfig.enableSocketLogging) {}
 
     _reconnectTimer = Timer(delay, () {
-      if (_subscribedBusId != null) {
+      // Only reconnect if still disconnected — guards against the race where
+      // the TripWatcher (or the caller) already reconnected while this timer
+      // was pending.
+      if (_subscribedBusId != null && !_isConnected) {
         _connectToBusWebSocket(_subscribedBusId!);
       }
     });
@@ -231,6 +314,17 @@ class BusWebSocketService {
     }));
   }
 
+  /// Request current trip state from server (heartbeat / sync)
+  void requestTripState() {
+    if (!_isConnected || _channel == null) {
+      return;
+    }
+
+    _channel!.sink.add(json.encode({
+      'type': 'request_trip_state',
+    }));
+  }
+
   /// Disconnect from WebSocket server
   void disconnect() {
     if (_reconnectTimer != null) {
@@ -241,6 +335,7 @@ class BusWebSocketService {
     if (_channel != null) {
       if (LocationConfig.enableSocketLogging) {}
 
+      _intentionalDisconnect = true; // Suppress auto-reconnect in _handleDisconnect
       _channel!.sink.close();
       _channel = null;
       _isConnected = false;

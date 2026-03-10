@@ -404,9 +404,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: AppTheme.lightDriverTheme,
-      child: Scaffold(
+    return Scaffold(
         appBar: CustomAppBar(
           title: 'Trip History',
           subtitle: '${_filteredTrips.length} trips found',
@@ -415,7 +413,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
               onPressed: _refreshTrips,
               icon: CustomIconWidget(
                 iconName: 'refresh',
-                color: AppTheme.textOnPrimary,
+                color: Theme.of(context).colorScheme.onPrimary,
                 size: 24,
               ),
               tooltip: 'Refresh trips',
@@ -461,7 +459,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
                     )
                   : RefreshIndicator(
                       onRefresh: _refreshTrips,
-                      color: AppTheme.primaryDriver,
+                      color: Theme.of(context).colorScheme.primary,
                       child: ListView.builder(
                         controller: _scrollController,
                         physics: const AlwaysScrollableScrollPhysics(),
@@ -472,7 +470,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
                               padding: EdgeInsets.all(4.w),
                               child: Center(
                                 child: CircularProgressIndicator(
-                                  color: AppTheme.primaryDriver,
+                                  color: Theme.of(context).colorScheme.primary,
                                 ),
                               ),
                             );
@@ -508,7 +506,6 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
             }
           },
         ),
-      ),
-    );
+      );
   }
 }

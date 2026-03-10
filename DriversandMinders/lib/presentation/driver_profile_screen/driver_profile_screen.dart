@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/app_export.dart';
-import '../../widgets/custom_app_bar.dart';
+import '../../services/theme_service.dart';
 import '../../widgets/custom_bottom_bar.dart';
+import '../../widgets/driver_drawer_widget.dart';
 
 class DriverProfileScreen extends StatefulWidget {
   const DriverProfileScreen({super.key});
@@ -17,7 +18,22 @@ class DriverProfileScreen extends StatefulWidget {
 }
 
 class _DriverProfileScreenState extends State<DriverProfileScreen> {
+  final ThemeService _themeService = ThemeService();
+
   bool _isLoading = true;
+
+  // Notification settings
+  bool _notificationsEnabled = true;
+  bool _soundEnabled = true;
+  bool _vibrationEnabled = true;
+
+  // Location
+  bool _locationTrackingEnabled = true;
+
+  // Region
+  String _language = 'English';
+  String _distanceUnit = 'Kilometers';
+
   Map<String, dynamic> _driverInfo = {};
   Map<String, dynamic>? _busInfo;
   Map<String, dynamic>? _routeInfo;
@@ -25,619 +41,870 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDriverProfile();
+    _loadProfile();
   }
 
-  Future<void> _loadDriverProfile() async {
-    setState(() {
-      _isLoading = true;
-    });
+  Future<void> _loadProfile() async {
+    final prefs = await SharedPreferences.getInstance();
 
-    try {
-      final prefs = await SharedPreferences.getInstance();
+    _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+    _soundEnabled = prefs.getBool('sound_enabled') ?? true;
+    _vibrationEnabled = prefs.getBool('vibration_enabled') ?? true;
+    _locationTrackingEnabled = prefs.getBool('location_tracking_enabled') ?? true;
+    _language = prefs.getString('language') ?? 'English';
+    _distanceUnit = prefs.getString('distance_unit') ?? 'Kilometers';
 
-      // Get driver information from SharedPreferences
-      _driverInfo = {
-        'name': prefs.getString('driver_name') ??
-            prefs.getString('user_name') ??
-            'Driver',
-        'id': (prefs.getInt('driver_id') ?? prefs.getInt('user_id'))
-                ?.toString() ??
-            'N/A',
-        'email': prefs.getString('driver_email') ??
-            prefs.getString('user_email') ??
-            'Not Available',
-        'phone': prefs.getString('driver_phone') ??
-            prefs.getString('user_phone') ??
-            'Not Available',
-        'licenseNumber': prefs.getString('license_number') ?? 'Not Available',
-        'licenseExpiry': prefs.getString('license_expiry') ?? 'Not Available',
-        'joinDate': prefs.getString('join_date') ?? 'Not Available',
-        'address': prefs.getString('user_address') ?? 'Not Available',
-        'dob': prefs.getString('user_dob') ?? 'Not Available',
-        'nationalId': prefs.getString('user_national_id') ?? 'Not Available',
-        'gender': prefs.getString('user_gender') ?? 'Not Available',
-      };
+    _driverInfo = {
+      'name': prefs.getString('driver_name') ??
+          prefs.getString('user_name') ??
+          'Driver',
+      'id': (prefs.getInt('driver_id') ?? prefs.getInt('user_id'))
+              ?.toString() ??
+          'N/A',
+      'email': prefs.getString('driver_email') ??
+          prefs.getString('user_email') ??
+          'Not available',
+      'phone': prefs.getString('driver_phone') ??
+          prefs.getString('user_phone') ??
+          'Not available',
+      'licenseNumber': prefs.getString('license_number') ?? 'Not available',
+      'licenseExpiry': prefs.getString('license_expiry') ?? 'Not available',
+      'joinDate': prefs.getString('join_date') ?? 'Not available',
+    };
 
-      // Get cached bus and route information used on Home/Start Shift
-      final cachedBusData = prefs.getString('cached_bus_data');
-      final cachedRouteData = prefs.getString('cached_route_data');
-
-      // Prefer parsing cached JSON (same data the home screen uses)
-      _busInfo = null;
-      if (cachedBusData != null) {
-        try {
-          final decoded = jsonDecode(cachedBusData);
-          if (decoded is Map<String, dynamic>) {
-            _busInfo = {
-              'busNumber': decoded['bus_number']?.toString() ??
-                  prefs.getString('bus_number') ??
-                  'Not Assigned',
-              'busPlate': decoded['number_plate']?.toString() ??
-                  prefs.getString('bus_plate') ??
-                  'N/A',
-              'capacity': (decoded['capacity'] ?? decoded['bus_capacity'])
-                      ?.toString() ??
-                  prefs.getInt('bus_capacity')?.toString() ??
-                  'N/A',
-              // Children assigned directly to the bus (from unified login)
-              'childrenCount': decoded['children_count'] ??
-                  (decoded['children'] is List
-                      ? (decoded['children'] as List).length
-                      : null),
-            };
-          }
-        } catch (e) {
-          _busInfo = null;
-        }
-      }
-
-      // Get route information from cached data
-      _routeInfo = null;
-      if (cachedRouteData != null) {
-        try {
-          final decoded = jsonDecode(cachedRouteData);
-          if (decoded is Map<String, dynamic>) {
-            final children = decoded['children'];
-            final totalChildren = decoded['total_children'] ??
-                decoded['children_count'] ??
-                (children is List ? children.length : null);
-            final totalStops = decoded['total_stops'] ??
-                decoded['total_assignments'] ??
-                (children is List ? children.length : null);
-
-            _routeInfo = {
-              'routeName': decoded['route_name']?.toString() ??
-                  decoded['name']?.toString() ??
-                  prefs.getString('route_name') ??
-                  'Not Assigned',
-              'totalStops': totalStops?.toString() ??
-                  prefs.getInt('total_stops')?.toString() ??
-                  'N/A',
-              'totalStudents': totalChildren?.toString() ??
-                  (_busInfo?['childrenCount']?.toString()) ??
-                  prefs.getInt('total_students')?.toString() ??
-                  'N/A',
-            };
-          }
-        } catch (e) {
-          _routeInfo = {
-            'routeName': prefs.getString('route_name') ?? 'Not Assigned',
-            'totalStops': prefs.getInt('total_stops')?.toString() ?? 'N/A',
-            'totalStudents':
-                prefs.getInt('total_students')?.toString() ?? 'N/A',
+    final cachedBusData = prefs.getString('cached_bus_data');
+    _busInfo = null;
+    if (cachedBusData != null) {
+      try {
+        final decoded = jsonDecode(cachedBusData);
+        if (decoded is Map<String, dynamic>) {
+          _busInfo = {
+            'busNumber': decoded['bus_number']?.toString() ??
+                prefs.getString('bus_number') ??
+                'Not assigned',
+            'busPlate': decoded['number_plate']?.toString() ??
+                prefs.getString('bus_plate') ??
+                'N/A',
+            'capacity':
+                (decoded['capacity'] ?? decoded['bus_capacity'])?.toString() ??
+                    prefs.getInt('bus_capacity')?.toString() ??
+                    'N/A',
+            'childrenCount': decoded['children_count'] ??
+                (decoded['children'] is List
+                    ? (decoded['children'] as List).length
+                    : null),
           };
         }
-      } else {
+      } catch (_) {}
+    }
+
+    final cachedRouteData = prefs.getString('cached_route_data');
+    _routeInfo = null;
+    if (cachedRouteData != null) {
+      try {
+        final decoded = jsonDecode(cachedRouteData);
+        if (decoded is Map<String, dynamic>) {
+          final children = decoded['children'];
+          final totalChildren = decoded['total_children'] ??
+              decoded['children_count'] ??
+              (children is List ? children.length : null);
+          final totalStops = decoded['total_stops'] ??
+              decoded['total_assignments'] ??
+              (children is List ? children.length : null);
+
+          _routeInfo = {
+            'routeName': decoded['route_name']?.toString() ??
+                decoded['name']?.toString() ??
+                prefs.getString('route_name') ??
+                'Not assigned',
+            'totalStops': totalStops?.toString() ??
+                prefs.getInt('total_stops')?.toString() ??
+                'N/A',
+            'totalStudents': totalChildren?.toString() ??
+                (_busInfo?['childrenCount']?.toString()) ??
+                prefs.getInt('total_students')?.toString() ??
+                'N/A',
+          };
+        }
+      } catch (_) {
         _routeInfo = {
-          'routeName': prefs.getString('route_name') ?? 'Not Assigned',
+          'routeName': prefs.getString('route_name') ?? 'Not assigned',
           'totalStops': prefs.getInt('total_stops')?.toString() ?? 'N/A',
           'totalStudents': prefs.getInt('total_students')?.toString() ?? 'N/A',
         };
       }
-
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+    } else {
+      _routeInfo = {
+        'routeName': prefs.getString('route_name') ?? 'Not assigned',
+        'totalStops': prefs.getInt('total_stops')?.toString() ?? 'N/A',
+        'totalStudents': prefs.getInt('total_students')?.toString() ?? 'N/A',
+      };
     }
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _savePref(String key, dynamic value) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (value is bool) {
+      await prefs.setBool(key, value);
+    } else if (value is String) {
+      await prefs.setString(key, value);
+    }
+  }
+
+  Future<void> _setDarkMode(bool value) async {
+    await _themeService.setThemeMode(value ? ThemeMode.dark : ThemeMode.light);
+    setState(() {});
+  }
+
+  void _showLogoutDialog() {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(6.w, 2.h, 6.w, 4.h),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              width: 10.w,
+              height: 4,
+              decoration: BoxDecoration(
+                color: cs.outline.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            SizedBox(height: 3.h),
+            // Icon
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: cs.error.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.logout_rounded, color: cs.error, size: 32),
+            ),
+            SizedBox(height: 2.h),
+            // Title
+            Text(
+              'Logout?',
+              style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            SizedBox(height: 1.h),
+            // Subtitle
+            Text(
+              'You will need to login again to access your account',
+              textAlign: TextAlign.center,
+              style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            SizedBox(height: 3.h),
+            // Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      side: BorderSide(
+                          color: cs.outline.withValues(alpha: 0.4)),
+                    ),
+                    child: Text('Cancel',
+                        style: tt.bodyLarge
+                            ?.copyWith(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                SizedBox(width: 4.w),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.of(ctx).pop();
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.clear();
+                      if (mounted) {
+                        Navigator.pushNamedAndRemoveUntil(
+                            context, '/shared-login-screen', (_) => false);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: cs.error,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: Text('Logout',
+                        style: tt.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showLanguageSheet() {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    const languages = ['English', 'French', 'Swahili', 'Hausa'];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 12.w,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.outline,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              SizedBox(height: 2.h),
+              Text('Select Language', style: tt.titleMedium),
+              SizedBox(height: 1.h),
+              ...languages.map((lang) => ListTile(
+                    title: Text(lang, style: tt.bodyLarge),
+                    trailing: _language == lang
+                        ? Icon(Icons.check_circle, color: cs.primary)
+                        : null,
+                    onTap: () {
+                      setState(() => _language = lang);
+                      _savePref('language', lang);
+                      Navigator.pop(ctx);
+                    },
+                  )),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDistanceSheet() {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    const units = ['Kilometers', 'Miles'];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 12.w,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.outline,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              SizedBox(height: 2.h),
+              Text('Distance Unit', style: tt.titleMedium),
+              SizedBox(height: 1.h),
+              ...units.map((unit) => ListTile(
+                    title: Text(unit, style: tt.bodyLarge),
+                    trailing: _distanceUnit == unit
+                        ? Icon(Icons.check_circle, color: cs.primary)
+                        : null,
+                    onTap: () {
+                      setState(() => _distanceUnit = unit);
+                      _savePref('distance_unit', unit);
+                      Navigator.pop(ctx);
+                    },
+                  )),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: AppTheme.lightDriverTheme,
-      child: Scaffold(
-        backgroundColor: AppTheme.backgroundPrimary,
-        appBar: CustomAppBar(
-          title: 'My Profile',
-          subtitle: 'Driver Information',
-        ),
-        body: _isLoading
-            ? Center(
-                child: CircularProgressIndicator(
-                  color: AppTheme.primaryDriver,
-                ),
-              )
-            : SingleChildScrollView(
-                child: Column(
-                  children: [
-                    SizedBox(height: 2.h),
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final isDark = _themeService.themeMode == ThemeMode.dark;
+    final driverName = _driverInfo['name'] as String? ?? 'Driver';
 
-                    // Modern header card with avatar + summary
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4.w),
-                      child: Container(
-                        padding: EdgeInsets.all(4.w),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              AppTheme.primaryDriver,
-                              AppTheme.primaryDriver.withValues(alpha: 0.8),
+    return Scaffold(
+      drawer: DriverDrawerWidget(
+        currentRoute: '/driver-profile-screen',
+        driverData: {'driverName': driverName},
+      ),
+      appBar: AppBar(
+        backgroundColor: cs.surface,
+        elevation: 0,
+        centerTitle: true,
+        automaticallyImplyLeading: false,
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: Icon(Icons.menu_rounded, color: cs.onSurface),
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+            tooltip: 'Open menu',
+          ),
+        ),
+        title: Text(
+          'Profile & Settings',
+          style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ),
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator(color: cs.primary))
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                  const SizedBox(height: 16),
+
+                  // ── Profile Header ─────────────────────────────────────
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                    child: Row(
+                      children: [
+                        _Avatar(
+                          label: driverName.substring(0, 1).toUpperCase(),
+                          size: 72,
+                        ),
+                        SizedBox(width: 4.w),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                driverName,
+                                style: tt.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w700),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _driverInfo['email'] as String? ??
+                                    'Not available',
+                                style: tt.bodySmall
+                                    ?.copyWith(color: cs.onSurfaceVariant),
+                              ),
+                              Text(
+                                _driverInfo['phone'] as String? ??
+                                    'Not available',
+                                style: tt.bodySmall
+                                    ?.copyWith(color: cs.onSurfaceVariant),
+                              ),
                             ],
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primaryDriver
-                                  .withValues(alpha: 0.35),
-                              offset: const Offset(0, 10),
-                              blurRadius: 24,
-                            ),
-                          ],
                         ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 72,
-                              height: 72,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppTheme.textOnPrimary,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  (_driverInfo['name'] as String? ?? 'D')
-                                      .substring(0, 1)
-                                      .toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.primaryDriver,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 4.w),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _driverInfo['name'] as String? ?? 'Driver',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.textOnPrimary,
-                                    ),
-                                  ),
-                                  SizedBox(height: 0.5.h),
-                                  Text(
-                                    'Driver ID: ${_driverInfo['id'] as String? ?? 'N/A'}',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: AppTheme.textOnPrimary
-                                          .withValues(alpha: 0.9),
-                                    ),
-                                  ),
-                                  SizedBox(height: 1.h),
-                                  Wrap(
-                                    spacing: 1.5.w,
-                                    runSpacing: 0.5.h,
-                                    children: [
-                                      if (_busInfo != null)
-                                        _buildChip(
-                                          Icons.directions_bus,
-                                          _busInfo?['busNumber'] as String? ??
-                                              'No Bus',
-                                        ),
-                                      if (_routeInfo != null)
-                                        _buildChip(
-                                          Icons.route,
-                                          _routeInfo?['routeName'] as String? ??
-                                              'No Route',
-                                        ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        IconButton(
+                          onPressed: () =>
+                              ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Edit profile coming soon')),
+                          ),
+                          icon: Icon(Icons.edit_outlined,
+                              color: cs.primary, size: 22),
                         ),
-                      ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 3.h),
+                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                  SizedBox(height: 2.5.h),
+
+                  // ── Bus Assignment ─────────────────────────────────────
+                  _sectionHeader('Bus Assignment'),
+                  SizedBox(height: 1.5.h),
+
+                  if (_busInfo != null)
+                    _AssignmentItem(
+                      icon: Icons.directions_bus_rounded,
+                      label: _busInfo!['busNumber'] as String? ??
+                          'Not assigned',
+                      subtitle:
+                          'Plate: ${_busInfo!['busPlate'] as String? ?? 'N/A'}  ·  Capacity: ${_busInfo!['capacity'] as String? ?? 'N/A'}',
                     ),
 
-                    SizedBox(height: 2.5.h),
+                  if (_routeInfo != null)
+                    _AssignmentItem(
+                      icon: Icons.route_rounded,
+                      label: _routeInfo!['routeName'] as String? ??
+                          'Not assigned',
+                      subtitle:
+                          'Stops: ${_routeInfo!['totalStops'] as String? ?? 'N/A'}  ·  Students: ${_routeInfo!['totalStudents'] as String? ?? 'N/A'}',
+                    ),
 
-                    // Quick stats row
+                  if (_busInfo == null && _routeInfo == null)
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4.w),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildStatCard(
-                              label: 'Students',
-                              value: _routeInfo?['totalStudents'] as String? ??
-                                  '0',
-                              icon: Icons.groups,
-                            ),
-                          ),
-                          SizedBox(width: 3.w),
-                          Expanded(
-                            child: _buildStatCard(
-                              label: 'Stops',
-                              value:
-                                  _routeInfo?['totalStops'] as String? ?? '0',
-                              icon: Icons.location_on_outlined,
-                            ),
-                          ),
-                          SizedBox(width: 3.w),
-                          Expanded(
-                            child: _buildStatCard(
-                              label: 'Bus Cap.',
-                              value: _busInfo?['capacity'] as String? ?? 'N/A',
-                              icon: Icons.airline_seat_recline_normal,
-                            ),
-                          ),
-                        ],
-                      ),
+                      child: Text('No assignment data',
+                          style: tt.bodyMedium
+                              ?.copyWith(color: cs.onSurfaceVariant)),
                     ),
 
-                    SizedBox(height: 3.h),
+                  SizedBox(height: 2.5.h),
+                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                  SizedBox(height: 2.5.h),
 
-                    // Personal Information Section
-                    _buildSection(
-                      title: 'Personal Information',
-                      icon: Icons.person,
-                      children: [
-                        _buildInfoRow(
-                            'Email',
-                            _driverInfo['email'] as String? ?? 'Not Available',
-                            Icons.email),
-                        _buildInfoRow(
-                            'Phone',
-                            _driverInfo['phone'] as String? ?? 'Not Available',
-                            Icons.phone),
-                        _buildInfoRow(
-                            'License Number',
-                            _driverInfo['licenseNumber'] as String? ??
-                                'Not Available',
-                            Icons.credit_card),
-                        _buildInfoRow(
-                            'License Expiry',
-                            _driverInfo['licenseExpiry'] as String? ??
-                                'Not Available',
-                            Icons.event_available),
-                        _buildInfoRow(
-                            'National ID',
-                            _driverInfo['nationalId'] as String? ??
-                                'Not Available',
-                            Icons.badge_outlined),
-                        _buildInfoRow(
-                            'Gender',
-                            _driverInfo['gender'] as String? ?? 'Not Available',
-                            Icons.person_outline),
-                        _buildInfoRow(
-                            'Date of Birth',
-                            _driverInfo['dob'] as String? ?? 'Not Available',
-                            Icons.cake_outlined),
-                        _buildInfoRow(
-                            'Address',
-                            _driverInfo['address'] as String? ??
-                                'Not Available',
-                            Icons.home_outlined),
-                        _buildInfoRow(
-                            'Join Date',
-                            _driverInfo['joinDate'] as String? ??
-                                'Not Available',
-                            Icons.calendar_today),
-                      ],
-                    ),
-
-                    // Bus Assignment Section (always shown, with safe defaults)
-                    _buildSection(
-                      title: 'Bus Assignment',
-                      icon: Icons.directions_bus,
-                      children: [
-                        _buildInfoRow(
-                          'Bus Number',
-                          (_busInfo?['busNumber'] as String?) ?? 'Not Assigned',
-                          Icons.confirmation_number,
-                        ),
-                        _buildInfoRow(
-                          'License Plate',
-                          (_busInfo?['busPlate'] as String?) ?? 'N/A',
-                          Icons.local_shipping,
-                        ),
-                        _buildInfoRow(
-                          'Capacity',
-                          (_busInfo?['capacity'] as String?) ?? 'N/A',
-                          Icons.airline_seat_recline_normal,
-                        ),
-                      ],
-                    ),
-
-                    // Route Information Section
-                    _buildSection(
-                      title: 'Route Information',
-                      icon: Icons.route,
-                      children: [
-                        _buildInfoRow(
-                            'Route Name',
-                            _routeInfo?['routeName'] as String? ??
-                                'Not Assigned',
-                            Icons.signpost),
-                        _buildInfoRow(
-                            'Total Stops',
-                            _routeInfo?['totalStops'] as String? ?? 'N/A',
-                            Icons.location_on),
-                        _buildInfoRow(
-                            'Total Students',
-                            _routeInfo?['totalStudents'] as String? ?? 'N/A',
-                            Icons.groups),
-                      ],
-                    ),
-
-                    SizedBox(height: 2.h),
-
-                    // Edit Profile Button
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4.w),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Edit profile feature coming soon'),
-                              backgroundColor: AppTheme.primaryDriver,
-                            ),
-                          );
+                  // ── Notifications ──────────────────────────────────────
+                  _sectionHeader('Notifications'),
+                  SizedBox(height: 1.5.h),
+                  _SettingsCard(
+                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                    children: [
+                      _ToggleRow(
+                        label: 'Push Notifications',
+                        subtitle: 'Receive updates and alerts',
+                        value: _notificationsEnabled,
+                        onChanged: (v) {
+                          HapticFeedback.lightImpact();
+                          setState(() => _notificationsEnabled = v);
+                          _savePref('notifications_enabled', v);
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryDriver,
-                          foregroundColor: AppTheme.textOnPrimary,
-                          padding: EdgeInsets.symmetric(vertical: 2.h),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 2,
+                      ),
+                      Divider(
+                          height: 1,
+                          color: cs.outline.withValues(alpha: 0.4)),
+                      _ToggleRow(
+                        label: 'Sound',
+                        subtitle: 'Play audio for notifications',
+                        value: _soundEnabled,
+                        onChanged: (v) {
+                          HapticFeedback.lightImpact();
+                          setState(() => _soundEnabled = v);
+                          _savePref('sound_enabled', v);
+                        },
+                      ),
+                      Divider(
+                          height: 1,
+                          color: cs.outline.withValues(alpha: 0.4)),
+                      _ToggleRow(
+                        label: 'Vibration',
+                        subtitle: 'Vibrate on new notifications',
+                        value: _vibrationEnabled,
+                        onChanged: (v) {
+                          HapticFeedback.lightImpact();
+                          setState(() => _vibrationEnabled = v);
+                          _savePref('vibration_enabled', v);
+                        },
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: 2.5.h),
+                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                  SizedBox(height: 2.5.h),
+
+                  // ── Location & Tracking ────────────────────────────────
+                  _sectionHeader('Location & Tracking'),
+                  SizedBox(height: 1.5.h),
+                  _SettingsCard(
+                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                    children: [
+                      _ToggleRow(
+                        label: 'Background Location',
+                        subtitle: 'Track GPS during active trips',
+                        value: _locationTrackingEnabled,
+                        onChanged: (v) {
+                          HapticFeedback.lightImpact();
+                          setState(() => _locationTrackingEnabled = v);
+                          _savePref('location_tracking_enabled', v);
+                        },
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: 2.5.h),
+                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                  SizedBox(height: 2.5.h),
+
+                  // ── Appearance ─────────────────────────────────────────
+                  _sectionHeader('Appearance'),
+                  SizedBox(height: 1.5.h),
+                  _SettingsCard(
+                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                    children: [
+                      _ToggleRow(
+                        label: 'Dark Mode',
+                        subtitle: 'Switch to dark theme',
+                        value: isDark,
+                        onChanged: _setDarkMode,
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: 2.5.h),
+                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                  SizedBox(height: 2.5.h),
+
+                  // ── Language & Region ──────────────────────────────────
+                  _sectionHeader('Language & Region'),
+                  SizedBox(height: 1.5.h),
+                  _SettingsCard(
+                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                    children: [
+                      _NavRow(
+                        label: 'Language',
+                        trailing: _language,
+                        onTap: _showLanguageSheet,
+                      ),
+                      Divider(
+                          height: 1,
+                          color: cs.outline.withValues(alpha: 0.4)),
+                      _NavRow(
+                        label: 'Distance Unit',
+                        trailing: _distanceUnit,
+                        onTap: _showDistanceSheet,
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: 2.5.h),
+                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                  SizedBox(height: 2.5.h),
+
+                  // ── About ──────────────────────────────────────────────
+                  _sectionHeader('About'),
+                  SizedBox(height: 1.5.h),
+                  _SettingsCard(
+                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                    children: [
+                      _InfoRow(label: 'Version', value: '1.0.0'),
+                      Divider(
+                          height: 1,
+                          color: cs.outline.withValues(alpha: 0.4)),
+                      _NavRow(
+                        label: 'Terms of Service',
+                        trailing: '',
+                        onTap: () => launchUrl(
+                          Uri.parse('https://www.apobasi.com/terms'),
+                          mode: LaunchMode.externalApplication,
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.edit, size: 20),
-                            SizedBox(width: 2.w),
-                            Text(
-                              'Edit Profile',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                      ),
+                      Divider(
+                          height: 1,
+                          color: cs.outline.withValues(alpha: 0.4)),
+                      _NavRow(
+                        label: 'Privacy Policy',
+                        trailing: '',
+                        onTap: () => launchUrl(
+                          Uri.parse('https://www.apobasi.com/privacy'),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: 2.5.h),
+                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                  SizedBox(height: 2.5.h),
+
+                  // ── Account ────────────────────────────────────────────
+                  _sectionHeader('Account'),
+                  SizedBox(height: 1.5.h),
+                  _SettingsCard(
+                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                    children: [
+                      _InfoRow(
+                        label: 'Driver ID',
+                        value: _driverInfo['id'] as String? ?? 'N/A',
+                      ),
+                      Divider(
+                          height: 1,
+                          color: cs.outline.withValues(alpha: 0.4)),
+                      _InfoRow(
+                        label: 'License',
+                        value: _driverInfo['licenseNumber'] as String? ?? 'N/A',
+                      ),
+                      Divider(
+                          height: 1,
+                          color: cs.outline.withValues(alpha: 0.4)),
+                      _InfoRow(
+                        label: 'Join Date',
+                        value: _driverInfo['joinDate'] as String? ?? 'N/A',
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: 3.h),
+
+                  // ── Logout ─────────────────────────────────────────────
+                  Center(
+                    child: GestureDetector(
+                      onTap: _showLogoutDialog,
+                      child: Text(
+                        'Logout',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: cs.error,
                         ),
                       ),
                     ),
+                  ),
 
-                    SizedBox(height: 4.h),
-                  ],
-                ),
+                  SizedBox(height: 4.h),
+                ],
               ),
-        bottomNavigationBar: CustomBottomBar(
-          currentIndex: 2, // Profile tab
-          onTap: (index) {
-            switch (index) {
-              case 0:
-                Navigator.pushNamed(context, '/driver-start-shift-screen');
-                break;
-              case 1:
-                Navigator.pushNamed(context, '/driver-active-trip-screen');
-                break;
-              case 2:
-                // Already on profile screen
-                break;
-            }
-          },
+            ),
+      bottomNavigationBar: CustomBottomBar(
+        currentIndex: 2,
+        onTap: (index) {
+          switch (index) {
+            case 0:
+              Navigator.pushNamed(context, '/driver-start-shift-screen');
+              break;
+            case 1:
+              Navigator.pushNamed(context, '/driver-active-trip-screen');
+              break;
+            case 2:
+              break;
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String title) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 4.w),
+      child: Text(
+        title,
+        style: Theme.of(context)
+            .textTheme
+            .titleLarge
+            ?.copyWith(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
+// ── Shared sub-widgets ─────────────────────────────────────────────────────────
+
+class _Avatar extends StatelessWidget {
+  final String label;
+  final double size;
+
+  const _Avatar({required this.label, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: cs.primaryContainer,
+      ),
+      child: Center(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: size * 0.42,
+            fontWeight: FontWeight.w700,
+            color: cs.onPrimaryContainer,
+          ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildSection({
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-  }) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundSecondary,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.shadowLight,
-            offset: Offset(0, 2),
-            blurRadius: 8,
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Section Header
-          Container(
-            padding: EdgeInsets.all(4.w),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryDriver.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  icon,
-                  color: AppTheme.primaryDriver,
-                  size: 24,
-                ),
-                SizedBox(width: 3.w),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.primaryDriver,
-                  ),
-                ),
-              ],
-            ),
-          ),
+class _AssignmentItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
 
-          // Section Content
-          Padding(
-            padding: EdgeInsets.all(4.w),
-            child: Column(
-              children: children,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  const _AssignmentItem({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+  });
 
-  Widget _buildChip(IconData icon, String label) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 2.5.w, vertical: 0.6.h),
-      decoration: BoxDecoration(
-        color: AppTheme.textOnPrimary.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(30),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: AppTheme.textOnPrimary),
-          SizedBox(width: 1.w),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textOnPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard({
-    required String label,
-    required String value,
-    required IconData icon,
-  }) {
-    return Container(
-      padding: EdgeInsets.symmetric(vertical: 1.8.h, horizontal: 2.w),
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundSecondary,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.shadowLight,
-            offset: const Offset(0, 4),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: EdgeInsets.all(1.h),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryDriver.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 18, color: AppTheme.primaryDriver),
-          ),
-          SizedBox(height: 1.h),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          SizedBox(height: 0.3.h),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: AppTheme.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value, IconData icon) {
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 1.h),
+      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 0.8.h),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            color: AppTheme.textSecondary,
-            size: 20,
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: cs.primaryContainer,
+            ),
+            child: Icon(icon, color: cs.primary, size: 24),
           ),
-          SizedBox(width: 3.w),
+          SizedBox(width: 4.w),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: 0.5.h),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: AppTheme.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                Text(label,
+                    style:
+                        tt.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: tt.bodySmall
+                        ?.copyWith(color: cs.onSurfaceVariant)),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SettingsCard extends StatelessWidget {
+  final List<Widget> children;
+  final EdgeInsetsGeometry padding;
+
+  const _SettingsCard({
+    required this.children,
+    required this.padding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: padding,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: cs.outline.withValues(alpha: 0.2)),
+          boxShadow: [
+            BoxShadow(
+              color: cs.shadow.withValues(alpha: 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(children: children),
+      ),
+    );
+  }
+}
+
+class _ToggleRow extends StatelessWidget {
+  final String label;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _ToggleRow({
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(label,
+          style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.w500)),
+      subtitle: Text(subtitle,
+          style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+      value: value,
+      onChanged: onChanged,
+    );
+  }
+}
+
+class _NavRow extends StatelessWidget {
+  final String label;
+  final String trailing;
+  final VoidCallback onTap;
+
+  const _NavRow({
+    required this.label,
+    required this.trailing,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title:
+          Text(label, style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.w500)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (trailing.isNotEmpty)
+            Text(trailing,
+                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          const SizedBox(width: 4),
+          Icon(Icons.chevron_right, size: 18, color: cs.onSurfaceVariant),
+        ],
+      ),
+      onTap: onTap,
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _InfoRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title:
+          Text(label, style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.w500)),
+      trailing:
+          Text(value, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
     );
   }
 }

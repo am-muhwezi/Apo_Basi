@@ -7,15 +7,28 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
 
     private val CHANNEL = "com.apobasi.driver/location_service"
+    private val GPS_EVENT_CHANNEL = "com.apobasi.driver/gps_stream"
     private val PERMISSION_REQUEST_CODE = 1001
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // EventChannel: native LocationTrackingService → Flutter UI
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, GPS_EVENT_CHANNEL)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+                    GpsStatusBroadcaster.eventSink = events
+                }
+                override fun onCancel(arguments: Any?) {
+                    GpsStatusBroadcaster.eventSink = null
+                }
+            })
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {

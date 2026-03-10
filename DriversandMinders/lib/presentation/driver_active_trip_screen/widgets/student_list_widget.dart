@@ -39,7 +39,7 @@ class _StudentListWidgetState extends State<StudentListWidget> {
                 Text(
                   'Student List',
                   style: theme.textTheme.titleMedium?.copyWith(
-                    color: AppTheme.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -47,13 +47,13 @@ class _StudentListWidgetState extends State<StudentListWidget> {
                   padding:
                       EdgeInsets.symmetric(horizontal: 2.w, vertical: 0.5.h),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryDriver.withValues(alpha: 0.1),
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     '${widget.students.length} Students',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppTheme.primaryDriver,
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -141,10 +141,10 @@ class _StudentListWidgetState extends State<StudentListWidget> {
       margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 0.5.h),
       padding: EdgeInsets.all(3.w),
       decoration: BoxDecoration(
-        color: AppTheme.backgroundSecondary,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppTheme.borderLight,
+          color: Theme.of(context).colorScheme.outline,
           width: 1,
         ),
       ),
@@ -162,7 +162,7 @@ class _StudentListWidgetState extends State<StudentListWidget> {
               child: Text(
                 studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: AppTheme.textOnPrimary,
+                  color: Theme.of(context).colorScheme.onPrimary,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -179,7 +179,7 @@ class _StudentListWidgetState extends State<StudentListWidget> {
                 Text(
                   studentName,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.w600,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -188,7 +188,7 @@ class _StudentListWidgetState extends State<StudentListWidget> {
                 Text(
                   'Grade $studentGrade • $stopName',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),

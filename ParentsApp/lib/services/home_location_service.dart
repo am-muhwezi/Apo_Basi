@@ -34,6 +34,18 @@ class HomeLocationService {
     _syncToBackend(latitude, longitude);
   }
 
+  /// Syncs any locally-stored home coordinates to the backend on app startup.
+  /// Migrates existing SharedPreferences coords to the DB for parents who had
+  /// home coords set before backend sync was introduced.
+  Future<void> syncOnStartup() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lat = prefs.getDouble(_homeLatKey);
+    final lng = prefs.getDouble(_homeLngKey);
+    if (lat != null && lng != null) {
+      _syncToBackend(lat, lng);
+    }
+  }
+
   /// Fire-and-forget sync of home coordinates to the Django backend.
   /// Failures are silently swallowed — local storage is the source of truth.
   Future<void> _syncToBackend(double lat, double lng) async {
