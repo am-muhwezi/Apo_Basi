@@ -8,6 +8,7 @@ from .views import (
     driver_phone_login,
     check_driver_email,
     driver_magic_link_auth,
+    DriverDemoLoginView,
     start_trip,
     end_trip,
     get_active_trip

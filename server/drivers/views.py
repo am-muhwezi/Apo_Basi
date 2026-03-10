@@ -493,24 +493,64 @@ def driver_magic_link_auth(request):
         )
 
     try:
-        # Fetch JWKS (JSON Web Key Set) from Supabase
-        jwks_response = requests.get(settings.SUPABASE_JWKS_URL, timeout=5)
-        jwks_response.raise_for_status()
-        jwks = jwks_response.json()
+        # First, try to decode without verification to see what's in the token (for debugging)
+        try:
+            unverified_payload = jwt.decode(access_token, options={"verify_signature": False})
+            logger.info(f"Supabase token payload (unverified): {unverified_payload}")
+        except Exception as e:
+            logger.error(f"Failed to decode token without verification: {str(e)}")
 
-        # Verify and decode the Supabase JWT token
-        payload = jwt.decode(
-            access_token,
-            jwks,
-            algorithms=['ES256'],
-            options={
-                'verify_aud': False,  # Supabase uses different audience
-                'verify_iss': True,
-            }
-        )
+        # Method 1: Try using Supabase secret key (HS256) - most common for Supabase
+        try:
+            if settings.SUPABASE_SECRET_KEY:
+                payload = jwt.decode(
+                    access_token,
+                    settings.SUPABASE_SECRET_KEY,
+                    algorithms=['HS256'],
+                    options={
+                        'verify_aud': False,
+                        'verify_iss': False,
+                    }
+                )
+                logger.info("Successfully verified token with HS256 (Supabase secret)")
+            else:
+                raise ValueError("SUPABASE_SECRET_KEY not configured")
+        except Exception as e:
+            logger.warning(f"HS256 verification failed: {str(e)}, trying JWKS method...")
+            
+            # Method 2: Fallback to JWKS (RS256/ES256) method
+            jwks_response = requests.get(settings.SUPABASE_JWKS_URL, timeout=5)
+            jwks_response.raise_for_status()
+            jwks = jwks_response.json()
+
+            # Try RS256 first (more common than ES256)
+            try:
+                payload = jwt.decode(
+                    access_token,
+                    jwks,
+                    algorithms=['RS256'],
+                    options={
+                        'verify_aud': False,
+                        'verify_iss': False,
+                    }
+                )
+                logger.info("Successfully verified token with RS256 (JWKS)")
+            except Exception:
+                # Try ES256 as last resort
+                payload = jwt.decode(
+                    access_token,
+                    jwks,
+                    algorithms=['ES256'],
+                    options={
+                        'verify_aud': False,
+                        'verify_iss': False,
+                    }
+                )
+                logger.info("Successfully verified token with ES256 (JWKS)")
 
         email = payload.get('email')
         if not email:
+            logger.error(f"No email in token payload: {payload}")
             return Response(
                 {"error": "Email not found in token"},
                 status=status.HTTP_400_BAD_REQUEST
