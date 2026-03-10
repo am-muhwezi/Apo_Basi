@@ -58,93 +58,6 @@ class AuthService {
     await prefs.setString('license_expiry', data['license_expiry'] ?? '');
   }
 
-  /// Phone-based login for drivers and bus minders (passwordless)
-  ///
-  /// Unified endpoint that automatically detects user type.
-  /// Returns Django JWT tokens and user/bus/route data.
-  ///
-  /// Returns:
-  /// - Map with 'success', 'message', and optional 'result' (AuthResult) keys
-  Future<Map<String, dynamic>> loginWithPhone(String phoneNumber) async {
-    try {
-      final response = await _dio.post(
-        '/api/auth/phone-login/',
-        data: {'phone_number': phoneNumber},
-      );
-
-      if (response.statusCode == 200) {
-        final data = response.data;
-
-        // Save driver data using helper method
-        await _saveDriverDataToPrefs(data);
-
-        return {
-          'success': true,
-          'message': 'Login successful',
-          'result': AuthResult(
-            success: true,
-            driver: {
-              'user_id': data['user_id'],
-              'name': data['name'],
-              'email': data['email'],
-              'phone': data['phone'],
-              'license_number': data['license_number'],
-              'license_expiry': data['license_expiry'],
-            },
-            bus: data['bus'],
-            route: data['route'],
-            tokens: data['tokens'],
-          ),
-        };
-      } else {
-        return {
-          'success': false,
-          'message': response.data['message'] ?? 'Login failed',
-        };
-      }
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 404) {
-        return {
-          'success': false,
-          'message': e.response?.data['error'] ??
-              'No driver or bus assistant account found with this phone number. Please contact your administrator.',
-        };
-      } else if (e.response?.statusCode == 400) {
-        return {
-          'success': false,
-          'message':
-              e.response?.data['error'] ?? 'Invalid phone number format.',
-        };
-      } else if (e.response?.statusCode == 403) {
-        return {
-          'success': false,
-          'message': e.response?.data['error'] ??
-              'Account is inactive. Please contact your administrator.',
-        };
-      }
-      return {
-        'success': false,
-        'message': 'Connection error. Please check your internet connection.',
-      };
-    } on FormatException catch (e) {
-      return {
-        'success': false,
-        'message':
-            'Invalid data format received from server. Please contact your administrator.',
-      };
-    } on TypeError catch (e) {
-      return {
-        'success': false,
-        'message': 'Data type error. Please contact your administrator.',
-      };
-    } catch (e) {
-      return {
-        'success': false,
-        'message': 'Login failed: ${e.toString()}',
-      };
-    }
-  }
-
   /// Send magic link to driver email
   ///
   /// First checks if email is registered in Django backend,
@@ -153,6 +66,14 @@ class AuthService {
   /// Returns:
   /// - Map with 'success' and 'message' keys
   Future<Map<String, dynamic>> sendMagicLink(String email) async {
+    // Reviewer demo account must use the password flow, not magic link
+    if (isReviewerAccount(email)) {
+      return {
+        'success': false,
+        'message': 'Please enter your password to sign in.',
+      };
+    }
+
     try {
       // Step 1: Check if email is registered in Django
       final checkResponse = await _dio.post(
