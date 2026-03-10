@@ -89,7 +89,7 @@ class _TripFilterBottomSheetState extends State<TripFilterBottomSheet> {
                   child: Text(
                     'Reset',
                     style: theme.textTheme.titleSmall?.copyWith(
-                      color: AppTheme.primaryDriver,
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -157,12 +157,12 @@ class _TripFilterBottomSheetState extends State<TripFilterBottomSheet> {
                     onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
                       padding: EdgeInsets.symmetric(vertical: 1.5.h),
-                      side: BorderSide(color: AppTheme.primaryDriver),
+                      side: BorderSide(color: Theme.of(context).colorScheme.primary),
                     ),
                     child: Text(
                       'Cancel',
                       style: theme.textTheme.titleSmall?.copyWith(
-                        color: AppTheme.primaryDriver,
+                        color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -173,13 +173,13 @@ class _TripFilterBottomSheetState extends State<TripFilterBottomSheet> {
                   child: ElevatedButton(
                     onPressed: _applyFilters,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryDriver,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       padding: EdgeInsets.symmetric(vertical: 1.5.h),
                     ),
                     child: Text(
                       'Apply Filters',
                       style: theme.textTheme.titleSmall?.copyWith(
-                        color: AppTheme.textOnPrimary,
+                        color: Theme.of(context).colorScheme.onPrimary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -227,7 +227,7 @@ class _TripFilterBottomSheetState extends State<TripFilterBottomSheet> {
                 option,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: isSelected
-                      ? AppTheme.textOnPrimary
+                      ? Theme.of(context).colorScheme.onPrimary
                       : colorScheme.onSurface,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 ),
@@ -235,11 +235,11 @@ class _TripFilterBottomSheetState extends State<TripFilterBottomSheet> {
               selected: isSelected,
               onSelected: (_) => onChanged(option),
               backgroundColor: colorScheme.surface,
-              selectedColor: AppTheme.primaryDriver,
-              checkmarkColor: AppTheme.textOnPrimary,
+              selectedColor: Theme.of(context).colorScheme.primary,
+              checkmarkColor: Theme.of(context).colorScheme.onPrimary,
               side: BorderSide(
                 color:
-                    isSelected ? AppTheme.primaryDriver : colorScheme.outline,
+                    isSelected ? Theme.of(context).colorScheme.primary : colorScheme.outline,
                 width: 1.0,
               ),
               shape: RoundedRectangleBorder(
@@ -277,7 +277,7 @@ class _TripFilterBottomSheetState extends State<TripFilterBottomSheet> {
                 onPressed: () => _selectDate(context, true),
                 icon: CustomIconWidget(
                   iconName: 'calendar_today',
-                  color: AppTheme.primaryDriver,
+                  color: Theme.of(context).colorScheme.primary,
                   size: 16,
                 ),
                 label: Text(
@@ -293,7 +293,7 @@ class _TripFilterBottomSheetState extends State<TripFilterBottomSheet> {
                 style: OutlinedButton.styleFrom(
                   padding:
                       EdgeInsets.symmetric(vertical: 1.2.h, horizontal: 3.w),
-                  side: BorderSide(color: AppTheme.primaryDriver),
+                  side: BorderSide(color: Theme.of(context).colorScheme.primary),
                 ),
               ),
             ),
@@ -303,7 +303,7 @@ class _TripFilterBottomSheetState extends State<TripFilterBottomSheet> {
                 onPressed: () => _selectDate(context, false),
                 icon: CustomIconWidget(
                   iconName: 'calendar_today',
-                  color: AppTheme.primaryDriver,
+                  color: Theme.of(context).colorScheme.primary,
                   size: 16,
                 ),
                 label: Text(
@@ -319,7 +319,7 @@ class _TripFilterBottomSheetState extends State<TripFilterBottomSheet> {
                 style: OutlinedButton.styleFrom(
                   padding:
                       EdgeInsets.symmetric(vertical: 1.2.h, horizontal: 3.w),
-                  side: BorderSide(color: AppTheme.primaryDriver),
+                  side: BorderSide(color: Theme.of(context).colorScheme.primary),
                 ),
               ),
             ),
@@ -339,7 +339,7 @@ class _TripFilterBottomSheetState extends State<TripFilterBottomSheet> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: AppTheme.primaryDriver,
+                  primary: Theme.of(context).colorScheme.primary,
                 ),
           ),
           child: child!,

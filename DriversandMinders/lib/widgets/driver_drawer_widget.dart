@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 
-import '../core/app_export.dart';
 import '../services/api_service.dart';
 
 class DriverDrawerWidget extends StatelessWidget {
@@ -28,115 +27,121 @@ class DriverDrawerWidget extends StatelessWidget {
   }
 
   void _showLogoutConfirmation(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.all(6.w),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            SizedBox(height: 3.h),
-            Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.criticalAlert.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.logout_rounded,
-                  size: 32, color: AppTheme.criticalAlert),
-            ),
-            SizedBox(height: 2.h),
-            Text(
-              'Logout?',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            SizedBox(height: 1.h),
-            Text(
-              'You will need to login again to access your account',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-            ),
-            SizedBox(height: 3.h),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      side: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    child: Text('Cancel',
-                        style: TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.w600)),
-                  ),
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return Container(
+          padding: EdgeInsets.all(6.w),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.outline,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                SizedBox(width: 4.w),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final apiService = ApiService();
-                      await apiService.clearToken();
-                      Navigator.pop(context);
-                      Navigator.pushNamedAndRemoveUntil(
-                        context,
-                        '/shared-login-screen',
-                        (route) => false,
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.criticalAlert,
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Text('Logout',
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.w600)),
-                  ),
+              ),
+              SizedBox(height: 3.h),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cs.error.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
                 ),
-              ],
-            ),
-            SizedBox(height: 2.h),
-          ],
-        ),
-      ),
+                child: Icon(Icons.logout_rounded, size: 32, color: cs.error),
+              ),
+              SizedBox(height: 2.h),
+              Text(
+                'Logout?',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface,
+                ),
+              ),
+              SizedBox(height: 1.h),
+              Text(
+                'You will need to login again to access your account',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+              ),
+              SizedBox(height: 3.h),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(
+                            color: cs.outline.withValues(alpha: 0.5)),
+                      ),
+                      child: Text('Cancel',
+                          style: TextStyle(
+                              color: cs.onSurface,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  SizedBox(width: 4.w),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final apiService = ApiService();
+                        await apiService.clearToken();
+                        Navigator.pop(context);
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          '/shared-login-screen',
+                          (route) => false,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: cs.error,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text('Logout',
+                          style: TextStyle(
+                              color: cs.onError,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 2.h),
+            ],
+          ),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final name = driverData?['driverName'] as String? ?? 'Driver';
 
     return Drawer(
-      backgroundColor: Color(0xFFFAFAFC),
+      backgroundColor: cs.surface,
       child: SafeArea(
         child: Column(
           children: [
-            // Minimal Header
+            // Header
             Container(
               padding: EdgeInsets.fromLTRB(5.w, 3.h, 5.w, 4.h),
               child: Row(
@@ -147,8 +152,8 @@ class DriverDrawerWidget extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          AppTheme.primaryDriver,
-                          AppTheme.primaryDriver.withOpacity(0.7)
+                          cs.primary,
+                          cs.primary.withValues(alpha: 0.7),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -156,9 +161,9 @@ class DriverDrawerWidget extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.primaryDriver.withOpacity(0.3),
+                          color: cs.primary.withValues(alpha: 0.3),
                           blurRadius: 12,
-                          offset: Offset(0, 4),
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
@@ -166,7 +171,7 @@ class DriverDrawerWidget extends StatelessWidget {
                       child: Text(
                         _getInitials(name),
                         style: TextStyle(
-                          color: Colors.white,
+                          color: cs.onPrimary,
                           fontWeight: FontWeight.w700,
                           fontSize: 18,
                         ),
@@ -183,17 +188,17 @@ class DriverDrawerWidget extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
+                            color: cs.onSurface,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Container(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: AppTheme.primaryDriver.withOpacity(0.1),
+                            color: cs.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -201,7 +206,7 @@ class DriverDrawerWidget extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: AppTheme.primaryDriver,
+                              color: cs.primary,
                             ),
                           ),
                         ),
@@ -211,23 +216,24 @@ class DriverDrawerWidget extends StatelessWidget {
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Container(
-                      padding: EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color: cs.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(Icons.close,
-                          size: 20, color: AppTheme.textSecondary),
+                          size: 20, color: cs.onSurfaceVariant),
                     ),
                   ),
                 ],
               ),
             ),
 
-            // Divider
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 5.w),
-              child: Divider(height: 1, color: Colors.grey.shade200),
+              child: Divider(
+                  height: 1,
+                  color: cs.outline.withValues(alpha: 0.3)),
             ),
 
             SizedBox(height: 2.h),
@@ -236,9 +242,9 @@ class DriverDrawerWidget extends StatelessWidget {
             Expanded(
               child: ListView(
                 padding: EdgeInsets.symmetric(horizontal: 4.w),
-                physics: BouncingScrollPhysics(),
+                physics: const BouncingScrollPhysics(),
                 children: [
-                  _buildSectionLabel('MAIN'),
+                  _buildSectionLabel(context, 'MAIN'),
                   _buildMenuItem(
                     context,
                     icon: Icons.home_rounded,
@@ -267,39 +273,23 @@ class DriverDrawerWidget extends StatelessWidget {
                   ),
 
                   SizedBox(height: 2.h),
-                  _buildSectionLabel('ACCOUNT'),
+                  _buildSectionLabel(context, 'ACCOUNT'),
                   _buildMenuItem(
                     context,
                     icon: Icons.person_outline_rounded,
-                    title: 'Profile',
+                    title: 'Profile & Settings',
+                    isActive: currentRoute == '/driver-profile-screen',
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.pushNamed(context, '/driver-profile-screen');
-                    },
-                  ),
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.settings_outlined,
-                    title: 'Settings',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/driver-settings-screen');
-                    },
-                  ),
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.chat_bubble_outline_rounded,
-                    title: 'Communications',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/driver-comms-screen');
+                      if (currentRoute != '/driver-profile-screen') {
+                        Navigator.pushNamed(context, '/driver-profile-screen');
+                      }
                     },
                   ),
 
-                  // Reset trip option when active
                   if (hasActiveTrip && onResetTrip != null) ...[
                     SizedBox(height: 2.h),
-                    _buildSectionLabel('TRIP'),
+                    _buildSectionLabel(context, 'TRIP'),
                     _buildMenuItem(
                       context,
                       icon: Icons.refresh_rounded,
@@ -315,7 +305,7 @@ class DriverDrawerWidget extends StatelessWidget {
               ),
             ),
 
-            // Logout at bottom
+            // Logout
             Padding(
               padding: EdgeInsets.all(5.w),
               child: GestureDetector(
@@ -325,25 +315,24 @@ class DriverDrawerWidget extends StatelessWidget {
                   _showLogoutConfirmation(context);
                 },
                 child: Container(
-                  padding: EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
-                    color: AppTheme.criticalAlert.withOpacity(0.08),
+                    color: cs.error.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: AppTheme.criticalAlert.withOpacity(0.2)),
+                    border:
+                        Border.all(color: cs.error.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.logout_rounded,
-                          size: 20, color: AppTheme.criticalAlert),
-                      SizedBox(width: 10),
+                      Icon(Icons.logout_rounded, size: 20, color: cs.error),
+                      const SizedBox(width: 10),
                       Text(
                         'Logout',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: AppTheme.criticalAlert,
+                          color: cs.error,
                         ),
                       ),
                     ],
@@ -357,15 +346,16 @@ class DriverDrawerWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionLabel(String label) {
+  Widget _buildSectionLabel(BuildContext context, String label) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: EdgeInsets.only(left: 4, top: 8, bottom: 12),
+      padding: const EdgeInsets.only(left: 4, top: 8, bottom: 12),
       child: Text(
         label,
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: AppTheme.textSecondary.withOpacity(0.6),
+          color: cs.onSurfaceVariant.withValues(alpha: 0.6),
           letterSpacing: 1.2,
         ),
       ),
@@ -380,15 +370,16 @@ class DriverDrawerWidget extends StatelessWidget {
     bool isActive = false,
     bool isDestructive = false,
   }) {
-    final color = isDestructive
-        ? AppTheme.criticalAlert
-        : (isActive ? Colors.white : AppTheme.textSecondary);
+    final cs = Theme.of(context).colorScheme;
+    final iconColor = isDestructive
+        ? cs.error
+        : (isActive ? cs.onPrimary : cs.onSurfaceVariant);
     final textColor = isDestructive
-        ? AppTheme.criticalAlert
-        : (isActive ? Colors.white : AppTheme.textPrimary);
+        ? cs.error
+        : (isActive ? cs.onPrimary : cs.onSurface);
     final bgColor = isDestructive
-        ? AppTheme.criticalAlert.withOpacity(0.08)
-        : (isActive ? AppTheme.primaryDriver : Colors.transparent);
+        ? cs.error.withValues(alpha: 0.08)
+        : (isActive ? cs.primary : Colors.transparent);
 
     return GestureDetector(
       onTap: () {
@@ -396,17 +387,17 @@ class DriverDrawerWidget extends StatelessWidget {
         onTap();
       },
       child: AnimatedContainer(
-        duration: Duration(milliseconds: 200),
-        margin: EdgeInsets.only(bottom: 6),
-        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: color),
-            SizedBox(width: 14),
+            Icon(icon, size: 22, color: iconColor),
+            const SizedBox(width: 14),
             Expanded(
               child: Text(
                 title,
@@ -422,7 +413,7 @@ class DriverDrawerWidget extends StatelessWidget {
                 width: 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cs.onPrimary,
                   shape: BoxShape.circle,
                 ),
               ),

@@ -6,6 +6,8 @@ from .views import (
     MyBusesView,
     BusChildrenView,
     MarkAttendanceView,
+    start_trip_busminder,
+    get_active_trip_busminder,
     busminder_phone_login,
     check_busminder_email,
     busminder_magic_link_auth,
@@ -26,4 +28,6 @@ urlpatterns = [
     path("my-buses/", MyBusesView.as_view(), name="my-buses"),
     path("buses/<int:bus_id>/children/", BusChildrenView.as_view(), name="bus-children"),
     path("mark-attendance/", MarkAttendanceView.as_view(), name="mark-attendance"),
+    path("start-trip/", start_trip_busminder, name="busminder-start-trip"),
+    path("active-trip/", get_active_trip_busminder, name="busminder-active-trip"),
 ]

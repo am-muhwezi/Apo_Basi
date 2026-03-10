@@ -24,14 +24,14 @@ class TripStatusHeaderWidget extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
       decoration: BoxDecoration(
-        color: AppTheme.primaryDriver,
+        color: Theme.of(context).colorScheme.primary,
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(16),
           bottomRight: Radius.circular(16),
         ),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.shadowLight,
+            color: Theme.of(context).colorScheme.shadow,
             offset: Offset(0, 2),
             blurRadius: 8,
             spreadRadius: 0,
@@ -54,7 +54,7 @@ class TripStatusHeaderWidget extends StatelessWidget {
                       Text(
                         'Trip Active',
                         style: theme.textTheme.titleMedium?.copyWith(
-                          color: AppTheme.textOnPrimary,
+                          color: Theme.of(context).colorScheme.onPrimary,
                           fontWeight: FontWeight.w600,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -63,7 +63,7 @@ class TripStatusHeaderWidget extends StatelessWidget {
                       Text(
                         'Route ${(tripData["routeNumber"] as String? ?? "101")}',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textOnPrimary.withValues(alpha: 0.8),
+                          color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.8),
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -73,13 +73,13 @@ class TripStatusHeaderWidget extends StatelessWidget {
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
                   decoration: BoxDecoration(
-                    color: AppTheme.textOnPrimary.withValues(alpha: 0.1),
+                    color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     elapsedTime,
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: AppTheme.textOnPrimary,
+                      color: Theme.of(context).colorScheme.onPrimary,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -94,14 +94,14 @@ class TripStatusHeaderWidget extends StatelessWidget {
               width: double.infinity,
               padding: EdgeInsets.all(3.w),
               decoration: BoxDecoration(
-                color: AppTheme.textOnPrimary.withValues(alpha: 0.1),
+                color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
                   CustomIconWidget(
                     iconName: 'location_on',
-                    color: AppTheme.textOnPrimary,
+                    color: Theme.of(context).colorScheme.onPrimary,
                     size: 20,
                   ),
                   SizedBox(width: 3.w),
@@ -113,14 +113,14 @@ class TripStatusHeaderWidget extends StatelessWidget {
                           'Current Stop',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color:
-                                AppTheme.textOnPrimary.withValues(alpha: 0.7),
+                                Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
                           currentStop,
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.textOnPrimary,
+                            color: Theme.of(context).colorScheme.onPrimary,
                             fontWeight: FontWeight.w500,
                           ),
                           overflow: TextOverflow.ellipsis,

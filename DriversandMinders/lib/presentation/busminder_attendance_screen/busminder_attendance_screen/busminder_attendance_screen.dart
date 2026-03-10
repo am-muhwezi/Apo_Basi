@@ -78,7 +78,7 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
             SnackBar(
               content:
                   Text('No active trip found. Please start a shift first.'),
-              backgroundColor: AppTheme.criticalAlert,
+              backgroundColor: Theme.of(context).colorScheme.error,
               duration: Duration(seconds: 3),
             ),
           );
@@ -302,7 +302,7 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
           content: Text('Status updated to ${newStatus.replaceAll('_', ' ')}'),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: AppTheme.successAction,
+          backgroundColor: Theme.of(context).colorScheme.secondary,
         ),
       );
     } catch (e) {
@@ -312,7 +312,7 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
           content: Text('Failed to sync: ${e.toString()}'),
           duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: AppTheme.criticalAlert,
+          backgroundColor: Theme.of(context).colorScheme.error,
           action: SnackBarAction(
             label: 'Retry',
             textColor: Colors.white,
@@ -585,29 +585,23 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
   @override
   Widget build(BuildContext context) {
     if (_isLoadingData) {
-      return Theme(
-        data: AppTheme.lightBusminderTheme,
-        child: Scaffold(
-          backgroundColor: AppTheme.backgroundPrimary,
+      return Scaffold(
           body: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 CircularProgressIndicator(
-                  color: AppTheme.primaryBusminder,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
                 SizedBox(height: 2.h),
                 Text('Loading student roster...'),
               ],
             ),
           ),
-        ),
-      );
+        );
     }
 
-    return Theme(
-      data: AppTheme.lightBusminderTheme,
-      child: Scaffold(
+    return Scaffold(
         drawer: BusminderDrawerWidget(
           currentRoute: '/busminder-attendance-screen',
         ),
@@ -619,7 +613,7 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
               onPressed: _handleRefresh,
               icon: CustomIconWidget(
                 iconName: 'refresh',
-                color: AppTheme.textOnPrimary,
+                color: Theme.of(context).colorScheme.onPrimary,
                 size: 24,
               ),
             ),
@@ -709,13 +703,12 @@ class _BusminderAttendanceScreenState extends State<BusminderAttendanceScreen>
             ? null // Hide FAB when there are students to avoid clutter
             : FloatingActionButton(
                 onPressed: _showAddStudentModal,
-                backgroundColor: AppTheme.primaryBusminder,
-                foregroundColor: AppTheme.textOnPrimary,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 elevation: 4,
                 child: Icon(Icons.person_add, size: 24),
               ),
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      ),
-    );
+      );
   }
 }

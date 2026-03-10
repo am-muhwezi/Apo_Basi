@@ -100,7 +100,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     _polylines.add(
       Polyline(
         points: routePoints,
-        color: AppTheme.primaryBusminder,
+        color: Theme.of(context).colorScheme.primary,
         strokeWidth: 4,
       ),
     );
@@ -172,7 +172,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
                   children: [
                     CustomIconWidget(
                       iconName: 'directions_bus',
-                      color: AppTheme.primaryBusminder,
+                      color: Theme.of(context).colorScheme.primary,
                       size: 16,
                     ),
                     SizedBox(width: 2.w),
@@ -180,7 +180,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
                       'Live Route',
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.primaryBusminder,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ],
@@ -198,10 +198,10 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
                   );
                 },
                 backgroundColor: theme.colorScheme.surface,
-                foregroundColor: AppTheme.primaryBusminder,
+                foregroundColor: Theme.of(context).colorScheme.primary,
                 child: CustomIconWidget(
                   iconName: 'my_location',
-                  color: AppTheme.primaryBusminder,
+                  color: Theme.of(context).colorScheme.primary,
                   size: 20,
                 ),
               ),

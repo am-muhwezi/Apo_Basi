@@ -6,7 +6,7 @@ from assignments.models import Assignment
 class ChildSerializer(serializers.ModelSerializer):
     """For GET requests - includes all data with relationships
 
-    NOTE: Uses Assignment API for assignedBusId and assignedBusNumber
+    NOTE: Uses Assignment API for assignedBusId, assignedBusNumber, and route information
     """
     firstName = serializers.CharField(source='first_name', read_only=True)
     lastName = serializers.CharField(source='last_name', read_only=True)
@@ -20,13 +20,17 @@ class ChildSerializer(serializers.ModelSerializer):
     parentName = serializers.SerializerMethodField()
     assignedBusId = serializers.SerializerMethodField()
     assignedBusNumber = serializers.SerializerMethodField()
+    routeName = serializers.SerializerMethodField()
+    routeCode = serializers.SerializerMethodField()
+    driverName = serializers.SerializerMethodField()
 
     class Meta:
         model = Child
         fields = [
             'id', 'firstName', 'lastName', 'grade', 'age', 'status', 'locationStatus',
             'address', 'emergencyContact', 'medicalInfo',
-            'parentId', 'parentName', 'assignedBusId', 'assignedBusNumber'
+            'parentId', 'parentName', 'assignedBusId', 'assignedBusNumber',
+            'routeName', 'routeCode', 'driverName'
         ]
 
     def get_parentName(self, obj):
@@ -43,6 +47,32 @@ class ChildSerializer(serializers.ModelSerializer):
         """Get assigned bus number from Assignment API"""
         assignment = Assignment.get_active_assignments_for(obj, 'child_to_bus').first()
         return assignment.assigned_to.bus_number if assignment and assignment.assigned_to else None
+
+    def get_routeName(self, obj):
+        """Get assigned route name from Assignment API"""
+        assignment = Assignment.get_active_assignments_for(obj, 'child_to_route').first()
+        return assignment.assigned_to.name if assignment and assignment.assigned_to else None
+
+    def get_routeCode(self, obj):
+        """Get assigned route code from Assignment API"""
+        assignment = Assignment.get_active_assignments_for(obj, 'child_to_route').first()
+        return assignment.assigned_to.route_code if assignment and assignment.assigned_to else None
+
+    def get_driverName(self, obj):
+        """Get driver name from the assigned bus"""
+        # First get the child's bus assignment
+        bus_assignment = Assignment.get_active_assignments_for(obj, 'child_to_bus').first()
+        if not bus_assignment or not bus_assignment.assigned_to:
+            return None
+        
+        bus = bus_assignment.assigned_to
+        # Then get the driver assigned to that bus
+        driver_assignment = Assignment.get_assignments_to(bus, 'driver_to_bus').first()
+        if driver_assignment and driver_assignment.assignee:
+            driver = driver_assignment.assignee
+            if hasattr(driver, 'user') and driver.user:
+                return f"{driver.user.first_name} {driver.user.last_name}"
+        return None
 
 
 class ChildCreateSerializer(serializers.Serializer):
