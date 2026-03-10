@@ -18,8 +18,24 @@ import 'config/supabase_config.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load .env before starting the app
-  await dotenv.load();
+  // Load .env before starting the app - explicitly specify the file name
+  try {
+    await dotenv.load(fileName: ".env");
+    print('✅ .env file loaded successfully');
+  } catch (e) {
+    print('❌ Failed to load .env file: $e');
+    // In release builds, continue anyway - we'll handle missing values later
+  }
+
+  // Print API configuration for debugging
+  ApiConfig.printConfigSummary();
+
+  // Validate required configuration
+  if (!ApiConfig.validateConfig()) {
+    print('⚠️ WARNING: Missing required API configuration!');
+    print('   API_BASE_URL: ${ApiConfig.apiBaseUrl.isEmpty ? "MISSING" : "OK"}');
+    print('   MAPBOX_ACCESS_TOKEN: ${ApiConfig.mapboxAccessToken.isEmpty ? "MISSING" : "OK"}');
+  }
 
   // Initialize Mapbox access token
   MapboxOptions.setAccessToken(ApiConfig.mapboxAccessToken);
