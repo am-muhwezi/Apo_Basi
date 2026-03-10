@@ -2,7 +2,7 @@
 name: Basi_driver
 description: ApoBasi Drivers & Bus Minders - Real-time school bus tracking and student attendance management for drivers and bus minders across African schools.
 publish_to: none
-version: 1.0.0+3
+version: 1.0.1+5
 
 environment:
   sdk: ^3.6.0
@@ -29,6 +29,7 @@ dependencies:
   flutter_map: ^8.2.2
   latlong2: ^0.9.1
   mapbox_maps_flutter: ^2.18.0
+  flutter_local_notifications: ^18.0.1
   # Native WebSocket support for Django Channels
   web_socket_channel: ^3.0.1
 
