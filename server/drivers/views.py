@@ -424,12 +424,23 @@ def check_driver_email(request):
         "message": "..."
     }
     """
-    email = request.data.get('email')
+    email = request.data.get('email', '').strip().lower()
 
     if not email:
         return Response(
             {"error": "email is required"},
             status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Reviewer demo account must use the password flow — block magic link path
+    reviewer_email = os.environ.get('REVIEWER_DRIVER_EMAIL', '').strip().lower()
+    if reviewer_email and email == reviewer_email:
+        return Response(
+            {
+                "registered": False,
+                "message": "Please use the password sign-in for this account."
+            },
+            status=status.HTTP_404_NOT_FOUND
         )
 
     # Check if driver exists with this email
@@ -732,9 +743,48 @@ def start_trip(request):
         route=route_name  # Use actual admin-created route name
     )
 
-    # Add all children from the bus to the trip (already validated above)
+    # Add all children and create one Stop per child that has home coordinates.
+    # Stops are created with a provisional order (0,1,2...) which the optimizer
+    # will immediately overwrite with the Mapbox-optimised sequence.
+    from trips.models import Stop
+    import threading
+
+    stops_created = 0
     for child_assignment in child_assignments:
-        trip.children.add(child_assignment.assignee)
+        child = child_assignment.assignee
+        trip.children.add(child)
+
+        parent = getattr(child, 'parent', None)
+        lat = getattr(parent, 'home_latitude', None)
+        lng = getattr(parent, 'home_longitude', None)
+        if lat is None or lng is None:
+            continue  # child has no geocoded home — skip stop creation
+
+        address = (
+            parent.address if parent and parent.address
+            else getattr(child, 'address', None) or 'No address'
+        )
+        stop = Stop.objects.create(
+            trip=trip,
+            address=address,
+            latitude=lat,
+            longitude=lng,
+            scheduled_time=now,
+            order=stops_created,
+        )
+        stop.children.add(child)
+        stops_created += 1
+
+    # Fire Mapbox optimisation in a daemon thread so the HTTP response is not
+    # delayed. The thread rewrites Stop.order; all subsequent reads via
+    # order_by('order') reflect the optimised sequence.
+    if stops_created >= 2:
+        from trips.views import _optimize_trip_stops_background
+        threading.Thread(
+            target=_optimize_trip_stops_background,
+            args=(trip.id,),
+            daemon=True,
+        ).start()
 
     # Notify all parents watching this bus so their screens update immediately
     # without waiting for the 60-second poll (mirrors end_trip broadcast).
