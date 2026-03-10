@@ -1,4 +1,5 @@
 import logging
+import os
 import requests
 from jose import jwt, JWTError
 
@@ -481,24 +482,64 @@ def driver_magic_link_auth(request):
         )
 
     try:
-        # Fetch JWKS (JSON Web Key Set) from Supabase
-        jwks_response = requests.get(settings.SUPABASE_JWKS_URL, timeout=5)
-        jwks_response.raise_for_status()
-        jwks = jwks_response.json()
+        # First, try to decode without verification to see what's in the token (for debugging)
+        try:
+            unverified_payload = jwt.decode(access_token, options={"verify_signature": False})
+            logger.info(f"Supabase token payload (unverified): {unverified_payload}")
+        except Exception as e:
+            logger.error(f"Failed to decode token without verification: {str(e)}")
 
-        # Verify and decode the Supabase JWT token
-        payload = jwt.decode(
-            access_token,
-            jwks,
-            algorithms=['ES256'],
-            options={
-                'verify_aud': False,  # Supabase uses different audience
-                'verify_iss': True,
-            }
-        )
+        # Method 1: Try using Supabase secret key (HS256) - most common for Supabase
+        try:
+            if settings.SUPABASE_SECRET_KEY:
+                payload = jwt.decode(
+                    access_token,
+                    settings.SUPABASE_SECRET_KEY,
+                    algorithms=['HS256'],
+                    options={
+                        'verify_aud': False,
+                        'verify_iss': False,
+                    }
+                )
+                logger.info("Successfully verified token with HS256 (Supabase secret)")
+            else:
+                raise ValueError("SUPABASE_SECRET_KEY not configured")
+        except Exception as e:
+            logger.warning(f"HS256 verification failed: {str(e)}, trying JWKS method...")
+            
+            # Method 2: Fallback to JWKS (RS256/ES256) method
+            jwks_response = requests.get(settings.SUPABASE_JWKS_URL, timeout=5)
+            jwks_response.raise_for_status()
+            jwks = jwks_response.json()
+
+            # Try RS256 first (more common than ES256)
+            try:
+                payload = jwt.decode(
+                    access_token,
+                    jwks,
+                    algorithms=['RS256'],
+                    options={
+                        'verify_aud': False,
+                        'verify_iss': False,
+                    }
+                )
+                logger.info("Successfully verified token with RS256 (JWKS)")
+            except Exception:
+                # Try ES256 as last resort
+                payload = jwt.decode(
+                    access_token,
+                    jwks,
+                    algorithms=['ES256'],
+                    options={
+                        'verify_aud': False,
+                        'verify_iss': False,
+                    }
+                )
+                logger.info("Successfully verified token with ES256 (JWKS)")
 
         email = payload.get('email')
         if not email:
+            logger.error(f"No email in token payload: {payload}")
             return Response(
                 {"error": "Email not found in token"},
                 status=status.HTTP_400_BAD_REQUEST
@@ -881,3 +922,162 @@ def get_active_trip(request):
             "trip": None,
             "message": "No active trip"
         })
+
+
+class DriverDemoLoginView(APIView):
+    """
+    POST /api/drivers/auth/demo-login/
+    Demo account login for Apple App Store review process (Drivers App).
+
+    This endpoint allows password-based authentication for a specific
+    demo driver account, bypassing the magic link flow for review purposes.
+
+    Credentials are stored in environment variables:
+    - REVIEWER_DRIVER_EMAIL
+    - REVIEWER_DRIVER_PASSWORD
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        import os
+        
+        email = request.data.get('email', '').strip().lower()
+        password = request.data.get('password', '')
+
+        reviewer_email = os.environ.get('REVIEWER_DRIVER_EMAIL', '').strip().lower()
+        reviewer_password = os.environ.get('REVIEWER_DRIVER_PASSWORD', '')
+
+        if not reviewer_email or not reviewer_password:
+            logger.error("Driver demo login credentials not configured in environment")
+            return Response(
+                {"error": "Demo login not available"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+        if email != reviewer_email or password != reviewer_password:
+            return Response(
+                {"error": "Invalid email or password"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        try:
+            driver = Driver.objects.select_related('user').get(
+                user__email__iexact=email,
+                status='active'
+            )
+            user = driver.user
+
+            # Generate Django JWT tokens
+            refresh = RefreshToken.for_user(user)
+
+            # Get bus and route data (same logic as magic link auth)
+            bus_data = None
+            route_data = None
+
+            # Find active driver-to-bus assignment
+            assignment = Assignment.get_active_assignments_for(driver, 'driver_to_bus').first()
+
+            if assignment:
+                bus = assignment.assigned_to
+
+                # Get children assigned to this bus
+                child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
+
+                # Get today's date for attendance
+                today = date.today()
+
+                children_data = []
+                for child_assignment in child_assignments:
+                    child = child_assignment.assignee
+
+                    # Get today's attendance for both pickup and dropoff
+                    pickup_attendance = Attendance.objects.filter(child=child, date=today, trip_type='pickup').first()
+                    dropoff_attendance = Attendance.objects.filter(child=child, date=today, trip_type='dropoff').first()
+
+                    children_data.append({
+                        "id": child.id,
+                        "first_name": child.first_name,
+                        "last_name": child.last_name,
+                        "child_name": f"{child.first_name} {child.last_name}",
+                        "name": f"{child.first_name} {child.last_name}",
+                        "grade": child.class_grade,
+                        "class_grade": child.class_grade,
+                        "address": child.parent.address if child.parent and child.parent.address else (child.address if hasattr(child, 'address') else "N/A"),
+                        "home_latitude": child.parent.home_latitude if child.parent else None,
+                        "home_longitude": child.parent.home_longitude if child.parent else None,
+                        "parent_name": child.parent.user.get_full_name() if child.parent else "N/A",
+                        "parent_contact": child.parent.contact_number if child.parent else "N/A",
+                        "emergency_contact": child.parent.emergency_contact if child.parent else "N/A",
+                        "pickup_status": pickup_attendance.status if pickup_attendance else None,
+                        "pickup_status_display": pickup_attendance.get_status_display() if pickup_attendance else "Not marked",
+                        "pickup_timestamp": pickup_attendance.timestamp if pickup_attendance else None,
+                        "dropoff_status": dropoff_attendance.status if dropoff_attendance else None,
+                        "dropoff_status_display": dropoff_attendance.get_status_display() if dropoff_attendance else "Not marked",
+                        "dropoff_timestamp": dropoff_attendance.timestamp if dropoff_attendance else None,
+                    })
+
+                bus_data = {
+                    "id": bus.id,
+                    "bus_number": bus.bus_number,
+                    "number_plate": bus.number_plate,
+                    "capacity": bus.capacity,
+                    "is_active": bus.is_active,
+                    "current_location": bus.current_location,
+                    "latitude": str(bus.latitude) if bus.latitude else None,
+                    "longitude": str(bus.longitude) if bus.longitude else None,
+                    "speed": bus.speed,
+                    "heading": bus.heading,
+                    "last_updated": bus.last_updated,
+                    "children_count": len(children_data),
+                    "children": children_data,
+                }
+
+                route_data = {
+                    "bus_number": bus.bus_number,
+                    "route_name": f"Bus {bus.bus_number} Route",
+                    "bus": {
+                        "id": bus.id,
+                        "bus_number": bus.bus_number,
+                        "number_plate": bus.number_plate,
+                        "is_active": bus.is_active,
+                    },
+                    "children": children_data,
+                    "route": children_data,
+                    "total_children": len(children_data)
+                }
+
+            logger.info(f"Driver demo login successful for: {email}")
+
+            return Response({
+                "user_id": user.id,
+                "name": user.get_full_name() or "Driver",
+                "email": user.email,
+                "phone": driver.phone_number,
+                "license_number": driver.license_number,
+                "license_expiry": driver.license_expiry.isoformat() if driver.license_expiry else None,
+                "tokens": {
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                },
+                "bus": bus_data,
+                "route": route_data,
+            }, status=status.HTTP_200_OK)
+
+        except Driver.DoesNotExist:
+            logger.error(f"Demo driver account not found for email: {email}")
+            return Response(
+                {
+                    "error": "Demo account not found",
+                    "message": "The demo driver account has not been set up. Please contact support."
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.exception("Unexpected error during driver demo login")
+            return Response(
+                {
+                    "error": "Login failed",
+                    "message": "Something went wrong. Please try again."
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
