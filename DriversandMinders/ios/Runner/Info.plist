@@ -26,18 +26,16 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>ApoBasi needs camera access to take profile photos.</string>
+	<string>Basi Driver uses the camera to take profile photos.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>ApoBasi needs background location access to notify you when your child's bus is approaching.</string>
+	<string>Basi Driver needs your location in the background to stream real-time GPS position to parents during active trips.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>ApoBasi needs your location to show your child's bus location and arrival time in real-time.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>ApoBasi needs access to save photos to your library.</string>
+	<string>Basi Driver needs your location to track the bus route and share your position with parents during trips.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>ApoBasi needs access to your photo library to select profile photos.</string>
-	<key>NSUserNotificationsUsageDescription</key>
-	<string>ApoBasi sends you important updates about your child's bus trips, pickups, and drop-offs.</string>
+	<string>Basi Driver needs access to your photo library to select a profile photo.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -1,0 +1,221 @@
+APOBASI LIMITED
+DATA PRIVACY STATEMENT FOR THE USE OF
+APOBASI APPLICATION (PARENTS APP) AND BASI DRIVER APPLICATION
+----------------------------------------------------------------------------
+
+1. OUR POLICY.
+
+This Privacy Policy ("Policy") covers ApoBasi Limited's ("ApoBasi", "we", "us", "our")
+treatment of personal information or personally identifiable information (both "Personal
+Information") that may be collected or submitted when you ("you", "user") use the ApoBasi
+application (for parents and guardians) or the Basi Driver application (for drivers and
+bus minders), collectively the "Applications".
+
+Please understand that whenever you voluntarily disclose Personal Information, this
+information cannot be made one-hundred percent secure and, in some cases, that information
+can be intercepted, collected and used by others. However, we work hard to protect your
+information. Your information is stored on a secure server that ApoBasi and its authorised
+personnel can only access through a password. Additionally, we use industry-standard
+encryption to prevent unauthorised third parties from intercepting your information while
+it is in transit.
+
+
+2. HOW WE COLLECT YOUR PERSONAL INFORMATION.
+
+Before using our Applications, you will submit Personal Information during registration.
+Depending on which Application you use, the Personal Information you may be asked to
+provide includes:
+
+  ApoBasi (Parent/Guardian App):
+    - Full name
+    - Email address
+    - Home address and home location coordinates (GPS latitude and longitude), used to
+      calculate accurate bus arrival estimates
+    - Your children's names, class grades, and school attendance records, as registered
+      by your school administrator
+
+  Basi Driver App (Drivers and Bus Minders):
+    - Full name
+    - Email address
+    - Phone number
+    - Driver's licence number and expiry date (drivers only)
+    - Real-time GPS location coordinates, collected continuously in the background
+      while an active trip is in progress and streamed to parents of children assigned
+      to your bus
+
+In both Applications, authentication is handled via a secure email magic link. No
+passwords are stored or transmitted by ApoBasi.
+
+
+3. DEVICE PERMISSIONS WE REQUEST.
+
+We request the following device permissions, each used only for the stated purpose:
+
+  ApoBasi (Parent/Guardian App):
+    - Location (while using the app): to allow you to set your home address by dropping
+      a pin or using your current position, for accurate bus arrival time estimates.
+      Your location is not tracked at any other time.
+    - Camera: to allow you to take a profile photo.
+    - Photo Library: to allow you to select a profile photo from your existing photos.
+    - Push Notifications: to send you important updates about your child's bus trips,
+      pickups, and drop-offs.
+
+  Basi Driver App:
+    - Location (while using the app and in the background): to continuously stream your
+      real-time GPS position to parents during an active trip. Background location access
+      is used only while a trip is marked as active. It is not used at any other time.
+    - Camera: to allow you to take a profile photo.
+    - Photo Library: to allow you to select a profile photo from your existing photos.
+    - Push Notifications: to send you important updates about your trips and schedule.
+
+You may revoke any of these permissions at any time through your device's Settings app.
+Revoking location permission on the Basi Driver app will prevent real-time tracking from
+functioning during trips.
+
+
+4. AUTHENTICATION AND SESSION DATA.
+
+Both Applications use Supabase (supabase.com) to manage secure, passwordless
+authentication via email magic links. When you sign in, Supabase issues an authentication
+token. This token is exchanged for a session token issued by our servers, which is stored
+securely on your device. This token is used to authenticate your requests to our servers
+and expires automatically. We do not store passwords.
+
+We use Mapbox (mapbox.com) to provide maps and route calculations within the Applications.
+Mapbox may process location coordinates submitted by the Applications as part of route
+and arrival time calculations.
+
+
+5. HOW WE USE YOUR PERSONAL INFORMATION.
+
+We use the Personal Information you provide solely for the following purposes:
+
+  - Carrying out your registration and managing your account;
+  - Enabling real-time school bus tracking — sharing a driver's live GPS position with
+    parents of children on that driver's assigned bus during an active trip;
+  - Calculating estimated arrival times at each parent's registered home location;
+  - Recording and displaying student attendance for each trip;
+  - Sending push notifications about trip start, arrival, and completion events;
+  - Verifying your identity and maintaining the security of your account;
+  - Improving the performance and reliability of our Applications;
+  - Responding to your queries or support requests;
+  - Complying with any legal, governmental or regulatory requirement, or for use by our
+    lawyers in connection with any legal proceedings;
+  - Preventing and detecting fraud or other misuse of the Applications.
+
+We do not use your Personal Information for marketing, advertising, or promotional
+communications. We do not sell, rent, or share your Personal Information with third-party
+advertisers.
+
+
+6. RETENTION OF INFORMATION.
+
+We will only retain your personal data for as long as reasonably necessary to fulfil
+the purposes for which it was collected, including for the purposes of satisfying any
+legal, regulatory, tax, accounting or reporting requirements. We may retain your personal
+data for a longer period in the event of a complaint, or if we reasonably believe there
+is a prospect of litigation in respect to our relationship with you.
+
+Real-time GPS location data transmitted during a trip is used for live tracking only.
+Historical trip location data may be retained for a limited period for trip reporting and
+audit purposes, after which it is deleted or anonymised.
+
+Anonymised information that can no longer be associated with you may be held indefinitely
+for operational and statistical purposes.
+
+
+7. HOW YOUR PERSONAL INFORMATION IS DISCLOSED.
+
+It is our policy not to disclose, sell or rent your Personal Information to any individual,
+business, government entity or outside parties except:
+
+  (i)  To school administrators operating the ApoBasi platform on behalf of the school
+       that has enrolled you, who have authorised access to the data of parents, drivers,
+       bus minders, and students registered under their school;
+  (ii) To provide services you have requested — specifically, sharing a driver's live
+       GPS position with parents of children on that driver's bus during an active trip;
+  (iii) To our third-party service providers, Supabase (authentication) and Mapbox
+        (mapping), solely to the extent required to provide the Applications' core
+        functions, and subject to their own privacy policies;
+  (iv) In response to a validly-issued court order or other legal process;
+  (v)  When necessary to establish or exercise our legal rights or defend against legal
+       action; or
+  (vi) Where you request us to do so.
+
+
+8. SETTING UP USER ACCOUNTS.
+
+Accounts on the Applications are created and managed by school administrators through the
+ApoBasi administration platform. As a parent, guardian, driver, or bus minder, you may
+contact your school administrator or ApoBasi support to update or correct your Personal
+Information, or to request deletion of your account.
+
+Unless we are required to respond to court orders or comply with the laws of Kenya or any
+other applicable law, we will use our best efforts to ensure that unauthorised third
+parties do not access your user account information.
+
+
+9. CORRECTING YOUR PERSONAL INFORMATION.
+
+You are responsible for ensuring that all Personal Information you provide through the
+Applications is accurate and kept current. If you believe any information held about you
+is incorrect or out of date, please contact your school administrator or reach us directly
+at the contact details in Section 13.
+
+
+10. CHILDREN'S PRIVACY.
+
+The ApoBasi Applications are designed for use by adults — parents, guardians, drivers,
+and bus minders. The Applications process data about minors (students) on behalf of, and
+with the consent of, the school and the child's parent or guardian who is registered on
+the platform. We do not collect Personal Information directly from children, and we do not
+knowingly permit children to create accounts on the Applications.
+
+If you are a parent or guardian and believe that information about your child is being
+processed without your consent, please contact us immediately at the details in Section 13.
+
+
+11. THIRD-PARTY SERVICES.
+
+The Applications integrate the following third-party services:
+
+  - Supabase (supabase.com): authentication and secure session management.
+    Privacy policy: https://supabase.com/privacy
+  - Mapbox (mapbox.com): maps, routing, and arrival time calculations.
+    Privacy policy: https://www.mapbox.com/legal/privacy
+
+Your use of these services within the Applications is also governed by their respective
+privacy policies. We encourage you to review them. ApoBasi is not responsible for the
+privacy practices of these third-party services beyond the scope of our integration.
+
+
+12. ENCRYPTION AND SECURITY.
+
+All data transmitted between the Applications and our servers is protected using HTTPS
+with Transport Layer Security (TLS). Authentication is managed via short-lived,
+cryptographically signed tokens. All accounts must be accessed via a secure email magic
+link. You are advised not to share your authentication link or session with any other
+person.
+
+Our Applications declare that they do not use non-exempt encryption, as all cryptographic
+functions used are standard platform features or communicate via TLS.
+
+
+13. AMENDMENTS.
+
+We reserve the right to amend this Policy at any time. We will notify registered users by
+email and will post a notice of changes within the Applications when the terms of this
+Policy are amended. Continued use of the Applications after such notice constitutes
+acceptance of the revised Policy.
+
+
+14. CONTACT.
+
+If you have any questions, concerns, or requests regarding this Policy or the processing
+of your Personal Information, you may contact us at:
+
+  ApoBasi Limited
+  Email: hello@apobasi.com
+
+----------------------------------------------------------------------------
+Effective Date: March 2026
