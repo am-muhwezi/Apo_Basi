@@ -13,6 +13,7 @@ import 'services/notification_service.dart';
 import 'services/bus_websocket_service.dart';
 import 'services/parent_notifications_service.dart';
 import 'services/theme_service.dart';
+import 'services/home_location_service.dart';
 import 'config/supabase_config.dart';
 
 Future<void> main() async {
@@ -85,6 +86,8 @@ class _MyAppState extends State<MyApp> {
       // Delay WebSocket connection even further to improve startup
       Future.delayed(const Duration(milliseconds: 500), () {
         _webSocketService.connect();
+        // Migrate any existing home coords from SharedPreferences to the backend DB
+        HomeLocationService().syncOnStartup();
         // Temporarily disable parent notifications WebSocket in staging
         // to avoid crashes when the backend WebSocket endpoint is not
         // available. The rest of the app will continue to work normally.
