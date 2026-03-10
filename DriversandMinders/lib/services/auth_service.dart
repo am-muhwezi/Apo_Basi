@@ -309,6 +309,59 @@ class AuthService {
     }
   }
 
+  /// The hardcoded email Apple reviewers use to trigger the password login flow.
+  static const String _reviewerEmail = 'reviewer.driver@apobasi.com';
+
+  /// Returns true when the typed email matches the Apple reviewer account.
+  /// The login screen uses this to show a password field instead of magic link.
+  static bool isReviewerAccount(String email) =>
+      email.trim().toLowerCase() == _reviewerEmail;
+
+  /// Password-based login used exclusively by the Apple reviewer demo account.
+  /// Calls POST /api/drivers/auth/demo-login/ and stores tokens on success.
+  Future<AuthResult> loginWithPassword(String email, String password) async {
+    try {
+      final response = await _dio.post(
+        '/api/drivers/auth/demo-login/',
+        data: {'email': email.trim().toLowerCase(), 'password': password},
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        await _saveDriverDataToPrefs(data);
+        return AuthResult(
+          success: true,
+          driver: {
+            'user_id': data['user_id'],
+            'name': data['name'],
+            'email': data['email'],
+            'phone': data['phone'],
+            'license_number': data['license_number'],
+            'license_expiry': data['license_expiry'],
+          },
+          bus: data['bus'],
+          route: data['route'],
+          tokens: data['tokens'],
+        );
+      }
+
+      return AuthResult(
+        success: false,
+        error: response.data['error'] ?? response.data['message'] ?? 'Login failed',
+      );
+    } on DioException catch (e) {
+      String msg = 'Login failed';
+      if (e.response?.statusCode == 401) msg = 'Invalid email or password';
+      if (e.response?.statusCode == 404) {
+        msg = e.response?.data['message'] ?? 'Demo account not configured';
+      }
+      if (e.response?.statusCode == 503) msg = 'Demo login not available';
+      return AuthResult(success: false, error: msg);
+    } catch (e) {
+      return AuthResult(success: false, error: 'Unexpected error: $e');
+    }
+  }
+
   /// Check if driver is currently authenticated (has valid tokens)
   Future<bool> isAuthenticated() async {
     final prefs = await SharedPreferences.getInstance();

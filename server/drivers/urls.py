@@ -4,6 +4,7 @@ from .views import (
     DriverDetailView,
     MyBusView,
     MyRouteView,
+    DriverDemoLoginView,
     driver_phone_login,
     check_driver_email,
     driver_magic_link_auth,
@@ -21,6 +22,7 @@ urlpatterns = [
     path("phone-login/", driver_phone_login, name="driver-phone-login"),
     path("auth/check-email/", check_driver_email, name="check-driver-email"),
     path("auth/magic-link/", driver_magic_link_auth, name="driver-magic-link-auth"),
+    path("auth/demo-login/", DriverDemoLoginView.as_view(), name="driver-demo-login"),
 
     # Driver-specific endpoints
     path("my-bus/", MyBusView.as_view(), name="my-bus"),

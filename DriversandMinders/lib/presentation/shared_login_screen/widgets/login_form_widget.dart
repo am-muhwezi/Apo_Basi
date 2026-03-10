@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
+import '../../../services/auth_service.dart';
 import '../../../widgets/custom_icon_widget.dart';
 
 class LoginFormWidget extends StatefulWidget {
   final Function(String) onLogin;
+  final Function(String email, String password)? onPasswordLogin;
   final bool isLoading;
   final bool magicLinkSent;
   final String? errorMessage;
@@ -13,6 +15,7 @@ class LoginFormWidget extends StatefulWidget {
   const LoginFormWidget({
     super.key,
     required this.onLogin,
+    this.onPasswordLogin,
     required this.isLoading,
     required this.magicLinkSent,
     this.errorMessage,
@@ -24,9 +27,13 @@ class LoginFormWidget extends StatefulWidget {
 
 class _LoginFormWidgetState extends State<LoginFormWidget> {
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   final FocusNode _emailFocusNode = FocusNode();
   String? _validationError;
+  String? _passwordError;
   bool _isEmailValid = false;
+  bool _isReviewerAccount = false;
+  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -37,6 +44,7 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
   @override
   void dispose() {
     _emailController.dispose();
+    _passwordController.dispose();
     _emailFocusNode.dispose();
     super.dispose();
   }
@@ -47,12 +55,15 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
       if (email.isEmpty) {
         _validationError = null;
         _isEmailValid = false;
+        _isReviewerAccount = false;
       } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
         _validationError = 'Please enter a valid email address';
         _isEmailValid = false;
+        _isReviewerAccount = false;
       } else {
         _validationError = null;
         _isEmailValid = true;
+        _isReviewerAccount = AuthService.isReviewerAccount(email);
       }
     });
   }
@@ -71,8 +82,27 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
       return;
     }
 
+    if (_isReviewerAccount) {
+      _handlePasswordLogin();
+      return;
+    }
+
     FocusScope.of(context).unfocus();
     widget.onLogin(email);
+  }
+
+  void _handlePasswordLogin() {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (password.isEmpty) {
+      setState(() => _passwordError = 'Please enter password');
+      return;
+    }
+
+    setState(() => _passwordError = null);
+    FocusScope.of(context).unfocus();
+    widget.onPasswordLogin?.call(email, password);
   }
 
   @override
@@ -257,9 +287,69 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
               ],
             ),
 
+            // Password field — only shown for the reviewer demo account
+            if (_isReviewerAccount) ...[
+              SizedBox(height: 2.h),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Password',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  SizedBox(height: 0.8.h),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    enabled: !widget.isLoading,
+                    onFieldSubmitted: (_) => _handlePasswordLogin(),
+                    decoration: InputDecoration(
+                      hintText: 'Password',
+                      prefixIcon: Padding(
+                        padding: EdgeInsets.all(2.w),
+                        child: CustomIconWidget(
+                          iconName: 'lock',
+                          color: colorScheme.onSurface.withValues(alpha: 0.6),
+                          size: 16,
+                        ),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          size: 20,
+                          color: colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                      errorText: _passwordError,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 3.w,
+                        vertical: 0.8.h,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: colorScheme.outline, width: 1),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5), width: 1),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
             SizedBox(height: 2.h),
 
-            // Send Login Link Button
+            // Button: "Sign In" for reviewer, "Send Login Link" for everyone else
             SizedBox(
               height: 5.5.h,
               child: ElevatedButton(
@@ -286,7 +376,7 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
                         ),
                       )
                     : Text(
-                        'Send Login Link',
+                        _isReviewerAccount ? 'Sign In' : 'Send Login Link',
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: colorScheme.onPrimary,
                           fontWeight: FontWeight.w600,

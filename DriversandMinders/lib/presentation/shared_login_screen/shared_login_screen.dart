@@ -179,6 +179,38 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
     }
   }
 
+  Future<void> _handlePasswordLogin(String email, String password) async {
+    FocusScope.of(context).unfocus();
+    setState(() { _isLoading = true; _errorMessage = null; });
+
+    try {
+      final result = await _authService.loginWithPassword(email, password);
+
+      if (result.success) {
+        HapticFeedback.selectionClick();
+        final userName = result.driver?['name'] ?? 'Driver';
+        String route = '/driver-start-shift-screen';
+        if (result.bus != null) {
+          _cacheDriverData(result);
+        } else if (result.route != null && result.route!['buses'] != null) {
+          route = '/busminder-start-shift-screen';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Welcome, $userName!'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ));
+        Navigator.pushReplacementNamed(context, route);
+      } else {
+        HapticFeedback.heavyImpact();
+        setState(() { _errorMessage = result.error ?? 'Login failed'; _isLoading = false; });
+      }
+    } catch (e) {
+      HapticFeedback.heavyImpact();
+      setState(() { _errorMessage = e.toString().replaceAll('Exception: ', ''); _isLoading = false; });
+    }
+  }
+
   Future<void> _handleSendMagicLink(String email) async {
     FocusScope.of(context).unfocus();
 
@@ -387,6 +419,7 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
                               ? LoginFormWidget(
                                   key: const ValueKey('email_form'),
                                   onLogin: _handleSendMagicLink,
+                                  onPasswordLogin: _handlePasswordLogin,
                                   isLoading: _isLoading,
                                   magicLinkSent: _magicLinkSent,
                                   errorMessage: _errorMessage,
