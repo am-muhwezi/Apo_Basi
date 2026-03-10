@@ -24,7 +24,7 @@ class BusLocation {
     required this.timestamp,
   });
 
-  /// Create from JSON (Socket.IO or HTTP response)
+  /// Create from JSON (WebSocket or HTTP response)
   factory BusLocation.fromJson(Map<String, dynamic> json) {
     return BusLocation(
       busId: json['busId'] ?? json['bus_id'],
@@ -132,9 +132,9 @@ class BusLocation {
 
 /// Location Connection State
 ///
-/// Represents the state of Socket.IO connection for real-time updates
+/// Represents the state of the WebSocket connection for real-time updates
 enum LocationConnectionState {
-  disconnected, // Not connected to Socket.IO server
+  disconnected, // Not connected to WebSocket server
   connecting, // Attempting to connect
   connected, // Successfully connected and receiving updates
   error, // Connection error occurred

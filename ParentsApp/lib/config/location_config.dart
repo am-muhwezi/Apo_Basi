@@ -1,7 +1,7 @@
 /// Real-time Location Tracking Configuration
 ///
-/// Centralized configuration for location tracking, Socket.IO connections,
-/// and real-time bus monitoring features.
+/// Centralized configuration for location tracking, WebSocket connections,
+/// and real-time bus monitoring features powered by Django Channels.
 
 import 'package:latlong2/latlong.dart';
 
@@ -17,18 +17,19 @@ class LocationConfig {
   static const LatLng boundsNortheast = LatLng(-1.1700, 36.8500);
 
   // ============================================================================
-  // Socket.IO Configuration
+  // WebSocket Configuration
   // ============================================================================
 
-  /// Socket.IO Server URL (defaults to value in api_config.dart)
-  /// This should point to the Node.js Socket.IO relay service
+  /// Optional WebSocket server URL override (defaults to value derived from
+  /// ApiConfig.apiBaseUrl). Kept for backwards compatibility but not required
+  /// now that Django ASGI serves bus WebSocket connections directly.
   static const String socketUrl =
       String.fromEnvironment('SOCKET_URL', defaultValue: '');
 
-  /// Socket.IO connection timeout
+  /// WebSocket connection timeout
   static const Duration socketConnectionTimeout = Duration(seconds: 10);
 
-  /// Socket.IO reconnection delay
+  /// WebSocket reconnection delay
   static const Duration socketReconnectionDelay = Duration(seconds: 2);
 
   /// Maximum reconnection attempts before giving up
@@ -93,7 +94,8 @@ class LocationConfig {
 
   /// Whether to request background location permission on Android
   /// Parents app only uses foreground location (home address detection).
-  /// Bus locations are received via Socket.IO, not device GPS.
+  /// Bus locations are received from the server via WebSockets, not device
+  /// GPS.
   static const bool requestBackgroundLocation = false;
 
   /// Whether to show rationale before requesting permissions
@@ -132,7 +134,7 @@ class LocationConfig {
   /// Enable detailed logging for location tracking
   static const bool enableLocationLogging = false;
 
-  /// Enable Socket.IO event logging
+  /// Enable WebSocket event logging
   static const bool enableSocketLogging = true;
 
   /// Show debug overlay on map (connection status, update count, etc.)
