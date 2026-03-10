@@ -28,7 +28,7 @@ dependencies:
   geolocator: ^14.0.2
   flutter_map: ^8.2.2
   latlong2: ^0.9.1
-  mapbox_maps_flutter: ^2.18.0
+  mapbox_maps_flutter: 2.18.0
   # Native WebSocket support for Django Channels
   web_socket_channel: ^3.0.1
 

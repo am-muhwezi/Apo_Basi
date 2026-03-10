@@ -232,7 +232,7 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
                   enabled: !widget.isLoading,
                   onFieldSubmitted: (_) => _validateAndSubmit(),
                   decoration: InputDecoration(
-                    hintText: 'e.g., driver@example.com',
+                    hintText: 'e.g., driver@yourcompany.com',
                     prefixIcon: Padding(
                       padding: EdgeInsets.all(2.w),
                       child: CustomIconWidget(
