@@ -274,6 +274,7 @@ class LocationTrackingService : Service() {
             accuracy  = location.accuracy.toDouble(),
             lat       = location.latitude,
             lng       = location.longitude,
+            heading   = location.bearing.toDouble(),
         )
 
         serviceScope.launch {

@@ -43,7 +43,6 @@ class ApiConfig {
   static double? get schoolLongitude =>
       double.tryParse(dotenv.env['SCHOOL_LONGITUDE'] ?? '');
 
-
   /// Get the Mapbox style URI for the native SDK
   static String getMapboxStyleUri() {
     return 'mapbox://styles/$mapboxStyleId';
@@ -61,7 +60,8 @@ class ApiConfig {
   static const String parentsEndpoint = '/api/parents/';
   static String parentDetailEndpoint(int id) => '/api/parents/$id/';
   static String parentChildrenEndpoint(int id) => '/api/parents/$id/children/';
-  static const String parentHomeLocationEndpoint = '/api/parents/home-location/';
+  static const String parentHomeLocationEndpoint =
+      '/api/parents/home-location/';
   static const String schoolInfoEndpoint = '/api/school/info/';
 
   /// Buses endpoints
@@ -92,9 +92,15 @@ class ApiConfig {
         apiBaseUrl.contains('192.168.');
   }
 
+  /// Check if using staging environment
+  static bool isStaging() {
+    return apiBaseUrl.contains('staging.');
+  }
+
   /// Get user-friendly environment name
   static String getEnvironmentName() {
     if (isDevelopment()) return 'Development';
+    if (isStaging()) return 'Staging';
     return 'Production';
   }
 
@@ -111,5 +117,26 @@ class ApiConfig {
 
   /// Print configuration summary (for debugging)
   static void printConfigSummary() {
+    print('🌍 API Environment: ${getEnvironmentName()}');
+    print('🔗 Backend URL: $apiBaseUrl');
+    print('📍 Home Location Endpoint: $apiBaseUrl$parentHomeLocationEndpoint');
+    if (isStaging()) {
+      print('⚠️  STAGING MODE: All parent locations save to staging database');
+    }
+    if (!isStaging() && !isDevelopment()) {
+      print('🚀 PRODUCTION MODE: App connected to live production backend');
+    }
+  }
+
+  /// Get a visible environment badge for the UI
+  static String getEnvironmentBadge() {
+    if (isDevelopment()) return '🔧 DEV';
+    if (isStaging()) return '🧪 STAGING';
+    return ''; // No badge in production
+  }
+
+  /// Check if we should show environment indicator in UI
+  static bool shouldShowEnvironmentIndicator() {
+    return isDevelopment() || isStaging();
   }
 }

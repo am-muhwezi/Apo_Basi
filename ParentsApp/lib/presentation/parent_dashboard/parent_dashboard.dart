@@ -3,6 +3,7 @@ import 'package:sizer/sizer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/app_export.dart';
+import '../../config/api_config.dart';
 import '../../services/api_service.dart';
 import '../../services/cache_service.dart';
 import '../../services/connectivity_service.dart';
@@ -366,12 +367,48 @@ class _ParentDashboardState extends State<ParentDashboard> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'Welcome, $_parentName',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: colorScheme.onSurface,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Welcome, $_parentName',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                // Environment indicator (only shown in dev/staging)
+                if (ApiConfig.shouldShowEnvironmentIndicator()) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: ApiConfig.isStaging()
+                          ? Colors.orange.withValues(alpha: 0.15)
+                          : Colors.blue.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color:
+                            ApiConfig.isStaging() ? Colors.orange : Colors.blue,
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      ApiConfig.getEnvironmentBadge(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: ApiConfig.isStaging()
+                            ? Colors.orange.shade800
+                            : Colors.blue.shade800,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           // Avatar circle

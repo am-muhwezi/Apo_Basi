@@ -5,14 +5,12 @@ import 'package:sizer/sizer.dart';
 
 import '../core/app_export.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 
 class BusminderDrawerWidget extends StatelessWidget {
   final String currentRoute;
 
-  const BusminderDrawerWidget({
-    super.key,
-    required this.currentRoute,
-  });
+  const BusminderDrawerWidget({super.key, required this.currentRoute});
 
   Future<Map<String, String>> _getUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
@@ -40,8 +38,7 @@ class BusminderDrawerWidget extends StatelessWidget {
           padding: EdgeInsets.all(6.w),
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -61,8 +58,7 @@ class BusminderDrawerWidget extends StatelessWidget {
                   color: cs.error.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child:
-                    Icon(Icons.logout_rounded, size: 32, color: cs.error),
+                child: Icon(Icons.logout_rounded, size: 32, color: cs.error),
               ),
               SizedBox(height: 2.h),
               Text(
@@ -77,8 +73,7 @@ class BusminderDrawerWidget extends StatelessWidget {
               Text(
                 'You will need to login again to access your account',
                 textAlign: TextAlign.center,
-                style:
-                    TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
               ),
               SizedBox(height: 3.h),
               Row(
@@ -87,46 +82,58 @@ class BusminderDrawerWidget extends StatelessWidget {
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         side: BorderSide(
-                            color: cs.outline.withValues(alpha: 0.5)),
+                          color: cs.outline.withValues(alpha: 0.5),
+                        ),
                       ),
-                      child: Text('Cancel',
-                          style: TextStyle(
-                              color: cs.onSurface,
-                              fontWeight: FontWeight.w600)),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: cs.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                   SizedBox(width: 4.w),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () async {
-                        final apiService = ApiService();
-                        await apiService.clearToken();
+                        // Close dialog first
                         Navigator.pop(context);
-                        Navigator.pushNamedAndRemoveUntil(
-                          context,
-                          '/shared-login-screen',
-                          (route) => false,
-                        );
+
+                        // Clear session using AuthService (includes Supabase cleanup)
+                        final authService = AuthService();
+                        await authService.signOut();
+
+                        // Navigate to login and clear all routes
+                        if (context.mounted) {
+                          Navigator.pushNamedAndRemoveUntil(
+                            context,
+                            '/shared-login-screen',
+                            (route) => false,
+                          );
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: cs.error,
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         elevation: 0,
                       ),
-                      child: const Text('Logout',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600)),
+                      child: const Text(
+                        'Logout',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -208,7 +215,9 @@ class BusminderDrawerWidget extends StatelessWidget {
                             const SizedBox(height: 4),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
                                 color: cs.primary.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
@@ -233,8 +242,11 @@ class BusminderDrawerWidget extends StatelessWidget {
                             color: cs.onSurface.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Icon(Icons.close,
-                              size: 20, color: cs.onSurfaceVariant),
+                          child: Icon(
+                            Icons.close,
+                            size: 20,
+                            color: cs.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     ],
@@ -247,7 +259,9 @@ class BusminderDrawerWidget extends StatelessWidget {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 5.w),
               child: Divider(
-                  height: 1, color: cs.outline.withValues(alpha: 0.4)),
+                height: 1,
+                color: cs.outline.withValues(alpha: 0.4),
+              ),
             ),
 
             SizedBox(height: 2.h),
@@ -304,14 +318,12 @@ class BusminderDrawerWidget extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: cs.error.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: cs.error.withValues(alpha: 0.2)),
+                    border: Border.all(color: cs.error.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.logout_rounded,
-                          size: 20, color: cs.error),
+                      Icon(Icons.logout_rounded, size: 20, color: cs.error),
                       const SizedBox(width: 10),
                       Text(
                         'Logout',
@@ -333,21 +345,23 @@ class BusminderDrawerWidget extends StatelessWidget {
   }
 
   Widget _buildSectionLabel(String label) {
-    return Builder(builder: (context) {
-      final cs = Theme.of(context).colorScheme;
-      return Padding(
-        padding: const EdgeInsets.only(left: 4, top: 8, bottom: 12),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-            letterSpacing: 1.2,
+    return Builder(
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return Padding(
+          padding: const EdgeInsets.only(left: 4, top: 8, bottom: 12),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+              letterSpacing: 1.2,
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
   }
 
   Widget _buildMenuItem(
@@ -376,11 +390,14 @@ class BusminderDrawerWidget extends StatelessWidget {
                   content: const Text('Please start a shift first'),
                   backgroundColor: Theme.of(context).colorScheme.error,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               );
               Navigator.pushReplacementNamed(
-                  context, '/busminder-start-shift-screen');
+                context,
+                '/busminder-start-shift-screen',
+              );
               return;
             }
           }

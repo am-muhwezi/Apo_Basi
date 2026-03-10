@@ -285,6 +285,66 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
     }
   }
 
+  Future<void> _handlePasswordLogin(String email, String password) async {
+    FocusScope.of(context).unfocus();
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    HapticFeedback.lightImpact();
+
+    try {
+      final result = await _authService.loginWithPassword(email, password);
+
+      if (result.success) {
+        HapticFeedback.selectionClick();
+
+        // Determine route based on assignment
+        String route;
+        String userName = 'Reviewer';
+
+        if (result.driver != null) {
+          userName = result.driver!['name'] ?? 'Reviewer';
+
+          if (result.bus != null) {
+            route = '/driver-start-shift-screen';
+            _cacheDriverData(result);
+          } else if (result.route != null && result.route!['buses'] != null) {
+            route = '/busminder-start-shift-screen';
+          } else {
+            route = '/driver-start-shift-screen';
+          }
+        } else {
+          route = '/driver-start-shift-screen';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Welcome, $userName!'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        Navigator.pushReplacementNamed(context, route);
+      } else {
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _errorMessage = result.error ?? 'Login failed';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
+    }
+  }
+
   void _handleLoginMethodChange(LoginMethod method) {
     if (_selectedLoginMethod != method) {
       setState(() {
@@ -387,6 +447,7 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
                               ? LoginFormWidget(
                                   key: const ValueKey('email_form'),
                                   onLogin: _handleSendMagicLink,
+                                  onPasswordLogin: _handlePasswordLogin, // Add password login handler
                                   isLoading: _isLoading,
                                   magicLinkSent: _magicLinkSent,
                                   errorMessage: _errorMessage,
