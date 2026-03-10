@@ -90,3 +90,6 @@ android/gradle.properties
 # Development screenshots
 *_[0-9][0-9]_*.png
 *.png
+**/GeneratedPluginRegistrant.*
+**/generated_plugin_registrant.*
+**/generated_plugins.cmake
