@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../core/app_export.dart';
 import '../widgets/custom_error_widget.dart';
@@ -55,6 +56,20 @@ Future<void> main() async {
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp])
   ]).then((value) {
     runApp(MyApp());
+
+    // Request location permission after first frame is rendered
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Drivers need background location to stream GPS during active trips.
+      // iOS requires whenInUse to be granted before upgrading to always.
+      final whenInUseStatus = await Permission.locationWhenInUse.status;
+      if (whenInUseStatus.isDenied) {
+        await Permission.locationWhenInUse.request();
+      }
+      final alwaysStatus = await Permission.locationAlways.status;
+      if (alwaysStatus.isDenied) {
+        await Permission.locationAlways.request();
+      }
+    });
   });
 }
 

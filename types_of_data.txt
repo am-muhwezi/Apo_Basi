@@ -1,0 +1,190 @@
+APOBASI LIMITED
+TYPES OF PERSONAL DATA COLLECTED BY THE APOBASI APPLICATIONS
+----------------------------------------------------------------------------
+
+This document describes the categories of personal data collected by ApoBasi Limited
+through the ApoBasi application (for parents and guardians) and the Basi Driver
+application (for drivers and bus minders), collectively the "Applications".
+
+----------------------------------------------------------------------------
+
+
+1. DATA YOU PROVIDE
+
+This is data you or your school administrator provides when creating or updating an
+account on the Applications.
+
+  Data category                    Data types
+  ----------------------------------------------------------------------------
+
+  a. Account information.          ApoBasi (Parent/Guardian App):
+  We collect data when your          - Email address
+  account is created on the          - Full name
+  ApoBasi platform (by you or        - Home address (entered as text)
+  your school administrator)         - Home location coordinates (GPS latitude
+  or when you update your              and longitude), used to calculate bus
+  profile within the                   arrival time estimates
+  Application.                       - Profile photo
+
+                                   Basi Driver App (Drivers and Bus Minders):
+                                     - Email address
+                                     - Full name
+                                     - Phone number
+                                     - Profile photo
+                                     - Driver's licence number (drivers only)
+                                     - Driver's licence expiry date (drivers only)
+
+  ----------------------------------------------------------------------------
+
+  b. Student data.                 ApoBasi (Parent/Guardian App):
+  School administrators              - Student's full name
+  register student information       - Class or grade
+  on behalf of the school and        - School attendance status per trip
+  the child's enrolled parent          (e.g., present, absent)
+  or guardian. ApoBasi does          - Parent/guardian association (linking
+  not collect this data                a student record to a registered
+  directly from children.              parent account)
+
+  ----------------------------------------------------------------------------
+
+
+2. DATA COLLECTED WHEN YOU USE OUR SERVICES
+
+This is data collected automatically as you use the Applications.
+
+  Data category                    Data types
+  ----------------------------------------------------------------------------
+
+  a. Location data.                ApoBasi (Parent/Guardian App):
+                                     - Precise GPS coordinates (latitude and
+  ApoBasi (Parent/Guardian            longitude), collected only when you
+  App): We collect your               set or update your home address by
+  device's precise location           dropping a pin or using your current
+  only when you use the app           position. Not collected at any
+  to set or update your home          other time.
+  address. Your location is
+  not tracked at any
+  other time.                     Basi Driver App:
+                                     - Precise GPS coordinates (latitude and
+  Basi Driver App: We collect         longitude), collected continuously in
+  your device's precise GPS           the background while an active trip
+  coordinates continuously in         is in progress
+  the background while an           - Timestamp associated with each
+  active trip is marked as            location point, used to derive
+  in progress. This data is           speed and arrival estimates
+  streamed in real time to
+  parents of children assigned
+  to your bus. Location
+  collection stops when the
+  trip is ended.
+
+  You may revoke location
+  permission at any time
+  through your device's
+  Settings app. Revoking
+  location permission on the
+  Basi Driver app will prevent
+  real-time tracking from
+  functioning during trips.
+
+  ----------------------------------------------------------------------------
+
+  b. Trip information.             - Trip type (pickup or dropoff)
+  We collect details about         - Trip status (scheduled, in progress,
+  each school bus trip               completed)
+  operated through the             - Trip start time and end time
+  Applications.                    - Bus identifier and route identifier
+                                   - Route stops and their sequence
+                                   - Student attendance records per trip
+                                     (e.g., picked up, dropped off,
+                                     marked absent)
+                                   - Estimated and actual arrival times
+                                     at each stop
+
+  ----------------------------------------------------------------------------
+
+  c. Usage data.                   - App crashes and system activity logs
+  This refers to data about        - Access dates and times
+  how you interact with the        - App screens or features accessed
+  Applications.                    - Push notification delivery and
+                                     interaction events
+
+  ----------------------------------------------------------------------------
+
+  d. Device data.                  - Device type and hardware model
+  This refers to data about        - Operating system and version
+  the device you use to            - Push notification token (used solely
+  access the Applications.           to deliver trip alerts to your device)
+
+  ----------------------------------------------------------------------------
+
+  e. Authentication and            - Email address used to receive a
+  session data.                      magic link sign-in
+  We collect data to manage        - Authentication session token (issued
+  your secure sign-in and            by Supabase; short-lived and
+  maintain your session.             cryptographically signed)
+                                   - Access token and refresh token
+                                     (issued by ApoBasi servers; stored
+                                     securely on your device and used to
+                                     authenticate your requests)
+
+  ----------------------------------------------------------------------------
+
+
+3. DATA FROM OTHER SOURCES
+
+These are data categories we receive from third parties in connection with the
+operation of the Applications.
+
+  Data category                    Data types
+  ----------------------------------------------------------------------------
+
+  a. School administrators.        - Parent/guardian name and email address
+  ApoBasi receives data from       - Driver or bus minder name, email
+  school administrators who          address, phone number, and licence
+  operate the platform on            details
+  behalf of their school.          - Student name, class/grade,
+  Administrators create and          parent/guardian association, and
+  manage accounts for                bus/route assignment
+  parents, guardians, drivers,
+  and bus minders, and
+  register student records
+  under their school.
+
+  ----------------------------------------------------------------------------
+
+  b. Authentication service        - Email address
+  provider (Supabase).             - Authentication event (sign-in
+  When you sign in via email         timestamp and status)
+  magic link, Supabase             - Authentication token confirming
+  processes your sign-in             successful sign-in
+  and returns a token to
+  the Applications confirming
+  your identity.
+
+  ----------------------------------------------------------------------------
+
+  c. Mapping and routing           - GPS coordinates submitted to Mapbox
+  service provider (Mapbox).         for route calculation
+  When the Applications           - Route geometry and turn-by-turn
+  calculate routes or                directions (derived from submitted
+  estimated arrival times,           coordinates)
+  location coordinates are         - Estimated travel durations between
+  submitted to Mapbox for            stops
+  processing via its
+  Directions and Optimization
+  APIs.
+
+  ----------------------------------------------------------------------------
+
+  d. Law enforcement officials     - Name
+  and other government             - Contact information
+  authorities.                     - Information relating to law
+                                     enforcement investigations or other
+                                     legal proceedings
+
+  ----------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------
+ApoBasi Limited  |  hello@apobasi.com  |  Effective Date: March 2026
