@@ -57,10 +57,10 @@ class TripStatisticsWidget extends StatelessWidget {
                   totalStudents.toString(),
                   CustomIconWidget(
                     iconName: 'school',
-                    color: AppTheme.primaryBusminder,
+                    color: Theme.of(context).colorScheme.primary,
                     size: 24,
                   ),
-                  AppTheme.primaryBusminder,
+                  Theme.of(context).colorScheme.primary,
                 ),
               ),
               SizedBox(width: 3.w),
@@ -71,10 +71,10 @@ class TripStatisticsWidget extends StatelessWidget {
                   '${attendanceRate.toInt()}%',
                   CustomIconWidget(
                     iconName: 'check_circle',
-                    color: AppTheme.successAction,
+                    color: Theme.of(context).colorScheme.secondary,
                     size: 24,
                   ),
-                  AppTheme.successAction,
+                  Theme.of(context).colorScheme.secondary,
                 ),
               ),
             ],
@@ -90,13 +90,13 @@ class TripStatisticsWidget extends StatelessWidget {
                   CustomIconWidget(
                     iconName: 'schedule',
                     color: onTimePerformance >= 80
-                        ? AppTheme.successAction
-                        : AppTheme.warningState,
+                        ? Theme.of(context).colorScheme.secondary
+                        : Theme.of(context).colorScheme.tertiary,
                     size: 24,
                   ),
                   onTimePerformance >= 80
-                      ? AppTheme.successAction
-                      : AppTheme.warningState,
+                      ? Theme.of(context).colorScheme.secondary
+                      : Theme.of(context).colorScheme.tertiary,
                 ),
               ),
               SizedBox(width: 3.w),
@@ -107,10 +107,10 @@ class TripStatisticsWidget extends StatelessWidget {
                   '$completedStops/$totalStops',
                   CustomIconWidget(
                     iconName: 'location_on',
-                    color: AppTheme.primaryBusminder,
+                    color: Theme.of(context).colorScheme.primary,
                     size: 24,
                   ),
-                  AppTheme.primaryBusminder,
+                  Theme.of(context).colorScheme.primary,
                 ),
               ),
             ],
@@ -180,19 +180,19 @@ class TripStatisticsWidget extends StatelessWidget {
     IconData performanceIcon;
 
     if (averagePerformance >= 90) {
-      performanceColor = AppTheme.successAction;
+      performanceColor = Theme.of(context).colorScheme.secondary;
       performanceText = 'Excellent Performance';
       performanceIcon = Icons.star;
     } else if (averagePerformance >= 75) {
-      performanceColor = AppTheme.primaryBusminder;
+      performanceColor = Theme.of(context).colorScheme.primary;
       performanceText = 'Good Performance';
       performanceIcon = Icons.thumb_up;
     } else if (averagePerformance >= 60) {
-      performanceColor = AppTheme.warningState;
+      performanceColor = Theme.of(context).colorScheme.tertiary;
       performanceText = 'Average Performance';
       performanceIcon = Icons.info;
     } else {
-      performanceColor = AppTheme.criticalAlert;
+      performanceColor = Theme.of(context).colorScheme.error;
       performanceText = 'Needs Improvement';
       performanceIcon = Icons.warning;
     }

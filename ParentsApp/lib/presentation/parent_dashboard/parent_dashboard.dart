@@ -6,11 +6,13 @@ import '../../core/app_export.dart';
 import '../../services/api_service.dart';
 import '../../services/cache_service.dart';
 import '../../services/connectivity_service.dart';
+import '../../services/home_location_service.dart';
 import '../../models/child_model.dart';
 import '../notifications_center/notifications_center.dart';
 import '../parent_profile_settings/parent_profile_settings.dart';
 import './widgets/child_status_card.dart';
 import './widgets/bus_approaching_card.dart';
+import './widgets/home_location_prompt_dialog.dart';
 
 class ParentDashboard extends StatefulWidget {
   const ParentDashboard({Key? key}) : super(key: key);
@@ -27,9 +29,11 @@ class _ParentDashboardState extends State<ParentDashboard> {
   final ApiService _apiService = ApiService();
   final CacheService _cacheService = CacheService();
   final ConnectivityService _connectivityService = ConnectivityService();
+  final HomeLocationService _homeLocationService = HomeLocationService();
   bool _isLoading = true;
   List<Child> _children = [];
   String _parentName = 'Parent';
+  bool _hasCheckedHomeLocation = false;
 
   @override
   void initState() {
@@ -40,6 +44,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
     // Defer connectivity initialization to reduce startup load
     Future.microtask(() {
       _initializeConnectivity();
+      _checkAndPromptHomeLocation();
     });
   }
 
@@ -69,7 +74,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? const Color(0xFFFF9500) : const Color(0xFF34C759),
+        backgroundColor:
+            isError ? const Color(0xFFFF9500) : const Color(0xFF34C759),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ),
@@ -101,7 +107,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
       final children = await _apiService.getMyChildren();
 
       // Cache the fresh data
-      await _cacheService.cacheChildren(children.map((c) => c.toJson()).toList());
+      await _cacheService
+          .cacheChildren(children.map((c) => c.toJson()).toList());
 
       if (mounted) {
         setState(() {
@@ -135,7 +142,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
         if (staleCache != null && staleCache.isNotEmpty) {
           if (mounted) {
             setState(() {
-              _children = staleCache.map((json) => Child.fromJson(json)).toList();
+              _children =
+                  staleCache.map((json) => Child.fromJson(json)).toList();
               _isLoading = false;
               _isConnected = false;
             });
@@ -160,6 +168,29 @@ class _ParentDashboardState extends State<ParentDashboard> {
 
   Future<void> _loadChildren() async {
     await _loadData();
+  }
+
+  /// Check if user has set home location, prompt if not
+  Future<void> _checkAndPromptHomeLocation() async {
+    if (_hasCheckedHomeLocation) return;
+    _hasCheckedHomeLocation = true;
+
+    // Wait a bit for the dashboard to load before showing dialog
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    final coordinates = await _homeLocationService.getHomeCoordinates();
+    if (coordinates == null && mounted) {
+      // User hasn't set home location yet - show prompt
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => HomeLocationPromptDialog(
+          onLocationSet: () {
+            _showToast('Home location saved successfully', isError: false);
+          },
+        ),
+      );
+    }
   }
 
   @override
@@ -373,8 +404,10 @@ class _ParentDashboardState extends State<ParentDashboard> {
     final approaching = <Map<String, dynamic>>[];
     for (final child in _children) {
       final status = (child.currentStatus ?? '').toLowerCase();
-      if (status == 'on_bus' || status == 'on-bus' ||
-          status == 'picked_up' || status == 'picked-up') {
+      if (status == 'on_bus' ||
+          status == 'on-bus' ||
+          status == 'picked_up' ||
+          status == 'picked-up') {
         approaching.add({
           'firstName': child.firstName,
           'busNumber': child.assignedBus?.numberPlate,
@@ -394,6 +427,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
       "busNumber": child.assignedBus?.numberPlate,
       "routeName":
           child.routeName, // Only route name, not route code (admin only)
+      "driverName": child.driverName, // Driver name from backend
     };
   }
 

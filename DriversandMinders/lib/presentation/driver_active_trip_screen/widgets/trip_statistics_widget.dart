@@ -35,7 +35,7 @@ class TripStatisticsWidget extends StatelessWidget {
               title: 'Students',
               value: '$studentsPickedUp/$totalStudents',
               subtitle: 'Picked Up',
-              color: AppTheme.successAction,
+              color: Theme.of(context).colorScheme.secondary,
             ),
           ),
 
@@ -49,7 +49,7 @@ class TripStatisticsWidget extends StatelessWidget {
               title: 'Stops',
               value: remainingStops.toString(),
               subtitle: 'Remaining',
-              color: AppTheme.warningState,
+              color: Theme.of(context).colorScheme.tertiary,
             ),
           ),
 
@@ -63,7 +63,7 @@ class TripStatisticsWidget extends StatelessWidget {
               title: 'ETA',
               value: estimatedArrival,
               subtitle: 'Arrival',
-              color: AppTheme.primaryDriver,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
         ],
@@ -84,7 +84,7 @@ class TripStatisticsWidget extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(3.w),
       decoration: BoxDecoration(
-        color: AppTheme.backgroundSecondary,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: color.withValues(alpha: 0.2),
@@ -92,7 +92,7 @@ class TripStatisticsWidget extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.shadowLight,
+            color: Theme.of(context).colorScheme.shadow,
             offset: Offset(0, 1),
             blurRadius: 4,
             spreadRadius: 0,
@@ -121,7 +121,7 @@ class TripStatisticsWidget extends StatelessWidget {
           Text(
             value,
             style: theme.textTheme.titleLarge?.copyWith(
-              color: AppTheme.textPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.w700,
             ),
             textAlign: TextAlign.center,
@@ -134,7 +134,7 @@ class TripStatisticsWidget extends StatelessWidget {
           Text(
             title,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: AppTheme.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
@@ -143,7 +143,7 @@ class TripStatisticsWidget extends StatelessWidget {
           Text(
             subtitle,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: AppTheme.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,

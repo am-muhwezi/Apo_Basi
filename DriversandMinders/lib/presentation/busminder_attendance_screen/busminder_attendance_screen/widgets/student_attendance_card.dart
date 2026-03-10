@@ -52,13 +52,13 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
   Color _getStatusColor() {
     switch (_currentStatus) {
       case 'picked_up':
-        return AppTheme.successAction;
+        return Theme.of(context).colorScheme.secondary;
       case 'dropped_off':
-        return AppTheme.successAction;
+        return Theme.of(context).colorScheme.secondary;
       case 'absent':
-        return AppTheme.criticalAlert;
+        return Theme.of(context).colorScheme.error;
       default:
-        return AppTheme.textSecondary;
+        return Theme.of(context).colorScheme.onSurfaceVariant;
     }
   }
 
@@ -118,7 +118,7 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
     // Generate consistent color based on student name
     final name = widget.student['name'] as String? ?? '';
     final colors = [
-      AppTheme.primaryBusminder,
+      Theme.of(context).colorScheme.primary,
       const Color(0xFF6366F1), // Indigo
       const Color(0xFF8B5CF6), // Purple
       const Color(0xFFEC4899), // Pink
@@ -176,7 +176,7 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
             border: Border.all(
               color: _currentStatus != 'pending'
                   ? _getStatusColor().withValues(alpha: 0.3)
-                  : AppTheme.borderLight,
+                  : Theme.of(context).colorScheme.outline,
               width: _currentStatus != 'pending' ? 2 : 1,
             ),
             boxShadow: [
@@ -296,7 +296,7 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w700,
                               fontSize: 17,
-                              color: AppTheme.textPrimary,
+                              color: Theme.of(context).colorScheme.onSurface,
                               letterSpacing: 0.2,
                             ),
                             maxLines: 1,
@@ -316,15 +316,15 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     colors: [
-                                      AppTheme.primaryBusminder
+                                      Theme.of(context).colorScheme.primary
                                           .withValues(alpha: 0.15),
-                                      AppTheme.primaryBusminder
+                                      Theme.of(context).colorScheme.primary
                                           .withValues(alpha: 0.08),
                                     ],
                                   ),
                                   borderRadius: BorderRadius.circular(8.0),
                                   border: Border.all(
-                                    color: AppTheme.primaryBusminder
+                                    color: Theme.of(context).colorScheme.primary
                                         .withValues(alpha: 0.2),
                                     width: 1,
                                   ),
@@ -332,7 +332,7 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
                                 child: Text(
                                   _formatGrade(widget.student['grade']),
                                   style: theme.textTheme.labelSmall?.copyWith(
-                                    color: AppTheme.primaryBusminder,
+                                    color: Theme.of(context).colorScheme.primary,
                                     fontWeight: FontWeight.w700,
                                     fontSize: 11.5,
                                     letterSpacing: 0.3,
@@ -351,15 +351,15 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
                                         colors: [
-                                          AppTheme.warningState
+                                          Theme.of(context).colorScheme.tertiary
                                               .withValues(alpha: 0.15),
-                                          AppTheme.warningState
+                                          Theme.of(context).colorScheme.tertiary
                                               .withValues(alpha: 0.08),
                                         ],
                                       ),
                                       borderRadius: BorderRadius.circular(8.0),
                                       border: Border.all(
-                                        color: AppTheme.warningState
+                                        color: Theme.of(context).colorScheme.tertiary
                                             .withValues(alpha: 0.3),
                                         width: 1,
                                       ),
@@ -369,7 +369,7 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
                                       children: [
                                         Icon(
                                           Icons.medical_services,
-                                          color: AppTheme.warningState,
+                                          color: Theme.of(context).colorScheme.tertiary,
                                           size: 12,
                                         ),
                                         SizedBox(width: 1.5.w),
@@ -378,7 +378,7 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
                                             'Special',
                                             style: theme.textTheme.labelSmall
                                                 ?.copyWith(
-                                              color: AppTheme.warningState,
+                                              color: Theme.of(context).colorScheme.tertiary,
                                               fontWeight: FontWeight.w700,
                                               fontSize: 11.5,
                                               letterSpacing: 0.3,
@@ -406,8 +406,8 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AppTheme.backgroundSecondary.withValues(alpha: 0.4),
-                        AppTheme.backgroundSecondary.withValues(alpha: 0.2),
+                        Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                        Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
                       ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
@@ -430,7 +430,7 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
                           icon: widget.tripType == 'pickup'
                               ? Icons.person_add_alt_1
                               : Icons.home_filled,
-                          color: AppTheme.successAction,
+                          color: Theme.of(context).colorScheme.secondary,
                           onTap: () {
                             _handleStatusChange(widget.tripType == 'pickup'
                                 ? 'picked_up'
@@ -445,7 +445,7 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
                           context,
                           label: 'Absent',
                           icon: Icons.person_off,
-                          color: AppTheme.criticalAlert,
+                          color: Theme.of(context).colorScheme.error,
                           onTap: () {
                             _handleStatusChange('absent');
                           },
@@ -456,7 +456,7 @@ class _StudentAttendanceCardState extends State<StudentAttendanceCard>
                       _buildIconButton(
                         context,
                         icon: Icons.more_horiz,
-                        color: AppTheme.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         onTap: () {
                           widget.onLongPress(widget.student['id'].toString());
                         },

@@ -29,7 +29,7 @@ class RouteDetailsModalWidget extends StatelessWidget {
             width: 12.w,
             height: 0.5.h,
             decoration: BoxDecoration(
-              color: AppTheme.textSecondary.withValues(alpha: 0.3),
+              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -45,7 +45,7 @@ class RouteDetailsModalWidget extends StatelessWidget {
                   style: AppTheme.lightDriverTheme.textTheme.headlineSmall
                       ?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 InkWell(
@@ -55,7 +55,7 @@ class RouteDetailsModalWidget extends StatelessWidget {
                     padding: EdgeInsets.all(2.w),
                     child: CustomIconWidget(
                       iconName: 'close',
-                      color: AppTheme.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       size: 24,
                     ),
                   ),
@@ -75,10 +75,10 @@ class RouteDetailsModalWidget extends StatelessWidget {
                     height: 25.h,
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: AppTheme.backgroundSecondary,
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: AppTheme.borderLight,
+                        color: Theme.of(context).colorScheme.outline,
                         width: 1,
                       ),
                     ),
@@ -106,7 +106,7 @@ class RouteDetailsModalWidget extends StatelessWidget {
                             ),
                             child: CustomIconWidget(
                               iconName: 'fullscreen',
-                              color: AppTheme.textPrimary,
+                              color: Theme.of(context).colorScheme.onSurface,
                               size: 20,
                             ),
                           ),
@@ -158,7 +158,7 @@ class RouteDetailsModalWidget extends StatelessWidget {
                   Container(
                     padding: EdgeInsets.all(4.w),
                     decoration: BoxDecoration(
-                      color: AppTheme.backgroundSecondary,
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -171,7 +171,7 @@ class RouteDetailsModalWidget extends StatelessWidget {
                                 width: 8,
                                 height: 8,
                                 decoration: BoxDecoration(
-                                  color: AppTheme.primaryDriver,
+                                  color: Theme.of(context).colorScheme.primary,
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -187,7 +187,7 @@ class RouteDetailsModalWidget extends StatelessWidget {
                                           .lightDriverTheme.textTheme.bodyMedium
                                           ?.copyWith(
                                         fontWeight: FontWeight.w600,
-                                        color: AppTheme.textPrimary,
+                                        color: Theme.of(context).colorScheme.onSurface,
                                       ),
                                     ),
                                     Text(
@@ -195,7 +195,7 @@ class RouteDetailsModalWidget extends StatelessWidget {
                                       style: AppTheme
                                           .lightDriverTheme.textTheme.bodySmall
                                           ?.copyWith(
-                                        color: AppTheme.textSecondary,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
@@ -223,7 +223,7 @@ class RouteDetailsModalWidget extends StatelessWidget {
       title,
       style: AppTheme.lightDriverTheme.textTheme.titleLarge?.copyWith(
         fontWeight: FontWeight.w700,
-        color: AppTheme.textPrimary,
+        color: Theme.of(context).colorScheme.onSurface,
       ),
     );
   }
@@ -232,7 +232,7 @@ class RouteDetailsModalWidget extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(4.w),
       decoration: BoxDecoration(
-        color: AppTheme.backgroundSecondary,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -248,7 +248,7 @@ class RouteDetailsModalWidget extends StatelessWidget {
         children: [
           CustomIconWidget(
             iconName: iconName,
-            color: AppTheme.textSecondary,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             size: 20,
           ),
           SizedBox(width: 3.w),
@@ -260,7 +260,7 @@ class RouteDetailsModalWidget extends StatelessWidget {
                   label,
                   style:
                       AppTheme.lightDriverTheme.textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -268,7 +268,7 @@ class RouteDetailsModalWidget extends StatelessWidget {
                   value,
                   style:
                       AppTheme.lightDriverTheme.textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

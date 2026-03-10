@@ -43,24 +43,24 @@ class TripHistoryCard extends StatelessWidget {
           children: [
             SlidableAction(
               onPressed: (_) => onViewDetails?.call(),
-              backgroundColor: AppTheme.primaryDriver,
-              foregroundColor: AppTheme.textOnPrimary,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               icon: Icons.visibility,
               label: 'View',
               borderRadius: BorderRadius.circular(8.0),
             ),
             SlidableAction(
               onPressed: (_) => onShareReport?.call(),
-              backgroundColor: AppTheme.successAction,
-              foregroundColor: AppTheme.textOnPrimary,
+              backgroundColor: Theme.of(context).colorScheme.secondary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               icon: Icons.share,
               label: 'Share',
               borderRadius: BorderRadius.circular(8.0),
             ),
             SlidableAction(
               onPressed: (_) => onAddNotes?.call(),
-              backgroundColor: AppTheme.warningState,
-              foregroundColor: AppTheme.textOnPrimary,
+              backgroundColor: Theme.of(context).colorScheme.tertiary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               icon: Icons.note_add,
               label: 'Notes',
               borderRadius: BorderRadius.circular(8.0),
@@ -142,7 +142,7 @@ class TripHistoryCard extends StatelessWidget {
                           children: [
                             CustomIconWidget(
                               iconName: 'timer',
-                              color: AppTheme.primaryDriver,
+                              color: Theme.of(context).colorScheme.primary,
                               size: 16,
                             ),
                             SizedBox(width: 2.w),
@@ -160,7 +160,7 @@ class TripHistoryCard extends StatelessWidget {
                         children: [
                           CustomIconWidget(
                             iconName: 'people',
-                            color: AppTheme.primaryDriver,
+                            color: Theme.of(context).colorScheme.primary,
                             size: 16,
                           ),
                           SizedBox(width: 2.w),
@@ -217,18 +217,18 @@ class TripHistoryCard extends StatelessWidget {
 
     switch (status.toLowerCase()) {
       case 'completed':
-        backgroundColor = AppTheme.successAction;
-        textColor = AppTheme.textOnPrimary;
+        backgroundColor = Theme.of(context).colorScheme.secondary;
+        textColor = Theme.of(context).colorScheme.onPrimary;
         displayText = 'Completed';
         break;
       case 'cancelled':
-        backgroundColor = AppTheme.criticalAlert;
-        textColor = AppTheme.textOnPrimary;
+        backgroundColor = Theme.of(context).colorScheme.error;
+        textColor = Theme.of(context).colorScheme.onPrimary;
         displayText = 'Cancelled';
         break;
       case 'delayed':
-        backgroundColor = AppTheme.warningState;
-        textColor = AppTheme.textOnPrimary;
+        backgroundColor = Theme.of(context).colorScheme.tertiary;
+        textColor = Theme.of(context).colorScheme.onPrimary;
         displayText = 'Delayed';
         break;
       default:

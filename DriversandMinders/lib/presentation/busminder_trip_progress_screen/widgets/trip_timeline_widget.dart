@@ -54,7 +54,7 @@ class TripTimelineWidget extends StatelessWidget {
                   currentStop,
                   CustomIconWidget(
                     iconName: 'location_on',
-                    color: AppTheme.successAction,
+                    color: Theme.of(context).colorScheme.secondary,
                     size: 20,
                   ),
                   true,
@@ -84,14 +84,14 @@ class TripTimelineWidget extends StatelessWidget {
           Container(
             padding: EdgeInsets.all(3.w),
             decoration: BoxDecoration(
-              color: AppTheme.primaryBusminder.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
                 CustomIconWidget(
                   iconName: 'schedule',
-                  color: AppTheme.primaryBusminder,
+                  color: Theme.of(context).colorScheme.primary,
                   size: 18,
                 ),
                 SizedBox(width: 2.w),
@@ -99,7 +99,7 @@ class TripTimelineWidget extends StatelessWidget {
                   'ETA: $estimatedArrival',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w500,
-                    color: AppTheme.primaryBusminder,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ],

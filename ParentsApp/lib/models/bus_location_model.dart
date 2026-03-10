@@ -8,6 +8,9 @@ class BusLocation {
   final String busNumber;
   final double latitude;
   final double longitude;
+  /// Road-snapped position pre-computed by the server (null for seed locations).
+  final double? snappedLatitude;
+  final double? snappedLongitude;
   final double? speed; // km/h
   final double? heading; // degrees (0-360)
   final bool isActive;
@@ -18,6 +21,8 @@ class BusLocation {
     required this.busNumber,
     required this.latitude,
     required this.longitude,
+    this.snappedLatitude,
+    this.snappedLongitude,
     this.speed,
     this.heading,
     required this.isActive,
@@ -31,6 +36,12 @@ class BusLocation {
       busNumber: json['busNumber'] ?? json['bus_number'] ?? '',
       latitude: _parseDouble(json['lat'] ?? json['latitude']),
       longitude: _parseDouble(json['lng'] ?? json['longitude']),
+      snappedLatitude: json['snapped_latitude'] != null
+          ? _parseDouble(json['snapped_latitude'])
+          : null,
+      snappedLongitude: json['snapped_longitude'] != null
+          ? _parseDouble(json['snapped_longitude'])
+          : null,
       speed: json['speed'] != null ? _parseDouble(json['speed']) : null,
       heading: json['heading'] != null ? _parseDouble(json['heading']) : null,
       isActive: json['isActive'] ?? json['is_active'] ?? true,
@@ -88,6 +99,8 @@ class BusLocation {
     String? busNumber,
     double? latitude,
     double? longitude,
+    double? snappedLatitude,
+    double? snappedLongitude,
     double? speed,
     double? heading,
     bool? isActive,
@@ -98,6 +111,8 @@ class BusLocation {
       busNumber: busNumber ?? this.busNumber,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      snappedLatitude: snappedLatitude ?? this.snappedLatitude,
+      snappedLongitude: snappedLongitude ?? this.snappedLongitude,
       speed: speed ?? this.speed,
       heading: heading ?? this.heading,
       isActive: isActive ?? this.isActive,

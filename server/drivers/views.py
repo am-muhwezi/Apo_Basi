@@ -735,6 +735,34 @@ def start_trip(request):
     for child_assignment in child_assignments:
         trip.children.add(child_assignment.assignee)
 
+    # Notify all parents watching this bus so their screens update immediately
+    # without waiting for the 60-second poll (mirrors end_trip broadcast).
+    try:
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"bus_{bus.id}",
+            {
+                "type": "bus.trip_event",
+                "event_type": "trip_started",
+                "trip_id": trip.id,
+                "trip_type": trip.trip_type,
+                "scheduled_time": (
+                    trip.scheduled_time.isoformat()
+                    if trip.scheduled_time else None
+                ),
+                # Include last known GPS so the parent map marker appears
+                # immediately without waiting for the first live location update.
+                "bus_latitude": float(bus.latitude) if bus.latitude else None,
+                "bus_longitude": float(bus.longitude) if bus.longitude else None,
+                "bus_speed": float(bus.speed) if bus.speed else 0.0,
+                "bus_heading": float(bus.heading) if bus.heading else 0.0,
+            }
+        )
+    except Exception:
+        pass  # Never let a broadcast failure block the HTTP response
+
     return Response({
         "message": "Trip started successfully",
         "trip": TripSerializer(trip).data

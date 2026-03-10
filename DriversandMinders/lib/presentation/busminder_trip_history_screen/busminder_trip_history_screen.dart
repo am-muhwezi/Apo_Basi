@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
 import '../../core/app_export.dart';
 import '../../services/api_service.dart';
+import '../../services/theme_service.dart';
+import '../../theme/app_theme.dart';
 
 class BusMinderTripHistoryScreen extends StatefulWidget {
   const BusMinderTripHistoryScreen({super.key});
@@ -14,6 +16,7 @@ class BusMinderTripHistoryScreen extends StatefulWidget {
 class _BusMinderTripHistoryScreenState
     extends State<BusMinderTripHistoryScreen> {
   final ApiService _apiService = ApiService();
+  ThemeData _busminderTheme = AppTheme.lightBusminderTheme;
   List<dynamic> _trips = [];
   bool _isLoading = true;
   String _selectedFilter = 'completed'; // completed, all
@@ -84,29 +87,39 @@ class _BusMinderTripHistoryScreenState
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (!didPop) {
-          _handleBackPress();
-        }
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeService().themeModeNotifier,
+      builder: (ctx, themeMode, _) {
+        _busminderTheme = themeMode == ThemeMode.dark
+            ? AppTheme.darkBusminderTheme
+            : AppTheme.lightBusminderTheme;
+        return Theme(
+          data: _busminderTheme,
+          child: PopScope(
+            canPop: false,
+            onPopInvokedWithResult: (didPop, result) async {
+              if (!didPop) _handleBackPress();
+            },
+            child: Scaffold(
+              backgroundColor: _busminderTheme.scaffoldBackgroundColor,
+              body: _showSummary && _tripSummary != null
+                  ? _buildModernSummaryView()
+                  : _buildLoadingView(),
+            ),
+          ),
+        );
       },
-      child: Scaffold(
-        backgroundColor: Color(0xFFF8FAFB),
-        body: _showSummary && _tripSummary != null
-            ? _buildModernSummaryView()
-            : _buildLoadingView(),
-      ),
     );
   }
 
   Widget _buildLoadingView() {
     return Center(
-      child: CircularProgressIndicator(color: AppTheme.primaryBusminder),
+      child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
     );
   }
 
   Widget _buildModernSummaryView() {
+    final cs = _busminderTheme.colorScheme;
     final totalStudents = _tripSummary!['totalStudents'] ?? 0;
     final studentsCompleted = _tripSummary!['studentsCompleted'] ?? 0;
     final studentsAbsent = _tripSummary!['studentsAbsent'] ?? 0;
@@ -114,90 +127,84 @@ class _BusMinderTripHistoryScreenState
     final completionRate = totalStudents > 0
         ? ((studentsCompleted / totalStudents) * 100).round()
         : 0;
+    final isPickup = tripType == 'pickup';
 
     return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 6.w),
-        child: Column(
-          children: [
-            SizedBox(height: 4.h),
-
-            // Success animation area
-            Expanded(
-              flex: 2,
+      child: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 5.w),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Animated check icon
+                  SizedBox(height: 5.h),
+
+                  // ── Success icon ──────────────────────────────────────────
                   Container(
-                    width: 100,
-                    height: 100,
+                    width: 96,
+                    height: 96,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.successAction,
-                          AppTheme.successAction.withOpacity(0.8),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: cs.primary,
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.successAction.withOpacity(0.3),
-                          blurRadius: 20,
-                          offset: Offset(0, 8),
+                          color: cs.primary.withValues(alpha: 0.35),
+                          blurRadius: 28,
+                          offset: const Offset(0, 10),
                         ),
                       ],
                     ),
-                    child: Icon(
-                      Icons.check_rounded,
-                      color: Colors.white,
-                      size: 56,
-                    ),
+                    child: const Icon(Icons.check_rounded,
+                        color: Colors.white, size: 52),
                   ),
+
                   SizedBox(height: 3.h),
+
+                  // ── Title ─────────────────────────────────────────────────
                   Text(
                     'Shift Complete!',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 30,
                       fontWeight: FontWeight.w800,
-                      color: AppTheme.textPrimary,
+                      color: cs.onSurface,
                       letterSpacing: -0.5,
                     ),
                   ),
-                  SizedBox(height: 1.h),
-                  Text(
-                    tripType == 'pickup'
-                        ? 'Morning Pickup'
-                        : 'Afternoon Dropoff',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: AppTheme.textSecondary,
-                      fontWeight: FontWeight.w500,
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Text(
+                      isPickup ? 'Pickup Trip' : 'Dropoff Trip',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: cs.primary,
+                      ),
                     ),
                   ),
-                ],
-              ),
-            ),
 
-            // Stats cards
-            Expanded(
-              flex: 3,
-              child: Column(
-                children: [
-                  // Completion rate card
+                  SizedBox(height: 4.h),
+
+                  // ── Attendance rate card ──────────────────────────────────
                   Container(
                     width: double.infinity,
-                    padding: EdgeInsets.all(5.w),
+                    padding: EdgeInsets.symmetric(
+                        vertical: 3.h, horizontal: 5.w),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: _busminderTheme.cardColor,
                       borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: cs.outline.withValues(alpha: 0.15)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 16,
-                          offset: Offset(0, 4),
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
@@ -210,32 +217,46 @@ class _BusMinderTripHistoryScreenState
                             Text(
                               '$completionRate',
                               style: TextStyle(
-                                fontSize: 48,
+                                fontSize: 56,
                                 fontWeight: FontWeight.w800,
-                                color: AppTheme.successAction,
+                                color: cs.primary,
                                 height: 1,
                               ),
                             ),
                             Padding(
-                              padding: EdgeInsets.only(bottom: 0.8.h),
+                              padding:
+                                  EdgeInsets.only(bottom: 0.6.h, left: 2),
                               child: Text(
                                 '%',
                                 style: TextStyle(
-                                  fontSize: 24,
+                                  fontSize: 26,
                                   fontWeight: FontWeight.w700,
-                                  color: AppTheme.successAction,
+                                  color: cs.primary,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        SizedBox(height: 0.5.h),
+                        const SizedBox(height: 6),
                         Text(
                           'Attendance Rate',
                           style: TextStyle(
                             fontSize: 14,
-                            color: AppTheme.textSecondary,
+                            color: cs.onSurfaceVariant,
                             fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Progress bar
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: completionRate / 100,
+                            minHeight: 7,
+                            backgroundColor:
+                                cs.outline.withValues(alpha: 0.15),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(cs.primary),
                           ),
                         ),
                       ],
@@ -244,104 +265,111 @@ class _BusMinderTripHistoryScreenState
 
                   SizedBox(height: 2.h),
 
-                  // Stats row
-                  Row(
-                    children: [
-                      Expanded(
-                          child: _buildStatCard('$totalStudents', 'Total',
-                              Icons.people_outline, AppTheme.primaryBusminder)),
-                      SizedBox(width: 3.w),
-                      Expanded(
-                          child: _buildStatCard(
-                              '$studentsCompleted',
-                              'Done',
-                              Icons.check_circle_outline,
-                              AppTheme.successAction)),
-                      SizedBox(width: 3.w),
-                      Expanded(
-                          child: _buildStatCard('$studentsAbsent', 'Absent',
-                              Icons.cancel_outlined, AppTheme.criticalAlert)),
-                    ],
+                  // ── Stats row ─────────────────────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: _busminderTheme.cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                          color: cs.outline.withValues(alpha: 0.15)),
+                    ),
+                    child: Row(
+                      children: [
+                        _buildStatItem(cs, '$totalStudents', 'Total',
+                            cs.primary),
+                        _buildStatDivider(cs),
+                        _buildStatItem(cs, '$studentsCompleted', 'Done',
+                            const Color(0xFF2E7D32)),
+                        _buildStatDivider(cs),
+                        _buildStatItem(cs, '$studentsAbsent', 'Absent',
+                            cs.error),
+                      ],
+                    ),
                   ),
+
+                  SizedBox(height: 4.h),
                 ],
               ),
             ),
+          ),
 
-            // Done button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pushNamedAndRemoveUntil(
-                    context,
-                    '/busminder-start-shift-screen',
-                    (route) => false,
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryBusminder,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 2.h),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+          // ── Done button (pinned at bottom) ────────────────────────────────
+          Padding(
+            padding: EdgeInsets.fromLTRB(5.w, 0, 5.w, 3.h),
+            child: GestureDetector(
+              onTap: () => Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/busminder-start-shift-screen',
+                (route) => false,
+              ),
+              child: Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      cs.primary,
+                      cs.primary.withValues(alpha: 0.85),
+                    ],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
                   ),
-                  elevation: 0,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: cs.primary.withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                child: Text(
-                  'Done',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                child: const Center(
+                  child: Text(
+                    'Done',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                    ),
                   ),
                 ),
               ),
             ),
-            SizedBox(height: 3.h),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildStatCard(
-      String value, String label, IconData icon, Color color) {
-    return Container(
-      padding: EdgeInsets.symmetric(vertical: 2.h, horizontal: 3.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
+  Widget _buildStatItem(
+      ColorScheme cs, String value, String label, Color color) {
+    return Expanded(
       child: Column(
         children: [
-          Icon(icon, color: color, size: 24),
-          SizedBox(height: 1.h),
           Text(
             value,
             style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.textPrimary,
-            ),
+                fontSize: 24, fontWeight: FontWeight.w800, color: color),
           ),
+          const SizedBox(height: 2),
           Text(
             label,
             style: TextStyle(
-              fontSize: 12,
-              color: AppTheme.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: cs.onSurfaceVariant),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildStatDivider(ColorScheme cs) => Container(
+        width: 1,
+        height: 36,
+        color: cs.outline.withValues(alpha: 0.2),
+      );
 
   Widget _buildFilterButton(String label, String filter, IconData icon) {
     final isSelected = _selectedFilter == filter;
@@ -353,7 +381,7 @@ class _BusMinderTripHistoryScreenState
       child: Container(
         padding: EdgeInsets.symmetric(vertical: 1.5.h),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryBusminder : Colors.grey[200],
+          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey[200],
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -422,7 +450,7 @@ class _BusMinderTripHistoryScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderLight),
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -448,7 +476,7 @@ class _BusMinderTripHistoryScreenState
                     style: TextStyle(
                       fontSize: 15.sp,
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ],
@@ -481,7 +509,7 @@ class _BusMinderTripHistoryScreenState
                 'Bus $busNumber',
                 style: TextStyle(
                   fontSize: 13.sp,
-                  color: AppTheme.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -531,7 +559,7 @@ class _BusMinderTripHistoryScreenState
                     '($duration)',
                     style: TextStyle(
                       fontSize: 12.sp,
-                      color: AppTheme.primaryBusminder,
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -542,14 +570,14 @@ class _BusMinderTripHistoryScreenState
           // Summary (if trip is completed)
           if (status == 'completed' && totalStudents > 0) ...[
             SizedBox(height: 2.h),
-            Divider(color: AppTheme.borderLight),
+            Divider(color: Theme.of(context).colorScheme.outline),
             SizedBox(height: 1.h),
             Text(
               'Trip Summary',
               style: TextStyle(
                 fontSize: 12.sp,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             SizedBox(height: 1.h),
@@ -606,7 +634,7 @@ class _BusMinderTripHistoryScreenState
           style: TextStyle(
             fontSize: 14.sp,
             fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         Text(
