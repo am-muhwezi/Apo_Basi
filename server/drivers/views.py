@@ -424,12 +424,23 @@ def check_driver_email(request):
         "message": "..."
     }
     """
-    email = request.data.get('email')
+    email = request.data.get('email', '').strip().lower()
 
     if not email:
         return Response(
             {"error": "email is required"},
             status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Reviewer demo account must use the password flow — block magic link path
+    reviewer_email = os.environ.get('REVIEWER_DRIVER_EMAIL', '').strip().lower()
+    if reviewer_email and email == reviewer_email:
+        return Response(
+            {
+                "registered": False,
+                "message": "Please use the password sign-in for this account."
+            },
+            status=status.HTTP_404_NOT_FOUND
         )
 
     # Check if driver exists with this email
@@ -772,9 +783,48 @@ def start_trip(request):
         route=route_name  # Use actual admin-created route name
     )
 
-    # Add all children from the bus to the trip (already validated above)
+    # Add all children and create one Stop per child that has home coordinates.
+    # Stops are created with a provisional order (0,1,2...) which the optimizer
+    # will immediately overwrite with the Mapbox-optimised sequence.
+    from trips.models import Stop
+    import threading
+
+    stops_created = 0
     for child_assignment in child_assignments:
-        trip.children.add(child_assignment.assignee)
+        child = child_assignment.assignee
+        trip.children.add(child)
+
+        parent = getattr(child, 'parent', None)
+        lat = getattr(parent, 'home_latitude', None)
+        lng = getattr(parent, 'home_longitude', None)
+        if lat is None or lng is None:
+            continue  # child has no geocoded home — skip stop creation
+
+        address = (
+            parent.address if parent and parent.address
+            else getattr(child, 'address', None) or 'No address'
+        )
+        stop = Stop.objects.create(
+            trip=trip,
+            address=address,
+            latitude=lat,
+            longitude=lng,
+            scheduled_time=now,
+            order=stops_created,
+        )
+        stop.children.add(child)
+        stops_created += 1
+
+    # Fire Mapbox optimisation in a daemon thread so the HTTP response is not
+    # delayed. The thread rewrites Stop.order; all subsequent reads via
+    # order_by('order') reflect the optimised sequence.
+    if stops_created >= 2:
+        from trips.views import _optimize_trip_stops_background
+        threading.Thread(
+            target=_optimize_trip_stops_background,
+            args=(trip.id,),
+            daemon=True,
+        ).start()
 
     # Notify all parents watching this bus so their screens update immediately
     # without waiting for the 60-second poll (mirrors end_trip broadcast).
@@ -927,10 +977,10 @@ def get_active_trip(request):
 class DriverDemoLoginView(APIView):
     """
     POST /api/drivers/auth/demo-login/
-    Demo account login for Apple App Store review process (Drivers App).
+    Demo account login for Apple App Store review process.
 
-    This endpoint allows password-based authentication for a specific
-    demo driver account, bypassing the magic link flow for review purposes.
+    Allows password-based authentication for a specific demo driver account,
+    bypassing the magic link flow so Apple reviewers can access the app.
 
     Credentials are stored in environment variables:
     - REVIEWER_DRIVER_EMAIL
@@ -939,8 +989,6 @@ class DriverDemoLoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        import os
-        
         email = request.data.get('email', '').strip().lower()
         password = request.data.get('password', '')
 
@@ -967,30 +1015,22 @@ class DriverDemoLoginView(APIView):
             )
             user = driver.user
 
-            # Generate Django JWT tokens
             refresh = RefreshToken.for_user(user)
 
-            # Get bus and route data (same logic as magic link auth)
+            # Get bus and route data (same as magic link auth)
             bus_data = None
             route_data = None
 
-            # Find active driver-to-bus assignment
             assignment = Assignment.get_active_assignments_for(driver, 'driver_to_bus').first()
 
             if assignment:
                 bus = assignment.assigned_to
-
-                # Get children assigned to this bus
                 child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
-
-                # Get today's date for attendance
                 today = date.today()
 
                 children_data = []
                 for child_assignment in child_assignments:
                     child = child_assignment.assignee
-
-                    # Get today's attendance for both pickup and dropoff
                     pickup_attendance = Attendance.objects.filter(child=child, date=today, trip_type='pickup').first()
                     dropoff_attendance = Attendance.objects.filter(child=child, date=today, trip_type='dropoff').first()
 
@@ -1002,7 +1042,7 @@ class DriverDemoLoginView(APIView):
                         "name": f"{child.first_name} {child.last_name}",
                         "grade": child.class_grade,
                         "class_grade": child.class_grade,
-                        "address": child.parent.address if child.parent and child.parent.address else (child.address if hasattr(child, 'address') else "N/A"),
+                        "address": child.parent.address if child.parent and child.parent.address else "N/A",
                         "home_latitude": child.parent.home_latitude if child.parent else None,
                         "home_longitude": child.parent.home_longitude if child.parent else None,
                         "parent_name": child.parent.user.get_full_name() if child.parent else "N/A",
@@ -1043,7 +1083,7 @@ class DriverDemoLoginView(APIView):
                     },
                     "children": children_data,
                     "route": children_data,
-                    "total_children": len(children_data)
+                    "total_children": len(children_data),
                 }
 
             logger.info(f"Driver demo login successful for: {email}")
@@ -1055,6 +1095,7 @@ class DriverDemoLoginView(APIView):
                 "phone": driver.phone_number,
                 "license_number": driver.license_number,
                 "license_expiry": driver.license_expiry.isoformat() if driver.license_expiry else None,
+                "user_type": "driver",
                 "tokens": {
                     "access": str(refresh.access_token),
                     "refresh": str(refresh),
@@ -1068,7 +1109,7 @@ class DriverDemoLoginView(APIView):
             return Response(
                 {
                     "error": "Demo account not found",
-                    "message": "The demo driver account has not been set up. Please contact support."
+                    "message": "The demo account has not been set up. Please contact support."
                 },
                 status=status.HTTP_404_NOT_FOUND
             )

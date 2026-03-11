@@ -31,61 +31,75 @@ class HomeLocationService {
     if (address != null && address.isNotEmpty) {
       await prefs.setString(_homeAddressKey, address);
     }
-
-    // Sync to backend and wait for response - throw error if it fails
-    await _syncToBackend(latitude, longitude);
+    _syncToBackend(latitude, longitude);
   }
 
-  /// Sync home coordinates to Django backend (STAGING environment).
-  /// Throws exception on failure so caller can handle the error.
-  Future<void> _syncToBackend(double lat, double lng) async {
+  /// Syncs any locally-stored home coordinates to the backend on app startup.
+  /// Migrates existing SharedPreferences coords to the DB for parents who had
+  /// home coords set before backend sync was introduced.
+  Future<void> syncOnStartup() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(_authTokenKey);
-    if (token == null || token.isEmpty) {
-      throw Exception('Authentication required. Please log in again.');
+    final lat = prefs.getDouble(_homeLatKey);
+    final lng = prefs.getDouble(_homeLngKey);
+    if (lat != null && lng != null) {
+      _syncToBackend(lat, lng);
     }
+  }
 
-    final url = Uri.parse(
-      '${ApiConfig.apiBaseUrl}${ApiConfig.parentHomeLocationEndpoint}',
-    );
+  /// Fire-and-forget sync of home coordinates to the Django backend.
+  /// Failures are silently swallowed — local storage is the source of truth.
+  Future<void> _syncToBackend(double lat, double lng) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString(_authTokenKey);
+      if (token == null || token.isEmpty) return;
 
-    final response = await http.patch(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({'homeLatitude': lat, 'homeLongitude': lng}),
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception(
-          'Failed to save location to server: ${response.statusCode}');
+      final url = Uri.parse(
+        '${ApiConfig.apiBaseUrl}${ApiConfig.parentHomeLocationEndpoint}',
+      );
+      await http.patch(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'homeLatitude': lat, 'homeLongitude': lng}),
+      );
+    } catch (_) {
+      // Backend sync is best-effort; local prefs remain the source of truth
     }
   }
 
   Future<bool> setHomeLocationFromAddress(String address) async {
-    if (address.trim().isEmpty) return false;
+    try {
+      if (address.trim().isEmpty) return false;
 
-    // Add country context to improve geocoding accuracy for Kenyan addresses
-    String searchAddress = address;
-    if (!address.toLowerCase().contains('kenya') &&
-        !address.toLowerCase().contains('nairobi')) {
-      searchAddress = '$address, Nairobi, Kenya';
-    }
+      // Add country context to improve geocoding accuracy for Kenyan addresses
+      String searchAddress = address;
+      if (!address.toLowerCase().contains('kenya') && !address.toLowerCase().contains('nairobi')) {
+        searchAddress = '$address, Nairobi, Kenya';
+      }
 
-    final results = await locationFromAddress(searchAddress);
-    if (results.isNotEmpty) {
-      final loc = results.first;
-      await setHomeLocation(
-        latitude: loc.latitude,
-        longitude: loc.longitude,
-        address: address,
-      );
-      return true;
-    } else {
-      throw Exception(
-          'Could not find coordinates for this address. Please use "Detect my location" or try a different address.');
+      final results = await locationFromAddress(searchAddress);
+      if (results.isNotEmpty) {
+        final loc = results.first;
+        await setHomeLocation(
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          address: address,
+        );
+        return true;
+      } else {
+        // Persist address only if geocoding failed
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_homeAddressKey, address);
+        return false;
+      }
+    } catch (e) {
+      // Persist address only if geocoding failed
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_homeAddressKey, address);
+      return false;
     }
   }
 

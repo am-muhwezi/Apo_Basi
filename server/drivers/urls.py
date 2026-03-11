@@ -4,6 +4,7 @@ from .views import (
     DriverDetailView,
     MyBusView,
     MyRouteView,
+    DriverDemoLoginView,
     driver_phone_login,
     check_driver_email,
     driver_magic_link_auth,

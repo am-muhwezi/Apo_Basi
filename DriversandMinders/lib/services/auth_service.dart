@@ -18,13 +18,11 @@ class AuthService {
   AuthService._internal();
 
   final SupabaseClient _supabase = Supabase.instance.client;
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.apiBaseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-    ),
-  );
+  final Dio _dio = Dio(BaseOptions(
+    baseUrl: ApiConfig.apiBaseUrl,
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 10),
+  ));
 
   StreamSubscription<AuthState>? _authSubscription;
 
@@ -52,101 +50,12 @@ class AuthService {
     await prefs.setInt('driver_id', userIdInt);
     await prefs.setInt('user_id', userIdInt);
     await prefs.setString('driver_name', data['name'] ?? '');
-    await prefs.setString(
-      'user_name',
-      data['name'] ?? '',
-    ); // dashboard reads this key
+    await prefs.setString('user_name', data['name'] ?? '');  // dashboard reads this key
     await prefs.setString('user_role', 'driver');
     await prefs.setString('driver_email', data['email'] ?? '');
     await prefs.setString('driver_phone', data['phone'] ?? '');
     await prefs.setString('license_number', data['license_number'] ?? '');
     await prefs.setString('license_expiry', data['license_expiry'] ?? '');
-  }
-
-  /// Phone-based login for drivers and bus minders (passwordless)
-  ///
-  /// Unified endpoint that automatically detects user type.
-  /// Returns Django JWT tokens and user/bus/route data.
-  ///
-  /// Returns:
-  /// - Map with 'success', 'message', and optional 'result' (AuthResult) keys
-  Future<Map<String, dynamic>> loginWithPhone(String phoneNumber) async {
-    try {
-      final response = await _dio.post(
-        '/api/auth/phone-login/',
-        data: {'phone_number': phoneNumber},
-      );
-
-      if (response.statusCode == 200) {
-        final data = response.data;
-
-        // Save driver data using helper method
-        await _saveDriverDataToPrefs(data);
-
-        return {
-          'success': true,
-          'message': 'Login successful',
-          'result': AuthResult(
-            success: true,
-            driver: {
-              'user_id': data['user_id'],
-              'name': data['name'],
-              'email': data['email'],
-              'phone': data['phone'],
-              'license_number': data['license_number'],
-              'license_expiry': data['license_expiry'],
-            },
-            bus: data['bus'],
-            route: data['route'],
-            tokens: data['tokens'],
-          ),
-        };
-      } else {
-        return {
-          'success': false,
-          'message': response.data['message'] ?? 'Login failed',
-        };
-      }
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 404) {
-        return {
-          'success': false,
-          'message':
-              e.response?.data['error'] ??
-              'No driver or bus assistant account found with this phone number. Please contact your administrator.',
-        };
-      } else if (e.response?.statusCode == 400) {
-        return {
-          'success': false,
-          'message':
-              e.response?.data['error'] ?? 'Invalid phone number format.',
-        };
-      } else if (e.response?.statusCode == 403) {
-        return {
-          'success': false,
-          'message':
-              e.response?.data['error'] ??
-              'Account is inactive. Please contact your administrator.',
-        };
-      }
-      return {
-        'success': false,
-        'message': 'Connection error. Please check your internet connection.',
-      };
-    } on FormatException catch (e) {
-      return {
-        'success': false,
-        'message':
-            'Invalid data format received from server. Please contact your administrator.',
-      };
-    } on TypeError catch (e) {
-      return {
-        'success': false,
-        'message': 'Data type error. Please contact your administrator.',
-      };
-    } catch (e) {
-      return {'success': false, 'message': 'Login failed: ${e.toString()}'};
-    }
   }
 
   /// Send magic link to driver email
@@ -157,6 +66,14 @@ class AuthService {
   /// Returns:
   /// - Map with 'success' and 'message' keys
   Future<Map<String, dynamic>> sendMagicLink(String email) async {
+    // Reviewer demo account must use the password flow, not magic link
+    if (isReviewerAccount(email)) {
+      return {
+        'success': false,
+        'message': 'Please enter your password to sign in.',
+      };
+    }
+
     try {
       // Step 1: Check if email is registered in Django
       final checkResponse = await _dio.post(
@@ -168,8 +85,7 @@ class AuthService {
         // Email not registered
         return {
           'success': false,
-          'message':
-              checkResponse.data['message'] ??
+          'message': checkResponse.data['message'] ??
               'This email is not registered. Please contact your administrator.',
         };
       }
@@ -180,13 +96,15 @@ class AuthService {
         emailRedirectTo: SupabaseConfig.redirectUrl,
       );
 
-      return {'success': true, 'message': 'Magic link sent to your email'};
+      return {
+        'success': true,
+        'message': 'Magic link sent to your email',
+      };
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) {
         return {
           'success': false,
-          'message':
-              e.response?.data['message'] ??
+          'message': e.response?.data['message'] ??
               'This email is not registered. Please contact your administrator.',
         };
       }
@@ -226,12 +144,10 @@ class AuthService {
             final result = await _exchangeTokenForDjangoAuth(accessToken);
             controller.add(result);
           } catch (e) {
-            controller.add(
-              AuthResult(
-                success: false,
-                error: 'Failed to complete authentication: ${e.toString()}',
-              ),
-            );
+            controller.add(AuthResult(
+              success: false,
+              error: 'Failed to complete authentication: ${e.toString()}',
+            ));
           }
         }
       },
@@ -246,7 +162,10 @@ class AuthService {
           errorMessage = 'Invalid magic link. Please request a new one.';
         }
 
-        controller.add(AuthResult(success: false, error: errorMessage));
+        controller.add(AuthResult(
+          success: false,
+          error: errorMessage,
+        ));
       },
     );
 
@@ -291,12 +210,10 @@ class AuthService {
       String errorMessage = 'Authentication failed';
 
       if (e.response?.statusCode == 404) {
-        errorMessage =
-            e.response?.data['message'] ??
+        errorMessage = e.response?.data['message'] ??
             'No driver account found. Please contact your administrator.';
       } else if (e.response?.statusCode == 401) {
-        errorMessage =
-            e.response?.data['message'] ??
+        errorMessage = e.response?.data['message'] ??
             'Session expired. Please request a new magic link.';
       } else if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.receiveTimeout) {
@@ -310,6 +227,59 @@ class AuthService {
         success: false,
         error: 'Unexpected error: ${e.toString()}',
       );
+    }
+  }
+
+  /// The hardcoded email Apple reviewers use to trigger the password login flow.
+  static const String _reviewerEmail = 'reviewer.driver@apobasi.com';
+
+  /// Returns true when the typed email matches the Apple reviewer account.
+  /// The login screen uses this to show a password field instead of magic link.
+  static bool isReviewerAccount(String email) =>
+      email.trim().toLowerCase() == _reviewerEmail;
+
+  /// Password-based login used exclusively by the Apple reviewer demo account.
+  /// Calls POST /api/drivers/auth/demo-login/ and stores tokens on success.
+  Future<AuthResult> loginWithPassword(String email, String password) async {
+    try {
+      final response = await _dio.post(
+        '/api/drivers/auth/demo-login/',
+        data: {'email': email.trim().toLowerCase(), 'password': password},
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        await _saveDriverDataToPrefs(data);
+        return AuthResult(
+          success: true,
+          driver: {
+            'user_id': data['user_id'],
+            'name': data['name'],
+            'email': data['email'],
+            'phone': data['phone'],
+            'license_number': data['license_number'],
+            'license_expiry': data['license_expiry'],
+          },
+          bus: data['bus'],
+          route: data['route'],
+          tokens: data['tokens'],
+        );
+      }
+
+      return AuthResult(
+        success: false,
+        error: response.data['error'] ?? response.data['message'] ?? 'Login failed',
+      );
+    } on DioException catch (e) {
+      String msg = 'Login failed';
+      if (e.response?.statusCode == 401) msg = 'Invalid email or password';
+      if (e.response?.statusCode == 404) {
+        msg = e.response?.data['message'] ?? 'Demo account not configured';
+      }
+      if (e.response?.statusCode == 503) msg = 'Demo login not available';
+      return AuthResult(success: false, error: msg);
+    } catch (e) {
+      return AuthResult(success: false, error: 'Unexpected error: $e');
     }
   }
 
@@ -368,114 +338,20 @@ class AuthService {
     }
   }
 
-  /// The hardcoded email Apple reviewers use to trigger the password login flow.
-  static const String _reviewerEmail = 'reviewer.driver@apobasi.com';
-
-  /// Returns true when the typed email matches the Apple reviewer account.
-  /// The login screen uses this to show a password field instead of magic link.
-  static bool isReviewerAccount(String email) =>
-      email.trim().toLowerCase() == _reviewerEmail;
-
-  /// Password-based login used exclusively by the Apple reviewer demo account.
-  /// Calls POST /api/drivers/auth/demo-login/ and stores tokens on success.
-  Future<AuthResult> loginWithPassword(String email, String password) async {
-    try {
-      final response = await _dio.post(
-        '/api/drivers/auth/demo-login/',
-        data: {'email': email.trim().toLowerCase(), 'password': password},
-      );
-
-      if (response.statusCode == 200) {
-        final data = response.data;
-
-        // Save driver data using helper method
-        await _saveDriverDataToPrefs(data);
-
-        return AuthResult(
-          success: true,
-          driver: {
-            'user_id': data['user_id'],
-            'name': data['name'],
-            'email': data['email'],
-            'phone': data['phone'],
-            'license_number': data['license_number'],
-            'license_expiry': data['license_expiry'],
-          },
-          bus: data['bus'],
-          route: data['route'],
-          tokens: data['tokens'],
-        );
-      }
-
-      return AuthResult(
-        success: false,
-        error:
-            response.data['error'] ??
-            response.data['message'] ??
-            'Login failed',
-      );
-    } on DioException catch (e) {
-      String msg = 'Login failed';
-      if (e.response?.statusCode == 401) msg = 'Invalid email or password';
-      if (e.response?.statusCode == 404) {
-        msg = e.response?.data['message'] ?? 'Demo account not configured';
-      }
-      if (e.response?.statusCode == 503) msg = 'Demo login not available';
-      return AuthResult(success: false, error: msg);
-    } catch (e) {
-      return AuthResult(success: false, error: 'Unexpected error: $e');
-    }
-  }
-
   /// Sign out driver
   Future<void> signOut() async {
-    try {
-      // Sign out from Supabase (clears Supabase session)
-      await _supabase.auth.signOut();
-    } catch (e) {
-      // Continue even if Supabase signout fails
-      print('Supabase signOut error (continuing): $e');
-    }
+    // Sign out from Supabase
+    await _supabase.auth.signOut();
 
-    // Clear ALL login-related storage
+    // Clear local storage
     final prefs = await SharedPreferences.getInstance();
-
-    // Clear tokens
     await prefs.remove('access_token');
     await prefs.remove('refresh_token');
-
-    // Clear unified keys
-    await prefs.remove('user_id');
-    await prefs.remove('user_name');
-    await prefs.remove('user_email');
-    await prefs.remove('user_phone');
-    await prefs.remove('user_role');
-    await prefs.remove('user_data');
-    await prefs.remove('is_logged_in');
-
-    // Clear driver-specific keys
     await prefs.remove('driver_id');
+    await prefs.remove('user_id');
     await prefs.remove('driver_name');
     await prefs.remove('driver_email');
     await prefs.remove('driver_phone');
-    await prefs.remove('license_number');
-    await prefs.remove('license_expiry');
-
-    // Clear cached data
-    await prefs.remove('cached_bus_data');
-    await prefs.remove('cached_route_data');
-
-    // Clear Supabase-specific keys that might persist
-    await prefs.remove('supabase.auth.token');
-    await prefs.remove('supabase.session');
-
-    // Clear all keys containing 'sb-' (Supabase prefix)
-    final allKeys = prefs.getKeys();
-    for (final key in allKeys) {
-      if (key.contains('sb-') || key.contains('supabase')) {
-        await prefs.remove(key);
-      }
-    }
   }
 
   /// Dispose resources
