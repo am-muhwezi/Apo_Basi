@@ -41,6 +41,9 @@ class BusWebSocketService {
   // Trip lifecycle events: trip_started / trip_ended
   final _tripEventController =
       StreamController<Map<String, dynamic>>.broadcast();
+  // Server-computed ETAs: childId (String) → seconds (int)
+  final _etaUpdateController =
+      StreamController<Map<String, int>>.broadcast();
 
   // Public streams
   Stream<BusLocation> get locationUpdateStream =>
@@ -50,6 +53,9 @@ class BusWebSocketService {
   Stream<String> get errorStream => _errorController.stream;
   Stream<Map<String, dynamic>> get tripEventStream =>
       _tripEventController.stream;
+  /// ETA updates broadcast from the server (Mapbox Matrix, 60 s throttle).
+  /// Keys are child IDs as strings; values are ETA in seconds.
+  Stream<Map<String, int>> get etaUpdateStream => _etaUpdateController.stream;
 
   bool get isConnected => _isConnected;
   int? get subscribedBusId => _subscribedBusId;
@@ -184,6 +190,7 @@ class BusWebSocketService {
           snappedLongitude: (data['snapped_longitude'] as num?)?.toDouble(),
           speed: (data['speed'] as num?)?.toDouble() ?? 0.0,
           heading: (data['heading'] as num?)?.toDouble() ?? 0.0,
+          bearing: (data['bearing'] as num?)?.toDouble(),
           isActive: data['is_active'] ?? true,
           timestamp: DateTime.parse(data['timestamp']),
         );
@@ -242,6 +249,12 @@ class BusWebSocketService {
           );
         }
         _tripEventController.add(event);
+      } else if (messageType == 'eta_update') {
+        final rawEtas = data['etas'] as Map<String, dynamic>? ?? {};
+        final etas = rawEtas.map(
+          (k, v) => MapEntry(k, (v as num).toInt()),
+        );
+        _etaUpdateController.add(etas);
       } else if (messageType == 'error') {
         _errorController.add(data['message']);
       }
@@ -352,6 +365,7 @@ class BusWebSocketService {
     _connectionStateController.close();
     _errorController.close();
     _tripEventController.close();
+    _etaUpdateController.close();
   }
 
   /// Get WebSocket base URL from API config

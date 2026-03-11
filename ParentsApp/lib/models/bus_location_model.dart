@@ -12,7 +12,9 @@ class BusLocation {
   final double? snappedLatitude;
   final double? snappedLongitude;
   final double? speed; // km/h
-  final double? heading; // degrees (0-360)
+  final double? heading; // degrees (0-360) — raw GPS sensor
+  /// Server-computed bearing derived from consecutive positions (reliable at low speed).
+  final double? bearing;
   final bool isActive;
   final DateTime timestamp;
 
@@ -25,6 +27,7 @@ class BusLocation {
     this.snappedLongitude,
     this.speed,
     this.heading,
+    this.bearing,
     required this.isActive,
     required this.timestamp,
   });
@@ -44,6 +47,7 @@ class BusLocation {
           : null,
       speed: json['speed'] != null ? _parseDouble(json['speed']) : null,
       heading: json['heading'] != null ? _parseDouble(json['heading']) : null,
+      bearing: json['bearing'] != null ? _parseDouble(json['bearing']) : null,
       isActive: json['isActive'] ?? json['is_active'] ?? true,
       timestamp: json['timestamp'] != null
           ? DateTime.parse(json['timestamp'])
@@ -68,6 +72,7 @@ class BusLocation {
       'lng': longitude,
       'speed': speed,
       'heading': heading,
+      'bearing': bearing,
       'isActive': isActive,
       'timestamp': timestamp.toIso8601String(),
     };
@@ -103,6 +108,7 @@ class BusLocation {
     double? snappedLongitude,
     double? speed,
     double? heading,
+    double? bearing,
     bool? isActive,
     DateTime? timestamp,
   }) {
@@ -115,6 +121,7 @@ class BusLocation {
       snappedLongitude: snappedLongitude ?? this.snappedLongitude,
       speed: speed ?? this.speed,
       heading: heading ?? this.heading,
+      bearing: bearing ?? this.bearing,
       isActive: isActive ?? this.isActive,
       timestamp: timestamp ?? this.timestamp,
     );

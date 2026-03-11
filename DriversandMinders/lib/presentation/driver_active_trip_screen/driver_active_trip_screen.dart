@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -14,6 +15,7 @@ import 'package:sizer/sizer.dart';
 import '../../core/app_export.dart';
 import '../../config/api_config.dart';
 import '../../services/api_service.dart';
+import '../../services/bus_websocket_service.dart';
 import '../../services/gps_stream_service.dart';
 import '../../services/native_location_service.dart';
 import '../../services/trip_state_service.dart';
@@ -62,10 +64,23 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   final GpsStreamService _gps = GpsStreamService();
   PointAnnotation? _navAnnotation;
   PolylineAnnotation? _routePolyline;
+  // Smooth nav-arrow animation (position + bearing interpolation).
+  Timer? _navAnimTimer;
+  double _navAnimFromLat = 0;
+  double _navAnimFromLng = 0;
+  double _navAnimFromBearing = 0;
+  // Latest road-snapped bearing — used to rotate the camera so it faces the
+  // direction of travel along the polyline (Google Maps nav style).
+  double _lastSnappedBearing = 0;
 
   // Route + ETA
   final Map<String, Duration?> _studentEtas = {};
   DateTime? _lastRouteRefresh;
+  // Polyline coords [lat, lng] used for bearing computation when GPS heading
+  // is unreliable (stationary / low speed).
+  List<List<double>> _routeLatLngs = [];
+  // Subscription to server-pushed ETA updates via the driver WebSocket.
+  StreamSubscription<Map<String, int>>? _wsEtaListener;
 
   // Next-turn navigation instruction (from Mapbox Directions steps)
   String? _nextTurnInstruction;
@@ -106,6 +121,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   @override
   void dispose() {
     _gpsListener?.cancel(); // cancel this screen's listener only
+    _wsEtaListener?.cancel();
+    _navAnimTimer?.cancel();
     _sheetController.dispose();
     _locationUpdateTimer?.cancel();
     super.dispose();
@@ -187,7 +204,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   /// Blue circle with accuracy pulse ring and white directional chevron inside.
   /// Points "up" (north) at heading=0 — Mapbox rotates it with iconRotate.
   Future<Uint8List> _renderNavigationArrow() async {
-    const double size = 80.0;
+    const double size = 120.0;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, size));
     final double cx = size / 2;
@@ -203,23 +220,23 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     // White border circle
     canvas.drawCircle(
       Offset(cx, cy),
-      24,
+      36,
       Paint()..color = Colors.white,
     );
 
     // Blue filled circle
     canvas.drawCircle(
       Offset(cx, cy),
-      20,
+      30,
       Paint()..color = const Color(0xFF4285F4),
     );
 
     // White navigation chevron pointing up (direction of travel)
     final path = Path()
-      ..moveTo(cx, cy - 13) // tip (north/forward)
-      ..lineTo(cx + 10, cy + 9) // bottom-right wing
-      ..lineTo(cx, cy + 4) // concave base center
-      ..lineTo(cx - 10, cy + 9) // bottom-left wing
+      ..moveTo(cx, cy - 19)       // tip (north/forward)
+      ..lineTo(cx + 15, cy + 13)  // bottom-right wing
+      ..lineTo(cx, cy + 6)        // concave base center
+      ..lineTo(cx - 15, cy + 13)  // bottom-left wing
       ..close();
 
     canvas.drawPath(path, Paint()..color = Colors.white);
@@ -251,33 +268,32 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       final snap = _gps.lastKnownPosition;
       if (snap != null && mounted) {
         setState(() => _driverPosition = snap);
-        await _updateNavAnnotation();
+        await _updateNavAnnotation(); // sets camera with correct pitch/zoom/bearing
         _updateRoute();
-        if (_mapboxMap != null) {
-          _mapboxMap!.setCamera(CameraOptions(
-            center: _latlng(snap.latitude, snap.longitude),
-            bearing: snap.heading,
-            pitch: 50.0,
-            zoom: 16.5,
-          ));
-        }
       }
 
       // Subscribe to the shared broadcast for live navigation updates.
       _gpsListener = _gps.stream.listen((geo.Position pos) {
         if (!mounted) return;
         setState(() => _driverPosition = pos);
-        _updateNavAnnotation();
+        _updateNavAnnotation(); // updates arrow + rotates camera
         _updateRoute(); // throttled internally to once per 45 s
+      });
 
-        if (_mapboxMap != null) {
-          _mapboxMap!.setCamera(CameraOptions(
-            center: _latlng(pos.latitude, pos.longitude),
-            bearing: pos.heading,
-            pitch: 50.0,
-            zoom: 16.5,
-          ));
+      // Subscribe to server-computed ETAs (Mapbox Matrix API, called server-side
+      // and broadcast via the driver WebSocket every ~60 s during trips).
+      _wsEtaListener?.cancel();
+      _wsEtaListener = BusWebSocketService().etaUpdateStream.listen((etas) {
+        if (!mounted) return;
+        final updated = <String, Duration?>{};
+        for (final entry in etas.entries) {
+          updated[entry.key] = Duration(seconds: entry.value);
         }
+        setState(() {
+          _studentEtas
+            ..clear()
+            ..addAll(updated);
+        });
       });
     } catch (_) {}
   }
@@ -291,7 +307,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
     // Apply navigation-style tilt immediately so the map is never flat,
     // even before the first GPS position arrives.
-    await mapboxMap.setCamera(CameraOptions(pitch: 50.0, zoom: 16.0));
+    await mapboxMap.setCamera(CameraOptions(pitch: 60.0, zoom: 18.5));
 
     // Polyline layer first so it renders below the point markers
     _polylineAnnotationManager =
@@ -322,7 +338,7 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     }
     if (center != null) {
       _mapboxMap!.flyTo(
-        CameraOptions(center: center, zoom: 16.0, pitch: 50.0),
+        CameraOptions(center: center, zoom: 18.5, pitch: 60.0),
         MapAnimationOptions(duration: 800),
       );
     }
@@ -379,25 +395,93 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
         _navArrowImage == null ||
         _driverPosition == null) return;
 
-    final point =
-        _latlng(_driverPosition!.latitude, _driverPosition!.longitude);
+    // Snap position to the loaded polyline (perpendicular projection, ≤ 50 m
+    // threshold). If the route is not loaded yet, raw GPS is returned unchanged
+    // — the arrow will re-snap automatically the moment _routeLatLngs is set.
+    final snap = _snapToPolyline(
+      _driverPosition!.latitude,
+      _driverPosition!.longitude,
+    );
+    final targetLat = snap.lat;
+    final targetLng = snap.lng;
 
-    if (_navAnnotation != null) {
-      _navAnnotation!.geometry = point;
-      _navAnnotation!.iconRotate = _driverPosition!.heading;
-      await _navAnnotationManager!.update(_navAnnotation!);
-    } else {
+    // Use GPS heading when moving fast and sensor is reliable; otherwise use
+    // the bearing of the polyline segment the driver is currently on.
+    const double minSpeedMs = 2.0;
+    final double targetBearing =
+        (_driverPosition!.speed >= minSpeedMs &&
+                _driverPosition!.heading != 0.0)
+            ? _driverPosition!.heading
+            : snap.bearing;
+
+    // Persist so the camera setCamera() calls (in the GPS listener) can rotate
+    // the map to face direction of travel.
+    _lastSnappedBearing = targetBearing;
+
+    // Update camera immediately — ensures rotation/pitch apply on every GPS
+    // tick without waiting for the setState rebuild cycle.
+    _mapboxMap?.setCamera(CameraOptions(
+      center: _latlng(targetLat, targetLng),
+      bearing: targetBearing,
+      pitch: 60.0,
+      zoom: 18.5,
+    ));
+
+    if (_navAnnotation == null) {
+      // First appearance — create immediately, no animation needed.
       _navAnnotation = await _navAnnotationManager!.create(
         PointAnnotationOptions(
-          geometry: point,
+          geometry: _latlng(targetLat, targetLng),
           image: _navArrowImage,
-          iconSize: 0.95,
+          iconSize: 1.3,
           iconAnchor: IconAnchor.CENTER,
-          iconRotate: _driverPosition!.heading,
+          iconRotate: targetBearing,
         ),
       );
+      _navAnimFromLat = targetLat;
+      _navAnimFromLng = targetLng;
+      _navAnimFromBearing = targetBearing;
+      return;
     }
+
+    // Animate from previous position/bearing to new values.
+    _navAnimTimer?.cancel();
+    final fromLat = _navAnimFromLat;
+    final fromLng = _navAnimFromLng;
+    final fromBearing = _navAnimFromBearing;
+
+    // Shortest angular delta for bearing (handles 0↔360 wrap).
+    double bearingDiff = targetBearing - fromBearing;
+    if (bearingDiff > 180) bearingDiff -= 360;
+    if (bearingDiff < -180) bearingDiff += 360;
+
+    const totalFrames = 30;
+    int frame = 0;
+    _navAnimTimer = Timer.periodic(const Duration(milliseconds: 33), (t) async {
+      frame++;
+      final rawT = frame / totalFrames;
+      if (rawT >= 1.0) t.cancel();
+      final easedT = _navEaseInOut(rawT.clamp(0.0, 1.0));
+
+      final lat = fromLat + (targetLat - fromLat) * easedT;
+      final lng = fromLng + (targetLng - fromLng) * easedT;
+      final bearing = fromBearing + bearingDiff * easedT;
+
+      if (_navAnnotation != null && _navAnnotationManager != null && mounted) {
+        _navAnnotation!.geometry = _latlng(lat, lng);
+        _navAnnotation!.iconRotate = bearing;
+        _navAnnotationManager!.update(_navAnnotation!); // fire-and-forget
+      }
+    });
+
+    _navAnimFromLat = targetLat;
+    _navAnimFromLng = targetLng;
+    _navAnimFromBearing = targetBearing;
   }
+
+  /// Ease-in-out curve for nav-arrow animation.
+  double _navEaseInOut(double t) =>
+      t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
   // ══════════════════════════════════════════════════════════════════════════════
   // OnPointAnnotationClickListener
@@ -428,12 +512,16 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   void _recenterOnDriver() {
     if (_driverPosition == null || _mapboxMap == null) return;
     setState(() => _selectedStudent = null);
+    final snap = _snapToPolyline(
+      _driverPosition!.latitude,
+      _driverPosition!.longitude,
+    );
     _mapboxMap!.flyTo(
       CameraOptions(
-        center: _latlng(_driverPosition!.latitude, _driverPosition!.longitude),
-        zoom: 16.5,
-        bearing: _driverPosition!.heading,
-        pitch: 50.0,
+        center: _latlng(snap.lat, snap.lng),
+        zoom: 18.5,
+        bearing: _lastSnappedBearing,
+        pitch: 60.0,
       ),
       MapAnimationOptions(duration: 500),
     );
@@ -986,6 +1074,97 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
+  // Polyline bearing helpers (road-snap heading)
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  /// Compass bearing (°, 0=North) from point 1 → point 2.
+  static double _bearingBetween(
+      double lat1, double lng1, double lat2, double lng2) {
+    final lat1r = lat1 * math.pi / 180;
+    final lat2r = lat2 * math.pi / 180;
+    final dLon = (lng2 - lng1) * math.pi / 180;
+    final y = math.sin(dLon) * math.cos(lat2r);
+    final x = math.cos(lat1r) * math.sin(lat2r) -
+        math.sin(lat1r) * math.cos(lat2r) * math.cos(dLon);
+    return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
+  }
+
+  /// Snap [lat, lng] to the nearest point on the loaded route polyline.
+  ///
+  /// Uses perpendicular projection onto each segment so the snapped point is
+  /// the true closest point — not just the closest vertex or midpoint.
+  /// Returns the snapped {lat, lng} and the bearing of the containing segment.
+  /// If the raw position is farther than [maxSnapDistM] metres from the
+  /// polyline (e.g. driver is off-route) it returns the raw coords so the
+  /// arrow doesn't jump to a wrong road.
+  ({double lat, double lng, double bearing}) _snapToPolyline(
+      double lat, double lng, {double maxSnapDistM = 50}) {
+    if (_routeLatLngs.length < 2) {
+      return (
+        lat: lat,
+        lng: lng,
+        bearing: _driverPosition?.heading ?? 0.0,
+      );
+    }
+
+    double minDistM = double.infinity;
+    double bestLat = lat;
+    double bestLng = lng;
+    int bestSegIdx = 0;
+    final cosLat = math.cos(lat * math.pi / 180);
+
+    for (int i = 0; i < _routeLatLngs.length - 1; i++) {
+      final aLat = _routeLatLngs[i][0];
+      final aLng = _routeLatLngs[i][1];
+      final bLat = _routeLatLngs[i + 1][0];
+      final bLng = _routeLatLngs[i + 1][1];
+
+      // Convert to flat-earth metres for projection maths.
+      final ax = aLng * 111000 * cosLat;
+      final ay = aLat * 111000.0;
+      final bx = bLng * 111000 * cosLat;
+      final by = bLat * 111000.0;
+      final px = lng * 111000 * cosLat;
+      final py = lat * 111000.0;
+
+      final dx = bx - ax;
+      final dy = by - ay;
+      final lenSq = dx * dx + dy * dy;
+
+      double t = 0;
+      if (lenSq > 0) {
+        t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+        t = t.clamp(0.0, 1.0);
+      }
+
+      final cx = ax + t * dx;
+      final cy = ay + t * dy;
+      final distM = math.sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
+
+      if (distM < minDistM) {
+        minDistM = distM;
+        bestSegIdx = i;
+        bestLat = aLat + t * (bLat - aLat);
+        bestLng = aLng + t * (bLng - aLng);
+      }
+    }
+
+    final bearing = _bearingBetween(
+      _routeLatLngs[bestSegIdx][0],
+      _routeLatLngs[bestSegIdx][1],
+      _routeLatLngs[bestSegIdx + 1][0],
+      _routeLatLngs[bestSegIdx + 1][1],
+    );
+
+    // Beyond the snap threshold — keep raw coords (wrong road / u-turn) but
+    // still return the polyline bearing so the arrow faces the route.
+    if (minDistM > maxSnapDistM) {
+      return (lat: lat, lng: lng, bearing: bearing);
+    }
+    return (lat: bestLat, lng: bestLng, bearing: bearing);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
   // Route + ETA via Mapbox Directions API
   // ══════════════════════════════════════════════════════════════════════════════
 
@@ -1144,7 +1323,15 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
               ))
           .toList();
 
-      // Draw / update polyline
+      // Cache [lat, lng] pairs for polyline-bearing computation in
+      // _updateNavAnnotation(). Mapbox returns coords as [lng, lat].
+      _routeLatLngs = rawCoords
+          .map((c) => <double>[(c as List)[1].toDouble(), c[0].toDouble()])
+          .toList();
+
+      // Route just loaded — re-snap the nav arrow immediately in case the
+      // first GPS fix arrived before the polyline was available.
+      if (mounted) _updateNavAnnotation();
       if (_routePolyline != null) {
         _routePolyline!.geometry = LineString(coordinates: coords);
         await _polylineAnnotationManager!.update(_routePolyline!);
@@ -1159,14 +1346,10 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
         );
       }
 
-      // Cumulative ETA per pending student from leg durations
+      // ETAs are now computed server-side (Mapbox Matrix API) and broadcast via
+      // WS eta_update messages. Do not re-derive them from Directions legs here.
+      // We still need `legs` for the navigation instructions below.
       final legs = route['legs'] as List;
-      double cumSecs = 0;
-      final newEtas = <String, Duration?>{};
-      for (int i = 0; i < capped.length && i < legs.length; i++) {
-        cumSecs += (legs[i]['duration'] as num).toDouble();
-        newEtas[capped[i]['id'] as String] = Duration(seconds: cumSecs.round());
-      }
 
       // Parse the next turn instruction from the first step of the first leg.
       // The first step is the driver's immediate next maneuver.
@@ -1192,16 +1375,14 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
 
       if (mounted) {
         setState(() {
-          _studentEtas
-            ..clear()
-            ..addAll(newEtas);
+          // _studentEtas populated by server eta_update WS messages, not here.
           _nextTurnInstruction = nextInstruction;
           _nextTurnType = nextType;
           _nextTurnModifier = nextModifier;
           _nextTurnDistanceM = nextDistM;
         });
       }
-      print('✅ _updateRoute: polyline drawn, ${newEtas.length} ETAs set');
+      print('✅ _updateRoute: polyline drawn, ETAs arrive from server WS');
     } on DioException catch (e) {
       print(
           '❌ _updateRoute DioException: ${e.message} | ${e.response?.statusCode} | ${e.response?.data}');
