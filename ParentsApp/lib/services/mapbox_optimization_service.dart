@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import '../config/api_config.dart';
@@ -30,9 +29,6 @@ class OptimizedRoute {
 
 /// Calls the Mapbox Optimization API to find the best stop ordering, then
 /// caches the result per bus so subsequent WebSocket updates don't re-call.
-///
-/// Fallback: if the API fails or the bus has > 11 children (API limit is 12
-/// coordinates total), a nearest-neighbour greedy sort is used instead.
 class MapboxOptimizationService {
   static const String _optimizationBaseUrl =
       'https://api.mapbox.com/optimized-trips/v1/mapbox/driving-traffic';
@@ -91,20 +87,6 @@ class MapboxOptimizationService {
       return result;
     }
 
-    // Mapbox Optimization API supports at most 12 coordinates total.
-    // For pickup: start + homes + school = busStops.length + 2 ≤ 12 → homes ≤ 10.
-    // For dropoff: school + homes = busStops.length + 1 ≤ 12 → homes ≤ 11.
-    final maxStops = tripType == 'pickup' ? 10 : 11;
-    if (busStops.length > maxStops) {
-      final result = _nearestNeighbourSort(
-        schoolLocation: schoolLocation,
-        busStops: busStops,
-        tripType: tripType,
-      );
-      _cache[cacheKey] = result;
-      return result;
-    }
-
     try {
       final result = await _callOptimizationApi(
         schoolLocation: schoolLocation,
@@ -117,17 +99,10 @@ class MapboxOptimizationService {
         return result;
       }
     } catch (_) {
-      // Fall through to nearest-neighbour
+      // API call failed — return null so the caller can decide how to handle
     }
 
-    // API failed — use greedy fallback
-    final fallback = _nearestNeighbourSort(
-      schoolLocation: schoolLocation,
-      busStops: busStops,
-      tripType: tripType,
-    );
-    _cache[cacheKey] = fallback;
-    return fallback;
+    return null;
   }
 
   // ---------------------------------------------------------------------------
@@ -247,114 +222,4 @@ class MapboxOptimizationService {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Nearest-neighbour greedy fallback (no extra API call)
-  // ---------------------------------------------------------------------------
-
-  static OptimizedRoute _nearestNeighbourSort({
-    required LatLng schoolLocation,
-    required List<BusStop> busStops,
-    required String tripType,
-  }) {
-    final remaining = List<BusStop>.from(busStops);
-    final ordered = <BusStop>[];
-
-    // Starting point for distance calculations
-    LatLng current = tripType == 'dropoff'
-        ? schoolLocation
-        : remaining.isNotEmpty
-            ? remaining.first.homeLatLng
-            : schoolLocation;
-
-    if (tripType == 'pickup') {
-      // For pickup, start from the geographically first home (farthest from school)
-      // Simple approach: just greedily pick nearest unvisited from current
-      current = schoolLocation; // measure from school to find farthest first
-      // Find stop farthest from school as starting point
-      BusStop? farthest;
-      double maxDist = -1;
-      for (final stop in remaining) {
-        final d = _haversineKm(schoolLocation, stop.homeLatLng);
-        if (d > maxDist) {
-          maxDist = d;
-          farthest = stop;
-        }
-      }
-      if (farthest != null) {
-        current = farthest.homeLatLng;
-        ordered.add(farthest);
-        remaining.remove(farthest);
-      }
-    }
-
-    while (remaining.isNotEmpty) {
-      BusStop? nearest;
-      double minDist = double.infinity;
-      for (final stop in remaining) {
-        final d = _haversineKm(current, stop.homeLatLng);
-        if (d < minDist) {
-          minDist = d;
-          nearest = stop;
-        }
-      }
-      if (nearest != null) {
-        ordered.add(nearest);
-        current = nearest.homeLatLng;
-        remaining.remove(nearest);
-      }
-    }
-
-    // Estimate leg durations at 30 km/h average (city traffic).
-    //
-    // legDurations[i] = time from ordered[i] to ordered[i+1].
-    // Last entry = time from ordered[N-1] to school (same convention as API).
-    final legDurations = <double>[];
-
-    if (tripType == 'dropoff') {
-      // First leg: school → ordered[0]
-      LatLng prev = schoolLocation;
-      for (final stop in ordered) {
-        legDurations.add(_haversineKm(prev, stop.homeLatLng) / 30.0 * 3600);
-        prev = stop.homeLatLng;
-      }
-    } else {
-      // Legs between homes: ordered[i] → ordered[i+1]
-      for (int i = 0; i < ordered.length - 1; i++) {
-        legDurations.add(
-            _haversineKm(ordered[i].homeLatLng, ordered[i + 1].homeLatLng) /
-                30.0 *
-                3600);
-      }
-      // Final leg: last home → school
-      legDurations.add(
-          _haversineKm(ordered.last.homeLatLng, schoolLocation) / 30.0 * 3600);
-    }
-
-    while (legDurations.length < ordered.length) {
-      legDurations.add(0.0);
-    }
-
-    return OptimizedRoute(orderedStops: ordered, legDurations: legDurations);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
-
-  /// Haversine distance in km between two lat/lng points.
-  static double _haversineKm(LatLng a, LatLng b) {
-    const r = 6371.0;
-    final dLat = _deg2rad(b.latitude - a.latitude);
-    final dLon = _deg2rad(b.longitude - a.longitude);
-    final sinDLat = sin(dLat / 2);
-    final sinDLon = sin(dLon / 2);
-    final h = sinDLat * sinDLat +
-        cos(_deg2rad(a.latitude)) *
-            cos(_deg2rad(b.latitude)) *
-            sinDLon *
-            sinDLon;
-    return 2 * r * asin(sqrt(h));
-  }
-
-  static double _deg2rad(double deg) => deg * pi / 180.0;
 }

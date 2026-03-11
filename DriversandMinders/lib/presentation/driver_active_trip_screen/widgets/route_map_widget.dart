@@ -117,8 +117,8 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     // Add stop markers
     for (int i = 0; i < stops.length; i++) {
       final stop = stops[i] as Map<String, dynamic>;
-      final lat = (stop["latitude"] as num?)?.toDouble() ?? 40.7128;
-      final lng = (stop["longitude"] as num?)?.toDouble() ?? -74.0060;
+      final lat = (stop["latitude"] as num?)?.toDouble() ?? 0.0;
+      final lng = (stop["longitude"] as num?)?.toDouble() ?? 0.0;
       final stopName = stop["name"] as String? ?? "Stop ${i + 1}";
       final isCompleted = stop["isCompleted"] as bool? ?? false;
 
@@ -148,8 +148,8 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
 
       // Add all stops
       for (final stop in stops) {
-        final lat = (stop["latitude"] as num?)?.toDouble() ?? 40.7128;
-        final lng = (stop["longitude"] as num?)?.toDouble() ?? -74.0060;
+        final lat = (stop["latitude"] as num?)?.toDouble() ?? 0.0;
+        final lng = (stop["longitude"] as num?)?.toDouble() ?? 0.0;
         routePoints.add(LatLng(lat, lng));
       }
 

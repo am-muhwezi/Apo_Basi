@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'core/app_export.dart';
 import 'config/api_config.dart';
@@ -13,6 +14,7 @@ import 'services/notification_service.dart';
 import 'services/bus_websocket_service.dart';
 import 'services/parent_notifications_service.dart';
 import 'services/theme_service.dart';
+import 'services/home_location_service.dart';
 import 'config/supabase_config.dart';
 
 Future<void> main() async {
@@ -97,11 +99,19 @@ class _MyAppState extends State<MyApp> {
     super.initState();
 
     // Delay heavy initialization until after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Request location permission on first run
+      final locationStatus = await Permission.locationWhenInUse.status;
+      if (locationStatus.isDenied) {
+        await Permission.locationWhenInUse.request();
+      }
+
       // Delay WebSocket connection even further to improve startup
       Future.delayed(const Duration(milliseconds: 500), () {
         _webSocketService.connect();
         _notificationsService.connect();
+        // Migrate any existing home coords from SharedPreferences to the backend DB
+        HomeLocationService().syncOnStartup();
       });
     });
   }
