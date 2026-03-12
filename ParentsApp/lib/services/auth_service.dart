@@ -17,7 +17,9 @@ class AuthService {
   factory AuthService() => _instance;
   AuthService._internal();
 
-  final SupabaseClient _supabase = Supabase.instance.client;
+  // Lazy getter — accessed only after AppInitScreen has run Supabase.initialize().
+  SupabaseClient get _supabase => Supabase.instance.client;
+
   final Dio _dio = Dio(BaseOptions(
     baseUrl: ApiConfig.apiBaseUrl,
     connectTimeout: const Duration(seconds: 10),
