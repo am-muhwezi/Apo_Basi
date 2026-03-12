@@ -49,6 +49,13 @@ class BusMinderDetailView(generics.RetrieveUpdateDestroyAPIView):
             return BusMinderCreateSerializer
         return BusMinderSerializer
 
+    def perform_destroy(self, instance):
+        # Delete the linked auth.User — the OneToOne CASCADE removes the
+        # BusMinder row automatically.  Without this, only the BusMinder row
+        # is deleted and the User (with its email) is left behind, blocking
+        # re-registration with the same email address.
+        instance.user.delete()
+
 
 class BusMinderRegistrationView(generics.CreateAPIView):
     serializer_class = BusMinderRegistrationSerializer

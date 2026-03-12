@@ -788,14 +788,12 @@ def push_location(request):
     try:
         driver = request.user.driver
 
-        # Try to get bus from Assignment API first (preferred method)
+        # Get bus from the Assignment table — the single source of truth.
+        # The legacy driver.assigned_bus FK is no longer written by any code
+        # path in the web client, so falling back to it would silently hide
+        # mis-assigned drivers rather than exposing the real problem.
         driver_assignment = Assignment.get_active_assignments_for(driver, 'driver_to_bus').first()
-
-        if driver_assignment:
-            bus = driver_assignment.assigned_to
-        else:
-            # Fallback to direct foreign key relationship
-            bus = driver.assigned_bus
+        bus = driver_assignment.assigned_to if driver_assignment else None
 
         if not bus:
             print(f"⚠️ Driver {driver.user.get_full_name()} has no assigned bus")

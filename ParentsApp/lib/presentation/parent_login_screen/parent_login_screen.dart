@@ -38,7 +38,8 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
     _emailController.addListener(_onEmailChanged);
     _emailFocusNode.addListener(_onEmailFocusChanged);
     _listenForAuthCallback();
-    _checkAuthAndAutoNavigate();
+    // Note: auth check + routing is handled by AppInitScreen before we
+    // ever navigate here, so no redundant _checkAuthAndAutoNavigate needed.
   }
 
   @override
@@ -49,13 +50,6 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
     _emailFocusNode.dispose();
     _authSubscription?.cancel();
     super.dispose();
-  }
-
-  Future<void> _checkAuthAndAutoNavigate() async {
-    final isAuthenticated = await _authService.isAuthenticated();
-    if (isAuthenticated && mounted) {
-      Navigator.pushReplacementNamed(context, '/parent-dashboard');
-    }
   }
 
   // Debounce: only validate after 250ms of no typing

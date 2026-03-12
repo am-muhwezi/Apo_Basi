@@ -42,6 +42,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   User? _user;
   Parent? _parent;
   List<Child> _children = [];
+  String? _homeAddress;
 
   @override
   void initState() {
@@ -136,6 +137,10 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
           }
           _isLoading = false;
         });
+
+        // Load home address immediately from local storage
+        final homeAddr = await _homeLocationService.getHomeAddress();
+        if (mounted) setState(() => _homeAddress = homeAddr);
       } else {
         setState(() {
           _isLoading = true;
@@ -197,6 +202,10 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
 
           _isLoading = false;
         });
+
+        // Load home address from local storage
+        final homeAddr = await _homeLocationService.getHomeAddress();
+        if (mounted) setState(() => _homeAddress = homeAddr);
       }
 
       // Cache fresh parent data for offline use
@@ -380,6 +389,38 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                                       fontWeight: FontWeight.w400,
                                       color: colorScheme.onSurfaceVariant,
                                     ),
+                                  ),
+                                ],
+                                if (_homeAddress != null &&
+                                    _homeAddress!.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        WidgetSpan(
+                                          alignment:
+                                              PlaceholderAlignment.middle,
+                                          child: Icon(
+                                            Icons.home_outlined,
+                                            size: 13,
+                                            color: colorScheme.primary
+                                                .withValues(alpha: 0.8),
+                                          ),
+                                        ),
+                                        const WidgetSpan(
+                                            child: SizedBox(width: 3)),
+                                        TextSpan(
+                                          text: _homeAddress!,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w400,
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ],
@@ -1153,6 +1194,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                             emergencyContact: _parent!.emergencyContact,
                             status: _parent!.status,
                           );
+                          _homeAddress = newAddress;
                         });
                         Navigator.of(context).pop(); // close loading
                         Navigator.of(context).pop(); // close dialog

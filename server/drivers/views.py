@@ -57,6 +57,13 @@ class DriverDetailView(generics.RetrieveUpdateDestroyAPIView):
             return DriverCreateSerializer
         return DriverSerializer
 
+    def perform_destroy(self, instance):
+        # Delete the linked auth.User — the OneToOne CASCADE removes the
+        # Driver row automatically.  Without this, only the Driver row is
+        # deleted and the User (with its email) is left behind, blocking
+        # re-registration with the same email address.
+        instance.user.delete()
+
 
 class MyBusView(APIView):
     """
