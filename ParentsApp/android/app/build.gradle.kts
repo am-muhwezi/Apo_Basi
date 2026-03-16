@@ -32,12 +32,24 @@ android {
 
     defaultConfig {
         applicationId = "com.apobasi.parents"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    flavorDimensions += "environment"
+    productFlavors {
+        create("staging") {
+            dimension = "environment"
+            applicationIdSuffix = ".staging"
+            versionNameSuffix = "-staging"
+            resValue("string", "app_name", "ApoBasi Staging")
+        }
+        create("prod") {
+            dimension = "environment"
+            resValue("string", "app_name", "ApoBasi")
+        }
     }
 
     signingConfigs {

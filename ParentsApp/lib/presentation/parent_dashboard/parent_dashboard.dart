@@ -379,35 +379,6 @@ class _ParentDashboardState extends State<ParentDashboard> {
                     color: colorScheme.onSurface,
                   ),
                 ),
-                // Environment indicator (only shown in dev/staging)
-                if (ApiConfig.shouldShowEnvironmentIndicator()) ...[
-                  const SizedBox(height: 4),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: ApiConfig.isStaging()
-                          ? Colors.orange.withValues(alpha: 0.15)
-                          : Colors.blue.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color:
-                            ApiConfig.isStaging() ? Colors.orange : Colors.blue,
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      ApiConfig.getEnvironmentBadge(),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: ApiConfig.isStaging()
-                            ? Colors.orange.shade800
-                            : Colors.blue.shade800,
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),

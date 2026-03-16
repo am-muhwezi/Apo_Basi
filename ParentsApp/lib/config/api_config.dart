@@ -1,4 +1,5 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'flavor_config.dart';
 
 /// API Configuration
 ///
@@ -15,7 +16,10 @@ class ApiConfig {
   /// Android emulator: 'http://10.0.2.2:8000'
   /// iOS simulator: 'http://localhost:8000'
   /// Production: 'https://yourdomain.com' or 'http://YOUR_VPS_IP'
-  static String get apiBaseUrl => dotenv.env['API_BASE_URL'] ?? '';
+  static String get apiBaseUrl {
+    final flavorUrl = FlavorConfig.apiBaseUrl;
+    return flavorUrl.isNotEmpty ? flavorUrl : dotenv.env['API_BASE_URL'] ?? '';
+  }
 
   /// Deprecated: historical Socket.IO server URL for real-time updates.
   ///
@@ -85,16 +89,14 @@ class ApiConfig {
   // Configuration Helpers
   // ============================================================================
 
-  /// Check if running in development mode
+  /// Check if running in development mode (no flavor set — local dotenv)
   static bool isDevelopment() {
-    return apiBaseUrl.contains('localhost') ||
-        apiBaseUrl.contains('127.0.0.1') ||
-        apiBaseUrl.contains('192.168.');
+    return FlavorConfig.apiBaseUrl.isEmpty;
   }
 
   /// Check if using staging environment
   static bool isStaging() {
-    return apiBaseUrl.contains('staging.');
+    return FlavorConfig.isStaging;
   }
 
   /// Get user-friendly environment name
