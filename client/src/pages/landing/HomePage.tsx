@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import Navbar from '../../components/landing/Navbar';
 import Footer from '../../components/landing/Footer';
 import Button from '../../components/landing/Button';
 import Badge from '../../components/landing/Badge';
 import Card from '../../components/landing/Card';
 import SectionHeader from '../../components/landing/SectionHeader';
+import { config } from '../../config/environment';
 
 const features = [
   {
@@ -86,6 +88,45 @@ const testimonials = [
 ];
 
 export default function HomePage() {
+  const [submitting, setSubmitting] = useState(false);
+  const [submitResult, setSubmitResult] = useState<'success' | 'error' | null>(null);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  async function handleContactSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSubmitting(true);
+    setSubmitResult(null);
+
+    const form = e.currentTarget;
+    const data = {
+      name: (form.elements.namedItem('name') as HTMLInputElement).value,
+      email: (form.elements.namedItem('email') as HTMLInputElement).value,
+      school: (form.elements.namedItem('school') as HTMLInputElement).value,
+      message: (form.elements.namedItem('message') as HTMLTextAreaElement).value,
+    };
+
+    try {
+      const res = await fetch(`${config.apiBaseUrl}/api/contact/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setSubmitResult('success');
+        form.reset();
+      } else {
+        setErrorMsg(json.error || 'Something went wrong. Please try again.');
+        setSubmitResult('error');
+      }
+    } catch {
+      setErrorMsg('Network error. Please email us directly at hello@apobasi.com.');
+      setSubmitResult('error');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <Navbar />
@@ -377,61 +418,81 @@ export default function HomePage() {
 
               {/* Contact Form */}
               <Card variant="gradient" className="p-8">
-                <form className="space-y-6" action="https://formspree.io/f/your-form-id" method="POST">
-                  <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      required
-                      className="w-full px-4 py-3 rounded-xl bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 transition-colors"
-                      placeholder="Your name"
-                    />
+                {submitResult === 'success' ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-3xl">✓</div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Message sent!</h3>
+                    <p className="text-gray-500 dark:text-gray-400">Thanks for reaching out. We'll get back to you shortly.</p>
+                    <button
+                      onClick={() => setSubmitResult(null)}
+                      className="text-blue-500 hover:text-blue-400 text-sm underline mt-2"
+                    >
+                      Send another message
+                    </button>
                   </div>
+                ) : (
+                  <form className="space-y-6" onSubmit={handleContactSubmit}>
+                    <div>
+                      <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
+                      <input
+                        type="text"
+                        id="name"
+                        name="name"
+                        required
+                        className="w-full px-4 py-3 rounded-xl bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 transition-colors"
+                        placeholder="Your name"
+                      />
+                    </div>
 
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      required
-                      className="w-full px-4 py-3 rounded-xl bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 transition-colors"
-                      placeholder="you@school.edu"
-                    />
-                  </div>
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
+                      <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        required
+                        className="w-full px-4 py-3 rounded-xl bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 transition-colors"
+                        placeholder="you@school.edu"
+                      />
+                    </div>
 
-                  <div>
-                    <label htmlFor="school" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">School Name</label>
-                    <input
-                      type="text"
-                      id="school"
-                      name="school"
-                      className="w-full px-4 py-3 rounded-xl bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 transition-colors"
-                      placeholder="Your school's name"
-                    />
-                  </div>
+                    <div>
+                      <label htmlFor="school" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">School Name</label>
+                      <input
+                        type="text"
+                        id="school"
+                        name="school"
+                        className="w-full px-4 py-3 rounded-xl bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 transition-colors"
+                        placeholder="Your school's name"
+                      />
+                    </div>
 
-                  <div>
-                    <label htmlFor="message" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Message</label>
-                    <textarea
-                      id="message"
-                      name="message"
-                      rows={4}
-                      required
-                      className="w-full px-4 py-3 rounded-xl bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 transition-colors resize-none"
-                      placeholder="Tell us about your school and transport needs..."
-                    ></textarea>
-                  </div>
+                    <div>
+                      <label htmlFor="message" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Message</label>
+                      <textarea
+                        id="message"
+                        name="message"
+                        rows={4}
+                        required
+                        className="w-full px-4 py-3 rounded-xl bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 transition-colors resize-none"
+                        placeholder="Tell us about your school and transport needs..."
+                      ></textarea>
+                    </div>
 
-                  <Button variant="primary" size="lg" className="w-full" type="submit">
-                    Send Message
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                  </Button>
-                </form>
+                    {submitResult === 'error' && (
+                      <p className="text-red-500 text-sm">{errorMsg}</p>
+                    )}
+
+                    <Button variant="primary" size="lg" className="w-full" type="submit" disabled={submitting}>
+                      {submitting ? 'Sending...' : 'Send Message'}
+                      {!submitting && (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                      )}
+                    </Button>
+                  </form>
+                )}
               </Card>
             </div>
           </div>

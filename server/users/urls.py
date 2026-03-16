@@ -1,9 +1,12 @@
 from django.urls import path
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from .throttles import TokenRefreshRateThrottle
 from . import views
+
+
+class ThrottledTokenRefreshView(TokenRefreshView):
+    throttle_classes = [TokenRefreshRateThrottle]
+
 
 app_name = 'users'
 
@@ -15,7 +18,7 @@ urlpatterns = [
 
     # JWT token endpoints
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/refresh/', ThrottledTokenRefreshView.as_view(), name='token_refresh'),
 
     # Profile management
     path('profile/', views.ProfileView.as_view(), name='profile'),
