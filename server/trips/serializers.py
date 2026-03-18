@@ -132,6 +132,14 @@ class TripSerializer(serializers.ModelSerializer):
                 'longitude': float(obj.current_longitude),
                 'timestamp': obj.location_timestamp.isoformat() if obj.location_timestamp else None
             }
+        # Fall back to bus's live location if trip hasn't been updated via REST
+        bus = obj.bus
+        if bus and bus.latitude and bus.longitude:
+            return {
+                'latitude': float(bus.latitude),
+                'longitude': float(bus.longitude),
+                'timestamp': bus.last_updated.isoformat() if hasattr(bus, 'last_updated') and bus.last_updated else None
+            }
         return None
 
 
