@@ -1,4 +1,5 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'flavor_config.dart';
 
 /// API Configuration for DriversandMinders App
 ///
@@ -14,7 +15,10 @@ class ApiConfig {
   /// Android emulator: 'http://10.0.2.2:8000'
   /// iOS simulator: 'http://localhost:8000'
   /// Production: 'https://yourdomain.com' or 'http://YOUR_VPS_IP'
-  static String get apiBaseUrl => dotenv.env['API_BASE_URL'] ?? '';
+  static String get apiBaseUrl {
+    final flavorUrl = FlavorConfig.apiBaseUrl;
+    return flavorUrl.isNotEmpty ? flavorUrl : dotenv.env['API_BASE_URL'] ?? '';
+  }
 
   /// Socket.IO Server URL for real-time updates
   /// Must be accessible from mobile devices (not localhost!)

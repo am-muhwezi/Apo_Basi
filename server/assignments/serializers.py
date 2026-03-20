@@ -334,27 +334,34 @@ class AssignmentCreateSerializer(serializers.Serializer):
         return data
 
     def create(self, validated_data):
-        """Create assignment instance"""
+        """Create assignment instance, auto-cancelling any conflicting active assignments."""
+        # Lazy import to avoid circular dependency
+        from .services import AssignmentService
+
         # Extract data needed for creation
         assignee = validated_data.pop('assignee')
         assigned_to = validated_data.pop('assigned_to')
-        assignee_content_type = validated_data.pop('assignee_content_type')
-        assigned_to_content_type = validated_data.pop('assigned_to_content_type')
-        assignee_id = validated_data.pop('assignee_id')
-        assigned_to_id = validated_data.pop('assigned_to_id')
+        validated_data.pop('assignee_content_type')
+        validated_data.pop('assigned_to_content_type')
+        validated_data.pop('assignee_id')
+        validated_data.pop('assigned_to_id')
 
         # Get assigned_by from context
         request = self.context.get('request')
         assigned_by = request.user if request and request.user.is_authenticated else None
 
-        # Create assignment
-        assignment = Assignment.objects.create(
-            assignee_content_type=assignee_content_type,
-            assignee_object_id=assignee.pk,
-            assigned_to_content_type=assigned_to_content_type,
-            assigned_to_object_id=assigned_to.pk,
+        # Delegate to service so conflicting active assignments are cancelled, not duplicated
+        assignment = AssignmentService.create_assignment(
+            assignment_type=validated_data.pop('assignment_type'),
+            assignee=assignee,
+            assigned_to=assigned_to,
             assigned_by=assigned_by,
-            **validated_data
+            effective_date=validated_data.pop('effective_date', None),
+            expiry_date=validated_data.pop('expiry_date', None),
+            reason=validated_data.pop('reason', ''),
+            notes=validated_data.pop('notes', ''),
+            metadata=validated_data.pop('metadata', {}),
+            auto_cancel_conflicting=True,  # Frontend has already confirmed reassignment
         )
 
         return assignment

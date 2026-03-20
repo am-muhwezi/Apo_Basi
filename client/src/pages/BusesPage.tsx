@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Eye, CreditCard as Edit, Trash2, Users, Bus as BusIcon, AlertTriangle, CheckCircle, UserCircle, UserCheck } from 'lucide-react';
+import { Plus, Search, Eye, CreditCard as Edit, Trash2, Users, Bus as BusIcon, AlertTriangle, CheckCircle, UserCircle, UserCheck, MapPin } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -11,7 +11,8 @@ import { useMinders } from '../hooks/useMinders';
 import { useChildren } from '../hooks/useChildren';
 import { useToast } from '../contexts/ToastContext';
 import { useConfirm } from '../contexts/ConfirmContext';
-import type { Bus } from '../types';
+import type { Bus, BusRoute } from '../types';
+import { assignmentService } from '../services/assignmentService';
 
 export default function BusesPage() {
   const toast = useToast();
@@ -19,7 +20,7 @@ export default function BusesPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const { buses, loadBuses, createBus, updateBus, deleteBus, assignDriver, assignMinder, assignChildren, hasMore: busesHasMore, loadMore: loadMoreBuses, loading: busesLoading, totalCount: busesTotal } = useBuses({ search: searchTerm });
+  const { buses, loadBuses, createBus, updateBus, deleteBus, hasMore: busesHasMore, loadMore: loadMoreBuses, loading: busesLoading, totalCount: busesTotal } = useBuses({ search: searchTerm });
 
   // Lazy load drivers, minders, children only when needed
   const { drivers, loadDrivers, hasMore: driversHasMore, loadMore: loadMoreDrivers } = useDrivers();
@@ -27,6 +28,7 @@ export default function BusesPage() {
   const { children, loadChildren, hasMore: childrenHasMore, loadMore: loadMoreChildren } = useChildren();
 
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [routes, setRoutes] = useState<BusRoute[]>([]);
 
   useEffect(() => {
     const timer = setTimeout(() => loadBuses(), searchTerm ? 400 : 0);
@@ -37,7 +39,7 @@ export default function BusesPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [formData, setFormData] = useState<Partial<Bus>>({});
-  const [assignData, setAssignData] = useState({ driverId: '', minderId: '', childrenIds: [] as string[] });
+  const [assignData, setAssignData] = useState({ driverId: '', minderId: '', childrenIds: [] as string[], routeId: '' });
 
   const filteredBuses = buses; // search is server-side
 
@@ -73,16 +75,19 @@ export default function BusesPage() {
     setAssignData({
       driverId: bus.driverId?.toString() || '',
       minderId: bus.minderId?.toString() || '',
-      childrenIds: bus.assignedChildrenIds || [],
+      childrenIds: bus.assignedChildrenIds?.map(String) || [],
+      routeId: bus.routeId?.toString() || '',
     });
 
-    // Load drivers, minders, children only once when first opening assignment modal
+    // Load drivers, minders, children, routes only once
     if (!dataLoaded) {
-      await Promise.all([
+      const [, , , loadedRoutes] = await Promise.all([
         loadDrivers(),
         loadMinders(),
         loadChildren(),
+        assignmentService.loadRoutes().catch(() => [] as BusRoute[]),
       ]);
+      setRoutes(loadedRoutes as BusRoute[]);
       setDataLoaded(true);
     }
 
@@ -135,43 +140,123 @@ export default function BusesPage() {
     setAssignError(null);
     if (!selectedBus) return;
 
-    // Execute assignments sequentially to avoid database locking issues with SQLite
-    // For production with PostgreSQL, Promise.all would be faster, but sequential is safer
-    const results: (any | null)[] = [];
+    // ── Conflict detection ──────────────────────────────────────────────────
+    const warnings: string[] = [];
 
-    // Assign driver first
+    // Normalise all IDs to strings for comparison (API returns numbers, selects hold strings)
+    const selectedBusId = String(selectedBus.id);
+
     if (assignData.driverId) {
-      const result = await assignDriver(selectedBus.id, assignData.driverId);
-      results.push(result);
-      if (!result.success) {
-        setAssignError(result.error?.message || 'Failed to assign driver');
-        return;
+      const driver = drivers.find(d => String(d.id) === assignData.driverId);
+      if (driver?.assignedBusId && String(driver.assignedBusId) !== selectedBusId) {
+        warnings.push(
+          `Driver "${driver.firstName} ${driver.lastName}" is currently assigned to bus ${driver.assignedBusNumber}. They will be reassigned to this bus.`
+        );
       }
     }
 
-    // Then assign minder
     if (assignData.minderId) {
-      const result = await assignMinder(selectedBus.id, assignData.minderId);
-      results.push(result);
-      if (!result.success) {
-        setAssignError(result.error?.message || 'Failed to assign minder');
-        return;
+      const minder = minders.find(m => String(m.id) === assignData.minderId);
+      if (minder?.assignedBusId && String(minder.assignedBusId) !== selectedBusId) {
+        warnings.push(
+          `Bus Assistant "${minder.firstName} ${minder.lastName}" is currently assigned to bus ${minder.assignedBusNumber}. They will be reassigned to this bus.`
+        );
       }
     }
 
-    // Finally assign children
-    if (assignData.childrenIds.length > 0) {
-      const result = await assignChildren(selectedBus.id, assignData.childrenIds);
-      results.push(result);
-      if (!result.success) {
-        setAssignError(result.error?.message || 'Failed to assign children');
-        return;
+    if (assignData.routeId && selectedBus.routeId && String(selectedBus.routeId) !== assignData.routeId) {
+      const newRoute = routes.find(r => String(r.id) === assignData.routeId);
+      warnings.push(
+        `This bus is currently on route "${selectedBus.routeName}". It will be moved to "${newRoute?.name || assignData.routeId}".`
+      );
+    }
+
+    // Children being newly added who are already on a different bus
+    const currentChildIds = new Set((selectedBus.assignedChildrenIds || []).map(String));
+    for (const childId of assignData.childrenIds) {
+      if (!currentChildIds.has(childId)) {
+        const child = children.find(c => String(c.id) === childId);
+        if (child?.assignedBusId && String(child.assignedBusId) !== selectedBusId) {
+          warnings.push(
+            `"${child.firstName} ${child.lastName}" is currently on bus ${child.assignedBusNumber}. They will be moved to this bus.`
+          );
+        }
       }
     }
 
-    // All assignments succeeded
-    toast.success('Assignments saved successfully');
-    setShowAssignModal(false);
+    if (warnings.length > 0) {
+      const confirmed = await confirm({
+        title: 'Reassignment Conflicts Detected',
+        message: warnings.join('\n\n') + '\n\nExisting assignments will be cancelled. Do you want to proceed?',
+        confirmText: 'Yes, Reassign',
+        cancelText: 'Cancel',
+        variant: 'warning',
+      });
+      if (!confirmed) return;
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
+    const today = new Date().toISOString().split('T')[0];
+    const busId = parseInt(selectedBus.id);
+
+    try {
+      // All run sequentially to avoid DB contention.
+      // Each call goes through the central Assignment API — single source of truth.
+      if (assignData.driverId) {
+        await assignmentService.createAssignment({
+          assignmentType: 'driver_to_bus',
+          assigneeId: parseInt(assignData.driverId),
+          assignedToId: busId,
+          effectiveDate: today,
+          status: 'active',
+        });
+      }
+
+      if (assignData.minderId) {
+        await assignmentService.createAssignment({
+          assignmentType: 'minder_to_bus',
+          assigneeId: parseInt(assignData.minderId),
+          assignedToId: busId,
+          effectiveDate: today,
+          status: 'active',
+        });
+      }
+
+      if (assignData.childrenIds.length > 0) {
+        await assignmentService.bulkAssignChildrenToBus(
+          busId,
+          assignData.childrenIds.map(Number),
+        );
+      }
+
+      if (assignData.routeId) {
+        await assignmentService.createAssignment({
+          assignmentType: 'bus_to_route',
+          assigneeId: busId,
+          assignedToId: parseInt(assignData.routeId),
+          effectiveDate: today,
+          status: 'active',
+        });
+      }
+
+      // Reload buses so all updated assignment fields (driverName, routeName, etc.) refresh
+      await loadBuses();
+      toast.success('Assignments saved successfully');
+      setShowAssignModal(false);
+    } catch (err: any) {
+      const errData = err?.response?.data;
+      let msg = errData?.message || errData?.detail || err?.message || 'Failed to save assignments';
+      // DRF validation errors arrive as { field: ["msg", ...], ... }
+      if (!errData?.message && !errData?.detail && errData && typeof errData === 'object') {
+        const firstField = Object.values(errData)[0];
+        if (Array.isArray(firstField) && firstField.length > 0) {
+          msg = String(firstField[0]);
+        } else if (typeof firstField === 'string') {
+          msg = firstField;
+        }
+      }
+      setAssignError(msg);
+    }
   };
 
   const toggleChildAssignment = (childId: string) => {
@@ -313,6 +398,9 @@ export default function BusesPage() {
                   Bus Assistant
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
+                  Route
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
                   Children
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
@@ -326,7 +414,7 @@ export default function BusesPage() {
             <tbody className="divide-y divide-slate-200">
               {filteredBuses.length === 0 && !busesLoading && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
+                  <td colSpan={8} className="px-6 py-16 text-center">
                     <p className="text-slate-500 font-medium">
                       {searchTerm ? 'No buses match your search' : 'No buses yet'}
                     </p>
@@ -347,6 +435,9 @@ export default function BusesPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
                     {bus.minderName || 'Not Assigned'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-slate-700">
+                    {bus.routeName || <span className="text-slate-400 italic text-xs">No route</span>}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-700">
                     {bus.assignedChildrenCount || 0}/{bus.capacity}
@@ -459,6 +550,11 @@ export default function BusesPage() {
                 <UserCheck className="w-4 h-4 text-slate-400" />
                 <span className="text-slate-600">Bus Assistant:</span>
                 <span className="font-medium text-slate-900">{bus.minderName || 'Not Assigned'}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <MapPin className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600">Route:</span>
+                <span className="font-medium text-slate-900">{bus.routeName || <span className="text-slate-400 italic">No route</span>}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Users className="w-4 h-4 text-slate-400" />
@@ -630,6 +726,19 @@ export default function BusesPage() {
             />
           </div>
 
+          <Select
+            label="Route"
+            value={assignData.routeId}
+            onChange={(e) => setAssignData({ ...assignData, routeId: e.target.value })}
+            options={[
+              { value: '', label: 'No route assigned' },
+              ...routes.map((r) => ({
+                value: r.id,
+                label: r.name,
+              })),
+            ]}
+          />
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-3">
               Assigned Children ({assignData.childrenIds.length}/{selectedBus?.capacity || 0})
@@ -715,6 +824,10 @@ export default function BusesPage() {
               <div>
                 <p className="text-sm font-medium text-slate-700">Bus Assistant</p>
                 <p className="text-base text-slate-900">{selectedBus.minderName || 'Not Assigned'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-700">Route</p>
+                <p className="text-base text-slate-900">{selectedBus.routeName || 'No route assigned'}</p>
               </div>
               {selectedBus.lastMaintenance && (
                 <div>

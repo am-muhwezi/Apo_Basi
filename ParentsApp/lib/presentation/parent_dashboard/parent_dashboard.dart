@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/app_export.dart';
+import '../../config/api_config.dart';
 import '../../services/api_service.dart';
 import '../../services/cache_service.dart';
 import '../../services/connectivity_service.dart';

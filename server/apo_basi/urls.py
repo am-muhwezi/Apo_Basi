@@ -1,16 +1,16 @@
 from django.contrib import admin
 from django.urls import path
 from django.urls import include
-from users.views import health_check, school_info
+from users.views import health_check, school_info, contact_form
 from users.views_auth import unified_phone_login
-from rest_framework_simplejwt.views import TokenRefreshView
+from users.urls import ThrottledTokenRefreshView
 from trips.views import StopDetailView, StopCompleteView, StopSkipView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     # Backwards-compatible alias for JWT refresh token endpoint
     # Primary endpoint lives at /api/users/token/refresh/
-    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh_compat"),
+    path("api/token/refresh/", ThrottledTokenRefreshView.as_view(), name="token_refresh_compat"),
     # Unified phone login for drivers and bus minders
     path("api/auth/phone-login/", unified_phone_login, name="unified_phone_login"),
     path("api/users/", include("users.urls")),
@@ -31,4 +31,5 @@ urlpatterns = [
     path("api/notifications/", include("notifications.urls")),
     path("api/health/", health_check, name="health_check"),
     path("api/school/info/", school_info, name="school_info"),
+    path("api/contact/", contact_form, name="contact_form"),
 ]

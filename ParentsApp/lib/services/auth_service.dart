@@ -17,7 +17,9 @@ class AuthService {
   factory AuthService() => _instance;
   AuthService._internal();
 
-  final SupabaseClient _supabase = Supabase.instance.client;
+  // Lazy getter — accessed only after AppInitScreen has run Supabase.initialize().
+  SupabaseClient get _supabase => Supabase.instance.client;
+
   final Dio _dio = Dio(BaseOptions(
     baseUrl: ApiConfig.apiBaseUrl,
     connectTimeout: const Duration(seconds: 10),
@@ -86,10 +88,26 @@ class AuthService {
         'success': false,
         'message': 'Connection error. Please check your internet connection.',
       };
-    } catch (e) {
+    } on AuthException catch (e) {
+      print('❌ Supabase AuthException: ${e.message}');
+      
+      // Provide user-friendly error messages
+      if (e.message.toLowerCase().contains('rate limit')) {
+        return {
+          'success': false,
+          'message': 'Too many login attempts. Please wait 1 minute and try again.',
+        };
+      }
+      
       return {
         'success': false,
-        'message': 'Failed to send magic link. Please try again.',
+        'message': e.message,
+      };
+    } catch (e) {
+      print('❌ Unexpected error in sendMagicLink: $e');
+      return {
+        'success': false,
+        'message': 'Failed to send magic link: ${e.toString()}',
       };
     }
   }
