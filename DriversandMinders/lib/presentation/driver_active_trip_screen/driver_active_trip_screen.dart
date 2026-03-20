@@ -706,6 +706,16 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
           if (gradeValue.toLowerCase().startsWith('grade')) {
             gradeValue = gradeValue.substring(5).trim();
           }
+          final rawLat = child['home_latitude'];
+          final rawLng = child['home_longitude'];
+          final parsedLat = double.tryParse(rawLat?.toString() ?? '');
+          final parsedLng = double.tryParse(rawLng?.toString() ?? '');
+
+          print('📍 Child ${child['first_name']} ${child['last_name']}: '
+              'rawLat=$rawLat (${rawLat.runtimeType}), '
+              'rawLng=$rawLng (${rawLng.runtimeType}), '
+              'parsedLat=$parsedLat, parsedLng=$parsedLng');
+
           byId[id] = {
             "id": id,
             "name": '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}',
@@ -716,8 +726,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
                 'N/A',
             "specialNotes": child['special_needs']?.toString() ?? '',
             "isPickedUp": false,
-            "lat": double.tryParse(child['home_latitude']?.toString() ?? ''),
-            "lng": double.tryParse(child['home_longitude']?.toString() ?? ''),
+            "lat": parsedLat,
+            "lng": parsedLng,
           };
         }
         _students = byId.values.toList();
@@ -1205,8 +1215,8 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
     final rawStops = _tripData['stops'] as List?;
     if (rawStops != null && rawStops.isNotEmpty) {
       final stops = rawStops.cast<Map<String, dynamic>>().toList()
-        ..sort(
-            (a, b) => (a['order'] as int? ?? 0).compareTo(b['order'] as int? ?? 0));
+        ..sort((a, b) =>
+            (a['order'] as int? ?? 0).compareTo(b['order'] as int? ?? 0));
       final refStop = tripType == 'dropoff' ? stops.first : stops.last;
       final lat = refStop['latitude'] as double?;
       final lng = refStop['longitude'] as double?;
@@ -1456,7 +1466,9 @@ class _DriverActiveTripScreenState extends State<DriverActiveTripScreen>
       drawer: DriverDrawerWidget(
         currentRoute: '/driver-active-trip-screen',
         driverData: {
-          'name': _driverName.isNotEmpty ? _driverName : (_tripData['driverName'] ?? ''),
+          'name': _driverName.isNotEmpty
+              ? _driverName
+              : (_tripData['driverName'] ?? ''),
           'bus_number':
               _busData?['bus_number'] ?? _busData?['number_plate'] ?? 'N/A',
         },
@@ -1783,10 +1795,10 @@ class _TripBottomSheet extends StatelessWidget {
           ...(() {
             final sorted = students.toList()
               ..sort((a, b) {
-                final aEta = studentEtas[a['id'] as String?]?.inSeconds ??
-                    999999;
-                final bEta = studentEtas[b['id'] as String?]?.inSeconds ??
-                    999999;
+                final aEta =
+                    studentEtas[a['id'] as String?]?.inSeconds ?? 999999;
+                final bEta =
+                    studentEtas[b['id'] as String?]?.inSeconds ?? 999999;
                 return aEta.compareTo(bEta);
               });
             return sorted.map((student) {
@@ -1796,9 +1808,8 @@ class _TripBottomSheet extends StatelessWidget {
                 student: student,
                 isSelected: selectedStudent?['id'] == student['id'],
                 eta: eta,
-                onTap: student['lat'] != null
-                    ? () => onStudentTap(student)
-                    : null,
+                onTap:
+                    student['lat'] != null ? () => onStudentTap(student) : null,
                 onToggle: (val) => onPickupToggle(id, val),
               );
             });

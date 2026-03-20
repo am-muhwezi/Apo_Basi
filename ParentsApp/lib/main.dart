@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -15,7 +14,6 @@ import 'services/bus_websocket_service.dart';
 import 'services/parent_notifications_service.dart';
 import 'services/theme_service.dart';
 import 'services/home_location_service.dart';
-import 'config/supabase_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,17 +37,16 @@ Future<void> main() async {
     print('   MAPBOX_ACCESS_TOKEN: ${ApiConfig.mapboxAccessToken.isEmpty ? "MISSING" : "OK"}');
   }
 
-  // Initialize Mapbox access token
+  // Initialize Mapbox access token (synchronous — fast)
   MapboxOptions.setAccessToken(ApiConfig.mapboxAccessToken);
 
-  // Initialize Supabase for magic link authentication
-  await Supabase.initialize(
-    url: SupabaseConfig.supabaseUrl,
-    anonKey: SupabaseConfig.supabasePublishableKey,
-  );
-
-  // Initialize theme service
+  // Initialize theme service — single SharedPreferences read, very fast.
   await ThemeService().initialize();
+
+  // NOTE: Supabase.initialize() has been moved into AppInitScreen so that
+  // runApp() is no longer blocked by the network SDK handshake (~300-800 ms).
+  // AppInitScreen shows branded UI while init runs, then routes to dashboard
+  // or login depending on whether a stored JWT token is found.
 
   runApp(MyApp());
 
@@ -91,7 +88,6 @@ class _MyAppState extends State<MyApp> {
   final BusWebSocketService _webSocketService = BusWebSocketService();
   final ParentNotificationsService _notificationsService =
       ParentNotificationsService();
-  final NotificationService _notificationService = NotificationService();
   final ThemeService _themeService = ThemeService();
 
   @override

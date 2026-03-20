@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// Service for showing system (OS-level) notifications.
 ///
@@ -30,6 +31,9 @@ class NotificationService {
   Future<void> init() async {
     if (_initialized) return;
 
+    // Request notification permission (required on Android 13+ and iOS)
+    await Permission.notification.request();
+
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
@@ -44,7 +48,7 @@ class NotificationService {
     );
 
     await _plugin.initialize(
-      settings: settings,
+      settings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         // Tapping the persistent attendance notification navigates back to
         // the active trip screen so the minder can quickly mark attendance.
@@ -70,10 +74,10 @@ class NotificationService {
     await init();
     final tripLabel = tripType == 'pickup' ? 'Pickup' : 'Dropoff';
     await _plugin.show(
-      id: _tripEndedId,
-      title: 'Trip Completed — $tripLabel',
-      body: 'Bus $busNumber trip has ended.',
-      notificationDetails: _alertNotificationDetails(),
+      _tripEndedId,
+      'Trip Completed — $tripLabel',
+      'Bus $busNumber trip has ended.',
+      _alertNotificationDetails(),
     );
   }
 
@@ -106,10 +110,10 @@ class NotificationService {
       presentSound: false,
     );
     await _plugin.show(
-      id: _ongoingAttendanceId,
-      title: 'Attendance in Progress — $tripLabel',
-      body: 'Bus $busNumber · Tap to mark student attendance',
-      notificationDetails: const NotificationDetails(android: android, iOS: ios),
+      _ongoingAttendanceId,
+      'Attendance in Progress — $tripLabel',
+      'Bus $busNumber · Tap to mark student attendance',
+      const NotificationDetails(android: android, iOS: ios),
       payload: 'attendance_ongoing',
     );
   }
@@ -117,7 +121,7 @@ class NotificationService {
   /// Removes the persistent attendance notification when the shift ends.
   Future<void> clearAttendanceNotification() async {
     await init();
-    await _plugin.cancel(id: _ongoingAttendanceId);
+    await _plugin.cancel(_ongoingAttendanceId);
   }
 
   NotificationDetails _alertNotificationDetails() {

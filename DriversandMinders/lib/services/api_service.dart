@@ -7,36 +7,41 @@ class ApiService {
   String? _accessToken;
 
   ApiService() {
-    _dio = Dio(BaseOptions(
-      baseUrl: ApiConfig.apiBaseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    ));
+    _dio = Dio(
+      BaseOptions(
+        baseUrl: ApiConfig.apiBaseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ),
+    );
 
-    _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) async {
-        // Skip authentication for login endpoints
-        final isLoginEndpoint = options.path.contains('/phone-login/') ||
-            options.path.contains('/login/');
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          // Skip authentication for login endpoints
+          final isLoginEndpoint =
+              options.path.contains('/phone-login/') ||
+              options.path.contains('/login/');
 
-        if (!isLoginEndpoint) {
-          // Load and add token for authenticated requests
-          await loadToken();
-          if (_accessToken != null) {
-            options.headers['Authorization'] = 'Bearer $_accessToken';
+          if (!isLoginEndpoint) {
+            // Load and add token for authenticated requests
+            await loadToken();
+            if (_accessToken != null) {
+              options.headers['Authorization'] = 'Bearer $_accessToken';
+            }
           }
-        }
-        return handler.next(options);
-      },
-      onError: (error, handler) {
-        if (error.response != null) {}
-        return handler.next(error);
-      },
-    ));
+          return handler.next(options);
+        },
+        onError: (error, handler) {
+          if (error.response != null) {}
+          return handler.next(error);
+        },
+      ),
+    );
   }
 
   String _extractErrorMessage(DioException e, String fallback) {
@@ -84,13 +89,31 @@ class ApiService {
   Future<void> clearToken() async {
     _accessToken = null;
     final prefs = await SharedPreferences.getInstance();
+
+    // Clear tokens
     await prefs.remove('access_token');
     await prefs.remove('refresh_token');
-    await prefs.remove('user_data');
+
+    // Clear unified keys
     await prefs.remove('user_id');
-    await prefs.remove('user_role');
     await prefs.remove('user_name');
+    await prefs.remove('user_email');
+    await prefs.remove('user_phone');
+    await prefs.remove('user_role');
+    await prefs.remove('user_data');
     await prefs.remove('is_logged_in');
+
+    // Clear driver-specific keys
+    await prefs.remove('driver_id');
+    await prefs.remove('driver_name');
+    await prefs.remove('driver_email');
+    await prefs.remove('driver_phone');
+    await prefs.remove('license_number');
+    await prefs.remove('license_expiry');
+
+    // Clear cached data
+    await prefs.remove('cached_bus_data');
+    await prefs.remove('cached_route_data');
   }
 
   // Save user ID to preferences
@@ -111,9 +134,7 @@ class ApiService {
     try {
       final response = await _dio.post(
         '/api/drivers/phone-login/',
-        data: {
-          'phone_number': phoneNumber,
-        },
+        data: {'phone_number': phoneNumber},
       );
 
       if (response.statusCode == 200) {
@@ -136,12 +157,16 @@ class ApiService {
         if (data.containsKey('license_number') &&
             data['license_number'] != null) {
           await prefs.setString(
-              'license_number', data['license_number'].toString());
+            'license_number',
+            data['license_number'].toString(),
+          );
         }
         if (data.containsKey('license_expiry') &&
             data['license_expiry'] != null) {
           await prefs.setString(
-              'license_expiry', data['license_expiry'].toString());
+            'license_expiry',
+            data['license_expiry'].toString(),
+          );
         }
         if (data.containsKey('email') && data['email'] != null) {
           // Store under user_email to match profile screens
@@ -158,9 +183,7 @@ class ApiService {
         throw Exception('Login failed');
       }
     } on DioException catch (e) {
-      throw Exception(
-        _extractErrorMessage(e, 'Phone number not found.'),
-      );
+      throw Exception(_extractErrorMessage(e, 'Phone number not found.'));
     }
   }
 
@@ -173,9 +196,7 @@ class ApiService {
     try {
       final response = await _dio.post(
         '/api/busminders/phone-login/',
-        data: {
-          'phone_number': phoneNumber,
-        },
+        data: {'phone_number': phoneNumber},
       );
 
       if (response.statusCode == 200) {
@@ -198,9 +219,7 @@ class ApiService {
         throw Exception('Login failed');
       }
     } on DioException catch (e) {
-      throw Exception(
-        _extractErrorMessage(e, 'Phone number not found.'),
-      );
+      throw Exception(_extractErrorMessage(e, 'Phone number not found.'));
     }
   }
 
@@ -280,8 +299,9 @@ class ApiService {
   // Backend endpoint: GET /api/busminders/buses/{bus_id}/children/?trip_type=pickup|dropoff
   Future<List<dynamic>> getBusChildren(int busId, {String? tripType}) async {
     try {
-      final Map<String, dynamic> queryParams =
-          tripType != null ? {'trip_type': tripType} : {};
+      final Map<String, dynamic> queryParams = tripType != null
+          ? {'trip_type': tripType}
+          : {};
       final response = await _dio.get(
         '/api/busminders/buses/$busId/children/',
         queryParameters: queryParams,
@@ -325,9 +345,7 @@ class ApiService {
         throw Exception('Failed to mark attendance');
       }
     } on DioException catch (e) {
-      throw Exception(
-        _extractErrorMessage(e, 'Failed to mark attendance'),
-      );
+      throw Exception(_extractErrorMessage(e, 'Failed to mark attendance'));
     }
   }
 
@@ -372,9 +390,7 @@ class ApiService {
         throw Exception('Failed to load attendance');
       }
     } on DioException catch (e) {
-      throw Exception(
-        _extractErrorMessage(e, 'Failed to load attendance'),
-      );
+      throw Exception(_extractErrorMessage(e, 'Failed to load attendance'));
     }
   }
 
@@ -462,9 +478,7 @@ class ApiService {
     try {
       final response = await _dio.post(
         '/api/drivers/start-trip/',
-        data: {
-          'trip_type': tripType,
-        },
+        data: {'trip_type': tripType},
       );
       return response.data;
     } on DioException catch (e) {
@@ -512,7 +526,9 @@ class ApiService {
   // ==================== BusMinder Trip Management ====================
 
   // Start a new trip as busminder
-  Future<Map<String, dynamic>> startBusminderTrip({String tripType = 'pickup'}) async {
+  Future<Map<String, dynamic>> startBusminderTrip({
+    String tripType = 'pickup',
+  }) async {
     try {
       final response = await _dio.post(
         '/api/busminders/start-trip/',

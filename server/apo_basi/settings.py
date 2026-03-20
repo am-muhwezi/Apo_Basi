@@ -150,6 +150,18 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
     "PAGE_SIZE": 20,
+    "DEFAULT_THROTTLE_CLASSES": [
+        "users.throttles.AuthenticatedUserThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "contact_form": "5/hour",
+        "login": "10/min",
+        "registration": "5/hour",
+        "token_refresh": "20/min",
+        "authenticated_user": "300/hour",
+    },
+    # 1 = nginx sits in front (production). Set to 0 in .env for local dev.
+    "NUM_PROXIES": config("NUM_PROXIES", cast=int, default=1),
 }
 
 # JWT Configuration
@@ -254,3 +266,19 @@ SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", cast=bool, default=False)
 
 SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", cast=bool, default=False)
 CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", cast=bool, default=False)
+
+# -----------------------------------------------------------------------
+# Email (contact form)
+# -----------------------------------------------------------------------
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND",
+    default="django.core.mail.backends.console.EmailBackend",
+)
+EMAIL_HOST = config("EMAIL_HOST", default="mail.privateemail.com")
+EMAIL_PORT = config("EMAIL_PORT", cast=int, default=587)
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", cast=bool, default=True)
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", cast=bool, default=False)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="ApoBasi <hello@apobasi.com>")
+CONTACT_EMAIL = config("CONTACT_EMAIL", default="hello@apobasi.com")

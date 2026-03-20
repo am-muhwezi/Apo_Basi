@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/app_export.dart';
+import '../../../theme/app_theme.dart';
+// ignore_for_file: unnecessary_import
 
 class NotificationCardWidget extends StatelessWidget {
   final Map<String, dynamic> notification;
@@ -22,7 +25,6 @@ class NotificationCardWidget extends StatelessWidget {
     this.onViewOnMap,
   }) : super(key: key);
 
-  // Add unique key based on notification ID to prevent unnecessary rebuilds
   @override
   Key? get key => ValueKey(notification['id']);
 
@@ -37,46 +39,41 @@ class NotificationCardWidget extends StatelessWidget {
         fullMessage.trim().isNotEmpty &&
         fullMessage.trim() != message.trim();
 
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    final typeColor = _getTypeColor(type);
+    final typeIcon = _getTypeIcon(type);
 
-    // Get unique styling for this notification type
-    final notificationStyle = _getNotificationStyle(type, context);
-    final Color typeColor = notificationStyle['color'];
+    final cardBg = isRead
+        ? (isDark
+            ? AppTheme.cardDark.withValues(alpha: 0.6)
+            : const Color(0xFFF8FAFF))
+        : (isDark ? AppTheme.cardDark : Colors.white);
 
     return RepaintBoundary(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
         decoration: BoxDecoration(
-          color: isCritical
-              ? colorScheme.error.withValues(alpha: 0.05)
-              : theme.cardColor,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isRead
-                ? colorScheme.outline
-                : typeColor.withValues(alpha: 0.3),
-            width: isRead ? 1 : 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: colorScheme.shadow.withValues(alpha: 0.12),
-              blurRadius: 2,
-            ),
-            BoxShadow(
-              color: colorScheme.shadow.withValues(alpha: 0.09),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          color: cardBg,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isRead
+              ? null
+              : [
+                  BoxShadow(
+                    color:
+                        Colors.black.withValues(alpha: isDark ? 0.25 : 0.07),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(16),
             child: Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,20 +81,17 @@ class NotificationCardWidget extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Type icon
+                      // Circular icon container
                       Container(
-                        width: 40,
-                        height: 40,
+                        width: 48,
+                        height: 48,
                         decoration: BoxDecoration(
-                          color: typeColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
+                          color: typeColor
+                              .withValues(alpha: isDark ? 0.2 : 0.12),
+                          shape: BoxShape.circle,
                         ),
                         child: Center(
-                          child: CustomIconWidget(
-                            iconName: notificationStyle['icon'],
-                            color: typeColor,
-                            size: 20,
-                          ),
+                          child: Icon(typeIcon, color: typeColor, size: 22),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -105,18 +99,18 @@ class NotificationCardWidget extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Title + timestamp row
+                            // Title + "New" badge row
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 Expanded(
                                   child: Text(
                                     notification['title'] ?? '',
-                                    style: TextStyle(
+                                    style: GoogleFonts.manrope(
                                       fontSize: 14,
                                       fontWeight: isRead
-                                          ? FontWeight.w500
-                                          : FontWeight.w600,
+                                          ? FontWeight.w600
+                                          : FontWeight.w700,
                                       color: isCritical
                                           ? colorScheme.error
                                           : colorScheme.onSurface,
@@ -125,25 +119,47 @@ class NotificationCardWidget extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _formatTimestamp(notification['timestamp']),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w400,
-                                    color: colorScheme.onSurfaceVariant,
+                                if (!isRead) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: typeColor,
+                                      borderRadius:
+                                          BorderRadius.circular(100),
+                                    ),
+                                    child: Text(
+                                      'New',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ],
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
+                            // Timestamp
+                            Text(
+                              _formatTimestamp(notification['timestamp']),
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
                             // Message body
                             Text(
                               message,
-                              style: TextStyle(
-                                fontSize: 14,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
                                 fontWeight: FontWeight.w400,
-                                color: colorScheme.onSurfaceVariant,
+                                color: isRead
+                                    ? colorScheme.onSurfaceVariant
+                                    : colorScheme.onSurface,
                                 height: 1.4,
                               ),
                               maxLines:
@@ -155,23 +171,21 @@ class NotificationCardWidget extends StatelessWidget {
                               if (hasExtraDetails) ...[
                                 const SizedBox(height: 10),
                                 Text(
-                                  fullMessage!,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w400,
+                                  fullMessage,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
                                     color: colorScheme.onSurface,
                                   ),
                                 ),
                               ],
                               const SizedBox(height: 10),
-                              // Action buttons
                               Row(
                                 children: [
                                   if (type == 'bus_approaching' ||
                                       type == 'pickup_confirmed') ...[
                                     _buildActionButton(
                                       context,
-                                      icon: 'map',
+                                      icon: Icons.map_rounded,
                                       label: 'View on Map',
                                       color: colorScheme.primary,
                                       onTap: onViewOnMap,
@@ -180,7 +194,7 @@ class NotificationCardWidget extends StatelessWidget {
                                   ],
                                   _buildActionButton(
                                     context,
-                                    icon: 'phone',
+                                    icon: Icons.phone_rounded,
                                     label: 'Call Driver',
                                     color: colorScheme.secondary,
                                     onTap: onContactSchool,
@@ -193,40 +207,6 @@ class NotificationCardWidget extends StatelessWidget {
                       ),
                     ],
                   ),
-                  // Unread badge
-                  if (!isRead) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: typeColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(100),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: typeColor,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'New',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: typeColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -238,7 +218,7 @@ class NotificationCardWidget extends StatelessWidget {
 
   Widget _buildActionButton(
     BuildContext context, {
-    required String icon,
+    required IconData icon,
     required String label,
     required Color color,
     VoidCallback? onTap,
@@ -249,22 +229,18 @@ class NotificationCardWidget extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CustomIconWidget(
-              iconName: icon,
-              color: color,
-              size: 16,
-            ),
+            Icon(icon, color: color, size: 16),
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
                 color: color,
               ),
             ),
@@ -274,64 +250,54 @@ class NotificationCardWidget extends StatelessWidget {
     );
   }
 
-  // Get unique styling for each notification type
-  Map<String, dynamic> _getNotificationStyle(
-      String type, BuildContext context) {
+  Color _getTypeColor(String type) {
     switch (type) {
-      case 'bus_approaching':
-        return {
-          'color': const Color(0xFF2B5CE6),
-          'icon': 'directions_bus',
-        };
       case 'pickup_confirmed':
-        return {
-          'color': const Color(0xFF34C759),
-          'icon': 'check_circle',
-        };
       case 'dropoff_complete':
-        return {
-          'color': const Color(0xFF22C55E),
-          'icon': 'verified',
-        };
-      case 'route_change':
-        return {
-          'color': const Color(0xFFFF9500),
-          'icon': 'alt_route',
-        };
-      case 'emergency':
-        return {
-          'color': const Color(0xFFFF3B30),
-          'icon': 'warning',
-        };
-      case 'major_delay':
-        return {
-          'color': const Color(0xFFEF4444),
-          'icon': 'schedule',
-        };
-      case 'trip_started':
-        return {
-          'color': const Color(0xFF2B5CE6),
-          'icon': 'directions_bus',
-        };
       case 'trip_ended':
       case 'trip_completed':
       case 'student_reached_safely':
       case 'reached_safely':
-        return {
-          'color': const Color(0xFF34C759),
-          'icon': 'check_circle',
-        };
+        return const Color(0xFF007D55);
+      case 'bus_approaching':
+      case 'trip_started':
+        return const Color(0xFF004AC6);
+      case 'route_change':
+        return const Color(0xFFA16500);
+      case 'emergency':
+      case 'major_delay':
+        return const Color(0xFFBA1A1A);
       default:
-        return {
-          'color': Theme.of(context).colorScheme.onSurfaceVariant,
-          'icon': 'notifications',
-        };
+        return const Color(0xFF6B7280);
+    }
+  }
+
+  IconData _getTypeIcon(String type) {
+    switch (type) {
+      case 'pickup_confirmed':
+        return Icons.check_circle_rounded;
+      case 'dropoff_complete':
+      case 'trip_ended':
+      case 'trip_completed':
+      case 'student_reached_safely':
+      case 'reached_safely':
+        return Icons.verified_rounded;
+      case 'bus_approaching':
+      case 'trip_started':
+        return Icons.directions_bus_rounded;
+      case 'route_change':
+        return Icons.alt_route_rounded;
+      case 'emergency':
+        return Icons.warning_rounded;
+      case 'major_delay':
+        return Icons.schedule_rounded;
+      default:
+        return Icons.notifications_rounded;
     }
   }
 
   String _formatTimestamp(dynamic timestamp) {
     if (timestamp == null) return '';
-
     DateTime dateTime;
     if (timestamp is DateTime) {
       dateTime = timestamp;
@@ -340,20 +306,12 @@ class NotificationCardWidget extends StatelessWidget {
     } else {
       return '';
     }
-
     final now = DateTime.now();
     final difference = now.difference(dateTime);
-
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
-    } else {
-      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
-    }
+    if (difference.inMinutes < 1) return 'Just now';
+    if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
+    if (difference.inHours < 24) return '${difference.inHours}h ago';
+    if (difference.inDays < 7) return '${difference.inDays}d ago';
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
   }
 }
