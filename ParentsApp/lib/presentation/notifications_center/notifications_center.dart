@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -527,51 +528,42 @@ class _NotificationsCenterState extends State<NotificationsCenter>
     await _loadNotificationsFromAPI();
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildHeader(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final hasNotifications = _groupedNotifications.isNotEmpty;
-
-    // Show loading indicator only if no cached data
-    if (_isLoading && _allNotifications.isEmpty) {
-      return Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: Text('Notifications'),
-        ),
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Notifications',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Notifications',
+                  style: GoogleFonts.manrope(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
                   ),
-            ),
-            if (_unreadCount > 0)
-              Text(
-                '$_unreadCount unread',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
+                ),
+                if (_unreadCount > 0)
+                  Text(
+                    '$_unreadCount unread',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: colorScheme.primary,
                     ),
-              ),
-          ],
-        ),
-        actions: [
+                  ),
+              ],
+            ),
+          ),
           IconButton(
             onPressed: _toggleSearch,
-            icon: CustomIconWidget(
-              iconName: _isSearchVisible ? 'close' : 'search',
-              color: Theme.of(context).colorScheme.onSurface,
-              size: 24,
+            icon: Icon(
+              _isSearchVisible ? Icons.close_rounded : Icons.search_rounded,
+              color: colorScheme.onSurface,
             ),
           ),
           if (hasNotifications && _unreadCount > 0)
@@ -579,187 +571,229 @@ class _NotificationsCenterState extends State<NotificationsCenter>
               onPressed: _markAllAsRead,
               child: Text(
                 'Mark All Read',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.primary,
+                ),
               ),
             ),
-          SizedBox(width: 2.w),
         ],
       ),
-      body: Column(
-        children: [
-          NotificationSearchBarWidget(
-            isVisible: _isSearchVisible,
-            onSearchChanged: _onSearchChanged,
-            onFilterTap: _showFilterSheet,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasNotifications = _groupedNotifications.isNotEmpty;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // Show loading indicator only if no cached data
+    if (_isLoading && _allNotifications.isEmpty) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(context),
+              const Expanded(
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ],
           ),
-          if (_selectedFilters.isNotEmpty) ...[
-            Container(
-              height: 6.h,
-              margin: EdgeInsets.symmetric(horizontal: 4.w),
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: _selectedFilters.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == 0) {
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(context),
+            NotificationSearchBarWidget(
+              isVisible: _isSearchVisible,
+              onSearchChanged: _onSearchChanged,
+              onFilterTap: _showFilterSheet,
+            ),
+            if (_selectedFilters.isNotEmpty) ...[
+              Container(
+                height: 6.h,
+                margin: EdgeInsets.symmetric(horizontal: 4.w),
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _selectedFilters.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return Container(
+                        margin: EdgeInsets.only(right: 2.w),
+                        child: FilterChip(
+                          label: const Text('Clear All'),
+                          onSelected: (_) {
+                            setState(() {
+                              _selectedFilters.clear();
+                              _groupNotificationsByDate();
+                            });
+                          },
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .error
+                              .withValues(alpha: 0.1),
+                          labelStyle: Theme.of(context)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                        ),
+                      );
+                    }
+                    final filterType = _selectedFilters[index - 1];
                     return Container(
                       margin: EdgeInsets.only(right: 2.w),
                       child: FilterChip(
-                        label: Text('Clear All'),
+                        label: Text(_getFilterLabel(filterType)),
+                        selected: true,
                         onSelected: (_) {
                           setState(() {
-                            _selectedFilters.clear();
+                            _selectedFilters.remove(filterType);
                             _groupNotificationsByDate();
                           });
                         },
-                        backgroundColor: Theme.of(context)
+                        selectedColor: Theme.of(context)
                             .colorScheme
-                            .error
+                            .primary
                             .withValues(alpha: 0.1),
                         labelStyle:
                             Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.error,
+                                  color: Theme.of(context).colorScheme.primary,
                                 ),
                       ),
                     );
-                  }
-
-                  final filterType = _selectedFilters[index - 1];
-                  return Container(
-                    margin: EdgeInsets.only(right: 2.w),
-                    child: FilterChip(
-                      label: Text(_getFilterLabel(filterType)),
-                      selected: true,
-                      onSelected: (_) {
-                        setState(() {
-                          _selectedFilters.remove(filterType);
-                          _groupNotificationsByDate();
-                        });
-                      },
-                      selectedColor: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.1),
-                      labelStyle:
-                          Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                    ),
-                  );
-                },
+                  },
+                ),
               ),
+            ],
+            Expanded(
+              child: hasNotifications
+                  ? RefreshIndicator(
+                      onRefresh: _onRefresh,
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        itemCount: _groupedNotifications.length,
+                        itemBuilder: (context, groupIndex) {
+                          final dateKey =
+                              _groupedNotifications.keys.elementAt(groupIndex);
+                          final notifications =
+                              _groupedNotifications[dateKey]!;
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (groupIndex == 0) const SizedBox(height: 4),
+                              // Date group header with divider line
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      dateKey.toUpperCase(),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: colorScheme.onSurfaceVariant,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Divider(
+                                        height: 1,
+                                        thickness: 1,
+                                        color: colorScheme.outlineVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ...notifications.map((notification) {
+                                return RepaintBoundary(
+                                  key: ValueKey('notif_${notification['id']}'),
+                                  child: Slidable(
+                                    key: ValueKey(notification['id']),
+                                    startActionPane: ActionPane(
+                                      motion: const ScrollMotion(),
+                                      children: [
+                                        if (!(notification['isRead'] ?? true))
+                                          SlidableAction(
+                                            onPressed: (_) =>
+                                                _markAsRead(notification),
+                                            backgroundColor:
+                                                colorScheme.secondary,
+                                            foregroundColor: Colors.white,
+                                            icon: Icons.mark_email_read,
+                                            label: 'Read',
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                        SlidableAction(
+                                          onPressed: (_) =>
+                                              _shareNotification(notification),
+                                          backgroundColor: colorScheme.primary,
+                                          foregroundColor: Colors.white,
+                                          icon: Icons.share,
+                                          label: 'Share',
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                      ],
+                                    ),
+                                    endActionPane: ActionPane(
+                                      motion: const ScrollMotion(),
+                                      children: [
+                                        if (notification['type'] != 'emergency')
+                                          SlidableAction(
+                                            onPressed: (_) =>
+                                                _deleteNotification(
+                                                    notification),
+                                            backgroundColor: colorScheme.error,
+                                            foregroundColor: Colors.white,
+                                            icon: Icons.delete,
+                                            label: 'Delete',
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                      ],
+                                    ),
+                                    child: NotificationCardWidget(
+                                      notification: notification,
+                                      onTap: () =>
+                                          _onNotificationTap(notification),
+                                      onMarkRead: () =>
+                                          _markAsRead(notification),
+                                      onShare: () =>
+                                          _shareNotification(notification),
+                                      onDelete: () =>
+                                          _deleteNotification(notification),
+                                      onContactSchool: _contactSchool,
+                                      onViewOnMap: _viewOnMap,
+                                    ),
+                                  ),
+                                );
+                              }),
+                              if (groupIndex ==
+                                  _groupedNotifications.length - 1)
+                                const SizedBox(height: 32),
+                            ],
+                          );
+                        },
+                      ),
+                    )
+                  : const EmptyNotificationsWidget(),
             ),
           ],
-          Expanded(
-            child: hasNotifications
-                ? RefreshIndicator(
-                    onRefresh: _onRefresh,
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: _groupedNotifications.length,
-                      itemBuilder: (context, index) {
-                        final dateKey =
-                            _groupedNotifications.keys.elementAt(index);
-                        final notifications = _groupedNotifications[dateKey]!;
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (index == 0) SizedBox(height: 1.h),
-                            Padding(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 4.w, vertical: 1.h),
-                              child: Text(
-                                dateKey,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                            ),
-                            ...notifications.map((notification) {
-                              final theme = Theme.of(context);
-                              final colorScheme = theme.colorScheme;
-
-                              return RepaintBoundary(
-                                key: ValueKey('notif_${notification['id']}'),
-                                child: Slidable(
-                                  key: ValueKey(notification['id']),
-                                  startActionPane: ActionPane(
-                                    motion: const ScrollMotion(),
-                                    children: [
-                                      if (!(notification['isRead'] ?? true))
-                                        SlidableAction(
-                                          onPressed: (_) =>
-                                              _markAsRead(notification),
-                                          backgroundColor:
-                                              colorScheme.secondary,
-                                          foregroundColor: Colors.white,
-                                          icon: Icons.mark_email_read,
-                                          label: 'Read',
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                      SlidableAction(
-                                        onPressed: (_) =>
-                                            _shareNotification(notification),
-                                        backgroundColor: colorScheme.primary,
-                                        foregroundColor: Colors.white,
-                                        icon: Icons.share,
-                                        label: 'Share',
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ],
-                                  ),
-                                  endActionPane: ActionPane(
-                                    motion: const ScrollMotion(),
-                                    children: [
-                                      if (notification['type'] != 'emergency')
-                                        SlidableAction(
-                                          onPressed: (_) =>
-                                              _deleteNotification(notification),
-                                          backgroundColor: colorScheme.error,
-                                          foregroundColor: Colors.white,
-                                          icon: Icons.delete,
-                                          label: 'Delete',
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                    ],
-                                  ),
-                                  child: NotificationCardWidget(
-                                    notification: notification,
-                                    onTap: () =>
-                                        _onNotificationTap(notification),
-                                    onMarkRead: () => _markAsRead(notification),
-                                    onShare: () =>
-                                        _shareNotification(notification),
-                                    onDelete: () =>
-                                        _deleteNotification(notification),
-                                    onContactSchool: _contactSchool,
-                                    onViewOnMap: _viewOnMap,
-                                  ),
-                                ),
-                              );
-                            }),
-                            if (index == _groupedNotifications.length - 1)
-                              SizedBox(height: 4.h),
-                          ],
-                        );
-                      },
-                    ),
-                  )
-                : const EmptyNotificationsWidget(),
-          ),
-        ],
+        ),
       ),
     );
   }
