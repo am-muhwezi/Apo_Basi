@@ -29,10 +29,20 @@ class BusWebSocketService {
   // Stream controllers
   final _connectionStateController = StreamController<bool>.broadcast();
   final _errorController = StreamController<String>.broadcast();
+  // ETA updates pushed by the server's Mapbox Matrix computation.
+  // Map of student_id (string) → eta_seconds (int).
+  final _etaUpdateController = StreamController<Map<String, int>>.broadcast();
+  // Road-snapped position echoed back by the server after processing each GPS packet.
+  final _snappedPositionController =
+      StreamController<Map<String, double>>.broadcast();
 
   // Public streams
   Stream<bool> get connectionStateStream => _connectionStateController.stream;
   Stream<String> get errorStream => _errorController.stream;
+  Stream<Map<String, int>> get etaUpdateStream => _etaUpdateController.stream;
+  /// Emits {lat, lng} with road-snapped coordinates from the server.
+  Stream<Map<String, double>> get snappedPositionStream =>
+      _snappedPositionController.stream;
 
   bool get isConnected => _isConnected;
   int? get connectedBusId => _connectedBusId;
@@ -104,8 +114,6 @@ class BusWebSocketService {
       };
 
       _channel!.sink.add(json.encode(locationData));
-
-          'Lng: ${position.longitude.toStringAsFixed(4)}');
     } catch (e) {
       _errorController.add('Failed to send location');
     }
@@ -123,7 +131,19 @@ class BusWebSocketService {
       } else if (messageType == 'error') {
         _errorController.add(data['message']);
       } else if (messageType == 'location_update') {
-        // This is an acknowledgment that location was received
+        // Server echoes back the road-snapped coordinates.
+        final sLat = (data['snapped_latitude'] as num?)?.toDouble();
+        final sLng = (data['snapped_longitude'] as num?)?.toDouble();
+        if (sLat != null && sLng != null) {
+          _snappedPositionController.add({'lat': sLat, 'lng': sLng});
+        }
+      } else if (messageType == 'eta_update') {
+        final rawEtas = data['etas'] as Map?;
+        if (rawEtas != null) {
+          _etaUpdateController.add(
+            rawEtas.map((k, v) => MapEntry(k.toString(), (v as num).toInt())),
+          );
+        }
       }
     } catch (e) {
       _errorController.add('Failed to parse message');
@@ -161,8 +181,6 @@ class BusWebSocketService {
     _reconnectionAttempts++;
     const delay = Duration(seconds: 3);
 
-        '🔄 Reconnecting in ${delay.inSeconds}s (attempt $_reconnectionAttempts/$maxAttempts)');
-
     _reconnectTimer = Timer(delay, () {
       if (_connectedBusId != null && _accessToken != null) {
         connectToBus(
@@ -196,6 +214,8 @@ class BusWebSocketService {
     disconnect();
     _connectionStateController.close();
     _errorController.close();
+    _etaUpdateController.close();
+    _snappedPositionController.close();
   }
 
   /// Build WebSocket URL from base URL
