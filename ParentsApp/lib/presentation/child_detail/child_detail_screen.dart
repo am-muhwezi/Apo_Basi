@@ -227,6 +227,20 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
           '["interpolate",["linear"],["zoom"],10,0.015,14,0.04,17,0.10]'),
     );
 
+    // Ensure per-annotation icon-rotate is applied (data-driven expression).
+    // Without this, Mapbox may ignore the per-feature rotation value.
+    await _mapboxMap!.style.setStyleLayerProperty(
+      _busAnnotationManager!.id,
+      'icon-rotate',
+      jsonDecode('["get", "icon-rotate"]'),
+    );
+    // Keep rotation absolute (relative to north), not to the camera bearing.
+    await _mapboxMap!.style.setStyleLayerProperty(
+      _busAnnotationManager!.id,
+      'icon-rotation-alignment',
+      'map',
+    );
+
     // Place initial markers
     _updateHomeAnnotation();
     _updateBusAnnotation();
@@ -813,187 +827,246 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
     return 'D';
   }
 
-  /// En route layout: driver avatar (with bus badge) + call icon + plate/route
-  Widget _buildEnRouteInfo(ColorScheme colorScheme, bool isDark) {
-    final String? busNumber = _childData?['busNumber'];
-    final String routeName = _getRouteDisplay();
+  String _getEtaLabel() {
+    if (_etaMinutes == null) return '';
+    if (_etaMinutes! <= 1) return '1 min away';
+    return '$_etaMinutes mins away';
+  }
 
-    return Row(
+  /// En route layout: driver card + actions + route progress
+  Widget _buildEnRouteInfo(ColorScheme colorScheme, bool isDark) {
+    final String routeName = _getRouteDisplay();
+    final String driverName = _childData?['driverName']?.toString() ?? 'Driver';
+    const kNavy = Color(0xFF0B1C30);
+    const kYellow = Color(0xFFFED01B);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Driver avatar with bus badge
-        SizedBox(
-          width: 64,
-          height: 64,
-          child: Stack(
-            clipBehavior: Clip.none,
+        // Driver card + action buttons row
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Driver circle
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? colorScheme.primary.withValues(alpha: 0.15)
-                      : const Color(0xFFE9E7F9),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    _getDriverInitial(),
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.primary,
-                    ),
+              // Dark driver card
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: kNavy,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      // Driver initial avatar with yellow dot
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Center(
+                              child: Text(
+                                _getDriverInitial(),
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: -2,
+                            right: -2,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: kYellow,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: kNavy, width: 2),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'VERIFIED DRIVER',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white.withValues(alpha: 0.55),
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              driverName,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              // Bus badge
-              Positioned(
-                bottom: 0,
-                right: 0,
+
+              const SizedBox(width: 10),
+
+              // Call button
+              GestureDetector(
+                onTap: () => _makePhoneCall('+254718073907'),
                 child: Container(
-                  width: 28,
-                  height: 28,
+                  width: 56,
                   decoration: BoxDecoration(
-                    color: isDark ? colorScheme.surface : Colors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: colorScheme.outline.withValues(alpha: 0.3),
-                      width: 1.5,
-                    ),
+                    color: kNavy,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(
-                    Icons.directions_bus,
-                    size: 16,
-                    color: colorScheme.primary,
+                  child: const Center(
+                    child: Icon(Icons.phone_rounded, color: kYellow, size: 24),
                   ),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: 10),
-        // Call icon
-        GestureDetector(
-          onTap: () => _makePhoneCall('+254718073907'),
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: isDark
-                  ? colorScheme.onSurface.withValues(alpha: 0.08)
-                  : const Color(0xFFF0F0F5),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.phone,
-              size: 22,
-              color: colorScheme.onSurface,
-            ),
+
+        const SizedBox(height: 12),
+
+        // Route chip
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : const Color(0xFFEFF4FF),
+            borderRadius: BorderRadius.circular(14),
           ),
-        ),
-        const Spacer(),
-        // Plate number + route (right-aligned)
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            if (busNumber != null && busNumber != 'N/A')
+          child: Row(
+            children: [
+              Icon(Icons.route_rounded,
+                  size: 16, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 8),
               Text(
-                busNumber,
+                routeName,
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: colorScheme.onSurface,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
-            const SizedBox(height: 2),
-            Text(
-              routeName,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
+              if (_etaMinutes != null) ...[
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Text(
+                    '$_etaMinutes min',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ],
     );
   }
 
-  /// At rest layout (home, school, etc.): status icon + message + call school
+  /// At rest layout (home, school, etc.)
   Widget _buildAtRestInfo(ColorScheme colorScheme, bool isDark) {
     final status = (_childData?['status'] ?? '').toString().toLowerCase();
     final childName = _childData?['name'] ?? 'Child';
     final firstName = childName.toString().split(' ').first;
 
     final bool isAtSchool = status == 'at_school' || status == 'at-school';
-    final IconData icon = isAtSchool ? Icons.school : Icons.home;
+    final IconData icon = isAtSchool ? Icons.school_rounded : Icons.home_rounded;
     final Color accentColor =
-        isAtSchool ? const Color(0xFF007AFF) : const Color(0xFF22CCB2);
+        isAtSchool ? const Color(0xFF004AC6) : const Color(0xFF006242);
     final String message = isAtSchool
         ? '$firstName is safely at school'
         : '$firstName is safely at home';
 
-    return Row(
-      children: [
-        // Status icon
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: accentColor.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, size: 28, color: accentColor),
-        ),
-        const SizedBox(width: 14),
-        // Status message
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                message,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _getRouteDisplay(),
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-        // Call school
-        GestureDetector(
-          onTap: () => _makePhoneCall('+254718073907'),
-          child: Container(
-            width: 44,
-            height: 44,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: accentColor.withValues(alpha: isDark ? 0.15 : 0.07),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
-              color: isDark
-                  ? colorScheme.onSurface.withValues(alpha: 0.08)
-                  : const Color(0xFFF0F0F5),
-              shape: BoxShape.circle,
+              color: accentColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(
-              Icons.phone,
-              size: 22,
-              color: colorScheme.onSurface,
+            child: Icon(icon, size: 26, color: accentColor),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _getRouteDisplay(),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-      ],
+          GestureDetector(
+            onTap: () => _makePhoneCall('+254718073907'),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: colorScheme.onSurface.withValues(alpha: isDark ? 0.1 : 0.06),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.phone_rounded, size: 20, color: accentColor),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1001,7 +1074,9 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final textTheme = theme.textTheme;
+    final isDark = theme.brightness == Brightness.dark;
+    const kNavy = Color(0xFF0B1C30);
+    const kYellow = Color(0xFFFED01B);
 
     if (_childData == null) {
       return Scaffold(
@@ -1011,194 +1086,230 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
     }
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Mapbox Map - native vector rendering with Studio styles
-          _isLoadingLocation
-              ? const Center(child: CircularProgressIndicator())
-              : _homeLocation != null
-                  ? MapWidget(
-                      styleUri: 'mapbox://styles/${ApiConfig.mapboxStyleId}',
-                      cameraOptions: CameraOptions(
-                        center: latLngToPoint(_homeLocation!),
-                        zoom: 16.0,
+          // ── Full-screen map ───────────────────────────────────────────────
+          Positioned.fill(
+            child: _isLoadingLocation
+                ? const Center(child: CircularProgressIndicator())
+                : _homeLocation != null
+                    ? MapWidget(
+                        styleUri:
+                            'mapbox://styles/${ApiConfig.mapboxStyleId}',
+                        cameraOptions: CameraOptions(
+                          center: latLngToPoint(_homeLocation!),
+                          zoom: 16.0,
+                        ),
+                        onMapCreated: _onMapCreated,
+                      )
+                    : Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.location_off,
+                                size: 64, color: colorScheme.error),
+                            const SizedBox(height: 16),
+                            Text('Unable to get location',
+                                style: theme.textTheme.titleLarge),
+                          ],
+                        ),
                       ),
-                      onMapCreated: _onMapCreated,
-                    )
-                  : Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.location_off,
-                              size: 64, color: colorScheme.error),
-                          SizedBox(height: 2.h),
-                          Text('Unable to get location',
-                              style: textTheme.titleLarge),
-                          SizedBox(height: 1.h),
-                          Text('Please enable location permissions',
-                              style: textTheme.bodyMedium),
-                        ],
-                      ),
-                    ),
+          ),
 
-          // Clean top UI - back button and recenter button
+          // ── Floating top bar ─────────────────────────────────────────────
           SafeArea(
             child: Padding(
-              padding: EdgeInsets.all(3.w),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: colorScheme.surface,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      icon:
-                          Icon(Icons.arrow_back, color: colorScheme.onSurface),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: colorScheme.surface,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      icon: Icon(Icons.my_location, color: colorScheme.primary),
-                      onPressed: () {
-                        if (_busLocation != null) {
-                          _mapboxMap?.flyTo(
-                            CameraOptions(
-                              center: latLngToPoint(ll.LatLng(
-                                _busLocation!.latitude,
-                                _busLocation!.longitude,
-                              )),
-                              zoom: 16.0,
-                            ),
-                            MapAnimationOptions(duration: 800),
-                          );
-                        } else if (_homeLocation != null) {
-                          _mapboxMap?.flyTo(
-                            CameraOptions(
-                              center: latLngToPoint(_homeLocation!),
-                              zoom: 16.0,
-                            ),
-                            MapAnimationOptions(duration: 800),
-                          );
-                        }
-                      },
-                      tooltip: 'Recenter map',
-                    ),
+                  // Back button — always dark icon on white bg
+                  _MapButton(
+                    onTap: () => Navigator.pop(context),
+                    child: const Icon(Icons.arrow_back_rounded,
+                        color: kNavy, size: 22),
                   ),
                 ],
               ),
             ),
           ),
 
-          // Bottom detail sheet
+          // ── Right-side map controls ───────────────────────────────────────
+          Positioned(
+            right: 16,
+            bottom: MediaQuery.of(context).size.height * 0.34,
+            child: Column(
+              children: [
+                _MapButton(
+                  onTap: () {
+                    final target = _busLocation != null
+                        ? ll.LatLng(
+                            _busLocation!.latitude, _busLocation!.longitude)
+                        : _homeLocation;
+                    if (target != null) {
+                      _mapboxMap?.flyTo(
+                        CameraOptions(
+                            center: latLngToPoint(target), zoom: 16.0),
+                        MapAnimationOptions(duration: 800),
+                      );
+                    }
+                  },
+                  child: Icon(Icons.my_location_rounded,
+                      color: colorScheme.primary, size: 22),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Bottom draggable sheet ────────────────────────────────────────
           DraggableScrollableSheet(
-            initialChildSize: 0.22,
-            minChildSize: 0.18,
-            maxChildSize: 0.45,
+            initialChildSize: 0.32,
+            minChildSize: 0.20,
+            maxChildSize: 0.65,
+            snap: true,
+            snapSizes: const [0.32, 0.65],
             builder: (context, scrollController) {
-              final isDark = theme.brightness == Brightness.dark;
               final bool isEnRoute = _isChildEnRoute();
+              final sheetBg = isDark
+                  ? const Color(0xFF1C1C1E)
+                  : Colors.white;
 
               return Container(
                 decoration: BoxDecoration(
-                  color: theme.cardColor,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
+                  color: sheetBg,
+                  borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(32)),
                   boxShadow: [
                     BoxShadow(
-                      color: colorScheme.shadow.withValues(alpha: 0.12),
-                      blurRadius: 16,
-                      offset: const Offset(0, -4),
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 32,
+                      offset: const Offset(0, -8),
                     ),
                   ],
                 ),
                 child: ListView(
                   controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                  padding:
+                      const EdgeInsets.fromLTRB(20, 10, 20, 32),
                   children: [
                     // Drag handle
                     Center(
                       child: Container(
-                        width: 36,
+                        width: 44,
                         height: 4,
-                        margin: const EdgeInsets.only(bottom: 14),
+                        margin: const EdgeInsets.only(bottom: 16),
                         decoration: BoxDecoration(
-                          color: colorScheme.onSurface.withValues(alpha: 0.15),
+                          color: colorScheme.onSurface
+                              .withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     ),
 
-                    // Status row + ETA pill
+                    // Status pill + ETA | Plate chip
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: Text(
-                            _getTripStatus(),
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: colorScheme.onSurface,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: kNavy,
+                                      borderRadius: BorderRadius.circular(100),
+                                    ),
+                                    child: Text(
+                                      isEnRoute ? 'ON BUS' : 'AT REST',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: kYellow,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ),
+                                  if (_etaMinutes != null) ...[
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _getEtaLabel(),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _getTripStatus(),
+                                style: TextStyle(
+                                  fontFamily: 'Manrope',
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: colorScheme.onSurface,
+                                  height: 1.1,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        if (_etaMinutes != null)
+                        // License plate chip
+                        if (_childData?['busNumber'] != null &&
+                            _childData!['busNumber'] != 'N/A') ...[
+                          const SizedBox(width: 12),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
+                                horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
-                              color: colorScheme.primary,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '$_etaMinutes mins',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.07)
+                                  : const Color(0xFFEFF4FF),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: colorScheme.onSurface
+                                    .withValues(alpha: 0.08),
                               ),
                             ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'LICENSE PLATE',
+                                  style: TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w700,
+                                    color: colorScheme.onSurfaceVariant,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _childData!['busNumber'].toString(),
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: colorScheme.onSurface,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                        ],
                       ],
                     ),
 
-                    // Divider
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: colorScheme.outline.withValues(alpha: 0.5),
-                      ),
-                    ),
+                    const SizedBox(height: 16),
 
-                    // Dynamic content based on status
+                    // Dynamic content
                     if (isEnRoute)
                       _buildEnRouteInfo(colorScheme, isDark)
                     else
@@ -1213,3 +1324,35 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
     );
   }
 }
+
+// ─── Shared map overlay widgets ───────────────────────────────────────────────
+
+class _MapButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final Widget child;
+  const _MapButton({required this.onTap, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.92),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 12,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(child: child),
+      ),
+    );
+  }
+}
+
