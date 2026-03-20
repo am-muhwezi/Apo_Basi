@@ -9,6 +9,7 @@ interface ButtonProps {
   children: ReactNode;
   onClick?: () => void;
   type?: 'button' | 'submit' | 'reset';
+  disabled?: boolean;
 }
 
 export default function Button({
@@ -19,6 +20,7 @@ export default function Button({
   children,
   onClick,
   type = 'button',
+  disabled = false,
 }: ButtonProps) {
   const baseClasses =
     'inline-flex items-center justify-center font-semibold rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-dark-950';
@@ -57,7 +59,7 @@ export default function Button({
   }
 
   return (
-    <button type={type} className={classes} onClick={onClick}>
+    <button type={type} className={`${classes} disabled:opacity-60 disabled:cursor-not-allowed`} onClick={onClick} disabled={disabled}>
       {children}
     </button>
   );

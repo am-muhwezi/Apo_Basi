@@ -24,6 +24,8 @@ class BusSerializer(serializers.ModelSerializer):
     minderName = serializers.SerializerMethodField()
     assignedChildrenCount = serializers.SerializerMethodField()
     assignedChildrenIds = serializers.SerializerMethodField()
+    routeId = serializers.SerializerMethodField()
+    routeName = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
     lastMaintenance = serializers.DateField(source='last_maintenance', allow_null=True)
     currentLocation = serializers.CharField(source='current_location', allow_blank=True)
@@ -37,6 +39,7 @@ class BusSerializer(serializers.ModelSerializer):
             'isActive', 'status', 'lastMaintenance', 'currentLocation',
             'driverId', 'driverName', 'minderId', 'minderName',
             'assignedChildrenCount', 'assignedChildrenIds',
+            'routeId', 'routeName',
             'latitude', 'longitude', 'lastUpdated'
         ]
 
@@ -75,6 +78,18 @@ class BusSerializer(serializers.ModelSerializer):
         """Get list of child IDs from Assignment API"""
         child_assignments = Assignment.get_assignments_to(obj, 'child_to_bus')
         return [ca.assignee_object_id for ca in child_assignments]
+
+    def get_routeId(self, obj):
+        """Get the route this bus is assigned to (bus_to_route, bus is assignee)"""
+        route_assignment = Assignment.get_active_assignments_for(obj, 'bus_to_route').first()
+        return route_assignment.assigned_to.id if route_assignment and route_assignment.assigned_to else None
+
+    def get_routeName(self, obj):
+        """Get the route name this bus is assigned to"""
+        route_assignment = Assignment.get_active_assignments_for(obj, 'bus_to_route').first()
+        if route_assignment and route_assignment.assigned_to:
+            return route_assignment.assigned_to.name
+        return None
 
     def get_status(self, obj):
         """Convert is_active boolean to status string for frontend"""

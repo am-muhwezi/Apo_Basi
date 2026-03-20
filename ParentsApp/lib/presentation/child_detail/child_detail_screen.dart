@@ -66,8 +66,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
   DateTime? _lastEtaRefresh;
   ll.LatLng? _lastEtaPosition;
 
-  // Trip-watcher: polls while no bus is broadcasting to detect trip start
+  // Trip-watcher: reconnects only when genuinely offline or zombie (silent >45 s)
   Timer? _tripWatchTimer;
+  // Timestamp of the last WS message — used for zombie-connection detection.
+  DateTime? _lastWsMessageAt;
 
   // Smooth bus position animation (Mapbox Maps SDK annotation interpolation)
   Timer? _busAnimTimer;
@@ -437,6 +439,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
       _locationSubscription =
           _webSocketService.locationUpdateStream.listen((location) {
         if (!mounted) return;
+        _lastWsMessageAt = DateTime.now(); // alive — reset zombie clock
         if (!_hasActiveTrip) {
           // No active trip — ignore all location updates (covers both the
           // "trip just ended" case and the "no trip on screen open" case).
@@ -458,6 +461,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
           _webSocketService.tripEventStream.listen((event) {
         if (!mounted) return;
         final eventType = event['type'] as String?;
+
+        _lastWsMessageAt = DateTime.now(); // alive — reset zombie clock
 
         if (eventType == 'trip_state') {
           // ── Sent by the server immediately on every (re)connect ──────────
@@ -641,12 +646,13 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
           '[Route] tripInfo=${tripInfo != null ? "ok eta=${tripInfo['eta']}" : "null"}');
 
       if (tripInfo != null) {
+        final info = tripInfo; // promote to non-nullable for setState closure
         setState(() {
           _snappedBusLocation = snappedCoord;
           // ETA is now delivered server-side via eta_update WebSocket message.
           // We keep distance and route for the polyline overlay only.
-          _distance = tripInfo['distance'];
-          _routePoints = tripInfo['route'];
+          _distance = info['distance'];
+          _routePoints = info['route'];
           _isCalculatingETA = false;
           _lastEtaRefresh = now;
           _lastEtaPosition = busCoord;
@@ -682,13 +688,13 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
 
   /// WebSocket health check — fires every 15 s.
   ///
-  /// Two modes:
-  ///  • No active trip:  force disconnect+reconnect every cycle so the server
-  ///    sends a fresh trip_state.  This handles zombie TCP connections (client
-  ///    thinks it's connected but the server can't reach it) and missed
-  ///    trip_started events.
-  ///  • Active trip:     only reconnect if offline — avoids interrupting the
-  ///    live GPS stream.
+  /// Reconnect policy:
+  ///  • Offline:       reconnect immediately.
+  ///  • Connected but silent >45 s (zombie TCP):  reconnect.
+  ///  • Connected and receiving messages:  do nothing — the server will push
+  ///    trip_started automatically when a trip begins.  Forcing periodic
+  ///    reconnects when has_active_trip==false causes an infinite
+  ///    connect→trip_state(false)→reconnect loop.
   void _startTripWatcher() {
     _tripWatchTimer?.cancel();
     _tripWatchTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
@@ -703,14 +709,22 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
       if (!_webSocketService.isConnected) {
         debugPrint('[TripWatcher] WebSocket offline — re-subscribing bus $busId');
         _webSocketService.subscribeToBus(busId);
-      } else if (!_hasActiveTrip) {
-        // No active trip: force a reconnect so the server sends a fresh
-        // trip_state.  This recovers from zombie connections and missed
-        // trip_started broadcasts.
-        debugPrint('[TripWatcher] No active trip — forcing WS refresh for bus $busId');
+        return;
+      }
+
+      // Connected — check for zombie (server alive but no messages delivered).
+      // A healthy connection always delivers trip_state on connect, so 45 s
+      // of silence means the TCP socket is dead without a clean close.
+      final silence = _lastWsMessageAt == null
+          ? const Duration(days: 1)
+          : DateTime.now().difference(_lastWsMessageAt!);
+      if (silence.inSeconds > 45) {
+        debugPrint(
+          '[TripWatcher] Zombie detected (${silence.inSeconds}s silent) — reconnecting bus $busId');
         _webSocketService.disconnect();
         _webSocketService.subscribeToBus(busId);
       }
+      // Otherwise: connected and alive — wait for server-pushed trip_started.
     });
   }
 

@@ -43,6 +43,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   User? _user;
   Parent? _parent;
   List<Child> _children = [];
+  String? _homeAddress;
 
   @override
   void initState() {
@@ -137,6 +138,10 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
           }
           _isLoading = false;
         });
+
+        // Load home address immediately from local storage
+        final homeAddr = await _homeLocationService.getHomeAddress();
+        if (mounted) setState(() => _homeAddress = homeAddr);
       } else {
         setState(() {
           _isLoading = true;
@@ -198,6 +203,10 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
 
           _isLoading = false;
         });
+
+        // Load home address from local storage
+        final homeAddr = await _homeLocationService.getHomeAddress();
+        if (mounted) setState(() => _homeAddress = homeAddr);
       }
 
       // Cache fresh parent data for offline use
@@ -1237,6 +1246,7 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
                             emergencyContact: _parent!.emergencyContact,
                             status: _parent!.status,
                           );
+                          _homeAddress = newAddress;
                         });
                         Navigator.of(context).pop(); // close loading
                         Navigator.of(context).pop(); // close dialog

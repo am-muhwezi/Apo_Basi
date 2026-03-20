@@ -5,6 +5,11 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
+import threading
+from django.core.mail import send_mail
+from django.conf import settings as django_settings
+from rest_framework.decorators import throttle_classes
+from .throttles import LoginRateThrottle, RegistrationRateThrottle, ContactFormThrottle
 from .serializers import (
     UserRegistrationSerializer,
     UserSerializer,
@@ -19,6 +24,7 @@ class UserRegistrationView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserRegistrationSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [RegistrationRateThrottle]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -40,6 +46,7 @@ class UserRegistrationView(generics.CreateAPIView):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([LoginRateThrottle])
 def login_view(request):
     username = request.data.get('username')
     password = request.data.get('password')
@@ -194,6 +201,41 @@ def health_check(request):
     return Response({'status': 'ok', 'message': 'Server is running'}, status=status.HTTP_200_OK)
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([ContactFormThrottle])
+def contact_form(request):
+    """
+    POST /api/contact/
+    Accepts a contact form submission and emails it to the support inbox.
+    Rate limited to 5 submissions per hour per IP.
+    """
+    name = (request.data.get('name') or '').strip()
+    email = (request.data.get('email') or '').strip()
+    school = (request.data.get('school') or '').strip()
+    message = (request.data.get('message') or '').strip()
+
+    if not name or not email or not message:
+        return Response({'error': 'Name, email, and message are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    subject = f"ApoBasi Contact: {name}" + (f" ({school})" if school else "")
+    body = f"From: {name} <{email}>\n"
+    if school:
+        body += f"School: {school}\n"
+    body += f"\n{message}"
+
+    recipient = getattr(django_settings, 'CONTACT_EMAIL', 'hello@apobasi.com')
+    from_email = django_settings.DEFAULT_FROM_EMAIL
+
+    def _send():
+        send_mail(subject=subject, message=body, from_email=from_email,
+                  recipient_list=[recipient], fail_silently=True)
+
+    threading.Thread(target=_send, daemon=True).start()
+
+    return Response({'success': True}, status=status.HTTP_200_OK)
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def school_info(request):
@@ -202,8 +244,6 @@ def school_info(request):
     Returns school configuration for this deployment.
     Unauthenticated so the Flutter app can call it before login if needed.
     """
-    from django.conf import settings as django_settings
-
     lat = getattr(django_settings, 'SCHOOL_LATITUDE', None)
     lng = getattr(django_settings, 'SCHOOL_LONGITUDE', None)
 
