@@ -45,6 +45,8 @@ export interface Bus {
   minderName?: string;
   assignedChildrenCount?: number;
   assignedChildrenIds?: string[];
+  routeId?: number;
+  routeName?: string;
   status?: 'active' | 'maintenance' | 'inactive';
   isActive?: boolean;
   lastMaintenance?: string;

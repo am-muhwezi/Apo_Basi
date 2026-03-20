@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../presentation/app_init_screen/app_init_screen.dart';
 import '../presentation/notifications_center/notifications_center.dart';
 import '../presentation/parent_profile_settings/parent_profile_settings.dart';
 import '../presentation/parent_login_screen/parent_login_screen.dart';
@@ -14,7 +15,8 @@ class AppRoutes {
   static const String parentProfileSettings = '/parent-profile-settings';
 
   static Map<String, WidgetBuilder> routes = {
-    initial: (context) => const ParentLoginScreen(),
+    // '/' now shows AppInitScreen which handles Supabase init + auth routing.
+    initial: (context) => const AppInitScreen(),
     parentLogin: (context) => const ParentLoginScreen(),
     parentDashboard: (context) => const ParentDashboard(),
     childDetail: (context) => const ChildDetailScreen(),

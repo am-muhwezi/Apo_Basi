@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 
 class DriverDrawerWidget extends StatelessWidget {
   final String currentRoute;
@@ -86,26 +87,37 @@ class DriverDrawerWidget extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         side: BorderSide(
-                            color: cs.outline.withValues(alpha: 0.5)),
+                          color: cs.outline.withValues(alpha: 0.5),
+                        ),
                       ),
-                      child: Text('Cancel',
-                          style: TextStyle(
-                              color: cs.onSurface,
-                              fontWeight: FontWeight.w600)),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: cs.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                   SizedBox(width: 4.w),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () async {
-                        final apiService = ApiService();
-                        await apiService.clearToken();
+                        // Close dialog first
                         Navigator.pop(context);
-                        Navigator.pushNamedAndRemoveUntil(
-                          context,
-                          '/shared-login-screen',
-                          (route) => false,
-                        );
+
+                        // Clear session using AuthService (includes Supabase cleanup)
+                        final authService = AuthService();
+                        await authService.signOut();
+
+                        // Navigate to login and clear all routes
+                        if (context.mounted) {
+                          Navigator.pushNamedAndRemoveUntil(
+                            context,
+                            '/shared-login-screen',
+                            (route) => false,
+                          );
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: cs.error,
@@ -115,10 +127,13 @@ class DriverDrawerWidget extends StatelessWidget {
                         ),
                         elevation: 0,
                       ),
-                      child: Text('Logout',
-                          style: TextStyle(
-                              color: cs.onError,
-                              fontWeight: FontWeight.w600)),
+                      child: Text(
+                        'Logout',
+                        style: TextStyle(
+                          color: cs.onError,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -151,10 +166,7 @@ class DriverDrawerWidget extends StatelessWidget {
                     height: 56,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [
-                          cs.primary,
-                          cs.primary.withValues(alpha: 0.7),
-                        ],
+                        colors: [cs.primary, cs.primary.withValues(alpha: 0.7)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -196,7 +208,9 @@ class DriverDrawerWidget extends StatelessWidget {
                         const SizedBox(height: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: cs.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
@@ -221,8 +235,11 @@ class DriverDrawerWidget extends StatelessWidget {
                         color: cs.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(Icons.close,
-                          size: 20, color: cs.onSurfaceVariant),
+                      child: Icon(
+                        Icons.close,
+                        size: 20,
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ],
@@ -232,8 +249,9 @@ class DriverDrawerWidget extends StatelessWidget {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 5.w),
               child: Divider(
-                  height: 1,
-                  color: cs.outline.withValues(alpha: 0.3)),
+                height: 1,
+                color: cs.outline.withValues(alpha: 0.3),
+              ),
             ),
 
             SizedBox(height: 2.h),
@@ -268,7 +286,9 @@ class DriverDrawerWidget extends StatelessWidget {
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.pushNamed(
-                          context, '/driver-active-trip-screen');
+                        context,
+                        '/driver-active-trip-screen',
+                      );
                     },
                   ),
 
@@ -319,8 +339,7 @@ class DriverDrawerWidget extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: cs.error.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: cs.error.withValues(alpha: 0.2)),
+                    border: Border.all(color: cs.error.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,

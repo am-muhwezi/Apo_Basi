@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-dim": "#cbdbf5",
+              "error-container": "#ffdad6",
+              "tertiary-fixed-dim": "#4edea3",
+              "on-surface": "#0b1c30",
+              "secondary": "#735c00",
+              "secondary-fixed": "#ffe083",
+              "on-secondary": "#ffffff",
+              "tertiary-container": "#007d55",
+              "primary-container": "#2563eb",
+              "surface-container-low": "#eff4ff",
+              "inverse-on-surface": "#eaf1ff",
+              "tertiary-fixed": "#6ffbbe",
+              "on-tertiary-fixed-variant": "#005236",
+              "error": "#ba1a1a",
+              "surface-container": "#e5eeff",
+              "surface-container-highest": "#d3e4fe",
+              "primary": "#004ac6",
+              "on-tertiary": "#ffffff",
+              "on-surface-variant": "#434655",
+              "outline": "#737686",
+              "on-error": "#ffffff",
+              "on-primary-fixed-variant": "#003ea8",
+              "on-tertiary-fixed": "#002113",
+              "on-secondary-container": "#6f5900",
+              "background": "#f8f9ff",
+              "surface": "#f8f9ff",
+              "on-secondary-fixed": "#231b00",
+              "primary-fixed": "#dbe1ff",
+              "primary-fixed-dim": "#b4c5ff",
+              "on-primary-container": "#eeefff",
+              "outline-variant": "#c3c6d7",
+              "inverse-surface": "#213145",
+              "surface-tint": "#0053db",
+              "on-error-container": "#93000a",
+              "on-background": "#0b1c30",
+              "surface-variant": "#d3e4fe",
+              "on-secondary-fixed-variant": "#574500",
+              "on-tertiary-container": "#bdffdb",
+              "on-primary": "#ffffff",
+              "inverse-primary": "#b4c5ff",
+              "surface-bright": "#f8f9ff",
+              "on-primary-fixed": "#00174b",
+              "secondary-fixed-dim": "#eec200",
+              "tertiary": "#006242",
+              "surface-container-high": "#dce9ff",
+              "surface-container-lowest": "#ffffff",
+              "secondary-container": "#fed01b",
+              "brand-navy": "#00174b",
+              "brand-yellow": "#fed01b"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9ff;
+        }
+        .editorial-shadow {
+            box-shadow: 0 24px 40px -10px rgba(11, 28, 48, 0.05);
+        }
+    </style>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="docked full-width top-0 sticky z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md shadow-sm dark:shadow-none">
+<div class="flex justify-between items-center px-6 py-4 w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-blue-700 dark:text-blue-400 cursor-pointer active:scale-95 duration-200">menu</span>
+<div class="flex items-center gap-2">
+<img alt="ApoBasi Logo" class="w-8 h-8 object-contain" src="https://lh3.googleusercontent.com/aida/ADBb0ug08n8kOGM91U8Y0JWmQLiJziIIrgpDOnHHCOniY1zM6MMjSO-5m7s5x2ZoWdYnvPBHUVrCVHq_Nq5H0CeeuYFd4BCJtu27SItB1JMXtKdZL-eM_dK4gMYHTHorRJyxsTHtqvIDkK3diwBhEhyhDOCz_OQ3qLQSGxyJBZ2YC5YR5I5nwTyZYF2Wc0H-np1wT4VwHZT4P35S87bgSExoz2yr_SrvVgsH6m32QtI10X8ehxFcXrkeuWohspERbTtYbD2XgVC1UN973Cg"/>
+<h1 class="font-manrope font-extrabold tracking-tight text-blue-700 dark:text-blue-400 text-2xl">ApoBasi</h1>
+</div>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden ring-2 ring-blue-50 dark:ring-blue-900/30 active:scale-95 transition-transform duration-200 cursor-pointer">
+<img class="w-full h-full object-cover" data-alt="User profile avatar of a smiling woman" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDqHFYcXtMZZZ--YSr64g2TS90PHf5F2Y_wzX17JoxYgDx235uQEgv8YKyEihnk-WieFXIN2FHZnJSIhXYUrIsQJgPTsXKVbrbn3DorlhhcMbh9vJO7HHR8_IHYYKre5QUe7uTkv-QN-NidoxIdO48pSIIPSGf68vaqz1l0N6TmlXk5Umc_PrICspyZqskLoLMn2zw8al2emlaY7RG4W38LlOjmwWnQdhPy3s2_L2elPXS7KChenc-NVo28xBGdqRDKFgiH3Es9Clq6"/>
+</div>
+</div>
+<div class="bg-slate-100 dark:bg-slate-800 h-[1px] w-full"></div>
+</header>
+<!-- Main Content Canvas -->
+<main class="max-w-2xl mx-auto px-6 pt-8">
+<!-- Header Section -->
+<div class="mb-10 flex flex-col gap-2">
+<div class="flex justify-between items-end">
+<h2 class="font-headline font-extrabold text-4xl tracking-tight text-brand-navy dark:text-blue-100">Notifications</h2>
+<div class="flex items-center gap-4 mb-1">
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-low text-blue-700 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined">search</span>
+</button>
+</div>
+</div>
+<div class="flex justify-end">
+<a class="font-label font-semibold text-blue-700 text-sm hover:underline" href="#">Mark All Read</a>
+</div>
+</div>
+<!-- Notification List -->
+<div class="flex flex-col gap-8">
+<!-- Date Group -->
+<section>
+<div class="mb-4 flex items-center gap-4">
+<span class="font-label font-bold text-xs uppercase tracking-widest text-outline">10/3/2026</span>
+<div class="h-[1px] flex-grow bg-outline-variant opacity-20"></div>
+</div>
+<div class="flex flex-col gap-4">
+<!-- Notification Card 1 -->
+<div class="bg-surface-container-lowest p-5 rounded-xl editorial-shadow relative overflow-hidden group transition-all active:scale-[0.98]">
+<div class="flex gap-4">
+<!-- Icon Container -->
+<div class="w-12 h-12 shrink-0 rounded-full bg-tertiary-container/10 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<!-- Content -->
+<div class="flex-grow flex flex-col gap-1">
+<div class="flex justify-between items-start">
+<h3 class="font-headline font-bold text-lg text-brand-navy dark:text-blue-100">First Picked Up</h3>
+<span class="font-label text-xs text-outline font-medium">08:15 AM</span>
+</div>
+<p class="font-body text-sm text-on-surface-variant leading-relaxed">Ethan has safely boarded the school bus at Willow Creek Station.</p>
+<div class="mt-2 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-brand-yellow animate-pulse"></span>
+<span class="font-label font-extrabold text-[10px] uppercase text-brand-yellow tracking-wider">New</span>
+</div>
+</div>
+</div>
+<!-- Decorative Element -->
+<div class="absolute top-0 right-0 w-24 h-full bg-gradient-to-l from-blue-700/5 to-transparent pointer-events-none"></div>
+</div>
+<!-- Notification Card 2 -->
+<div class="bg-surface-container-low/50 p-5 rounded-xl flex gap-4 transition-all opacity-80">
+<!-- Icon Container -->
+<div class="w-12 h-12 shrink-0 rounded-full bg-primary-container/10 flex items-center justify-center text-blue-700">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">directions_bus</span>
+</div>
+<!-- Content -->
+<div class="flex-grow flex flex-col gap-1">
+<div class="flex justify-between items-start">
+<h3 class="font-headline font-bold text-lg text-brand-navy dark:text-blue-100">Trip Started</h3>
+<span class="font-label text-xs text-outline font-medium">07:45 AM</span>
+</div>
+<p class="font-body text-sm text-on-surface-variant leading-relaxed">Bus #402 has started its route toward your location.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Date Group 2 -->
+<section>
+<div class="mb-4 flex items-center gap-4">
+<span class="font-label font-bold text-xs uppercase tracking-widest text-outline">09/3/2026</span>
+<div class="h-[1px] flex-grow bg-outline-variant opacity-20"></div>
+</div>
+<div class="flex flex-col gap-4">
+<!-- Notification Card 3 -->
+<div class="bg-surface-container-low/50 p-5 rounded-xl flex gap-4 transition-all opacity-80">
+<!-- Icon Container -->
+<div class="w-12 h-12 shrink-0 rounded-full bg-brand-yellow/20 flex items-center justify-center text-brand-yellow">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">notifications</span>
+</div>
+<!-- Content -->
+<div class="flex-grow flex flex-col gap-1">
+<div class="flex justify-between items-start">
+<h3 class="font-headline font-bold text-lg text-brand-navy dark:text-blue-100">Monthly Report</h3>
+<span class="font-label text-xs text-outline font-medium">Yesterday</span>
+</div>
+<p class="font-body text-sm text-on-surface-variant leading-relaxed">Your attendance summary for February is now available for review.</p>
+</div>
+</div>
+<!-- Notification Card 4 -->
+<div class="bg-surface-container-low/50 p-5 rounded-xl flex gap-4 transition-all opacity-80">
+<!-- Icon Container -->
+<div class="w-12 h-12 shrink-0 rounded-full bg-error-container/40 flex items-center justify-center text-error">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<!-- Content -->
+<div class="flex-grow flex flex-col gap-1">
+<div class="flex justify-between items-start">
+<h3 class="font-headline font-bold text-lg text-brand-navy dark:text-blue-100">Schedule Change</h3>
+<span class="font-label text-xs text-outline font-medium">Yesterday</span>
+</div>
+<p class="font-body text-sm text-on-surface-variant leading-relaxed">Next Monday's drop-off time will be delayed by 15 minutes due to maintenance.</p>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-white dark:bg-slate-950 z-50 rounded-t-3xl border-t border-slate-100 dark:border-slate-800 shadow-[0_-4px_20px_rgba(11,28,48,0.05)] dark:shadow-none">
+<!-- Home -->
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 px-6 py-2 hover:text-blue-600 dark:hover:text-blue-200 transition-transform active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined mb-1">home</span>
+<span class="font-inter text-[10px] font-medium uppercase tracking-wider">Home</span>
+</a>
+<!-- Notifications (ACTIVE) -->
+<a class="flex flex-col items-center justify-center bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-2xl px-6 py-2 transition-transform active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">notifications</span>
+<span class="font-inter text-[10px] font-medium uppercase tracking-wider">Notifications</span>
+</a>
+<!-- Profile -->
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 px-6 py-2 hover:text-blue-600 dark:hover:text-blue-200 transition-transform active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined mb-1">person</span>
+<span class="font-inter text-[10px] font-medium uppercase tracking-wider">Profile</span>
+</a>
+</nav>
+</body></html>

@@ -18,8 +18,9 @@ class GpsStreamService {
   factory GpsStreamService() => _instance;
   GpsStreamService._internal();
 
-  static const EventChannel _nativeChannel =
-      EventChannel('com.apobasi.driver/gps_stream');
+  static const EventChannel _nativeChannel = EventChannel(
+    'com.apobasi.driver/gps_stream',
+  );
 
   final StreamController<Position> _controller =
       StreamController<Position>.broadcast();
@@ -119,28 +120,29 @@ class GpsStreamService {
 
   void _startGeolocator() {
     if (_geoSub != null) return; // already running
-    _geoSub = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 5,
-      ),
-    ).listen(
-      (Position pos) {
-        if (_nativeActive) {
-          // Native took over — stop Geolocator
-          _stopGeolocator();
-          return;
-        }
-        lastKnownPosition = pos;
-        isConnected = true;
-        accuracyText = '±${pos.accuracy.toInt()}m';
-        if (!_controller.isClosed) _controller.add(pos);
-      },
-      onError: (_) {
-        isConnected = false;
-        accuracyText = 'Error';
-      },
-    );
+    _geoSub =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 5,
+          ),
+        ).listen(
+          (Position pos) {
+            if (_nativeActive) {
+              // Native took over — stop Geolocator
+              _stopGeolocator();
+              return;
+            }
+            lastKnownPosition = pos;
+            isConnected = true;
+            accuracyText = '±${pos.accuracy.toInt()}m';
+            if (!_controller.isClosed) _controller.add(pos);
+          },
+          onError: (_) {
+            isConnected = false;
+            accuracyText = 'Error';
+          },
+        );
   }
 
   void _stopGeolocator() {
@@ -166,7 +168,7 @@ class GpsStreamService {
       accuracy: accuracy,
       altitude: 0.0,
       altitudeAccuracy: 0.0,
-      heading: 0.0,
+      heading: (map['heading'] as num?)?.toDouble() ?? 0.0,
       headingAccuracy: 0.0,
       speed: speedMs,
       speedAccuracy: 0.0,

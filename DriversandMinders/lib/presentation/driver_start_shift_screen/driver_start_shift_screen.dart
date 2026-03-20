@@ -105,9 +105,9 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     _handleConnectivityChange(result);
 
     // Listen for changes
-    _connectivitySubscription = Connectivity()
-        .onConnectivityChanged
-        .listen((List<ConnectivityResult> results) {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      List<ConnectivityResult> results,
+    ) {
       _handleConnectivityChange(results);
     });
   }
@@ -138,6 +138,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     // Run all independent async operations in parallel
     await Future.wait([
       _checkLocationPermission(),
+      _checkNotificationPermission(),
       _loadDriverData(),
       _checkForActiveTrip(),
     ], eagerError: false); // Continue even if one fails
@@ -157,7 +158,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
           _hasActiveTrip = true;
           _activeTripInfo = {
             'tripId': tripId,
-            'tripType': tripType ?? 'unknown'
+            'tripType': tripType ?? 'unknown',
           };
         });
       }
@@ -244,7 +245,8 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
       final prefs = await SharedPreferences.getInstance();
       // 'user_name' is set by phone login; 'driver_name' by magic-link login.
       // Fall back to driver_name so both auth paths show the real name.
-      final userName = (prefs.getString('user_name')?.isNotEmpty == true
+      final userName =
+          (prefs.getString('user_name')?.isNotEmpty == true
               ? prefs.getString('user_name')
               : prefs.getString('driver_name')) ??
           'Driver';
@@ -259,8 +261,9 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
           final busDataJson = jsonDecode(cachedBusData!);
           final routeDataJson = jsonDecode(cachedRouteData!);
           _busData = busDataJson is Map<String, dynamic> ? busDataJson : null;
-          _routeDetails =
-              routeDataJson is Map<String, dynamic> ? routeDataJson : null;
+          _routeDetails = routeDataJson is Map<String, dynamic>
+              ? routeDataJson
+              : null;
 
           if (_routeDetails?['children'] != null &&
               _routeDetails!['children'] is List) {
@@ -272,7 +275,8 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                 'id': id,
                 'name':
                     '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}',
-                'grade': child['grade']?.toString() ??
+                'grade':
+                    child['grade']?.toString() ??
                     child['class_grade']?.toString() ??
                     'N/A',
               };
@@ -285,7 +289,8 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
             "driverName": userName,
             "busNumber": _busData?['bus_number'] ?? 'No Bus',
             "busPlate": _busData?['number_plate'] ?? 'N/A',
-            "routeName": _routeDetails?['route_name'] ??
+            "routeName":
+                _routeDetails?['route_name'] ??
                 _routeDetails?['name'] ??
                 'No Route',
             "routeAssignment": _busData?['bus_number'] ?? 'No Bus',
@@ -313,9 +318,9 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         _busData = busResponse['buses'] is Map
             ? busResponse['buses'] as Map<String, dynamic>
             : (busResponse['buses'] is List &&
-                    (busResponse['buses'] as List).isNotEmpty
-                ? busResponse['buses'][0] as Map<String, dynamic>
-                : null);
+                      (busResponse['buses'] as List).isNotEmpty
+                  ? busResponse['buses'][0] as Map<String, dynamic>
+                  : null);
 
         _routeDetails = routeResponse;
         await prefs.setString('cached_bus_data', jsonEncode(_busData));
@@ -331,7 +336,8 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
               'id': id,
               'name':
                   '${child['first_name'] ?? ''} ${child['last_name'] ?? ''}',
-              'grade': child['grade']?.toString() ??
+              'grade':
+                  child['grade']?.toString() ??
                   child['class_grade']?.toString() ??
                   'N/A',
               'lat': double.tryParse(child['home_latitude']?.toString() ?? ''),
@@ -380,12 +386,13 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
   Future<void> _initializeFallbackData() async {
     final prefs = await SharedPreferences.getInstance();
-    final userName = prefs.getString('driver_name') ??
+    final userName =
+        prefs.getString('driver_name') ??
         prefs.getString('user_name') ??
         'Driver';
     final userId =
         (prefs.getInt('driver_id') ?? prefs.getInt('user_id'))?.toString() ??
-            'N/A';
+        'N/A';
 
     if (!mounted) return;
     setState(() {
@@ -473,7 +480,8 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   @override
   void dispose() {
     _timeTimer?.cancel();
-    _gpsListener?.cancel(); // cancel this screen's listener only — keeps shared stream alive
+    _gpsListener
+        ?.cancel(); // cancel this screen's listener only — keeps shared stream alive
     _retryTimer?.cancel();
     _connectivitySubscription?.cancel();
     _pulseController.dispose();
@@ -482,8 +490,10 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
   void _startTimeUpdates() {
     _updateCurrentTime();
-    _timeTimer =
-        Timer.periodic(const Duration(seconds: 1), (_) => _updateCurrentTime());
+    _timeTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _updateCurrentTime(),
+    );
   }
 
   void _updateCurrentTime() {
@@ -499,6 +509,17 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
       final permission = await Permission.location.status;
       if (permission.isGranted) await _enableLocationServices();
     } catch (_) {}
+  }
+
+  Future<void> _checkNotificationPermission() async {
+    try {
+      final permission = await Permission.notification.status;
+      if (!permission.isGranted) {
+        await Permission.notification.request();
+      }
+    } catch (_) {
+      // Silently fail - notification permission is not critical for core functionality
+    }
   }
 
   Future<void> _toggleLocationServices() async {
@@ -576,13 +597,16 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         content: Text('Location access is needed to track the bus route.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
           ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                openAppSettings();
-              },
-              child: Text('Settings')),
+            onPressed: () {
+              Navigator.pop(context);
+              openAppSettings();
+            },
+            child: Text('Settings'),
+          ),
         ],
       ),
     );
@@ -597,13 +621,16 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         content: Text('Please enable location services.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
           ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Geolocator.openLocationSettings();
-              },
-              child: Text('Settings')),
+            onPressed: () {
+              Navigator.pop(context);
+              Geolocator.openLocationSettings();
+            },
+            child: Text('Settings'),
+          ),
         ],
       ),
     );
@@ -627,8 +654,9 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
       if (trip != null && trip['id'] != null) {
         final prefs = await SharedPreferences.getInstance();
-        final tripId =
-            trip['id'] is int ? trip['id'] : int.parse(trip['id'].toString());
+        final tripId = trip['id'] is int
+            ? trip['id']
+            : int.parse(trip['id'].toString());
         final busId = _busData?['id'];
         final busNumber = _busData?['bus_number'] ?? 'Bus';
 
@@ -636,17 +664,25 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         await prefs.setInt('current_trip_id', tripId);
         await prefs.setInt('trip_id', tripId);
         await prefs.setString(
-            'current_trip_type', trip['trip_type'] ?? tripType);
+          'current_trip_type',
+          trip['trip_type'] ?? tripType,
+        );
         await prefs.setString('trip_type', trip['trip_type'] ?? tripType);
         await prefs.setString(
-            'trip_start_time', DateTime.now().toIso8601String());
+          'trip_start_time',
+          DateTime.now().toIso8601String(),
+        );
         await prefs.setBool('trip_in_progress', true);
         await prefs.setBool('trip_active', true);
         if (busId != null) {
           await prefs.setInt(
-              'bus_id', busId is int ? busId : int.parse(busId.toString()));
-          await prefs.setInt('current_bus_id',
-              busId is int ? busId : int.parse(busId.toString()));
+            'bus_id',
+            busId is int ? busId : int.parse(busId.toString()),
+          );
+          await prefs.setInt(
+            'current_bus_id',
+            busId is int ? busId : int.parse(busId.toString()),
+          );
         }
         await prefs.setString('bus_number', busNumber.toString());
 
@@ -667,7 +703,8 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-                builder: (context) => const DriverActiveTripScreen()),
+              builder: (context) => const DriverActiveTripScreen(),
+            ),
           );
         }
       } else {
@@ -682,9 +719,10 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
             : raw;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(message),
-              backgroundColor: Theme.of(context).colorScheme.error,
-              duration: const Duration(seconds: 5)),
+            content: Text(message),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     }
@@ -697,71 +735,101 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
       builder: (context) => Container(
         padding: EdgeInsets.all(6.w),
         decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(2))),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(
+                  context,
+                ).colorScheme.outline.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             SizedBox(height: 3.h),
-            Icon(Icons.warning_amber_rounded,
-                size: 48, color: Theme.of(context).colorScheme.tertiary),
+            Icon(
+              Icons.warning_amber_rounded,
+              size: 48,
+              color: Theme.of(context).colorScheme.tertiary,
+            ),
             SizedBox(height: 2.h),
-            Text('Reset Trip State?',
-                style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Theme.of(context).colorScheme.onSurface)),
+            Text(
+              'Reset Trip State?',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
             SizedBox(height: 1.h),
             Text(
-                'This will clear local trip data. Only use if the app is stuck.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              'This will clear local trip data. Only use if the app is stuck.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
             SizedBox(height: 3.h),
             Row(
               children: [
                 Expanded(
-                    child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12))),
-                        child: Text('Cancel',
-                            style: TextStyle(
-                                color:
-                                    Theme.of(context).colorScheme.onSurface)))),
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
                 SizedBox(width: 4.w),
                 Expanded(
-                    child: ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    await _clearStaleLocalTripState();
-                    setState(() {
-                      _hasActiveTrip = false;
-                      _activeTripInfo = null;
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('Trip state reset'),
-                        backgroundColor:
-                            Theme.of(context).colorScheme.secondary));
-                  },
-                  style: ElevatedButton.styleFrom(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      await _clearStaleLocalTripState();
+                      setState(() {
+                        _hasActiveTrip = false;
+                        _activeTripInfo = null;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Trip state reset'),
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.secondary,
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.tertiary,
                       padding: EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      elevation: 0),
-                  child: Text('Reset',
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'Reset',
                       style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w600)),
-                )),
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
             SizedBox(height: 2.h),
@@ -788,21 +856,41 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     return Container(
       padding: EdgeInsets.all(3),
       decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(14)),
-      child: Row(children: [
-        Expanded(
-            child: _buildTripOption('pickup', Icons.wb_sunny_outlined, 'Pickup',
-                'Morning', Theme.of(context).colorScheme.primary)),
-        Expanded(
-            child: _buildTripOption('dropoff', Icons.nights_stay_outlined,
-                'Dropoff', 'Afternoon', const Color(0xFF10B981))),
-      ]),
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildTripOption(
+              'pickup',
+              Icons.wb_sunny_outlined,
+              'Pickup',
+              'Morning',
+              Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          Expanded(
+            child: _buildTripOption(
+              'dropoff',
+              Icons.nights_stay_outlined,
+              'Dropoff',
+              'Afternoon',
+              const Color(0xFF10B981),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildTripOption(
-      String type, IconData icon, String label, String sub, Color color) {
+    String type,
+    IconData icon,
+    String label,
+    String sub,
+    Color color,
+  ) {
     final isSelected = _selectedTripType == type;
     return GestureDetector(
       onTap: () => setState(() => _selectedTripType = type),
@@ -810,40 +898,55 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         duration: const Duration(milliseconds: 150),
         padding: EdgeInsets.symmetric(vertical: 1.4.h, horizontal: 2.w),
         decoration: BoxDecoration(
-          color:
-              isSelected ? color.withValues(alpha: 0.12) : Colors.transparent,
+          color: isSelected
+              ? color.withValues(alpha: 0.12)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(11),
           border: isSelected
               ? Border.all(color: color.withValues(alpha: 0.35), width: 1)
               : null,
         ),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
               size: 17,
               color: isSelected
                   ? color
-                  : Theme.of(context).colorScheme.onSurfaceVariant),
-          SizedBox(width: 7),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label,
-                style: TextStyle(
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            SizedBox(width: 7),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                     color: isSelected
                         ? color
-                        : Theme.of(context).colorScheme.onSurfaceVariant)),
-            Text(sub,
-                style: TextStyle(
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  sub,
+                  style: TextStyle(
                     fontSize: 11,
                     color: isSelected
                         ? color.withOpacity(0.7)
-                        : Theme.of(context).colorScheme.onSurfaceVariant)),
-          ]),
-          if (isSelected) ...[
-            SizedBox(width: 5),
-            Icon(Icons.check_circle, size: 14, color: color),
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            if (isSelected) ...[
+              SizedBox(width: 5),
+              Icon(Icons.check_circle, size: 14, color: color),
+            ],
           ],
-        ]),
+        ),
       ),
     );
   }
@@ -877,10 +980,11 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     final name = _driverData?['driverName'] as String? ?? 'Driver';
     return Scaffold(
       drawer: DriverDrawerWidget(
-          currentRoute: '/driver-start-shift-screen',
-          driverData: _driverData,
-          hasActiveTrip: _hasActiveTrip,
-          onResetTrip: _showResetTripStateDialog),
+        currentRoute: '/driver-start-shift-screen',
+        driverData: _driverData,
+        hasActiveTrip: _hasActiveTrip,
+        onResetTrip: _showResetTripStateDialog,
+      ),
       appBar: AppBar(
         backgroundColor: cs.surface,
         elevation: 0,
@@ -894,10 +998,14 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_getGreeting(),
-                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-            Text(name.split(' ').first,
-                style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              _getGreeting(),
+              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              name.split(' ').first,
+              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
           ],
         ),
         actions: [
@@ -915,24 +1023,28 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                     : cs.outline.withValues(alpha: 0.3),
               ),
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
                   width: 7,
                   height: 7,
                   decoration: BoxDecoration(
-                      color: _isGpsConnected
-                          ? cs.secondary
-                          : cs.onSurfaceVariant,
-                      shape: BoxShape.circle)),
-              const SizedBox(width: 6),
-              Text(_currentTime,
+                    color: _isGpsConnected ? cs.secondary : cs.onSurfaceVariant,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _currentTime,
                   style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: _isGpsConnected
-                          ? cs.secondary
-                          : cs.onSurfaceVariant)),
-            ]),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _isGpsConnected ? cs.secondary : cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -948,11 +1060,16 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           CircularProgressIndicator(
-              color: Theme.of(context).colorScheme.primary, strokeWidth: 3),
+            color: Theme.of(context).colorScheme.primary,
+            strokeWidth: 3,
+          ),
           SizedBox(height: 2.h),
-          Text('Loading...',
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          Text(
+            'Loading...',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
       ),
     );
@@ -960,76 +1077,78 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
 
   Widget _buildMainContent() {
     final cs = Theme.of(context).colorScheme;
-    return Column(children: [
-      if (!_isOnline || !_isServerReachable) _buildOfflineBanner(),
-      Expanded(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            await _loadDriverData();
-            await _checkForActiveTrip();
-          },
-          color: cs.primary,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
-                SizedBox(height: 2.h),
+    return Column(
+      children: [
+        if (!_isOnline || !_isServerReachable) _buildOfflineBanner(),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await _loadDriverData();
+              await _checkForActiveTrip();
+            },
+            color: cs.primary,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                  SizedBox(height: 2.h),
 
-                // ── Assignment ──────────────────────────────────────────
-                _sectionHeader('Assignment'),
-                SizedBox(height: 1.5.h),
-                if (_driverData?['routeAssignment'] == 'Not Assigned Yet')
+                  // ── Assignment ──────────────────────────────────────────
+                  _sectionHeader('Assignment'),
+                  SizedBox(height: 1.5.h),
+                  if (_driverData?['routeAssignment'] == 'Not Assigned Yet')
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4.w),
+                      child: _buildNotAssignedCard(),
+                    )
+                  else
+                    _buildAssignmentCard(),
+
+                  SizedBox(height: 2.5.h),
+                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                  SizedBox(height: 2.5.h),
+
+                  // ── Location ────────────────────────────────────────────
+                  _sectionHeader('Location'),
+                  SizedBox(height: 1.5.h),
+                  _buildCompactStatusRow(),
+
+                  SizedBox(height: 2.5.h),
+                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                  SizedBox(height: 2.5.h),
+
+                  // ── Trip Type ───────────────────────────────────────────
+                  _sectionHeader('Trip Type'),
+                  SizedBox(height: 1.5.h),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 4.w),
-                    child: _buildNotAssignedCard(),
-                  )
-                else
-                  _buildAssignmentCard(),
+                    child: _buildCompactTripToggle(),
+                  ),
 
-                SizedBox(height: 2.5.h),
-                Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
-                SizedBox(height: 2.5.h),
+                  SizedBox(height: 2.5.h),
+                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
+                  SizedBox(height: 2.5.h),
 
-                // ── Location ────────────────────────────────────────────
-                _sectionHeader('Location'),
-                SizedBox(height: 1.5.h),
-                _buildCompactStatusRow(),
+                  // ── Pre-Trip Checklist ──────────────────────────────────
+                  _sectionHeader('Pre-Trip Checklist'),
+                  SizedBox(height: 1.5.h),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4.w),
+                    child: _buildChecklistCard(),
+                  ),
 
-                SizedBox(height: 2.5.h),
-                Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
-                SizedBox(height: 2.5.h),
-
-                // ── Trip Type ───────────────────────────────────────────
-                _sectionHeader('Trip Type'),
-                SizedBox(height: 1.5.h),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4.w),
-                  child: _buildCompactTripToggle(),
-                ),
-
-                SizedBox(height: 2.5.h),
-                Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
-                SizedBox(height: 2.5.h),
-
-                // ── Pre-Trip Checklist ──────────────────────────────────
-                _sectionHeader('Pre-Trip Checklist'),
-                SizedBox(height: 1.5.h),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4.w),
-                  child: _buildChecklistCard(),
-                ),
-
-                SizedBox(height: 4.h),
-              ],
+                  SizedBox(height: 4.h),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-      _buildBottomButton(),
-    ]);
+        _buildBottomButton(),
+      ],
+    );
   }
 
   Widget _buildOfflineBanner() {
@@ -1037,19 +1156,29 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
       width: double.infinity,
       padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 8),
       color: Colors.orange.shade700,
-      child: Row(children: [
-        Icon(Icons.wifi_off_rounded, size: 14, color: Colors.white),
-        SizedBox(width: 6),
-        Expanded(
-            child: Text('Offline — showing cached data',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500))),
-        Text('Pull to refresh',
+      child: Row(
+        children: [
+          Icon(Icons.wifi_off_rounded, size: 14, color: Colors.white),
+          SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Offline — showing cached data',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Text(
+            'Pull to refresh',
             style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8), fontSize: 11)),
-      ]),
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1058,10 +1187,9 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
       padding: EdgeInsets.symmetric(horizontal: 4.w),
       child: Text(
         title,
-        style: Theme.of(context)
-            .textTheme
-            .titleLarge
-            ?.copyWith(fontWeight: FontWeight.w700),
+        style: Theme.of(
+          context,
+        ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -1090,74 +1218,107 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
             // Bus row
             Padding(
               padding: EdgeInsets.symmetric(vertical: 0.8.h),
-              child: Row(children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle, color: cs.primaryContainer),
-                  child: Icon(Icons.directions_bus_rounded,
-                      color: cs.primary, size: 22),
-                ),
-                SizedBox(width: 4.w),
-                Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text(_driverData?['busNumber'] ?? 'Bus',
-                          style: tt.bodyLarge
-                              ?.copyWith(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 2),
-                      Text(
-                          'Plate: ${_driverData?['busPlate'] ?? 'N/A'}',
-                          style: tt.bodySmall
-                              ?.copyWith(color: cs.onSurfaceVariant)),
-                    ])),
-                if (_hasActiveTrip)
+              child: Row(
+                children: [
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
-                      color: cs.secondary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(20),
+                      shape: BoxShape.circle,
+                      color: cs.primaryContainer,
                     ),
-                    child: Text('Active',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: cs.secondary)),
+                    child: Icon(
+                      Icons.directions_bus_rounded,
+                      color: cs.primary,
+                      size: 22,
+                    ),
                   ),
-              ]),
+                  SizedBox(width: 4.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _driverData?['busNumber'] ?? 'Bus',
+                          style: tt.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Plate: ${_driverData?['busPlate'] ?? 'N/A'}',
+                          style: tt.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_hasActiveTrip)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cs.secondary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'Active',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: cs.secondary,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
             Divider(height: 1, color: cs.outline.withValues(alpha: 0.3)),
             // Route row
             Padding(
               padding: EdgeInsets.symmetric(vertical: 0.8.h),
-              child: Row(children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle, color: cs.primaryContainer),
-                  child:
-                      Icon(Icons.route_rounded, color: cs.primary, size: 22),
-                ),
-                SizedBox(width: 4.w),
-                Expanded(
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: cs.primaryContainer,
+                    ),
+                    child: Icon(
+                      Icons.route_rounded,
+                      color: cs.primary,
+                      size: 22,
+                    ),
+                  ),
+                  SizedBox(width: 4.w),
+                  Expanded(
                     child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text(_driverData?['routeName'] ?? 'No Route',
-                          style: tt.bodyLarge
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                          overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 2),
-                      Text(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _driverData?['routeName'] ?? 'No Route',
+                          style: tt.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
                           '${_driverData?['studentCount'] ?? 0} students  ·  ${_driverData?['estimatedDuration'] ?? 'N/A'}',
-                          style: tt.bodySmall
-                              ?.copyWith(color: cs.onSurfaceVariant)),
-                    ])),
-              ]),
+                          style: tt.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -1165,35 +1326,49 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     );
   }
 
-
   Widget _buildNotAssignedCard() {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     return Container(
       padding: EdgeInsets.all(4.w),
       decoration: BoxDecoration(
-          color: cs.tertiary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: cs.tertiary.withValues(alpha: 0.3))),
-      child: Row(children: [
-        Container(
+        color: cs.tertiary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.tertiary.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-                color: cs.tertiary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12)),
-            child: Icon(Icons.warning_amber_rounded,
-                color: cs.tertiary, size: 28)),
-        SizedBox(width: 4.w),
-        Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Not Assigned Yet',
-              style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          Text('Contact your administrator for a bus assignment',
-              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-        ])),
-      ]),
+              color: cs.tertiary.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.warning_amber_rounded,
+              color: cs.tertiary,
+              size: 28,
+            ),
+          ),
+          SizedBox(width: 4.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Not Assigned Yet',
+                  style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Contact your administrator for a bus assignment',
+                  style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1218,42 +1393,49 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         ),
         child: GestureDetector(
           onTap: _toggleLocationServices,
-          child: Row(children: [
-            Icon(
+          child: Row(
+            children: [
+              Icon(
                 _isGpsConnected
                     ? Icons.gps_fixed
                     : (_isLocationEnabled
-                        ? Icons.gps_not_fixed
-                        : Icons.gps_off),
+                          ? Icons.gps_not_fixed
+                          : Icons.gps_off),
                 size: 20,
                 color: _isGpsConnected
                     ? cs.secondary
-                    : (_isLocationEnabled
-                        ? cs.tertiary
-                        : cs.onSurfaceVariant)),
-            const SizedBox(width: 12),
-            Expanded(
+                    : (_isLocationEnabled ? cs.tertiary : cs.onSurfaceVariant),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
                       _isGpsConnected
                           ? 'GPS Connected'
                           : (_isLocationEnabled
-                              ? 'Acquiring GPS...'
-                              : 'Location Off'),
-                      style:
-                          tt.bodyLarge?.copyWith(fontWeight: FontWeight.w500)),
-                  Text(_accuracyText,
-                      style:
-                          tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                ])),
-            Switch(
+                                ? 'Acquiring GPS...'
+                                : 'Location Off'),
+                      style: tt.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      _accuracyText,
+                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
                 value: _isLocationEnabled,
                 onChanged: (_) => _toggleLocationServices(),
                 activeThumbColor: cs.secondary,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
-          ]),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1275,13 +1457,15 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
           ),
         ],
       ),
-      child: Column(children: [
-        for (int i = 0; i < _checklistItems.length; i++) ...[
-          _buildChecklistItem(i),
-          if (i < _checklistItems.length - 1)
-            Divider(height: 1, color: cs.outline.withValues(alpha: 0.25)),
+      child: Column(
+        children: [
+          for (int i = 0; i < _checklistItems.length; i++) ...[
+            _buildChecklistItem(i),
+            if (i < _checklistItems.length - 1)
+              Divider(height: 1, color: cs.outline.withValues(alpha: 0.25)),
+          ],
         ],
-      ]),
+      ),
     );
   }
 
@@ -1295,37 +1479,45 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
       onTap: () => _toggleChecklistItem(index),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
                 color: isChecked ? cs.secondary : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                    color: isChecked
-                        ? cs.secondary
-                        : cs.outline.withValues(alpha: 0.6),
-                    width: 2)),
-            child: isChecked
-                ? const Icon(Icons.check, size: 16, color: Colors.white)
-                : null,
-          ),
-          const SizedBox(width: 14),
-          Icon(_getChecklistIcon(item['icon'] as String),
+                  color: isChecked
+                      ? cs.secondary
+                      : cs.outline.withValues(alpha: 0.6),
+                  width: 2,
+                ),
+              ),
+              child: isChecked
+                  ? const Icon(Icons.check, size: 16, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 14),
+            Icon(
+              _getChecklistIcon(item['icon'] as String),
               size: 20,
-              color: isChecked ? cs.secondary : cs.onSurfaceVariant),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Text(item['title'] as String,
-                  style: tt.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color:
-                          isChecked ? cs.onSurfaceVariant : cs.onSurface,
-                      decoration:
-                          isChecked ? TextDecoration.lineThrough : null))),
-        ]),
+              color: isChecked ? cs.secondary : cs.onSurfaceVariant,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                item['title'] as String,
+                style: tt.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: isChecked ? cs.onSurfaceVariant : cs.onSurface,
+                  decoration: isChecked ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1333,12 +1525,16 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
   Widget _buildBottomButton() {
     return Container(
       padding: EdgeInsets.all(5.w),
-      decoration: BoxDecoration(color: Theme.of(context).cardColor, boxShadow: [
-        BoxShadow(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        boxShadow: [
+          BoxShadow(
             color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.08),
             blurRadius: 10,
-            offset: Offset(0, -5))
-      ]),
+            offset: Offset(0, -5),
+          ),
+        ],
+      ),
       child: SafeArea(
         top: false,
         child: AnimatedBuilder(
@@ -1362,37 +1558,40 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                 height: 56,
                 decoration: BoxDecoration(
                   gradient: canStart
-                      ? LinearGradient(colors: [
-                          _hasActiveTrip
-                              ? Theme.of(context).colorScheme.secondary
-                              : Theme.of(context).colorScheme.primary,
-                          _hasActiveTrip
-                              ? Theme.of(context)
-                                  .colorScheme
-                                  .secondary
-                                  .withOpacity(0.8)
-                              : Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withOpacity(0.8)
-                        ])
+                      ? LinearGradient(
+                          colors: [
+                            _hasActiveTrip
+                                ? Theme.of(context).colorScheme.secondary
+                                : Theme.of(context).colorScheme.primary,
+                            _hasActiveTrip
+                                ? Theme.of(
+                                    context,
+                                  ).colorScheme.secondary.withOpacity(0.8)
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withOpacity(0.8),
+                          ],
+                        )
                       : null,
                   color: canStart
                       ? null
-                      : Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.12),
+                      : Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: canStart
                       ? [
                           BoxShadow(
-                              color: (_hasActiveTrip
-                                      ? Theme.of(context).colorScheme.secondary
-                                      : Theme.of(context).colorScheme.primary)
-                                  .withOpacity(0.4),
-                              blurRadius: 12,
-                              offset: Offset(0, 4))
+                            color:
+                                (_hasActiveTrip
+                                        ? Theme.of(
+                                            context,
+                                          ).colorScheme.secondary
+                                        : Theme.of(context).colorScheme.primary)
+                                    .withOpacity(0.4),
+                            blurRadius: 12,
+                            offset: Offset(0, 4),
+                          ),
                         ]
                       : null,
                 ),
@@ -1402,27 +1601,32 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                           width: 24,
                           height: 24,
                           child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2.5))
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
                       : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                              Icon(
-                                  _hasActiveTrip
-                                      ? Icons.play_circle_outline
-                                      : Icons.play_arrow_rounded,
-                                  color: Colors.white,
-                                  size: 24),
-                              SizedBox(width: 10),
-                              Text(
-                                  _hasActiveTrip
-                                      ? 'Continue Trip'
-                                      : 'Begin Route',
-                                  style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                      letterSpacing: 0.3)),
-                            ]),
+                            Icon(
+                              _hasActiveTrip
+                                  ? Icons.play_circle_outline
+                                  : Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                            SizedBox(width: 10),
+                            Text(
+                              _hasActiveTrip ? 'Continue Trip' : 'Begin Route',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
               ),
             );

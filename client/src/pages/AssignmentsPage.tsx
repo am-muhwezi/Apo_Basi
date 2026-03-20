@@ -126,6 +126,7 @@ export default function AssignmentsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMoreAssignments, setHasMoreAssignments] = useState(false);
+  const [totalAssignments, setTotalAssignments] = useState(0);
 
   // Load data on mount
   useEffect(() => {
@@ -158,33 +159,44 @@ export default function AssignmentsPage() {
 
   // Stable ref to track offset for append loads (avoids stale closure)
   const assignmentsOffsetRef = useRef(0);
+  // Ref-based guard prevents concurrent fresh loads racing with Load More
+  const assignmentsLoadingRef = useRef(false);
 
   async function loadAssignments(append = false) {
     if (append && isLoadingMore) return;
+    // Block concurrent fresh (non-append) loads
+    if (!append && assignmentsLoadingRef.current) return;
+    assignmentsLoadingRef.current = true;
     try {
       if (append) setIsLoadingMore(true);
       const offset = append ? assignmentsOffsetRef.current : 0;
-      const data = await assignmentService.loadAssignments({ limit: 20, offset });
+      const { results, count } = await assignmentService.loadAssignments({ limit: 20, offset });
+
+      const newOffset = append ? offset + results.length : results.length;
 
       setAssignments(prevAssignments => {
         if (append) {
           const existingIds = new Set(prevAssignments.map(a => a.id));
-          const newAssignments = data.filter(a => !existingIds.has(a.id));
+          const newAssignments = results.filter(a => !existingIds.has(a.id));
           return [...prevAssignments, ...newAssignments];
         }
-        return data;
+        return results;
       });
 
-      assignmentsOffsetRef.current = append ? offset + data.length : data.length;
-      setHasMoreAssignments(data.length === 20);
+      assignmentsOffsetRef.current = newOffset;
+      setTotalAssignments(count);
+      // Use server count as source of truth — avoids the DRF quirk where
+      // `next` is non-null even when the very last page was just fetched.
+      setHasMoreAssignments(newOffset < count);
     } catch (error) {
     } finally {
       if (append) setIsLoadingMore(false);
+      assignmentsLoadingRef.current = false;
     }
   }
 
   function loadMoreAssignments() {
-    if (!isLoading && !isLoadingMore && hasMoreAssignments) {
+    if (!isLoading && !isLoadingMore && !assignmentsLoadingRef.current && hasMoreAssignments) {
       loadAssignments(true);
     }
   }
@@ -325,6 +337,52 @@ export default function AssignmentsPage() {
   async function handleSubmitAssignment(e: React.FormEvent) {
     e.preventDefault();
 
+    // ── Conflict detection (new assignments only) ───────────────────────────
+    if (!isEditMode) {
+      const warnings: string[] = [];
+      const { assignmentType, assigneeId, assignedToId } = assignmentFormData;
+
+      if (assignmentType === 'driver_to_bus') {
+        const driver = drivers.find(d => String(d.id) === String(assigneeId));
+        if (driver?.assignedBusId && String(driver.assignedBusId) !== String(assignedToId)) {
+          warnings.push(`Driver "${driver.firstName} ${driver.lastName}" is already assigned to bus ${driver.assignedBusNumber}. Their current assignment will be cancelled.`);
+        }
+      }
+
+      if (assignmentType === 'minder_to_bus') {
+        const minder = minders.find(m => String(m.id) === String(assigneeId));
+        if (minder?.assignedBusId && String(minder.assignedBusId) !== String(assignedToId)) {
+          warnings.push(`Bus Assistant "${minder.firstName} ${minder.lastName}" is already assigned to bus ${minder.assignedBusNumber}. Their current assignment will be cancelled.`);
+        }
+      }
+
+      if (assignmentType === 'child_to_bus') {
+        const child = children.find(c => String(c.id) === String(assigneeId));
+        if (child?.assignedBusId && String(child.assignedBusId) !== String(assignedToId)) {
+          warnings.push(`"${child.firstName} ${child.lastName}" is currently on bus ${child.assignedBusNumber}. They will be moved to the new bus.`);
+        }
+      }
+
+      if (assignmentType === 'bus_to_route') {
+        const bus = buses.find(b => String(b.id) === String(assigneeId));
+        if (bus?.routeId && String(bus.routeId) !== String(assignedToId)) {
+          warnings.push(`Bus "${bus.busNumber}" is currently on route "${bus.routeName}". It will be moved to the selected route.`);
+        }
+      }
+
+      if (warnings.length > 0) {
+        const confirmed = await confirm({
+          title: 'Reassignment Conflict',
+          message: warnings.join('\n\n') + '\n\nDo you want to proceed?',
+          confirmText: 'Yes, Reassign',
+          cancelText: 'Cancel',
+          variant: 'warning',
+        });
+        if (!confirmed) return;
+      }
+    }
+    // ───────────────────────────────────────────────────────────────────────
+
     try {
       if (isEditMode && currentAssignment) {
         await assignmentService.updateAssignment(currentAssignment.id, assignmentFormData);
@@ -336,31 +394,6 @@ export default function AssignmentsPage() {
       await loadAssignments();
       setShowAssignmentModal(false);
     } catch (error) {
-      // If backend reported conflicting assignments, offer to cancel and reassign
-      // @ts-ignore
-      const conflicts = error?.response?.data?.conflicts;
-      if (conflicts && conflicts.length) {
-        const confirmed = await confirm({
-          title: 'Conflicting assignments detected',
-          message: `The following conflicts were found:\n${conflicts.join('\n')}\n\nCancel conflicting assignments and proceed?`,
-          confirmText: 'Cancel and Reassign',
-          variant: 'danger'
-        });
-
-        if (confirmed) {
-          try {
-            await assignmentService.createAssignment({ ...assignmentFormData, auto_cancel_conflicting: true });
-            toast.success('Assignment created and conflicting assignments cancelled');
-            await loadAssignments();
-            setShowAssignmentModal(false);
-            return;
-          } catch (err) {
-            toast.error('Failed to force-create assignment after cancelling conflicts.');
-            return;
-          }
-        }
-      }
-
       toast.error('Failed to save assignment. Please check all fields and try again.');
     }
   }
@@ -481,7 +514,7 @@ export default function AssignmentsPage() {
   }
 
   // Calculate stats
-  const totalAssignments = assignments.length;
+  const isFiltered = !!assignmentSearchTerm || assignmentTypeFilter !== 'all' || assignmentStatusFilter !== 'all';
   const activeAssignments = assignments.filter((a) => a.status === 'active').length;
   const expiredAssignments = assignments.filter((a) => a.status === 'expired').length;
   const childAssignments = assignments.filter((a) => a.assignmentType === 'child_to_bus').length;
@@ -813,10 +846,16 @@ export default function AssignmentsPage() {
             </div>
             <div className="p-4 border-t border-slate-200">
               <div className="flex flex-col items-center gap-3">
-                <span className="text-sm text-slate-600">
-                  Loaded {filteredAssignments.length} of {filteredAssignments.length}{hasMoreAssignments ? '+' : ''} assignments
-                </span>
-                {hasMoreAssignments && (
+                {isFiltered && filteredAssignments.length === 0 ? (
+                  <span className="text-sm text-slate-500">
+                    0 matches in {assignments.length} loaded records &mdash; {totalAssignments} total in database
+                  </span>
+                ) : (
+                  <span className="text-sm text-slate-600">
+                    Loaded {assignments.length} of {totalAssignments} assignments
+                  </span>
+                )}
+                {hasMoreAssignments && filteredAssignments.length > 0 && (
                   <Button
                     onClick={loadMoreAssignments}
                     disabled={isLoading || isLoadingMore}
@@ -824,6 +863,16 @@ export default function AssignmentsPage() {
                     size="sm"
                   >
                     {isLoadingMore ? 'Loading...' : 'Load More'}
+                  </Button>
+                )}
+                {hasMoreAssignments && isFiltered && filteredAssignments.length === 0 && (
+                  <Button
+                    onClick={loadMoreAssignments}
+                    disabled={isLoading || isLoadingMore}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    {isLoadingMore ? 'Loading...' : 'Load More Records'}
                   </Button>
                 )}
               </div>
@@ -916,7 +965,7 @@ export default function AssignmentsPage() {
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
                 <div className="flex flex-col items-center gap-3">
                   <span className="text-sm text-slate-600">
-                    Loaded {filteredAssignments.length} of {filteredAssignments.length}{hasMoreAssignments ? '+' : ''} assignments
+                    Loaded {assignments.length} of {totalAssignments} assignments
                   </span>
                   {hasMoreAssignments && (
                     <Button

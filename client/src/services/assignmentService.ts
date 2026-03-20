@@ -3,11 +3,16 @@ import type { Assignment, BusRoute, AssignmentHistory, AssignmentFormData, Route
 
 class AssignmentService {
   // Assignment methods
-  async loadAssignments(filters?: Record<string, any>): Promise<Assignment[]> {
+  async loadAssignments(filters?: Record<string, any>): Promise<{ results: Assignment[]; count: number; next: string | null }> {
     try {
       const response = await assignmentApi.getAssignments(filters);
       // Handle paginated response from DRF: {results: [], count, next, previous}
-      return response.data.results || response.data || [];
+      const data = response.data;
+      if (data && Array.isArray(data.results)) {
+        return { results: data.results, count: data.count ?? data.results.length, next: data.next ?? null };
+      }
+      const list: Assignment[] = Array.isArray(data) ? data : [];
+      return { results: list, count: list.length, next: null };
     } catch (error) {
       throw error;
     }

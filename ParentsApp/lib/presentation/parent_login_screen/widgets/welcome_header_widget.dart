@@ -7,37 +7,31 @@ class WelcomeHeaderWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 48,
-        bottom: 24,
-      ),
-      // Flat colour — no LinearGradient repainting on every keystroke
-      color: AppTheme.primaryLight,
-      child: SafeArea(
-        bottom: false,
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 40, bottom: 28),
         child: Column(
           children: [
+            // Logo in rounded square with frosted border
             Container(
-              width: 64,
-              height: 64,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1),
               ),
-              child: ClipOval(
+              padding: const EdgeInsets.all(6),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
                 child: Image.asset(
                   'assets/images/AB_logo.jpg',
-                  width: 64,
-                  height: 64,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => const Icon(
                     Icons.directions_bus_rounded,
-                    size: 32,
-                    color: AppTheme.primaryLight,
+                    size: 48,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -45,23 +39,22 @@ class WelcomeHeaderWidget extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               'ApoBasi',
-              style: GoogleFonts.inter(
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
+              style: GoogleFonts.manrope(
+                fontSize: 32,
+                fontWeight: FontWeight.w800,
                 color: Colors.white,
                 letterSpacing: -0.5,
                 height: 1.1,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               'Safe journeys, Happy parents',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-                color: Colors.white70,
-                height: 1.3,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFFFED01B), // secondary yellow
               ),
             ),
           ],
