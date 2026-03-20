@@ -80,31 +80,77 @@ post_install do |installer|
     end
   end
 
-  # Fix "Upload Symbols Failed" for Mapbox binary frameworks.
-  # Mapbox does not distribute dSYMs for MapboxCommon/MapboxCoreMaps.
-  # This adds a build phase that generates dSYM stubs with matching UUIDs
-  # so App Store Connect accepts the archive without warnings.
-  # 'always_out_of_date = 1' marks it as intentionally always-run, which
-  # suppresses the "no outputs specified" Xcode warning.
   project = Xcodeproj::Project.open("#{installer.sandbox.root}/../Runner.xcodeproj")
   runner_target = project.targets.find { |t| t.name == 'Runner' }
 
+  # ── Fix "Upload Symbols Failed" for Mapbox binary frameworks ─────────────
+  # Mapbox ships pre-compiled frameworks without dSYMs. This script generates
+  # them at archive time so App Store Connect can symbolicate Mapbox frames.
+  # Always regenerate (no [ ! -d ] guard) so a stale dSYM with a wrong UUID
+  # never silently persists across builds.
   phase_name = 'Generate Mapbox dSYMs'
   phase = runner_target.shell_script_build_phases.find { |p| p.name == phase_name }
   unless phase
     phase = runner_target.new_shell_script_build_phase(phase_name)
-    phase.shell_script = <<~'SCRIPT'
-      for framework in MapboxCommon MapboxCoreMaps; do
-        FW_PATH="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/${framework}.framework/${framework}"
-        DSYM_PATH="${DWARF_DSYM_FOLDER_PATH}/${framework}.framework.dSYM"
-        if [ -f "$FW_PATH" ] && [ ! -d "$DSYM_PATH" ]; then
-          echo "Generating dSYM for ${framework}..."
-          xcrun dsymutil "$FW_PATH" -o "$DSYM_PATH" 2>/dev/null || true
+  end
+  phase.shell_script = <<~'SCRIPT'
+    for framework in MapboxCommon MapboxCoreMaps objective_c; do
+      FW_PATH="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/${framework}.framework/${framework}"
+      DSYM_PATH="${DWARF_DSYM_FOLDER_PATH}/${framework}.framework.dSYM"
+      if [ -f "$FW_PATH" ]; then
+        echo "Generating dSYM for ${framework}..."
+        xcrun dsymutil "$FW_PATH" -o "$DSYM_PATH" 2>/dev/null || true
+      fi
+    done
+  SCRIPT
+  phase.always_out_of_date = '1'
+
+  # ── Strip simulator-platform slices from embedded frameworks ─────────────
+  # On Apple Silicon Macs, the Dart objective_c package produces a fat
+  # framework where the arm64 slice carries LC_BUILD_VERSION platform=IOSSIMULATOR.
+  # App Store Connect rejects any binary with simulator-tagged slices.
+  # This script uses `vtool` to identify and `lipo` to remove such slices
+  # after Xcode embeds the frameworks but before code-signing.
+  # Fixes:
+  #   "executable references an unsupported platform in the arm64 slice"
+  #   "bundle does not support the minimum OS Version specified in the Info.plist"
+  strip_phase_name = 'Strip Simulator Slices'
+  strip_phase = runner_target.shell_script_build_phases.find { |p| p.name == strip_phase_name }
+  unless strip_phase
+    strip_phase = runner_target.new_shell_script_build_phase(strip_phase_name)
+  end
+  strip_phase.shell_script = <<~'SCRIPT'
+    APP_PATH="${TARGET_BUILD_DIR}/${WRAPPER_NAME}"
+    find "$APP_PATH" -name '*.framework' -type d | while IFS= read -r FRAMEWORK; do
+      BINARY_NAME=$(defaults read "$FRAMEWORK/Info.plist" CFBundleExecutable 2>/dev/null) || continue
+      BINARY="$FRAMEWORK/$BINARY_NAME"
+      [ -f "$BINARY" ] || continue
+
+      ALL_ARCHS=$(lipo -archs "$BINARY" 2>/dev/null) || continue
+      for ARCH in $ALL_ARCHS; do
+        PLATFORM=$(vtool -show-build "$BINARY" -arch "$ARCH" 2>/dev/null | awk '/platform:/{print $2; exit}')
+        if [ "$PLATFORM" = "IOSSIMULATOR" ] || [ "$PLATFORM" = "MACCATALYST" ]; then
+          echo "$(basename $FRAMEWORK): removing $ARCH ($PLATFORM)"
+          lipo -remove "$ARCH" -output "$BINARY" "$BINARY" 2>/dev/null || true
         fi
       done
-    SCRIPT
+    done
+  SCRIPT
+  # Must run after "Embed Frameworks" and before "Sign" — set deployment postprocessing flag
+  strip_phase.run_only_for_deployment_postprocessing = '1'
+  strip_phase.always_out_of_date = '1'
+
+  # ── Prevent actool from re-encoding the app icon as ARGB ─────────────────
+  # Xcode's asset catalog compiler can convert a clean RGB PNG to ARGB when
+  # optimising for performance. App Store Connect rejects icons with alpha.
+  # "space" optimisation keeps the original pixel format.
+  runner_target.build_configurations.each do |config|
+    next unless config.name == 'Release'
+    config.build_settings['ASSETCATALOG_COMPILER_OPTIMIZATION'] = 'space'
+    # Prevent pngcrush/actool from re-encoding the app icon with an alpha channel.
+    # actool can convert a clean RGB PNG to ARGB regardless of the source format.
+    config.build_settings['COMPRESS_PNG_FILES'] = 'NO'
   end
-  # Declare as intentionally always-run (suppresses "no outputs" warning)
-  phase.always_out_of_date = '1'
+
   project.save
 end

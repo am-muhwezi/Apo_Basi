@@ -18,13 +18,15 @@ generate_icon() {
     # Create directory if it doesn't exist
     mkdir -p "$(dirname "$output_path")"
 
-    # Generate PNG
-    rsvg-convert -w "$size" -h "$size" "$SOURCE_SVG" > "$output_path"
-
-    if [ $? -eq 0 ]; then
+    # Generate PNG with white background (no alpha) - required for App Store icons
+    # Use a temp file to avoid truncating the output if rsvg-convert fails
+    local tmp_path="${output_path}.tmp"
+    if rsvg-convert -w "$size" -h "$size" --background-color=white "$SOURCE_SVG" > "$tmp_path" 2>/dev/null; then
+        mv "$tmp_path" "$output_path"
         echo "✓ Generated $output_path (${size}x${size})"
     else
-        echo "✗ Failed to generate $output_path"
+        rm -f "$tmp_path"
+        echo "✗ Failed to generate $output_path (is rsvg-convert installed? brew install librsvg)"
         return 1
     fi
 }
