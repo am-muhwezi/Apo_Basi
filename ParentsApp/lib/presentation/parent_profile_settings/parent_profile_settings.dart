@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:sizer/sizer.dart';
@@ -283,317 +284,379 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
 
     final bool showLoading = _isLoading && _user == null;
 
+    final cardBg = isDark ? const Color(0xFF1E2A3A) : Colors.white;
+    final cardShadow = BoxShadow(
+      color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
+      blurRadius: 12,
+      offset: const Offset(0, 4),
+    );
+
+    if (showLoading) {
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: theme.appBarTheme.backgroundColor,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        centerTitle: true,
-        title: Text(
-          'Profile & Settings',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: colorScheme.onSurface,
-          ),
-        ),
-      ),
-      body: showLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: () => _loadProfileData(forceRefresh: true),
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Divider(
-                        height: 1,
-                        color: colorScheme.outline.withValues(alpha: 0.3)),
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: () => _loadProfileData(forceRefresh: true),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Page heading ─────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  child: Text(
+                    'Profile & Settings',
+                    style: GoogleFonts.manrope(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ),
 
-                    // ── Profile header ──────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-                      child: Row(
-                        children: [
-                          // Large avatar
-                          Container(
-                            width: 72,
-                            height: 72,
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? colorScheme.primary
-                                      .withValues(alpha: 0.15)
-                                  : const Color(0xFFF9E4F1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Text(
-                                _user?.fullName.isNotEmpty == true
-                                    ? _user!.fullName[0].toUpperCase()
-                                    : 'P',
-                                style: TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w600,
-                                  color: colorScheme.primary,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          // Name, email, phone
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _user?.fullName ?? 'Parent',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w700,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                if (_user?.email != null &&
-                                    _user!.email.isNotEmpty)
-                                  Text(
-                                    _user!.email,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w400,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                if (_parent?.contactNumber.isNotEmpty ==
-                                    true) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _parent!.contactNumber,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w400,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          // Edit pencil
-                          GestureDetector(
-                            onTap: () => _showUpdateAddressDialog(),
-                            child: Icon(
-                              Icons.edit_outlined,
-                              size: 20,
+                // ── Profile card ─────────────────────────────────
+                Container(
+                  margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [cardShadow],
+                  ),
+                  child: Row(
+                    children: [
+                      // Avatar
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary
+                              .withValues(alpha: isDark ? 0.2 : 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            _user?.fullName.isNotEmpty == true
+                                ? _user!.fullName[0].toUpperCase()
+                                : 'P',
+                            style: GoogleFonts.manrope(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
                               color: colorScheme.primary,
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-
-                    // ── Children section ────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                      child: Text(
-                        'Children',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onSurface,
                         ),
                       ),
-                    ),
-
-                    if (_children.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 16),
-                        child: Text(
-                          'No children registered. Contact your school admin.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: colorScheme.onSurfaceVariant,
+                      const SizedBox(width: 16),
+                      // Name + email + phone
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _user?.fullName ?? 'Parent',
+                              style: GoogleFonts.manrope(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSurface,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (_user?.email != null &&
+                                _user!.email.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                _user!.email,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                            if (_parent?.contactNumber.isNotEmpty == true) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                _parent!.contactNumber,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      // Edit button
+                      GestureDetector(
+                        onTap: _showUpdateAddressDialog,
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary
+                                .withValues(alpha: isDark ? 0.2 : 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.edit_rounded,
+                            size: 18,
+                            color: colorScheme.primary,
                           ),
                         ),
-                      )
-                    else
-                      ..._children
-                          .map((child) => ChildInformationWidget(
-                                childData: _childToCardData(child),
-                              ))
-                          .toList(),
+                      ),
+                    ],
+                  ),
+                ),
 
-                    const SizedBox(height: 20),
+                // ── Children section ─────────────────────────────
+                _buildSectionHeader('Children', colorScheme),
 
-                    // ── Settings section ────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                      child: Text(
-                        'Settings',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onSurface,
-                        ),
+                if (_children.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    child: Text(
+                      'No children registered. Contact your school admin.',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
+                  )
+                else
+                  ..._children
+                      .map((child) => ChildInformationWidget(
+                            childData: _childToCardData(child),
+                          ))
+                      .toList(),
 
-                    // Settings grouped card
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
-                      decoration: BoxDecoration(
-                        color: theme.cardColor,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: colorScheme.outline,
-                        ),
+                // ── Settings section ─────────────────────────────
+                _buildSectionHeader('Settings', colorScheme),
+
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [cardShadow],
+                  ),
+                  child: Column(
+                    children: [
+                      // Notification Preferences
+                      _buildSwitchRow(
+                        icon: Icons.notifications_rounded,
+                        label: 'Notifications',
+                        value: true,
+                        onChanged: (val) {},
+                        colorScheme: colorScheme,
+                        isDark: isDark,
+                        isFirst: true,
+                        isLast: false,
                       ),
-                      child: Column(
-                        children: [
-                          // Notification Preferences
-                          _buildSwitchRow(
-                            label: 'Notification Preferences',
-                            value: true, // TODO: connect to actual preference
+                      _buildDivider(colorScheme),
+                      // Dark Mode
+                      ValueListenableBuilder<ThemeMode>(
+                        valueListenable: _themeService.themeModeNotifier,
+                        builder: (context, themeMode, child) {
+                          return _buildSwitchRow(
+                            icon: Icons.dark_mode_rounded,
+                            label: 'Dark Mode',
+                            value: themeMode == ThemeMode.dark,
                             onChanged: (val) {
-                              // TODO: toggle notification preferences
-                            },
-                            colorScheme: colorScheme,
-                          ),
-                          Divider(
-                            height: 1,
-                            indent: 16,
-                            endIndent: 16,
-                            color:
-                                colorScheme.outline.withValues(alpha: 0.5),
-                          ),
-                          // Dark Mode
-                          ValueListenableBuilder<ThemeMode>(
-                            valueListenable: _themeService.themeModeNotifier,
-                            builder: (context, themeMode, child) {
-                              return _buildSwitchRow(
-                                label: 'Dark Mode',
-                                value: themeMode == ThemeMode.dark,
-                                onChanged: (val) {
-                                  _themeService.setThemeMode(
-                                    val ? ThemeMode.dark : ThemeMode.light,
-                                  );
-                                },
-                                colorScheme: colorScheme,
+                              _themeService.setThemeMode(
+                                val ? ThemeMode.dark : ThemeMode.light,
                               );
                             },
-                          ),
-                          Divider(
-                            height: 1,
-                            indent: 16,
-                            endIndent: 16,
-                            color:
-                                colorScheme.outline.withValues(alpha: 0.5),
-                          ),
-                          // Home Location
-                          _buildNavRow(
-                            label: 'Home',
-                            onTap: () => _showUpdateAddressDialog(),
                             colorScheme: colorScheme,
-                          ),
-                        ],
+                            isDark: isDark,
+                            isFirst: false,
+                            isLast: false,
+                          );
+                        },
                       ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // ── Account section ─────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                      child: Text(
-                        'Account',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onSurface,
-                        ),
+                      _buildDivider(colorScheme),
+                      // Home Location
+                      _buildNavRow(
+                        icon: Icons.home_rounded,
+                        label: 'Home Location',
+                        onTap: _showUpdateAddressDialog,
+                        colorScheme: colorScheme,
+                        isDark: isDark,
+                        isFirst: false,
+                        isLast: true,
+                        trailing: (_parent?.address ?? '').isNotEmpty
+                            ? Text(
+                                _cleanAddress(_parent!.address),
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              )
+                            : null,
                       ),
-                    ),
-
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
-                      decoration: BoxDecoration(
-                        color: theme.cardColor,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: colorScheme.outline,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          _buildNavRow(
-                            label: 'Privacy Policy',
-                            onTap: () => _openPrivacyPolicy(),
-                            colorScheme: colorScheme,
-                          ),
-                          Divider(
-                            height: 1,
-                            indent: 16,
-                            endIndent: 16,
-                            color:
-                                colorScheme.outline.withValues(alpha: 0.5),
-                          ),
-                          _buildNavRow(
-                            label: 'Terms of Service',
-                            onTap: () => _openTermsAndConditions(),
-                            colorScheme: colorScheme,
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // ── Logout ──────────────────────────────────────
-                    Center(
-                      child: GestureDetector(
-                        onTap: () => _showLogoutDialog(),
-                        child: const Text(
-                          'Logout',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFFFF3B30),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 48),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+
+                // ── Account section ──────────────────────────────
+                _buildSectionHeader('Account', colorScheme),
+
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [cardShadow],
+                  ),
+                  child: Column(
+                    children: [
+                      _buildNavRow(
+                        icon: Icons.shield_rounded,
+                        label: 'Privacy Policy',
+                        onTap: _openPrivacyPolicy,
+                        colorScheme: colorScheme,
+                        isDark: isDark,
+                        isFirst: true,
+                        isLast: false,
+                      ),
+                      _buildDivider(colorScheme),
+                      _buildNavRow(
+                        icon: Icons.description_rounded,
+                        label: 'Terms of Service',
+                        onTap: _openTermsAndConditions,
+                        colorScheme: colorScheme,
+                        isDark: isDark,
+                        isFirst: false,
+                        isLast: true,
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // ── Logout button ────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: SizedBox(
+                    height: 50,
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _showLogoutDialog,
+                      icon: const Icon(Icons.logout_rounded,
+                          size: 18, color: Color(0xFFBA1A1A)),
+                      label: Text(
+                        'Log Out',
+                        style: GoogleFonts.manrope(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFBA1A1A),
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(
+                            color: Color(0xFFBA1A1A), width: 1.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 48),
+              ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 10),
+      child: Row(
+        children: [
+          Text(
+            title.toUpperCase(),
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: colorScheme.onSurfaceVariant,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: colorScheme.outlineVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDivider(ColorScheme colorScheme) {
+    return Divider(
+      height: 1,
+      indent: 56,
+      endIndent: 16,
+      color: colorScheme.outlineVariant,
     );
   }
 
   Widget _buildSwitchRow({
+    required IconData icon,
     required String label,
     required bool value,
     required ValueChanged<bool> onChanged,
     required ColorScheme colorScheme,
+    required bool isDark,
+    required bool isFirst,
+    required bool isLast,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: isFirst ? 4 : 0,
+        bottom: isLast ? 4 : 0,
+      ),
       child: Row(
         children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: colorScheme.primary
+                  .withValues(alpha: isDark ? 0.2 : 0.1),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon, size: 17, color: colorScheme.primary),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               label,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
                 color: colorScheme.onSurface,
               ),
             ),
@@ -608,35 +671,56 @@ class _ParentProfileSettingsState extends State<ParentProfileSettings> {
   }
 
   Widget _buildNavRow({
+    required IconData icon,
     required String label,
     required VoidCallback onTap,
     required ColorScheme colorScheme,
+    required bool isDark,
+    required bool isFirst,
+    required bool isLast,
     Widget? trailing,
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.vertical(
+        top: isFirst ? const Radius.circular(20) : Radius.zero,
+        bottom: isLast ? const Radius.circular(20) : Radius.zero,
+      ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: EdgeInsets.fromLTRB(16, isFirst ? 16 : 12, 16, isLast ? 16 : 12),
         child: Row(
           children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: colorScheme.primary
+                    .withValues(alpha: isDark ? 0.2 : 0.1),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(icon, size: 17, color: colorScheme.primary),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
                   color: colorScheme.onSurface,
                 ),
               ),
             ),
             if (trailing != null) ...[
-              trailing,
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 120),
+                child: trailing,
+              ),
               const SizedBox(width: 4),
             ],
             Icon(
-              Icons.chevron_right,
-              size: 22,
+              Icons.chevron_right_rounded,
+              size: 20,
               color: colorScheme.onSurfaceVariant,
             ),
           ],
