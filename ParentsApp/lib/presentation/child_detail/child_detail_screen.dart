@@ -53,6 +53,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
   StreamSubscription? _locationSubscription;
   StreamSubscription? _connectionSubscription;
   StreamSubscription? _tripEventSubscription;
+  // Server-pushed ETA stream (bus.eta_update via WebSocket).
+  StreamSubscription? _etaSubscription;
 
   // ETA and Route Information
   int? _etaMinutes;
@@ -130,6 +132,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
     _locationSubscription?.cancel();
     _connectionSubscription?.cancel();
     _tripEventSubscription?.cancel();
+    _etaSubscription?.cancel();
     super.dispose();
   }
 
@@ -315,7 +318,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
 
     final targetLatLng = _snappedBusLocation ??
         ll.LatLng(_busLocation!.latitude, _busLocation!.longitude);
-    final targetHeading = (_busLocation!.heading ?? 0).toDouble();
+    // Prefer server-computed bearing (derived from consecutive GPS positions —
+    // reliable at low speed) over the raw GPS heading sensor.
+    final targetHeading =
+        (_busLocation!.bearing ?? _busLocation!.heading ?? 0).toDouble();
 
     if (_busAnnotation == null) {
       // First appearance — create annotation and fly the camera to the bus
@@ -493,6 +499,20 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
       // the last trip_state the server sent is still in memory. Apply it now
       // so the screen shows the correct trip status synchronously instead of
       // showing the blank/no-trip state until the next WS message arrives.
+      // Server-computed ETAs (Mapbox Directions, sequential waypoints —
+      // trip-type aware: pickup = farthest-stop first; dropoff = nearest first).
+      _etaSubscription?.cancel();
+      _etaSubscription = _webSocketService.etaUpdateStream.listen((etas) {
+        if (!mounted) return;
+        final childId =
+            _childData?['id']?.toString() ??
+            _childData?['childId']?.toString();
+        if (childId != null && etas.containsKey(childId)) {
+          setState(() =>
+              _etaMinutes = (etas[childId]! / 60).round().clamp(0, 9999));
+        }
+      });
+
       final cached = _webSocketService.lastTripState;
       if (cached != null && mounted) {
         _applyTripState(cached);
@@ -623,7 +643,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
       if (tripInfo != null) {
         setState(() {
           _snappedBusLocation = snappedCoord;
-          _etaMinutes = tripInfo!['eta'];
+          // ETA is now delivered server-side via eta_update WebSocket message.
+          // We keep distance and route for the polyline overlay only.
           _distance = tripInfo['distance'];
           _routePoints = tripInfo['route'];
           _isCalculatingETA = false;

@@ -1,5 +1,7 @@
 import asyncio
 import json
+import math
+import time as _time
 import requests as req_lib
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
@@ -86,6 +88,10 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
         # Cache trip-active flag so location broadcasts are gated without an
         # extra DB query on every GPS packet.
         self._trip_active = trip_state.get("has_active_trip", False)
+        # State for server-side bearing and throttled ETA computation.
+        self._prev_lat = None
+        self._prev_lng = None
+        self._last_eta_time = None
         await self.send(text_data=json.dumps({
             "type": "trip_state",
             **trip_state,
@@ -137,6 +143,13 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
                     # the pre-snapped position so they don't each have to call
                     # the Map Matching API individually.
                     snapped_lat, snapped_lng = await self._snap_to_road(lat, lng)
+                    # Compute bearing from consecutive GPS positions — reliable
+                    # at all speeds unlike the raw GPS heading sensor.
+                    bearing = self._compute_bearing(
+                        self._prev_lat, self._prev_lng, lat, lng
+                    )
+                    self._prev_lat = lat
+                    self._prev_lng = lng
                     await self.channel_layer.group_send(
                         self.group_name,
                         {
@@ -148,9 +161,15 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
                             "snapped_longitude": snapped_lng,
                             "speed": data.get("speed", 0),
                             "heading": data.get("heading", 0),
+                            "bearing": bearing,
                             "timestamp": data.get("timestamp"),
                         }
                     )
+                    # Throttled ETA broadcast — Mapbox Matrix API, at most once per 60 s.
+                    now = _time.monotonic()
+                    if self._last_eta_time is None or (now - self._last_eta_time) >= 60:
+                        self._last_eta_time = now
+                        await self._broadcast_etas(self.bus_id, lat, lng)
 
             elif message_type == "request_current_location":
                 # Only respond with a location when a trip is active — driver
@@ -227,9 +246,139 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
             "snapped_longitude": event.get("snapped_longitude"),
             "speed": event.get("speed", 0),
             "heading": event.get("heading", 0),
+            "bearing": event.get("bearing", 0),
             "is_active": True,
             "timestamp": event.get("timestamp"),
         }))
+
+    async def bus_eta(self, event):
+        """Forward ETA update to all connected clients in the group."""
+        await self.send(text_data=json.dumps({
+            "type": "eta_update",
+            "etas": event.get("etas", {}),
+            # Trip type lets clients display context ("pickup" vs "dropoff").
+            "trip_type": event.get("trip_type"),
+        }))
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _compute_bearing(lat1, lng1, lat2, lng2):
+        """
+        Compute compass bearing (degrees, 0=North) from point 1 → point 2.
+        Returns 0.0 if either position is unavailable (first update, stationary).
+        """
+        if lat1 is None or lng1 is None or lat2 is None or lng2 is None:
+            return 0.0
+        lat1_r = math.radians(float(lat1))
+        lat2_r = math.radians(float(lat2))
+        dlon   = math.radians(float(lng2) - float(lng1))
+        x = math.sin(dlon) * math.cos(lat2_r)
+        y = (math.cos(lat1_r) * math.sin(lat2_r)
+             - math.sin(lat1_r) * math.cos(lat2_r) * math.cos(dlon))
+        return (math.degrees(math.atan2(x, y)) + 360) % 360
+
+    async def _broadcast_etas(self, bus_id, bus_lat, bus_lng):
+        """
+        Compute cumulative, trip-type-aware ETAs using the Mapbox Directions API
+        with sequential waypoints: bus → stop1 → stop2 → … → stopN.
+
+        Using the Directions API (not Matrix) means each child's ETA correctly
+        includes the time the bus spends visiting all earlier stops first:
+
+          ETA(child at stop_i) = Σ leg_durations[0 … i−1]
+
+        Stop order is driven by the 'order' DB field, which encodes trip intent:
+          pickup  — farthest-from-school stop first, nearest-to-school last.
+          dropoff — nearest-to-school stop first, farthest last.
+        """
+        from django.conf import settings
+        token = getattr(settings, "MAPBOX_ACCESS_TOKEN", "")
+        if not token:
+            return
+
+        trip_data = await self._get_trip_remaining_stops(bus_id)
+        trip_type = trip_data["trip_type"]
+        stops     = trip_data["stops"]
+        if not stops:
+            return
+
+        # Mapbox Directions allows up to 25 waypoints (bus + 24 stops).
+        capped_stops = stops[:24]
+
+        # Waypoints: bus position first, then stops in route order.
+        waypoints = [f"{bus_lng},{bus_lat}"] + [
+            f"{s['lng']},{s['lat']}" for s in capped_stops
+        ]
+        coords_str = ";".join(waypoints)
+        url = (
+            f"https://api.mapbox.com/directions/v5/mapbox/driving/{coords_str}"
+            f"?access_token={token}&overview=false"
+        )
+
+        def _sync_directions():
+            try:
+                resp = req_lib.get(url, timeout=8.0)
+                if resp.status_code != 200:
+                    return {}
+                routes = resp.json().get("routes", [])
+                if not routes:
+                    return {}
+                legs = routes[0].get("legs", [])
+                etas = {}
+                cumulative_secs = 0.0
+                for i, stop in enumerate(capped_stops):
+                    if i < len(legs):
+                        cumulative_secs += legs[i].get("duration", 0)
+                    # All children at this stop share the same cumulative ETA.
+                    for child_id in stop["child_ids"]:
+                        etas[str(child_id)] = int(cumulative_secs)
+                return etas
+            except Exception:
+                return {}
+
+        etas = await asyncio.to_thread(_sync_directions)
+        if etas:
+            await self.channel_layer.group_send(
+                self.group_name,
+                {"type": "bus.eta", "etas": etas, "trip_type": trip_type},
+            )
+
+    @database_sync_to_async
+    def _get_trip_remaining_stops(self, bus_id):
+        """
+        Return the active trip's type and its remaining (non-completed) stops
+        in route order, each annotated with child IDs and GPS coordinates.
+
+        Stop order semantics (set by the trip planner):
+          pickup  — ascending 'order' = farthest-from-school first.
+          dropoff — ascending 'order' = nearest-to-school first.
+        """
+        from trips.models import Trip, Stop
+        try:
+            trip = Trip.objects.filter(bus_id=bus_id, status="in-progress").first()
+            if not trip:
+                return {"trip_type": None, "stops": []}
+            stops = (
+                Stop.objects
+                .filter(trip=trip)
+                .exclude(status="completed")
+                .prefetch_related("children")
+                .order_by("order")
+            )
+            result = []
+            for stop in stops:
+                if stop.latitude and stop.longitude:
+                    child_ids = [c.id for c in stop.children.all()]
+                    if child_ids:
+                        result.append({
+                            "child_ids": child_ids,
+                            "lat": float(stop.latitude),
+                            "lng": float(stop.longitude),
+                        })
+            return {"trip_type": trip.trip_type, "stops": result}
+        except Exception:
+            return {"trip_type": None, "stops": []}
 
     async def _snap_to_road(self, lat, lng):
         """
