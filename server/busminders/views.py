@@ -1,4 +1,5 @@
 import logging
+import os
 import requests
 from jose import jwt, JWTError
 
@@ -801,3 +802,90 @@ def busminder_magic_link_auth(request):
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+class BusMinderDemoLoginView(APIView):
+    """
+    POST /api/busminders/auth/demo-login/
+    Password-based login for Apple App Store review process.
+    Credentials stored in REVIEWER_EMAIL / REVIEWER_PASSWORD env vars.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        from assignments.models import Assignment
+        from datetime import date
+
+        email = request.data.get('email', '').strip().lower()
+        password = request.data.get('password', '')
+
+        reviewer_email = os.environ.get('REVIEWER_EMAIL', '').strip().lower()
+        reviewer_password = os.environ.get('REVIEWER_PASSWORD', '')
+
+        if not reviewer_email or not reviewer_password:
+            return Response({'error': 'Demo login not available'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        if email != reviewer_email or password != reviewer_password:
+            return Response({'error': 'Invalid email or password'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        try:
+            busminder = BusMinder.objects.select_related('user').get(user__email__iexact=email, status='active')
+            user = busminder.user
+            refresh = RefreshToken.for_user(user)
+
+            bus_assignments = Assignment.get_active_assignments_for(busminder, 'minder_to_bus')
+            buses_data = []
+            today = date.today()
+
+            for assignment in bus_assignments:
+                bus = assignment.assigned_to
+                from attendance.models import Attendance
+                child_assignments = Assignment.get_assignments_to(bus, 'child_to_bus')
+                children_data = []
+                for ca in child_assignments:
+                    child = ca.assignee
+                    pickup = Attendance.objects.filter(child=child, date=today, trip_type='pickup').first()
+                    dropoff = Attendance.objects.filter(child=child, date=today, trip_type='dropoff').first()
+                    children_data.append({
+                        "id": child.id,
+                        "first_name": child.first_name,
+                        "last_name": child.last_name,
+                        "name": f"{child.first_name} {child.last_name}",
+                        "grade": child.class_grade,
+                        "parent_name": child.parent.user.get_full_name() if child.parent else "N/A",
+                        "parent_contact": child.parent.contact_number if child.parent else "N/A",
+                        "pickup_status": pickup.status if pickup else None,
+                        "pickup_status_display": pickup.get_status_display() if pickup else "Not marked",
+                        "dropoff_status": dropoff.status if dropoff else None,
+                        "dropoff_status_display": dropoff.get_status_display() if dropoff else "Not marked",
+                    })
+                buses_data.append({
+                    "id": bus.id,
+                    "bus_number": bus.bus_number,
+                    "number_plate": bus.number_plate,
+                    "capacity": bus.capacity,
+                    "is_active": bus.is_active,
+                    "children_count": len(children_data),
+                    "children": children_data,
+                })
+
+            return Response({
+                "user_id": user.id,
+                "name": user.get_full_name() or "Bus Minder",
+                "email": user.email,
+                "phone": busminder.phone_number,
+                "user_type": "busminder",
+                "tokens": {
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                },
+                "buses": buses_data,
+                "total_buses": len(buses_data),
+            }, status=status.HTTP_200_OK)
+
+        except BusMinder.DoesNotExist:
+            logger.error(f"Demo busminder account not found for email: {email}")
+            return Response({'error': 'Demo account not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception:
+            logger.exception("Unexpected error during busminder demo login")
+            return Response({'error': 'Login failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

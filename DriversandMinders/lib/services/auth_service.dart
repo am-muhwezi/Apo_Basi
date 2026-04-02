@@ -268,21 +268,23 @@ class AuthService {
     }
   }
 
-  /// The hardcoded email Apple reviewers use to trigger the password login flow.
-  static const String _reviewerEmail = 'reviewer.driver@apobasi.com';
+  static const String _reviewerDriverEmail = 'reviewer.driver@apobasi.com';
+  static const String _reviewerMinderemail = 'reviewer.minder@apobasi.com';
 
-  /// Returns true when the typed email matches the Apple reviewer account.
-  /// The login screen uses this to show a password field instead of magic link.
-  static bool isReviewerAccount(String email) =>
-      email.trim().toLowerCase() == _reviewerEmail;
+  static bool isReviewerAccount(String email) {
+    final e = email.trim().toLowerCase();
+    return e == _reviewerDriverEmail || e == _reviewerMinderemail;
+  }
 
-  /// Password-based login used exclusively by the Apple reviewer demo account.
-  /// Calls POST /api/drivers/auth/demo-login/ and stores tokens on success.
   Future<AuthResult> loginWithPassword(String email, String password) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    final endpoint = normalizedEmail == _reviewerMinderemail
+        ? '/api/busminders/auth/demo-login/'
+        : '/api/drivers/auth/demo-login/';
     try {
       final response = await _dio.post(
-        '/api/drivers/auth/demo-login/',
-        data: {'email': email.trim().toLowerCase(), 'password': password},
+        endpoint,
+        data: {'email': normalizedEmail, 'password': password},
       );
 
       if (response.statusCode == 200) {
