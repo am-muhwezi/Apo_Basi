@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ApoBasi Profile &amp; Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-dim": "#cbdbf5",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "on-surface": "#0b1c30",
+                        "secondary": "#735c00",
+                        "secondary-fixed": "#ffe083",
+                        "on-secondary": "#ffffff",
+                        "tertiary-container": "#007d55",
+                        "primary-container": "#2563eb",
+                        "surface-container-low": "#eff4ff",
+                        "inverse-on-surface": "#eaf1ff",
+                        "tertiary-fixed": "#6ffbbe",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "error": "#ba1a1a",
+                        "surface-container": "#e5eeff",
+                        "surface-container-highest": "#d3e4fe",
+                        "primary": "#004ac6",
+                        "on-tertiary": "#ffffff",
+                        "on-surface-variant": "#434655",
+                        "outline": "#737686",
+                        "on-error": "#ffffff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "on-tertiary-fixed": "#002113",
+                        "on-secondary-container": "#6f5900",
+                        "background": "#f8f9ff",
+                        "surface": "#f8f9ff",
+                        "on-secondary-fixed": "#231b00",
+                        "primary-fixed": "#dbe1ff",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-primary-container": "#eeefff",
+                        "outline-variant": "#c3c6d7",
+                        "inverse-surface": "#213145",
+                        "surface-tint": "#0053db",
+                        "on-error-container": "#93000a",
+                        "on-background": "#0b1c30",
+                        "surface-variant": "#d3e4fe",
+                        "on-secondary-fixed-variant": "#574500",
+                        "on-tertiary-container": "#bdffdb",
+                        "on-primary": "#ffffff",
+                        "inverse-primary": "#b4c5ff",
+                        "surface-bright": "#f8f9ff",
+                        "on-primary-fixed": "#00174b",
+                        "secondary-fixed-dim": "#eec200",
+                        "tertiary": "#006242",
+                        "surface-container-high": "#dce9ff",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-container": "#fed01b",
+                        "brand-navy": "#002d72",
+                        "brand-yellow": "#fed01b"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary-fixed selection:text-on-primary-fixed">
+<header class="w-full top-0 sticky z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md shadow-sm dark:shadow-none border-b border-slate-100 dark:border-slate-800">
+<div class="flex items-center justify-between px-6 py-4 w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-blue-700 dark:text-blue-400 cursor-pointer active:scale-95 duration-200" data-icon="menu">menu</span>
+<div class="flex items-center gap-2">
+<img alt="ApoBasi Logo" class="h-8 w-8 object-contain" src="https://lh3.googleusercontent.com/aida/ADBb0ug08n8kOGM91U8Y0JWmQLiJziIIrgpDOnHHCOniY1zM6MMjSO-5m7s5x2ZoWdYnvPBHUVrCVHq_Nq5H0CeeuYFd4BCJtu27SItB1JMXtKdZL-eM_dK4gMYHTHorRJyxsTHtqvIDkK3diwBhEhyhDOCz_OQ3qLQSGxyJBZ2YC5YR5I5nwTyZYF2Wc0H-np1wT4VwHZT4P35S87bgSExoz2yr_SrvVgsH6m32QtI10X8ehxFcXrkeuWohspERbTtYbD2XgVC1UN973Cg"/>
+<h1 class="font-manrope font-extrabold text-blue-700 dark:text-blue-400 text-2xl tracking-tight">ApoBasi</h1>
+</div>
+</div>
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-container-highest flex items-center justify-center border border-slate-200 dark:border-slate-700 active:scale-95 duration-200 cursor-pointer">
+<img alt="Apple Reviewer" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-UcccBOPLzH7DRgO0FFvrMTtAqlhB7gRTmUxpR7bVDjHtnhVVauBFZ_mqjyG_8jFyNqdYLQC2bujkxeBsZCmdOikpjvFgtaKJ1XkpqFeUkpctOi18wH-xeOvS_gVINURQSw8UpXevzkJzutlLUzqXAkujLmFNjl_D9oZaIkMBo1xyFI2jvoBYuBHK5oOTO5ZTbZK7T7RPYSqmT9B3nWrdKRp2-jr53p_t5_hj5atA5KsC5pUIfZGUERZ-cdfQrqWpiDhEGGq1JZcy"/>
+</div>
+</div>
+</header>
+<main class="max-w-2xl mx-auto px-6 pt-8 pb-32 space-y-10">
+<section class="relative">
+<div class="bg-surface-container-lowest rounded-[2.5rem] p-8 shadow-sm overflow-hidden relative group border border-slate-100 dark:border-slate-800">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary-fixed-dim/10 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110 duration-500"></div>
+<div class="flex flex-col md:flex-row items-center gap-6 relative z-10">
+<div class="relative">
+<div class="w-24 h-24 rounded-3xl overflow-hidden shadow-xl rotate-3 group-hover:rotate-0 transition-transform duration-300">
+<img alt="Profile Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRb01NMu_Iyn6ln06Ho56JKqf1wARqqzM-PG7GSKbWgnGwPfcZPdlAs-qaKAzfAsYAHJ7dvTkX6Tb6zOYiiy5s5uvL6fGxNhVN0_SaHO9A4x2Pjg72aldO5598HCmYXOAPiEKHyqY8tQ-t2-jByF3Z8fHEjwS9EL-_rj0Acy7mK5aXEtQyZBhftlwbj0ACVLhEUzOkDOUYxL8TSqGKonqPU3yrFfz8rDjFmBEvfvOXLSdgmlV_IOPZ3j3x9XZS__DWUFGRpzy2J_8m"/>
+</div>
+<button class="absolute -bottom-2 -right-2 bg-blue-700 text-on-primary w-10 h-10 rounded-xl flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-[20px]" data-icon="edit">edit</span>
+</button>
+</div>
+<div class="text-center md:text-left">
+<h2 class="font-headline font-bold text-3xl tracking-tight text-on-surface">Apple Reviewer</h2>
+<div class="mt-2 space-y-1">
+<div class="flex items-center justify-center md:justify-start gap-2 text-on-surface-variant font-medium">
+<span class="material-symbols-outlined text-[18px]" data-icon="mail">mail</span>
+<span>reviewer@apple.com</span>
+</div>
+<div class="flex items-center justify-center md:justify-start gap-2 text-on-surface-variant font-medium">
+<span class="material-symbols-outlined text-[18px]" data-icon="call">call</span>
+<span>+1 (555) 012-3456</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="space-y-6">
+<div class="flex items-center justify-between px-2">
+<h3 class="font-headline font-bold text-xl text-on-surface">Children</h3>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="bg-surface-container-low p-6 rounded-[2rem] flex items-center gap-4 transition-all hover:bg-surface-container">
+<div class="w-12 h-12 rounded-2xl bg-brand-navy flex items-center justify-center text-brand-yellow">
+<span class="material-symbols-outlined" data-icon="child_care">child_care</span>
+</div>
+<div class="flex-1">
+<h4 class="font-headline font-bold text-lg text-on-surface">Leo Reviewer</h4>
+<p class="text-on-surface-variant text-sm font-medium">Grade 4 • Primary School</p>
+</div>
+</div>
+<div class="bg-surface-container-low p-6 rounded-[2rem] flex items-center gap-4 transition-all hover:bg-surface-container">
+<div class="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-700 dark:text-blue-300">
+<span class="material-symbols-outlined" data-icon="child_care">child_care</span>
+</div>
+<div class="flex-1">
+<h4 class="font-headline font-bold text-lg text-on-surface">Mia Reviewer</h4>
+<p class="text-on-surface-variant text-sm font-medium">Grade 1 • Kindergarten</p>
+</div>
+</div>
+</div>
+</section>
+<section class="space-y-6">
+<h3 class="font-headline font-bold text-xl text-on-surface px-2">Settings</h3>
+<div class="bg-surface-container-lowest rounded-[2rem] overflow-hidden border border-slate-100 dark:border-slate-800 shadow-sm">
+<div class="p-6 flex items-center justify-between border-b border-surface-container-low">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-xl bg-brand-yellow flex items-center justify-center text-brand-navy">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</div>
+<div>
+<p class="font-bold text-on-surface">Notification Preferences</p>
+<p class="text-sm text-on-surface-variant">Arrival &amp; departure alerts</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-navy"></div>
+</label>
+</div>
+<div class="p-6 flex items-center justify-between border-b border-surface-container-low">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-xl bg-brand-yellow flex items-center justify-center text-brand-navy">
+<span class="material-symbols-outlined" data-icon="dark_mode">dark_mode</span>
+</div>
+<div>
+<p class="font-bold text-on-surface">Dark Mode</p>
+<p class="text-sm text-on-surface-variant">Reduce eye strain at night</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-navy"></div>
+</label>
+</div>
+<div class="p-6">
+<div class="flex items-center gap-4 mb-4">
+<div class="w-10 h-10 rounded-xl bg-brand-yellow flex items-center justify-center text-brand-navy">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+</div>
+<p class="font-bold text-on-surface">Home Address</p>
+</div>
+<div class="relative">
+<input class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-on-surface font-medium focus:ring-2 focus:ring-brand-navy/20 outline-none transition-all" type="text" value="1 Infinite Loop, Cupertino, CA 95014"/>
+<span class="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-brand-navy text-[20px]" data-icon="location_on">location_on</span>
+</div>
+</div>
+</div>
+</section>
+<section class="space-y-6">
+<h3 class="font-headline font-bold text-xl text-on-surface px-2">Account</h3>
+<div class="bg-surface-container-lowest rounded-[2rem] overflow-hidden border border-slate-100 dark:border-slate-800 shadow-sm">
+<a class="p-6 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors border-b border-surface-container-low" href="#">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-brand-navy" data-icon="policy">policy</span>
+<span class="font-bold text-on-surface">Privacy Policy</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="chevron_right">chevron_right</span>
+</a>
+<a class="p-6 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors border-b border-surface-container-low" href="#">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-brand-navy" data-icon="description">description</span>
+<span class="font-bold text-on-surface">Terms of Service</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="chevron_right">chevron_right</span>
+</a>
+<button class="w-full p-6 flex items-center gap-4 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors text-error">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-bold">Logout</span>
+</button>
+</div>
+</section>
+</main>
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-white dark:bg-slate-950 z-50 rounded-t-3xl border-t border-slate-100 dark:border-slate-800 shadow-[0_-4px_20px_rgba(11,28,48,0.05)]">
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 px-6 py-2 hover:text-blue-600 dark:hover:text-blue-200 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-inter text-[10px] font-medium uppercase tracking-wider mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 px-6 py-2 hover:text-blue-600 dark:hover:text-blue-200 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="font-inter text-[10px] font-medium uppercase tracking-wider mt-1">Notifications</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-2xl px-6 py-2 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="person" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="font-inter text-[10px] font-medium uppercase tracking-wider mt-1">Profile</span>
+</a>
+</nav>
+</body></html>
