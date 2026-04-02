@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/api_config.dart';
 import '../config/supabase_config.dart';
+import '../data/user_session.dart';
+import 'app_store.dart';
 
 /// Authentication Service for Driver Magic Link Flow
 ///
@@ -26,36 +28,19 @@ class AuthService {
 
   StreamSubscription<AuthState>? _authSubscription;
 
-  /// Helper method to save driver data to SharedPreferences
-  /// Avoids code duplication across different login methods
+  // Tracks whether the last check-email call identified a driver or busminder.
+  String _pendingUserType = 'driver';
+
+  /// Persist session data to [AppStore] and flat token keys.
   Future<void> _saveDriverDataToPrefs(Map<String, dynamic> data) async {
+    await AppStore.instance.saveUser(UserSession.fromApiResponse(data));
+    // Keep flat token keys so the HTTP interceptor can read them without AppStore.
     final prefs = await SharedPreferences.getInstance();
-
-    // Store tokens
-    await prefs.setString('access_token', data['tokens']['access']);
-    await prefs.setString('refresh_token', data['tokens']['refresh']);
-
-    // Store driver info - parse user_id to int (API may return as String)
-    final userId = data['user_id'];
-    final userIdInt = userId is int ? userId : int.parse(userId.toString());
-
-    // New unified keys used across the app
-    await prefs.setInt('user_id', userIdInt);
-    await prefs.setString('user_name', data['name'] ?? '');
-    await prefs.setString('user_email', data['email'] ?? '');
-    await prefs.setString('user_phone', data['phone'] ?? '');
-    await prefs.setString('user_role', data['user_type'] ?? 'driver');
-
-    // Backwards‑compatible driver-specific keys used by some older screens
-    await prefs.setInt('driver_id', userIdInt);
-    await prefs.setInt('user_id', userIdInt);
-    await prefs.setString('driver_name', data['name'] ?? '');
-    await prefs.setString('user_name', data['name'] ?? '');  // dashboard reads this key
-    await prefs.setString('user_role', 'driver');
-    await prefs.setString('driver_email', data['email'] ?? '');
-    await prefs.setString('driver_phone', data['phone'] ?? '');
-    await prefs.setString('license_number', data['license_number'] ?? '');
-    await prefs.setString('license_expiry', data['license_expiry'] ?? '');
+    final tokens = data['tokens'] as Map<String, dynamic>?;
+    if (tokens != null) {
+      await prefs.setString('access_token', tokens['access'] as String? ?? '');
+      await prefs.setString('refresh_token', tokens['refresh'] as String? ?? '');
+    }
   }
 
   /// Send magic link to driver email
@@ -75,18 +60,41 @@ class AuthService {
     }
 
     try {
-      // Step 1: Check if email is registered in Django
-      final checkResponse = await _dio.post(
-        '/api/drivers/auth/check-email/',
-        data: {'email': email},
-      );
+      // Step 1: Check if email is registered as a driver or busminder
+      bool registered = false;
+      try {
+        final driverCheck = await _dio.post(
+          '/api/drivers/auth/check-email/',
+          data: {'email': email},
+        );
+        if (driverCheck.statusCode == 200) {
+          registered = true;
+          _pendingUserType = 'driver';
+        }
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404) {
+          // Not a driver — try busminder
+          try {
+            final busminderCheck = await _dio.post(
+              '/api/busminders/auth/check-email/',
+              data: {'email': email},
+            );
+            if (busminderCheck.statusCode == 200) {
+              registered = true;
+              _pendingUserType = 'busminder';
+            }
+          } on DioException {
+            registered = false;
+          }
+        } else {
+          rethrow;
+        }
+      }
 
-      if (checkResponse.statusCode != 200) {
-        // Email not registered
+      if (!registered) {
         return {
           'success': false,
-          'message': checkResponse.data['message'] ??
-              'This email is not registered. Please contact your administrator.',
+          'message': 'This email is not registered. Please contact your administrator.',
         };
       }
 
@@ -113,9 +121,22 @@ class AuthService {
         'message': 'Connection error. Please check your internet connection.',
       };
     } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('over_email_send_rate_limit') || msg.contains('rate limit')) {
+        return {
+          'success': false,
+          'message': 'Too many login attempts. Please wait a few minutes and try again.',
+        };
+      }
+      if (msg.contains('email not confirmed') || msg.contains('not confirmed')) {
+        return {
+          'success': false,
+          'message': 'Please check your email and confirm your account first.',
+        };
+      }
       return {
         'success': false,
-        'message': 'Failed to send magic link. Please try again.',
+        'message': 'Failed to send login link. Please check your connection and try again.',
       };
     }
   }
@@ -174,18 +195,34 @@ class AuthService {
 
   /// Exchange Supabase access token for Django JWT tokens
   Future<AuthResult> _exchangeTokenForDjangoAuth(String supabaseToken) async {
+    // Try the expected endpoint first, fall back to the other role.
+    // This handles deep-link cold starts where _pendingUserType resets to default.
+    final primaryEndpoint = _pendingUserType == 'busminder'
+        ? '/api/busminders/auth/magic-link/'
+        : '/api/drivers/auth/magic-link/';
+    final fallbackEndpoint = _pendingUserType == 'busminder'
+        ? '/api/drivers/auth/magic-link/'
+        : '/api/busminders/auth/magic-link/';
+
     try {
-      final response = await _dio.post(
-        '/api/drivers/auth/magic-link/',
-        data: {'access_token': supabaseToken},
-      );
+      Response response;
+      try {
+        response = await _dio.post(primaryEndpoint, data: {'access_token': supabaseToken});
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 401 || e.response?.statusCode == 404) {
+          response = await _dio.post(fallbackEndpoint, data: {'access_token': supabaseToken});
+        } else {
+          rethrow;
+        }
+      }
 
       if (response.statusCode == 200) {
         final data = response.data;
 
-        // Save driver data using helper method
+        // Save driver/busminder data using helper method
         await _saveDriverDataToPrefs(data);
 
+        final isBusMinder = data['user_type'] == 'busminder';
         return AuthResult(
           success: true,
           driver: {
@@ -197,7 +234,8 @@ class AuthService {
             'license_expiry': data['license_expiry'],
           },
           bus: data['bus'],
-          route: data['route'],
+          // For busminders, pack buses list into route so routing logic works.
+          route: isBusMinder ? {'buses': data['buses']} : data['route'],
           tokens: data['tokens'],
         );
       } else {
@@ -340,18 +378,14 @@ class AuthService {
 
   /// Sign out driver
   Future<void> signOut() async {
-    // Sign out from Supabase
-    await _supabase.auth.signOut();
-
-    // Clear local storage
+    // 1. Clear ALL local state immediately — prefs.clear() is synchronous/local,
+    //    so this is fast and removes every key written anywhere in the app.
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('access_token');
-    await prefs.remove('refresh_token');
-    await prefs.remove('driver_id');
-    await prefs.remove('user_id');
-    await prefs.remove('driver_name');
-    await prefs.remove('driver_email');
-    await prefs.remove('driver_phone');
+    await prefs.clear();
+
+    // 2. Revoke the Supabase session server-side — fire-and-forget so the UI
+    //    never waits on a network call. Errors are silently swallowed.
+    _supabase.auth.signOut().catchError((_) {});
   }
 
   /// Dispose resources

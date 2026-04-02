@@ -193,12 +193,9 @@ def list_users(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def health_check(request):
-    """
-    Simple health check endpoint
-    """
-    return Response({'status': 'ok', 'message': 'Server is running'}, status=status.HTTP_200_OK)
+    return Response({'status': 'ok'}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
