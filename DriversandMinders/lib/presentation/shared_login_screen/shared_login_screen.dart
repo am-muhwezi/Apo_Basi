@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
+import '../../services/app_store.dart';
 import '../../services/auth_service.dart';
 import './widgets/app_logo_widget.dart';
 import './widgets/login_form_widget.dart';
@@ -35,7 +35,7 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
     super.initState();
     _initializeAnimations();
     _listenForAuthCallback();
-    _checkAuthAndAutoNavigate();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAuthAndAutoNavigate());
   }
 
   void _initializeAnimations() {
@@ -117,13 +117,7 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
 
   Future<void> _cacheDriverData(AuthResult result) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      if (result.bus != null) {
-        await prefs.setString('cached_bus_data', jsonEncode(result.bus));
-      }
-      if (result.route != null) {
-        await prefs.setString('cached_route_data', jsonEncode(result.route));
-      }
+      await AppStore.instance.saveBusCache(result.bus, result.route);
     } catch (_) {}
   }
 
@@ -223,9 +217,11 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
                   children: [
                     SizedBox(height: 4.h),
 
-                    FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: const AppLogoWidget(),
+                    RepaintBoundary(
+                      child: FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: const AppLogoWidget(),
+                      ),
                     ),
 
                     SizedBox(height: 3.h),

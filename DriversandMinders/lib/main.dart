@@ -12,6 +12,7 @@ import '../widgets/custom_error_widget.dart';
 import '../config/api_config.dart';
 import '../config/supabase_config.dart';
 import 'config/api_config.dart';
+import 'services/app_store.dart';
 import 'services/theme_service.dart';
 
 Future<void> main() async {
@@ -47,6 +48,9 @@ Future<void> main() async {
     }
     return SizedBox.shrink();
   };
+
+  // Initialize AppStore (in-memory state backed by SharedPreferences)
+  await AppStore.initialize();
 
   // Initialize theme service so saved preference is loaded before first frame
   await ThemeService().initialize();

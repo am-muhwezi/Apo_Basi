@@ -25,7 +25,8 @@
         android:label="Basi Driver"
         android:name="com.apobasi.driver.LocationApp"
         android:icon="@mipmap/ic_launcher"
-        android:enableOnBackInvokedCallback="true">
+        android:enableOnBackInvokedCallback="true"
+        android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"
             android:exported="true"

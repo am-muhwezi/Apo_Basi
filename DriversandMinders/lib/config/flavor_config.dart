@@ -1,4 +1,4 @@
-enum Flavor { staging, prod }
+enum Flavor { dev, staging, prod }
 
 class FlavorConfig {
   static Flavor _flavor = Flavor.prod;
@@ -14,6 +14,7 @@ class FlavorConfig {
   /// Empty string means no flavor was set — ApiConfig falls back to dotenv (local dev).
   static String get apiBaseUrl => _apiBaseUrl;
 
+  static bool get isDev => _flavor == Flavor.dev;
   static bool get isStaging => _flavor == Flavor.staging;
   static bool get isProd => _flavor == Flavor.prod;
 }

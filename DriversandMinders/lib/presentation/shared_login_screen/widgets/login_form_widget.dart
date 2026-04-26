@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
 
@@ -34,6 +36,7 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
   bool _isEmailValid = false;
   bool _isReviewerAccount = false;
   bool _obscurePassword = true;
+  Timer? _validationTimer;
 
   @override
   void initState() {
@@ -43,6 +46,7 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
 
   @override
   void dispose() {
+    _validationTimer?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     _emailFocusNode.dispose();
@@ -50,6 +54,11 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
   }
 
   void _validateEmail() {
+    _validationTimer?.cancel();
+    _validationTimer = Timer(const Duration(milliseconds: 250), _runValidation);
+  }
+
+  void _runValidation() {
     final email = _emailController.text.trim();
     setState(() {
       if (email.isEmpty) {
@@ -110,6 +119,24 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+
+    final br12 = BorderRadius.circular(12);
+    final enabledBorder = OutlineInputBorder(
+      borderRadius: br12,
+      borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5)),
+    );
+    final focusedBorder = OutlineInputBorder(
+      borderRadius: br12,
+      borderSide: BorderSide(color: colorScheme.primary, width: 2),
+    );
+    final errorBorder = OutlineInputBorder(
+      borderRadius: br12,
+      borderSide: BorderSide(color: colorScheme.error),
+    );
+    final focusedErrorBorder = OutlineInputBorder(
+      borderRadius: br12,
+      borderSide: BorderSide(color: colorScheme.error, width: 2),
+    );
 
     return Container(
       width: 85.w,
@@ -247,41 +274,11 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
                       horizontal: 3.w,
                       vertical: 0.8.h,
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: colorScheme.outline,
-                        width: 1,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: colorScheme.outline.withValues(alpha: 0.5),
-                        width: 1,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: colorScheme.primary,
-                        width: 2,
-                      ),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: colorScheme.error,
-                        width: 1,
-                      ),
-                    ),
-                    focusedErrorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: colorScheme.error,
-                        width: 2,
-                      ),
-                    ),
+                    border: enabledBorder,
+                    enabledBorder: enabledBorder,
+                    focusedBorder: focusedBorder,
+                    errorBorder: errorBorder,
+                    focusedErrorBorder: focusedErrorBorder,
                   ),
                 ),
               ],
@@ -329,18 +326,9 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
                         horizontal: 3.w,
                         vertical: 0.8.h,
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: colorScheme.outline, width: 1),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5), width: 1),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: colorScheme.primary, width: 2),
-                      ),
+                      border: enabledBorder,
+                      enabledBorder: enabledBorder,
+                      focusedBorder: focusedBorder,
                     ),
                   ),
                 ],

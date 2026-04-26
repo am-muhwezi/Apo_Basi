@@ -11,7 +11,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
+import '../../core/app_keys.dart';
 import '../../services/api_service.dart';
+import '../../services/app_store.dart';
 import '../../services/gps_stream_service.dart';
 import '../../services/native_location_service.dart';
 import '../../widgets/driver_drawer_widget.dart';
@@ -242,28 +244,28 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final store = AppStore.instance;
       // 'user_name' is set by phone login; 'driver_name' by magic-link login.
-      // Fall back to driver_name so both auth paths show the real name.
-      final userName =
-          (prefs.getString('user_name')?.isNotEmpty == true
-              ? prefs.getString('user_name')
-              : prefs.getString('driver_name')) ??
+      // AppStore.user.name covers both — fall back to prefs for legacy sessions.
+      final prefs = await SharedPreferences.getInstance();
+      final storedName = store.user.name.isNotEmpty ? store.user.name : null;
+      final userName = storedName ??
+          (prefs.getString(AppKeys.userName)?.isNotEmpty == true
+              ? prefs.getString(AppKeys.userName)
+              : prefs.getString(AppKeys.driverName)) ??
           'Driver';
-      final userId = prefs.getInt('user_id')?.toString() ?? 'N/A';
+      final userId = store.user.isLoggedIn
+          ? store.user.userId.toString()
+          : prefs.getInt(AppKeys.userId)?.toString() ?? 'N/A';
 
-      final cachedBusData = prefs.getString('cached_bus_data');
-      final cachedRouteData = prefs.getString('cached_route_data');
-      final hasCachedData = cachedBusData != null && cachedRouteData != null;
+      // Load cached bus/route from AppStore (already in memory, no I/O needed)
+      final cachedBus = store.busData;
+      final cachedRoute = store.routeData;
 
-      if (hasCachedData) {
+      if (cachedBus != null && cachedRoute != null) {
         try {
-          final busDataJson = jsonDecode(cachedBusData!);
-          final routeDataJson = jsonDecode(cachedRouteData!);
-          _busData = busDataJson is Map<String, dynamic> ? busDataJson : null;
-          _routeDetails = routeDataJson is Map<String, dynamic>
-              ? routeDataJson
-              : null;
+          _busData = cachedBus;
+          _routeDetails = cachedRoute;
 
           if (_routeDetails?['children'] != null &&
               _routeDetails!['children'] is List) {
@@ -310,8 +312,10 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         // Persist name from API so all auth paths stay fresh
         final apiName = busResponse['driver_name'] as String?;
         if (apiName != null && apiName.isNotEmpty) {
-          await prefs.setString('user_name', apiName);
-          await prefs.setString('driver_name', apiName);
+          await Future.wait([
+            prefs.setString(AppKeys.userName, apiName),
+            prefs.setString(AppKeys.driverName, apiName),
+          ]);
         }
         final freshName = apiName?.isNotEmpty == true ? apiName! : userName;
 
@@ -323,8 +327,8 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
                   : null);
 
         _routeDetails = routeResponse;
-        await prefs.setString('cached_bus_data', jsonEncode(_busData));
-        await prefs.setString('cached_route_data', jsonEncode(_routeDetails));
+        // Write through AppStore so cache and memory stay in sync.
+        await store.saveBusCache(_busData, _routeDetails);
 
         if (routeResponse['children'] != null &&
             routeResponse['children'] is List) {
@@ -367,7 +371,7 @@ class _DriverStartShiftScreenState extends State<DriverStartShiftScreen>
         if (mounted) setState(() => _isServerReachable = false);
         _startRetryTimer();
         // Only fall back to "Not Assigned" when there is truly no cached data
-        if (!hasCachedData) {
+        if (AppStore.instance.busData == null) {
           await _initializeFallbackData();
         }
       }

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/api_config.dart';
 import '../config/supabase_config.dart';
+import '../core/app_keys.dart';
 import '../data/user_session.dart';
 import 'app_store.dart';
 
@@ -33,13 +34,17 @@ class AuthService {
 
   /// Persist session data to [AppStore] and flat token keys.
   Future<void> _saveDriverDataToPrefs(Map<String, dynamic> data) async {
+    // Wipe any stale state from a previous session before writing new data.
+    AppStore.instance.resetInMemory();
     await AppStore.instance.saveUser(UserSession.fromApiResponse(data));
     // Keep flat token keys so the HTTP interceptor can read them without AppStore.
     final prefs = await SharedPreferences.getInstance();
     final tokens = data['tokens'] as Map<String, dynamic>?;
     if (tokens != null) {
-      await prefs.setString('access_token', tokens['access'] as String? ?? '');
-      await prefs.setString('refresh_token', tokens['refresh'] as String? ?? '');
+      await Future.wait([
+        prefs.setString(AppKeys.accessToken, tokens['access'] as String? ?? ''),
+        prefs.setString(AppKeys.refreshToken, tokens['refresh'] as String? ?? ''),
+      ]);
     }
   }
 
@@ -380,13 +385,8 @@ class AuthService {
 
   /// Sign out driver
   Future<void> signOut() async {
-    // 1. Clear ALL local state immediately — prefs.clear() is synchronous/local,
-    //    so this is fast and removes every key written anywhere in the app.
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-
-    // 2. Revoke the Supabase session server-side — fire-and-forget so the UI
-    //    never waits on a network call. Errors are silently swallowed.
+    // Clear memory + targeted disk keys atomically, then revoke Supabase session.
+    await AppStore.clearAll();
     _supabase.auth.signOut().catchError((_) {});
   }
 

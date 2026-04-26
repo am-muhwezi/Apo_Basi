@@ -2,6 +2,7 @@ import logging
 import os
 import requests
 from jose import jwt, JWTError
+from decouple import config as env_config, UndefinedValueError
 
 from rest_framework import status, generics, filters
 from rest_framework.views import APIView
@@ -819,10 +820,10 @@ class BusMinderDemoLoginView(APIView):
         email = request.data.get('email', '').strip().lower()
         password = request.data.get('password', '')
 
-        reviewer_email = os.environ.get('REVIEWER_EMAIL', '').strip().lower()
-        reviewer_password = os.environ.get('REVIEWER_PASSWORD', '')
-
-        if not reviewer_email or not reviewer_password:
+        try:
+            reviewer_email = env_config('REVIEWER_EMAIL').strip().lower()
+            reviewer_password = env_config('REVIEWER_PASSWORD')
+        except UndefinedValueError:
             return Response({'error': 'Demo login not available'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         if email != reviewer_email or password != reviewer_password:

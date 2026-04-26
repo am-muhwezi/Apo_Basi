@@ -314,70 +314,96 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
   }
 
   Widget _buildEmailInput() {
-    return Container(
-      decoration: BoxDecoration(
-        color: _kSurfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: _emailError != null
-            ? Border.all(color: _kError, width: 1.5)
-            : Border.all(color: Colors.transparent),
+    final radius = BorderRadius.circular(14);
+    return TextField(
+      controller: _emailController,
+      focusNode: _emailFocusNode,
+      keyboardType: TextInputType.emailAddress,
+      autofillHints: const [AutofillHints.email],
+      style: GoogleFonts.inter(
+        fontSize: 15,
+        color: _kOnSurface,
       ),
-      child: TextField(
-        controller: _emailController,
-        focusNode: _emailFocusNode,
-        keyboardType: TextInputType.emailAddress,
-        autofillHints: const [AutofillHints.email],
-        style: GoogleFonts.inter(
+      decoration: InputDecoration(
+        hintText: 'e.g. parent@example.com',
+        hintStyle: GoogleFonts.inter(
           fontSize: 15,
-          color: _kOnSurface,
+          color: _kOutline,
         ),
-        decoration: InputDecoration(
-          hintText: 'e.g. parent@example.com',
-          hintStyle: GoogleFonts.inter(
-            fontSize: 15,
-            color: _kOutline,
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          border: InputBorder.none,
-          suffixIcon: _isEmailValid
-              ? const Icon(Icons.check_circle_rounded, color: Color(0xFF006242), size: 20)
-              : Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: Icon(Icons.mail_outline_rounded,
-                      color: _kPrimary.withValues(alpha: 0.4), size: 20),
-                ),
-          suffixIconConstraints: const BoxConstraints(minWidth: 40),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        filled: true,
+        fillColor: _kSurfaceContainerLow,
+        border: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide.none,
         ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: _emailError != null
+              ? const BorderSide(color: _kError, width: 1.5)
+              : BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: _emailError != null
+              ? const BorderSide(color: _kError, width: 1.5)
+              : BorderSide.none,
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: const BorderSide(color: _kError, width: 1.5),
+        ),
+        suffixIcon: _isEmailValid
+            ? const Icon(Icons.check_circle_rounded, color: Color(0xFF006242), size: 20)
+            : Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Icon(Icons.mail_outline_rounded,
+                    color: _kPrimary.withValues(alpha: 0.4), size: 20),
+              ),
+        suffixIconConstraints: const BoxConstraints(minWidth: 40),
       ),
     );
   }
 
   Widget _buildPasswordInput() {
-    return Container(
-      decoration: BoxDecoration(
-        color: _kSurfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: _passwordError != null
-            ? Border.all(color: _kError, width: 1.5)
-            : Border.all(color: Colors.transparent),
-      ),
-      child: TextField(
-        controller: _passwordController,
-        obscureText: _obscurePassword,
-        style: GoogleFonts.inter(fontSize: 15, color: _kOnSurface),
-        decoration: InputDecoration(
-          hintText: 'Password',
-          hintStyle: GoogleFonts.inter(fontSize: 15, color: _kOutline),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          border: InputBorder.none,
-          suffixIcon: IconButton(
-            icon: Icon(
-              _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-              color: _kOutline,
-              size: 20,
-            ),
-            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+    final radius = BorderRadius.circular(14);
+    return TextField(
+      controller: _passwordController,
+      obscureText: _obscurePassword,
+      style: GoogleFonts.inter(fontSize: 15, color: _kOnSurface),
+      decoration: InputDecoration(
+        hintText: 'Password',
+        hintStyle: GoogleFonts.inter(fontSize: 15, color: _kOutline),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        filled: true,
+        fillColor: _kSurfaceContainerLow,
+        border: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: _passwordError != null
+              ? const BorderSide(color: _kError, width: 1.5)
+              : BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: _passwordError != null
+              ? const BorderSide(color: _kError, width: 1.5)
+              : BorderSide.none,
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: const BorderSide(color: _kError, width: 1.5),
+        ),
+        suffixIcon: IconButton(
+          icon: Icon(
+            _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+            color: _kOutline,
+            size: 20,
           ),
+          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
         ),
       ),
     );

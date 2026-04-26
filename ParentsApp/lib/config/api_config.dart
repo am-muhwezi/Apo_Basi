@@ -101,7 +101,7 @@ class ApiConfig {
 
   /// Get user-friendly environment name
   static String getEnvironmentName() {
-    if (isDevelopment()) return 'Development';
+    if (FlavorConfig.isDev || isDevelopment()) return 'Development';
     if (isStaging()) return 'Staging';
     return 'Production';
   }

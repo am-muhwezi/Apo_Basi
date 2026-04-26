@@ -40,6 +40,12 @@ android {
 
     flavorDimensions += "environment"
     productFlavors {
+        create("dev") {
+            dimension = "environment"
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            resValue("string", "app_name", "ApoBasi Dev")
+        }
         create("staging") {
             dimension = "environment"
             applicationIdSuffix = ".staging"

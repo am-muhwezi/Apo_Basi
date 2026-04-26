@@ -2,6 +2,7 @@ import logging
 import os
 import requests
 from jose import jwt, JWTError
+from decouple import config as env_config, UndefinedValueError
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -440,7 +441,10 @@ def check_driver_email(request):
         )
 
     # Reviewer demo account must use the password flow — block magic link path
-    reviewer_email = os.environ.get('REVIEWER_DRIVER_EMAIL', '').strip().lower()
+    try:
+        reviewer_email = env_config('REVIEWER_DRIVER_EMAIL').strip().lower()
+    except UndefinedValueError:
+        reviewer_email = ''
     if reviewer_email and email == reviewer_email:
         return Response(
             {
@@ -999,10 +1003,10 @@ class DriverDemoLoginView(APIView):
         email = request.data.get('email', '').strip().lower()
         password = request.data.get('password', '')
 
-        reviewer_email = os.environ.get('REVIEWER_DRIVER_EMAIL', '').strip().lower()
-        reviewer_password = os.environ.get('REVIEWER_DRIVER_PASSWORD', '')
-
-        if not reviewer_email or not reviewer_password:
+        try:
+            reviewer_email = env_config('REVIEWER_DRIVER_EMAIL').strip().lower()
+            reviewer_password = env_config('REVIEWER_DRIVER_PASSWORD')
+        except UndefinedValueError:
             logger.error("Driver demo login credentials not configured in environment")
             return Response(
                 {"error": "Demo login not available"},

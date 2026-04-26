@@ -3,6 +3,7 @@
 import os
 import logging
 import requests
+from decouple import config as env_config, UndefinedValueError
 from jose import jwt, JWTError
 
 from rest_framework import viewsets, status, filters
@@ -737,10 +738,10 @@ class DemoLoginView(APIView):
         email = request.data.get('email', '').strip().lower()
         password = request.data.get('password', '')
 
-        reviewer_email = os.environ.get('REVIEWER_EMAIL', '').strip().lower()
-        reviewer_password = os.environ.get('REVIEWER_PASSWORD', '')
-
-        if not reviewer_email or not reviewer_password:
+        try:
+            reviewer_email = env_config('REVIEWER_EMAIL').strip().lower()
+            reviewer_password = env_config('REVIEWER_PASSWORD')
+        except UndefinedValueError:
             logger.error("Demo login credentials not configured in environment")
             return Response(
                 {"error": "Demo login not available"},
