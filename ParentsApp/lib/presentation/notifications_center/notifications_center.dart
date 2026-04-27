@@ -483,11 +483,9 @@ class _NotificationsCenterState extends State<NotificationsCenter>
   }
 
   void _deleteNotification(Map<String, dynamic> notification) async {
-    // Call API to mark as deleted/read
     try {
-      final notificationId = int.parse(notification['id']);
-      await _apiService
-          .markNotificationsAsRead(notificationIds: [notificationId]);
+      final notificationId = int.parse(notification['id'].toString());
+      await _apiService.deleteNotification(notificationId);
     } catch (e) {}
 
     setState(() {

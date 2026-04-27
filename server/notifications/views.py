@@ -89,6 +89,30 @@ def mark_notification_read(request, notification_id):
         )
 
 
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_notification(request, notification_id):
+    """
+    DELETE /api/notifications/<id>/ - Permanently delete a notification
+    """
+    user = request.user
+    if user.user_type != 'parent':
+        return Response({"error": "Only parents can delete notifications"}, status=status.HTTP_403_FORBIDDEN)
+
+    from parents.models import Parent
+    try:
+        parent = Parent.objects.get(user=user)
+    except Parent.DoesNotExist:
+        return Response({"error": "Parent record not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        notification = Notification.objects.get(id=notification_id, parent=parent)
+        notification.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    except Notification.DoesNotExist:
+        return Response({"error": "Notification not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def mark_all_notifications_read(request):
