@@ -295,6 +295,7 @@ class AuthService {
       if (response.statusCode == 200) {
         final data = response.data;
         await _saveDriverDataToPrefs(data);
+        final isBusMinder = data['user_type'] == 'busminder';
         return AuthResult(
           success: true,
           driver: {
@@ -305,8 +306,8 @@ class AuthService {
             'license_number': data['license_number'],
             'license_expiry': data['license_expiry'],
           },
-          bus: data['bus'],
-          route: data['route'],
+          bus: isBusMinder ? null : data['bus'],
+          route: isBusMinder ? {'buses': data['buses']} : data['route'],
           tokens: data['tokens'],
         );
       }
