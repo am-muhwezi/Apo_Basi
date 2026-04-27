@@ -821,8 +821,8 @@ class BusMinderDemoLoginView(APIView):
         password = request.data.get('password', '')
 
         try:
-            reviewer_email = env_config('REVIEWER_EMAIL').strip().lower()
-            reviewer_password = env_config('REVIEWER_PASSWORD')
+            reviewer_email = env_config('REVIEWER_MINDER_EMAIL').strip().lower()
+            reviewer_password = env_config('REVIEWER_MINDER_PASSWORD')
         except UndefinedValueError:
             return Response({'error': 'Demo login not available'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 

@@ -1,7 +1,9 @@
+import 'dart:async';
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
-import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -21,8 +23,10 @@ Future<void> main() async {
   // Load environment variables (cached after first load)
   await dotenv.load();
 
-  // Initialize Mapbox SDK with access token
-  MapboxOptions.setAccessToken(ApiConfig.mapboxAccessToken);
+  // Initialize Mapbox SDK with access token (mobile only — not supported on desktop)
+  if (Platform.isAndroid || Platform.isIOS) {
+    MapboxOptions.setAccessToken(ApiConfig.mapboxAccessToken);
+  }
 
   // Initialize Supabase for magic link authentication
   await Supabase.initialize(
@@ -61,19 +65,19 @@ Future<void> main() async {
   ]).then((value) {
     runApp(MyApp());
 
-    // Request location permission after first frame is rendered
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Drivers need background location to stream GPS during active trips.
-      // iOS requires whenInUse to be granted before upgrading to always.
-      final whenInUseStatus = await Permission.locationWhenInUse.status;
-      if (whenInUseStatus.isDenied) {
-        await Permission.locationWhenInUse.request();
-      }
-      final alwaysStatus = await Permission.locationAlways.status;
-      if (alwaysStatus.isDenied) {
-        await Permission.locationAlways.request();
-      }
-    });
+    // Request location permission after first frame (mobile only)
+    if (Platform.isAndroid || Platform.isIOS) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final whenInUseStatus = await Permission.locationWhenInUse.status;
+        if (whenInUseStatus.isDenied) {
+          await Permission.locationWhenInUse.request();
+        }
+        final alwaysStatus = await Permission.locationAlways.status;
+        if (alwaysStatus.isDenied) {
+          await Permission.locationAlways.request();
+        }
+      });
+    }
   });
 }
 
