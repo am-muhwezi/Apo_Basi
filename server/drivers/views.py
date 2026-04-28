@@ -920,9 +920,10 @@ def end_trip(request, trip_id):
 
     trip.save()
 
-    # Broadcast trip_ended to all parents connected to this bus so the
-    # ParentsApp updates immediately without waiting for the 60-second poll.
-    if trip.bus_id:
+    # For pickup trips: broadcast trip_ended so the parent map clears immediately.
+    # For dropoff trips: skip — each parent's map already clears when the busminder
+    # marks their child as dropped off (attendance subscription in ParentsApp).
+    if trip.bus_id and trip.trip_type == 'pickup':
         from channels.layers import get_channel_layer
         from asgiref.sync import async_to_sync
         channel_layer = get_channel_layer()
