@@ -411,8 +411,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
       _routeAnnotation = null;
     }
 
-    // Create new route if we have points
-    if (_routePoints != null && _routePoints!.isNotEmpty) {
+    // Create new route if we have points and a trip is still active
+    if (_routePoints != null && _routePoints!.isNotEmpty && _hasActiveTrip) {
       _routeAnnotation = await _polylineAnnotationManager!.create(
         PolylineAnnotationOptions(
           geometry: LineString(
