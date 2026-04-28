@@ -361,33 +361,6 @@ class MarkAttendanceView(APIView):
             attendance.notes = notes or ''  # Ensure notes is never None
             attendance.save()
 
-        # Create notification for parent when pickup or dropoff is confirmed
-        if child.parent and new_status in ['picked_up', 'dropped_off']:
-            from notifications.views import create_notification
-
-            # Determine notification type and message
-            if new_status == 'picked_up':
-                notification_type = 'pickup_confirmed'
-                title = f"{child.first_name} Picked Up"
-                message = f"Your child {child.first_name} {child.last_name} has been safely picked up by the bus at {attendance.timestamp.strftime('%I:%M %p')}."
-            else:  # dropped_off
-                notification_type = 'dropoff_complete'
-                title = f"{child.first_name} Dropped Off"
-                message = f"Your child {child.first_name} {child.last_name} has been safely dropped off at {attendance.timestamp.strftime('%I:%M %p')}."
-
-            # Create the notification
-            try:
-                create_notification(
-                    parent=child.parent,
-                    notification_type=notification_type,
-                    title=title,
-                    message=message,
-                    related_object=attendance
-                )
-            except Exception as e:
-                # Log error but don't fail the attendance marking
-                print(f"Failed to create notification: {e}")
-
         return Response({
             "message": f"Attendance marked as {attendance.get_status_display()}",
             "attendance": {
@@ -492,28 +465,6 @@ def start_trip_busminder(request):
 
     for child_assignment in child_assignments:
         trip.children.add(child_assignment.assignee)
-
-    # Notify parents via WebSocket
-    try:
-        from channels.layers import get_channel_layer
-        from asgiref.sync import async_to_sync
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f"bus_{bus.id}",
-            {
-                "type": "bus.trip_event",
-                "event_type": "trip_started",
-                "trip_id": trip.id,
-                "trip_type": trip.trip_type,
-                "scheduled_time": trip.scheduled_time.isoformat() if trip.scheduled_time else None,
-                "bus_latitude": float(bus.latitude) if bus.latitude else None,
-                "bus_longitude": float(bus.longitude) if bus.longitude else None,
-                "bus_speed": float(bus.speed) if bus.speed else 0.0,
-                "bus_heading": float(bus.heading) if bus.heading else 0.0,
-            }
-        )
-    except Exception:
-        pass
 
     return Response({
         "message": "Trip started successfully",

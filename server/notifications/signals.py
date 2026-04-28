@@ -5,6 +5,8 @@ from .utils import (
     send_trip_completed_notification,
     send_child_pickup_notification,
     send_child_dropoff_notification,
+    send_child_absent_notification,
+    send_child_missed_trip_notification,
     notify_parents_of_children,
 )
 
@@ -64,21 +66,49 @@ def trip_status_changed(sender, instance, created, **kwargs):
 
         children = Child.objects.filter(id__in=list(ids), parent__isnull=False)
 
-        # Trip started: transition into 'in-progress'
+        # Trip started by driver (pickup or dropoff): notify all parents on this bus.
+        # Busminder-started trips are operational; only driver-started trips
+        # represent the parent-visible "bus is on the move" event.
         if current_status == 'in-progress' and previous_status != 'in-progress':
-            print(f"🚀 Trip started - sending notifications to {len(children)} parents")
-            for child in children:
-                if child.parent and hasattr(child.parent, 'user'):
-                    send_trip_started_notification(child.parent.user_id, trip, trip.bus, child=child)
-                    print(f"  ✅ Sent to parent of {child.first_name} (parent ID: {child.parent.user_id})")
+            if not trip.bus_minder:
+                print(f"🚀 {trip.trip_type.title()} trip started - sending notifications to {len(children)} parents")
+                for child in children:
+                    if child.parent and hasattr(child.parent, 'user'):
+                        send_trip_started_notification(child.parent.user_id, trip, trip.bus, child=child)
+                        print(f"  ✅ Sent to parent of {child.first_name} (parent ID: {child.parent.user_id})")
 
-        # Trip completed: transition into 'completed'
+        # Pickup trip completed (driver only): only children who were actually picked up
+        # have reached school — skip absent/pending children.
         elif current_status == 'completed' and previous_status != 'completed':
-            print(f"🏁 Trip completed - sending notifications to {len(children)} parents")
-            for child in children:
-                if child.parent and hasattr(child.parent, 'user'):
-                    send_trip_completed_notification(child.parent.user_id, trip, trip.bus, child=child)
-                    print(f"  ✅ Sent to parent of {child.first_name} (parent ID: {child.parent.user_id})")
+            if trip.trip_type == 'pickup' and not trip.bus_minder:
+                from attendance.models import Attendance
+                trip_date = (trip.end_time or trip.start_time).date()
+                picked_up_ids = set(
+                    Attendance.objects.filter(
+                        bus=trip.bus,
+                        trip_type='pickup',
+                        date=trip_date,
+                        status='picked_up'
+                    ).values_list('child_id', flat=True)
+                )
+                absent_ids = set(
+                    Attendance.objects.filter(
+                        bus=trip.bus,
+                        trip_type='pickup',
+                        date=trip_date,
+                        status='absent'
+                    ).values_list('child_id', flat=True)
+                )
+                print(f"🏁 Pickup trip completed - notifying {len(picked_up_ids)} picked-up, {len(absent_ids)} absent")
+                for child in children:
+                    if not child.parent or not hasattr(child.parent, 'user'):
+                        continue
+                    if child.id in picked_up_ids:
+                        send_trip_completed_notification(child.parent.user_id, trip, trip.bus, child=child)
+                        print(f"  ✅ Reached school: {child.first_name} (parent {child.parent.user_id})")
+                    elif child.id in absent_ids:
+                        send_child_missed_trip_notification(child.parent.user_id, child, trip.bus, trip)
+                        print(f"  ⚠️ Absent reminder: {child.first_name} (parent {child.parent.user_id})")
 
     except Exception as e:
         print(f"Error in trip_status_changed signal: {e}")
@@ -124,37 +154,36 @@ def attendance_marked(sender, instance, created, **kwargs):
         previous_status = getattr(attendance, '_previous_status', None)
         new_status = attendance.status
 
-        if new_status not in ['picked_up', 'dropped_off']:
+        if new_status not in ['picked_up', 'dropped_off', 'absent']:
             return
 
+        # Deduplicate: skip if status hasn't actually changed and child state is already correct.
         if not created and previous_status == new_status:
-            # No actual status change, nothing to notify or update.
-            return
+            if new_status == 'picked_up' and child.location_status == 'on-bus':
+                return
+            if new_status == 'dropped_off' and child.location_status == 'home':
+                return
+            if new_status == 'absent':
+                return  # Already notified for this absence
 
         parent_id = child.parent.user_id  # Parent uses user as primary key
 
-        # Update the child's high-level location/tracking status so that
-        # the Parents app dashboard can show clear states like
-        # "On bus", "At school", and "At home".
-        #
+        # Update the child's high-level location/tracking status.
         # Mapping rules:
         # - pickup trip + picked_up   -> on-bus (on the way to school)
         # - pickup trip + dropped_off -> at-school
         # - dropoff trip + picked_up  -> on-bus (on the way home)
         # - dropoff trip + dropped_off -> home
+        # - absent (either trip)      -> home (child was not transported)
         try:
             trip_type = attendance.trip_type
 
             if new_status == 'picked_up':
-                # Child has boarded the bus (either to school or back home)
                 child.location_status = 'on-bus'
-            else:  # dropped_off
-                if trip_type == 'pickup':
-                    # Morning trip completed for this child -> now at school
-                    child.location_status = 'at-school'
-                else:
-                    # Dropoff trip completed for this child -> now at home
-                    child.location_status = 'home'
+            elif new_status == 'dropped_off':
+                child.location_status = 'at-school' if trip_type == 'pickup' else 'home'
+            else:  # absent — child stayed home
+                child.location_status = 'home'
 
             child.save(update_fields=['location_status'])
         except Exception as e:
@@ -163,9 +192,12 @@ def attendance_marked(sender, instance, created, **kwargs):
         if new_status == 'picked_up':
             send_child_pickup_notification(parent_id, child, bus, attendance)
             print(f"✅ Sent pickup notification for {child.first_name} to parent {parent_id}")
-        else:  # dropped_off
+        elif new_status == 'dropped_off':
             send_child_dropoff_notification(parent_id, child, bus, attendance)
             print(f"✅ Sent dropoff notification for {child.first_name} to parent {parent_id}")
+        else:  # absent
+            send_child_absent_notification(parent_id, child, bus)
+            print(f"⚠️ Sent absent notification for {child.first_name} to parent {parent_id}")
 
     except Exception as e:
         print(f"Error in attendance_marked signal: {e}")

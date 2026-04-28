@@ -207,7 +207,11 @@ class ParentNotificationsService {
         tripType: data['trip_type'] ?? 'Unknown',
         busId: data['bus_id'] ?? 0,
       );
-    } else if (notificationType == 'trip_ended') {
+    } else if (notificationType == 'trip_ended' &&
+        (data['trip_type'] ?? '') == 'pickup') {
+      // Only show a completion notification for pickup trips ("reached school safely").
+      // Dropoff trip endings are communicated via the per-child dropped-off attendance
+      // notification, so no redundant "trip complete" banner is needed.
       NotificationService().showTripCompletedNotification(
         childName: childName,
         busNumber: data['bus_number'] ?? 'Unknown',
@@ -235,6 +239,11 @@ class ParentNotificationsService {
       );
     } else if (notificationType == 'dropoff_complete') {
       NotificationService().showDropoffNotification(
+        childName: childName,
+        busNumber: busNumber,
+      );
+    } else if (notificationType == 'child_absent') {
+      NotificationService().showAbsentNotification(
         childName: childName,
         busNumber: busNumber,
       );

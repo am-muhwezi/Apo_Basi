@@ -14,6 +14,9 @@ class NotificationService {
 
   bool _isInitialized = false;
 
+  // Set by main.dart before runApp so the tap callback can navigate.
+  GlobalKey<NavigatorState>? navigatorKey;
+
   Future<void> initialize() async {
     if (_isInitialized) return;
 
@@ -38,7 +41,7 @@ class NotificationService {
     await _plugin.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // Handle notification tap — navigate to notifications screen
+        navigatorKey?.currentState?.pushNamed('/notifications-center');
       },
     );
 
@@ -188,6 +191,28 @@ class NotificationService {
         ),
         iOS: _iosDetails,
       ),
+    );
+  }
+
+  Future<void> showAbsentNotification({
+    required String childName,
+    required String busNumber,
+  }) async {
+    await _ensureInitialized();
+
+    await _plugin.show(
+      DateTime.now().millisecondsSinceEpoch % 100000,
+      '$childName Marked Absent',
+      '$childName was not picked up and has been marked absent today.',
+      NotificationDetails(
+        android: _androidDetails(
+          channelId: 'attendance_notifications',
+          channelName: 'Attendance Alerts',
+          ticker: 'Child marked absent',
+        ),
+        iOS: _iosDetails,
+      ),
+      payload: 'notifications',
     );
   }
 

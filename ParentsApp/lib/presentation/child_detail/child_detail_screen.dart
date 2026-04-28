@@ -16,6 +16,7 @@ import '../../models/bus_location_model.dart';
 import '../../services/bus_websocket_service.dart';
 import '../../services/mapbox_route_service.dart';
 import '../../services/home_location_service.dart';
+import '../../services/parent_notifications_service.dart';
 
 class ChildDetailScreen extends StatefulWidget {
   const ChildDetailScreen({Key? key}) : super(key: key);
@@ -55,6 +56,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
   StreamSubscription? _tripEventSubscription;
   // Server-pushed ETA stream (bus.eta_update via WebSocket).
   StreamSubscription? _etaSubscription;
+  // Attendance notifications — stop map tracking when this child is dropped off.
+  StreamSubscription? _attendanceSubscription;
 
   // ETA and Route Information
   int? _etaMinutes;
@@ -80,6 +83,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
 
   // Single source of truth for trip state — set exclusively by WebSocket events
   bool _hasActiveTrip = false;
+  // Guards against concurrent annotation creation (unawaited async calls race).
+  bool _busAnnotationCreating = false;
 
   @override
   void initState() {
@@ -135,6 +140,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
     _connectionSubscription?.cancel();
     _tripEventSubscription?.cancel();
     _etaSubscription?.cancel();
+    _attendanceSubscription?.cancel();
     super.dispose();
   }
 
@@ -326,6 +332,11 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
         (_busLocation!.bearing ?? _busLocation!.heading ?? 0).toDouble();
 
     if (_busAnnotation == null) {
+      // Guard against concurrent creation: two unawaited calls can both see
+      // _busAnnotation == null and create duplicate map annotations.
+      if (_busAnnotationCreating) return;
+      _busAnnotationCreating = true;
+
       // First appearance — create annotation and fly the camera to the bus
       // so the parent sees it immediately, even if home is far away.
       _busAnnotation = await _busAnnotationManager!.create(
@@ -336,6 +347,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
           iconAnchor: IconAnchor.CENTER,
         ),
       );
+      _busAnnotationCreating = false;
       _busAnimFrom = targetLatLng;
       _busAnimFromHeading = targetHeading;
       _mapboxMap?.flyTo(
@@ -474,6 +486,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
           // Reuse the same seed+route logic as trip_state.
           _applyTripState({
             'has_active_trip': true,
+            'trip_type': event['trip_type'],
             'bus_latitude': event['bus_latitude'],
             'bus_longitude': event['bus_longitude'],
             'bus_speed': event['bus_speed'],
@@ -523,6 +536,30 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
         _applyTripState(cached);
       }
 
+      // When this specific child is dropped off, stop showing the bus on the map.
+      _attendanceSubscription?.cancel();
+      _attendanceSubscription = ParentNotificationsService()
+          .attendanceNotificationStream
+          .listen((notification) {
+        if (!mounted) return;
+        if (notification['notification_type'] != 'dropoff_complete') return;
+        final notifChildId = notification['child_id'];
+        final currentChildId = _childData?['id'];
+        if (notifChildId == null || currentChildId == null) return;
+        if (notifChildId.toString() != currentChildId.toString()) return;
+
+        setState(() {
+          _hasActiveTrip = false;
+          _busLocation = null;
+          _etaMinutes = null;
+          _routePoints = null;
+          _lastEtaRefresh = null;
+          _lastEtaPosition = null;
+        });
+        _updateBusAnnotation();
+        _updateRouteAnnotation();
+      });
+
       _subscribeToBus();
     } catch (e) {
       // Failed to initialize WebSocket
@@ -533,6 +570,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
   /// Used both by the stream listener and by the cached-state restore path.
   void _applyTripState(Map<String, dynamic> event) {
     final hasActiveTrip = event['has_active_trip'] as bool? ?? false;
+    final tripType = event['trip_type'] as String?;
+
     if (!hasActiveTrip) {
       setState(() => _hasActiveTrip = false);
       return;

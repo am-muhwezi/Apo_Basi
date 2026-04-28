@@ -63,6 +63,14 @@ export default function AttendancePage() {
     fetchAttendanceData();
   }, [selectedDate]);
 
+  // Auto-refresh every 30 seconds when viewing today's attendance
+  useEffect(() => {
+    const isToday = selectedDate.toDateString() === new Date().toDateString();
+    if (!isToday) return;
+    const interval = setInterval(fetchAttendanceData, 30_000);
+    return () => clearInterval(interval);
+  }, [selectedDate]);
+
   const fetchAttendanceData = async () => {
     setLoading(true);
     try {

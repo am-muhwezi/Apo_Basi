@@ -294,24 +294,39 @@ class TripCompleteView(APIView):
 
         trip.save()
 
-        # Update children location_status when pickup trip ends
-        if trip.trip_type == 'pickup':
-            # Mark all children on this pickup trip as 'at-school'
-            trip.children.update(location_status='at-school')
+        # Busminder trips are operational records only — do not touch parent-visible
+        # state (location_status, bus channel events) when a busminder ends their shift.
+        if not trip.bus_minder:
+            # Update children location_status when a driver's pickup trip ends.
+            # Only children who were actually picked up go to 'at-school';
+            # the attendance_marked signal already set absent/pending children to 'home'.
+            if trip.trip_type == 'pickup':
+                from attendance.models import Attendance
+                trip_date = trip.end_time.date()
+                picked_up_ids = list(
+                    Attendance.objects.filter(
+                        bus=trip.bus,
+                        trip_type='pickup',
+                        date=trip_date,
+                        status='picked_up'
+                    ).values_list('child_id', flat=True)
+                )
+                if picked_up_ids:
+                    trip.children.filter(id__in=picked_up_ids).update(location_status='at-school')
 
-        # Push trip_ended so parent apps can hide the bus marker / show arrived.
-        if trip.bus_id:
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                f"bus_{trip.bus_id}",
-                {
-                    "type": "bus.trip_event",
-                    "event_type": "trip_ended",
-                    "trip_id": trip.id,
-                    "trip_type": trip.trip_type,
-                    "scheduled_time": None,
-                }
-            )
+            # Push trip_ended so parent apps can hide the bus marker / show arrived.
+            if trip.bus_id:
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f"bus_{trip.bus_id}",
+                    {
+                        "type": "bus.trip_event",
+                        "event_type": "trip_ended",
+                        "trip_id": trip.id,
+                        "trip_type": trip.trip_type,
+                        "scheduled_time": None,
+                    }
+                )
 
         serializer = TripSerializer(trip)
         return Response(serializer.data)

@@ -356,7 +356,7 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
         """
         from trips.models import Trip, Stop
         try:
-            trip = Trip.objects.filter(bus_id=bus_id, status="in-progress").first()
+            trip = Trip.objects.filter(bus_id=bus_id, status="in-progress", bus_minder__isnull=True).first()
             if not trip:
                 return {"trip_type": None, "stops": []}
             stops = (
@@ -571,7 +571,7 @@ class BusLocationConsumer(AsyncWebsocketConsumer):
         }
 
         try:
-            trip = Trip.objects.filter(bus_id=bus_id, status="in-progress").first()
+            trip = Trip.objects.filter(bus_id=bus_id, status="in-progress", bus_minder__isnull=True).first()
             print(f"[get_trip_state] bus_id={bus_id} trip={trip} (status query: in-progress)")
             if trip:
                 result["has_active_trip"] = True

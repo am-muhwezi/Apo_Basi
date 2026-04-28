@@ -937,9 +937,8 @@ def end_trip(request, trip_id):
             }
         )
 
-    # Update children's location_status for PICKUP trips only
-    # Pickup trip ended → children have arrived at school
-    # Dropoff status is already handled by bus assistant marking attendance
+    # Pickup trip ended → children have arrived at school.
+    # Notification is sent by the trip_status_changed signal.
     if trip.trip_type == 'pickup':
         for child in trip.children.all():
             child.location_status = 'at-school'

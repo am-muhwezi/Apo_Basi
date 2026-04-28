@@ -43,6 +43,11 @@ Future<void> main() async {
   // Initialize theme service — single SharedPreferences read, very fast.
   await ThemeService().initialize();
 
+  // Give the notification service a navigator key so tapping any notification
+  // opens the notifications page, regardless of which screen is active.
+  final navKey = GlobalKey<NavigatorState>();
+  NotificationService().navigatorKey = navKey;
+
   // NOTE: Supabase.initialize() has been moved into AppInitScreen so that
   // runApp() is no longer blocked by the network SDK handshake (~300-800 ms).
   // AppInitScreen shows branded UI while init runs, then routes to dashboard
@@ -127,6 +132,7 @@ class _MyAppState extends State<MyApp> {
           builder: (context, themeMode, _) {
             // Only MaterialApp rebuilds, not entire widget tree
             return MaterialApp(
+              navigatorKey: NotificationService().navigatorKey,
               title: 'ApoBasi',
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,
