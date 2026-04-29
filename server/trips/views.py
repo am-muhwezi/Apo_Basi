@@ -314,8 +314,11 @@ class TripCompleteView(APIView):
                 if picked_up_ids:
                     trip.children.filter(id__in=picked_up_ids).update(location_status='at-school')
 
-            # Push trip_ended so parent apps can hide the bus marker / show arrived.
-            if trip.bus_id:
+            # Push trip_ended for PICKUP trips only. Dropoff trips are
+            # considered ended individually per-parent when the minder marks
+            # each child as dropped off — the global event would clear the map
+            # for parents whose children haven't been dropped off yet.
+            if trip.bus_id and trip.trip_type == 'pickup':
                 channel_layer = get_channel_layer()
                 async_to_sync(channel_layer.group_send)(
                     f"bus_{trip.bus_id}",

@@ -732,11 +732,15 @@ def start_trip(request):
 
     bus = assignment.assigned_to
 
-    # Check if there's already an active trip
+    # Check if there's already a driver-started trip in progress.
+    # Exclude busminder trips (bus_minder__isnull=False) — those are operational
+    # records only and must not block the driver from creating their own
+    # parent-visible trip, even when the minder has already started their shift.
     existing_trip = Trip.objects.filter(
         driver=driver.user,  # Trip.driver is a ForeignKey to User, not Driver
         bus=bus,
-        status='in-progress'
+        status='in-progress',
+        bus_minder__isnull=True,
     ).first()
 
     if existing_trip:
@@ -825,6 +829,11 @@ def start_trip(request):
         )
         stop.children.add(child)
         stops_created += 1
+
+    # For dropoff trips all children board the bus at school when the trip starts,
+    # so their location_status must reflect that immediately.
+    if trip_type == 'dropoff':
+        trip.children.all().update(location_status='on-bus')
 
     # Fire Mapbox optimisation in a daemon thread so the HTTP response is not
     # delayed. The thread rewrites Stop.order; all subsequent reads via

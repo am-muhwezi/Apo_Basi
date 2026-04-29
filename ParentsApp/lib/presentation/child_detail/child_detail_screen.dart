@@ -83,6 +83,12 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
 
   // Single source of truth for trip state — set exclusively by WebSocket events
   bool _hasActiveTrip = false;
+  String? _activeTripType; // 'pickup' | 'dropoff' | null
+  // Set when the notification WebSocket confirms this specific child was dropped
+  // off. Prevents a subsequent trip_state / trip_started reconnect message from
+  // re-showing the bus for a child whose trip has already ended from their
+  // parent's perspective.
+  bool _childDroppedOff = false;
   // Guards against concurrent annotation creation (unawaited async calls race).
   bool _busAnnotationCreating = false;
 
@@ -494,10 +500,17 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
           });
 
         } else if (eventType == 'trip_ended') {
+          final endedTripType = event['trip_type'] as String?;
+          // Dropoff trips end per-child when the minder marks each child as
+          // dropped off (dropoff_complete attendance notification). Ignore the
+          // global trip_ended so parents don't lose live tracking before their
+          // specific child has been confirmed dropped off.
+          if (endedTripType == 'dropoff') return;
           debugPrint('[TripEvent] trip_ended — clearing trip state');
           if (mounted) {
             setState(() {
               _hasActiveTrip = false;
+              _activeTripType = null;
               _busLocation = null;
               _etaMinutes = null;
               _routePoints = null;
@@ -505,6 +518,19 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
               // triggers an immediate route+ETA computation.
               _lastEtaRefresh = null;
               _lastEtaPosition = null;
+              // Advance the displayed status: a child who was on the bus when
+              // the pickup trip ended has now reached school. Without this,
+              // _getTripStatus() matches the stale 'on-bus' value and still
+              // shows "Emma is on the bus" after the trip is complete.
+              if (_childData != null) {
+                final currentStatus =
+                    (_childData!['status'] ?? '').toString().toLowerCase();
+                if (currentStatus.contains('on') ||
+                    currentStatus.contains('picked')) {
+                  _childData = Map<String, dynamic>.from(_childData!);
+                  _childData!['status'] = 'at-school';
+                }
+              }
             });
             _updateBusAnnotation();
             _updateRouteAnnotation();
@@ -536,17 +562,41 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
         _applyTripState(cached);
       }
 
-      // When this specific child is dropped off, stop showing the bus on the map.
+      // React to per-child attendance events from the notification WebSocket.
       _attendanceSubscription?.cancel();
       _attendanceSubscription = ParentNotificationsService()
           .attendanceNotificationStream
           .listen((notification) {
         if (!mounted) return;
-        if (notification['notification_type'] != 'dropoff_complete') return;
+        final notifType = notification['notification_type'] as String?;
         final notifChildId = notification['child_id'];
         final currentChildId = _childData?['id'];
-        if (notifChildId == null || currentChildId == null) return;
-        if (notifChildId.toString() != currentChildId.toString()) return;
+        final idMatch = notifChildId != null &&
+            currentChildId != null &&
+            notifChildId.toString() == currentChildId.toString();
+
+        // ── Child was picked up: update status card to "on bus" ────────────
+        if (notifType == 'pickup_confirmed' && idMatch) {
+          setState(() {
+            if (_childData != null) {
+              _childData = Map<String, dynamic>.from(_childData!);
+              _childData!['status'] = 'on-bus';
+            }
+          });
+          return;
+        }
+
+        // ── Child was dropped off: stop showing the bus for this parent ─────
+        if (notifType != 'dropoff_complete' || !idMatch) return;
+
+        // Cancel location updates immediately so any in-flight Mapbox
+        // continuation cannot re-draw the marker after we clear state.
+        _locationSubscription?.cancel();
+        _locationSubscription = null;
+
+        // Latch this flag so that a subsequent trip_state reconnect message
+        // (the trip is still active for other children) does not re-show the bus.
+        _childDroppedOff = true;
 
         setState(() {
           _hasActiveTrip = false;
@@ -555,6 +605,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
           _routePoints = null;
           _lastEtaRefresh = null;
           _lastEtaPosition = null;
+          if (_childData != null) {
+            _childData = Map<String, dynamic>.from(_childData!);
+            _childData!['status'] = 'home';
+          }
         });
         _updateBusAnnotation();
         _updateRouteAnnotation();
@@ -569,14 +623,27 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
   /// Apply a trip_state (or trip_state-shaped) event map to local state.
   /// Used both by the stream listener and by the cached-state restore path.
   void _applyTripState(Map<String, dynamic> event) {
+    // If this child has already been confirmed dropped off this session, ignore
+    // any server-pushed trip_state / trip_started that would re-show the bus.
+    if (_childDroppedOff) return;
     final hasActiveTrip = event['has_active_trip'] as bool? ?? false;
     final tripType = event['trip_type'] as String?;
 
     if (!hasActiveTrip) {
-      setState(() => _hasActiveTrip = false);
+      setState(() { _hasActiveTrip = false; _activeTripType = null; });
       return;
     }
-    setState(() => _hasActiveTrip = true);
+    setState(() {
+      _hasActiveTrip = true;
+      _activeTripType = tripType;
+      // For dropoff trips the child boards at school, so they are immediately
+      // on the bus the moment the driver starts the trip — no individual
+      // minder attendance mark is needed to advance the status.
+      if (tripType == 'dropoff' && _childData != null) {
+        _childData = Map<String, dynamic>.from(_childData!);
+        _childData!['status'] = 'on-bus';
+      }
+    });
 
     final lat = event['bus_latitude'];
     final lng = event['bus_longitude'];
@@ -834,11 +901,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
       if (_busLocation != null) {
         final isMoving = (_busLocation!.speed ?? 0) > 0.5;
         if (!isMoving) return 'Bus Stopped';
-        if (_etaMinutes != null) {
-          if (_etaMinutes! <= 3) return 'Bus arrives soon';
-          if (_etaMinutes! <= 15) return 'Driver on the way';
-        }
-        return 'Driver on the way';
+        if (_etaMinutes != null && _etaMinutes! <= 3) return 'Bus arrives soon';
+        return _activeTripType == 'pickup'
+            ? 'Bus on the way to school'
+            : 'Bus on the way home';
       }
       return '$firstName is on the bus';
     }
@@ -893,6 +959,21 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
         status == 'on-bus' ||
         status == 'picked_up' ||
         status == 'picked-up';
+  }
+
+  /// Returns the label for the status chip in the bottom sheet.
+  ///
+  /// Distinct from _isChildEnRoute() because a child can be "en route" (trip
+  /// active, bus on map) while still being AT HOME — the minder hasn't marked
+  /// them as boarded yet. Only show ON BUS once attendance confirms pickup.
+  String _getStatusChipLabel() {
+    if (_childDroppedOff) return 'AT HOME';
+    final status = (_childData?['status'] ?? '').toString().toLowerCase();
+    if (status == 'at-school' || status == 'at_school') return 'AT SCHOOL';
+    if (status == 'on-bus' || status == 'on_bus' ||
+        status == 'picked_up' || status == 'picked-up') return 'ON BUS';
+    if (_hasActiveTrip) return 'AT HOME';
+    return 'AT REST';
   }
 
   String _getDriverInitial() {
@@ -1298,7 +1379,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen>
                                       borderRadius: BorderRadius.circular(100),
                                     ),
                                     child: Text(
-                                      isEnRoute ? 'ON BUS' : 'AT REST',
+                                      _getStatusChipLabel(),
                                       style: const TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w700,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +10,7 @@ import '../../services/api_service.dart';
 import '../../services/cache_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/home_location_service.dart';
+import '../../services/parent_notifications_service.dart';
 import '../../models/child_model.dart';
 import '../notifications_center/notifications_center.dart';
 import '../parent_profile_settings/parent_profile_settings.dart';
@@ -35,13 +38,76 @@ class _ParentDashboardState extends State<ParentDashboard> {
   String _parentName = 'Parent';
   bool _hasCheckedHomeLocation = false;
 
+  // Real-time status overrides driven by notification WebSocket events.
+  // Keyed by child.id; takes precedence over the REST-fetched currentStatus.
+  final Map<int, String> _childStatusOverrides = {};
+  StreamSubscription? _attendanceStatusSub;
+  StreamSubscription? _tripStatusSub;
+
   @override
   void initState() {
     super.initState();
     _loadData();
+    _subscribeToRealtimeStatus();
     Future.microtask(() {
       _initializeConnectivity();
       _checkAndPromptHomeLocation();
+    });
+  }
+
+  void _subscribeToRealtimeStatus() {
+    final notifService = ParentNotificationsService();
+
+    _attendanceStatusSub =
+        notifService.attendanceNotificationStream.listen((notification) {
+      if (!mounted) return;
+      final rawChildId = notification['child_id'];
+      if (rawChildId == null) return;
+      final childId = int.tryParse(rawChildId.toString());
+      if (childId == null) return;
+
+      final type = notification['notification_type'] as String?;
+      String? newStatus;
+      if (type == 'pickup_confirmed') {
+        newStatus = 'on-bus';
+      } else if (type == 'dropoff_complete') {
+        newStatus = 'home';
+      } else if (type == 'child_absent') {
+        newStatus = 'home';
+      }
+
+      if (newStatus != null) {
+        setState(() => _childStatusOverrides[childId] = newStatus!);
+      }
+    });
+
+    _tripStatusSub =
+        notifService.tripNotificationStream.listen((notification) {
+      if (!mounted) return;
+      final type = notification['notification_type'] as String?;
+      final tripType = notification['trip_type'] as String?;
+
+      // Dropoff trip started → children board at school, immediately on-bus.
+      if (type == 'trip_started' && tripType == 'dropoff') {
+        setState(() {
+          for (final child in _children) {
+            _childStatusOverrides[child.id] = 'on-bus';
+          }
+        });
+      }
+
+      // Pickup trip ended → any child previously on-bus is now at school.
+      if (type == 'trip_ended' && tripType == 'pickup') {
+        setState(() {
+          for (final child in _children) {
+            final current =
+                _childStatusOverrides[child.id] ?? child.currentStatus ?? '';
+            if (current.contains('on') || current.contains('picked')) {
+              _childStatusOverrides[child.id] = 'at-school';
+            }
+          }
+        });
+      }
     });
   }
 
@@ -104,6 +170,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
           _children = children;
           _isLoading = false;
           _isConnected = true;
+          // Fresh API data — discard in-memory overrides so REST is the source of truth.
+          _childStatusOverrides.clear();
         });
       }
     } catch (e) {
@@ -152,6 +220,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
   @override
   void dispose() {
     _connectivityService.dispose();
+    _attendanceStatusSub?.cancel();
+    _tripStatusSub?.cancel();
     super.dispose();
   }
 
@@ -518,7 +588,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
       'id': child.id,
       'name': child.fullName,
       'grade': child.classGrade,
-      'status': child.currentStatus ?? 'no record today',
+      'status': _childStatusOverrides[child.id] ?? child.currentStatus ?? 'no record today',
       'busId': child.assignedBus?.id,
       'busNumber': child.assignedBus?.numberPlate,
       'routeName': child.routeName,
