@@ -115,27 +115,25 @@ class ChildStatusCard extends StatelessWidget {
             const SizedBox(height: 16),
 
             // Action button — full width
-            SizedBox(
-              height: 46,
-              child: ElevatedButton.icon(
-                onPressed: onTrackLive,
-                icon: Icon(actionConfig.icon, size: 16,
-                    color: actionConfig.foregroundColor),
-                label: Text(
-                  actionConfig.label,
-                  style: GoogleFonts.manrope(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: actionConfig.foregroundColor,
-                  ),
+            ElevatedButton.icon(
+              onPressed: onTrackLive,
+              icon: Icon(actionConfig.icon, size: 16,
+                  color: actionConfig.foregroundColor),
+              label: Text(
+                actionConfig.label,
+                style: GoogleFonts.manrope(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: actionConfig.foregroundColor,
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: actionConfig.backgroundColor,
-                  foregroundColor: actionConfig.foregroundColor,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: actionConfig.backgroundColor,
+                foregroundColor: actionConfig.foregroundColor,
+                elevation: 0,
+                minimumSize: const Size(double.infinity, 46),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
                 ),
               ),
             ),

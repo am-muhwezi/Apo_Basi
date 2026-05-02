@@ -541,10 +541,12 @@ class _NotificationsCenterState extends State<NotificationsCenter>
                 Text(
                   'Notifications',
                   style: GoogleFonts.manrope(
-                    fontSize: 28,
+                    fontSize: 22,
                     fontWeight: FontWeight.w800,
                     color: colorScheme.onSurface,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 if (_unreadCount > 0)
                   Text(

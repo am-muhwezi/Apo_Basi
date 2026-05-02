@@ -105,8 +105,14 @@ class BusMinderCreateSerializer(serializers.Serializer):
         qs = User.objects.filter(email__iexact=value)
         if instance:
             qs = qs.exclude(pk=instance.user.pk)
-        if qs.exists():
-            raise serializers.ValidationError(f"A user with email '{value}' already exists.")
+        conflict = qs.first()
+        if conflict:
+            name = conflict.get_full_name() or conflict.username
+            role = getattr(conflict, 'user_type', 'user')
+            raise serializers.ValidationError(
+                f"Email '{value}' is already registered to {name} ({role}). "
+                f"Remove or change that account's email first."
+            )
         return value
 
     def create(self, validated_data):

@@ -383,6 +383,13 @@ class _ParentDashboardState extends State<ParentDashboard> {
     );
   }
 
+  String get _greeting {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }
+
   Widget _buildWelcomeSection(ColorScheme colorScheme) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
@@ -390,7 +397,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Welcome, $_parentName',
+            '$_greeting, $_parentName',
             style: GoogleFonts.manrope(
               fontSize: 32,
               fontWeight: FontWeight.w800,
