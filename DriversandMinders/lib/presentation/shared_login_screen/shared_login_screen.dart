@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
+import '../../main.dart' show supabaseReadyNotifier;
 import '../../services/app_store.dart';
 import '../../services/auth_service.dart';
 import './widgets/app_logo_widget.dart';
@@ -34,8 +36,32 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
-    _listenForAuthCallback();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAuthAndAutoNavigate());
+    // Supabase initialises in the background after runApp. Wire up the
+    // auth subscription immediately if it's already ready, otherwise wait.
+    if (supabaseReadyNotifier.value) {
+      _listenForAuthCallback();
+    } else {
+      supabaseReadyNotifier.addListener(_onSupabaseReady);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _checkAuthAndAutoNavigate();
+      // Request location permissions after login screen is visible,
+      // not during app startup where it caused a blank-screen delay.
+      _requestLocationPermissions();
+    });
+  }
+
+  void _onSupabaseReady() {
+    supabaseReadyNotifier.removeListener(_onSupabaseReady);
+    if (mounted) _listenForAuthCallback();
+  }
+
+  Future<void> _requestLocationPermissions() async {
+    final whenInUse = await Permission.locationWhenInUse.status;
+    if (whenInUse.isDenied) await Permission.locationWhenInUse.request();
+    if (!mounted) return;
+    final always = await Permission.locationAlways.status;
+    if (always.isDenied) await Permission.locationAlways.request();
   }
 
   void _initializeAnimations() {
@@ -176,6 +202,7 @@ class _SharedLoginScreenState extends State<SharedLoginScreen>
 
   @override
   void dispose() {
+    supabaseReadyNotifier.removeListener(_onSupabaseReady);
     _fadeController.dispose();
     _slideController.dispose();
     _authSubscription?.cancel();

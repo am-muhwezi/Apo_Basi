@@ -4,7 +4,7 @@ import 'main.dart' as app;
 void main() {
   FlavorConfig.initialize(
     flavor: Flavor.staging,
-    apiBaseUrl: 'https://staging.api.apobasi.com',
+    apiBaseUrl: 'https://staging.apobasi.com',
   );
   app.main();
 }
